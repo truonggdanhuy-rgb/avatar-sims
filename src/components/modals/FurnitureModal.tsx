@@ -11,7 +11,7 @@ interface FurnitureModalProps {
   onClose: () => void;
 }
 
-const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({item}) => {
+export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({item}) => {
   const c = item.color;
   const a = item.accentColor || '#9E734B';
 
@@ -336,8 +336,8 @@ export const FurnitureModal: React.FC<FurnitureModalProps> = ({
           </div>
 
           {visibleItems.length === 0 && (
-            <div className="flex h-40 items-center justify-center text-center text-xs font-medium text-[#7A6048]">
-              Chưa có món nội thất nào trong mục này.
+            <div className="flex h-40 items-center justify-center px-6 text-center text-xs font-medium leading-relaxed text-[#7A6048]">
+              Tủ nội thất hiện chưa có món nào trong mục này. Hãy ghé Cửa Hàng gặp Bob để mua thêm đồ trang trí nhé!
             </div>
           )}
         </div>
