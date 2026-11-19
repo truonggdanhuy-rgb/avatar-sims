@@ -52,6 +52,7 @@ interface WorldCanvasProps {
   onChangeZone: (next: ZoneId) => void;
   onOpenWardrobe: () => void;
   onOpenShop: () => void;
+  onOpenFurnitureShop: () => void;
   onOpenSettings: () => void;
   onOpenDailyQuests: () => void;
   onOpenFurniture: () => void;
@@ -136,6 +137,13 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
     return {fov, pos: [-1.8, 12.6, 17.2] as const, look: [-1.8, 0.7, 0.2] as const};
   }
 
+  if (zone === 'boutique') {
+    if (isPortrait) {
+      return {fov, pos: [0, 8.6, 13.4] as const, look: [0, 0.75, -0.45] as const};
+    }
+    return {fov, pos: [0, 7.6, 11.4] as const, look: [0, 0.75, -0.45] as const};
+  }
+
   if (isPortrait) {
     return {fov, pos: [0, 6.8, 10.6] as const, look: [0, 0.75, -0.35] as const};
   }
@@ -148,6 +156,9 @@ function getZoneWalkBounds(zone: ZoneId) {
   }
   if (zone === 'home') {
     return {minX: -12.85, maxX: 9.85, minZ: -8.95, maxZ: 6.95};
+  }
+  if (zone === 'boutique') {
+    return {minX: -5.6, maxX: 5.6, minZ: -4.8, maxZ: 4.9};
   }
   return {minX: -3.45, maxX: 3.45, minZ: -4.05, maxZ: 4.05};
 }
@@ -299,6 +310,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onChangeZone,
   onOpenWardrobe,
   onOpenShop,
+  onOpenFurnitureShop,
   onOpenSettings,
   onOpenDailyQuests,
   onOpenFurniture,
@@ -354,6 +366,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onChangeZone,
     onOpenWardrobe,
     onOpenShop,
+    onOpenFurnitureShop,
     onOpenSettings,
     onOpenDailyQuests,
     onOpenFurniture,
@@ -372,6 +385,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onChangeZone,
     onOpenWardrobe,
     onOpenShop,
+    onOpenFurnitureShop,
     onOpenSettings,
     onOpenDailyQuests,
     onOpenFurniture,
@@ -1070,6 +1084,20 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               onArrive: () => {
                 soundFX.sparkle();
                 callbacksRef.current.onOpenShop();
+              },
+            };
+            return;
+          }
+
+          if (kind === 'open_furniture_shop') {
+            soundFX.tap();
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'idle',
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onOpenFurnitureShop();
               },
             };
             return;
