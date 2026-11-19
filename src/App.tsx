@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import {BoutiqueModal} from './components/modals/BoutiqueModal';
 import {DailyQuestsModal} from './components/modals/DailyQuestsModal';
 import {FurnitureModal} from './components/modals/FurnitureModal';
+import {FurnitureShopModal} from './components/modals/FurnitureShopModal';
 import {SettingsModal} from './components/modals/SettingsModal';
 import {WardrobeModal} from './components/modals/WardrobeModal';
 import {WorldCanvas} from './components/WorldCanvas';
@@ -14,6 +15,7 @@ import {
 import {
   AvatarConfig,
   DailyQuestProgress,
+  FurnitureCatalogItem,
   GameStats,
   GardenPlotState,
   PlacedFurniture,
@@ -24,7 +26,7 @@ import {
 import {soundFX} from './utils/sound';
 
 const STORAGE_KEY = 'thi_tran_may_save_v1';
-const HOUSE_LAYOUT_VERSION = 2;
+const HOUSE_LAYOUT_VERSION = 3;
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -57,6 +59,7 @@ export default function App() {
   const [zone, setZone] = useState<ZoneId>('town');
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [boutiqueOpen, setBoutiqueOpen] = useState(false);
+  const [furnitureShopOpen, setFurnitureShopOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dailyQuestsOpen, setDailyQuestsOpen] = useState(false);
   const [furnitureModalOpen, setFurnitureModalOpen] = useState(false);
@@ -257,6 +260,19 @@ export default function App() {
     markQuestDone('dressup');
   };
 
+  const handleBuyFurnitureItem = (item: FurnitureCatalogItem) => {
+    if (stats.coins < item.price) return;
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - item.price,
+      mood: Math.min(100, prev.mood + 4),
+    }));
+    setFurnitureInventory((prev) => ({
+      ...prev,
+      [item.id]: (prev[item.id] || 0) + 1,
+    }));
+  };
+
   const handleClaimQuest = (key: keyof DailyQuestProgress['tasks'], reward: number) => {
     setDailyQuests((prev) => {
       if (!prev.tasks[key] || prev.claimed[key]) return prev;
@@ -384,6 +400,7 @@ export default function App() {
         onChangeZone={handleZoneChange}
         onOpenWardrobe={() => setWardrobeOpen(true)}
         onOpenShop={() => setBoutiqueOpen(true)}
+        onOpenFurnitureShop={() => setFurnitureShopOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenDailyQuests={() => setDailyQuestsOpen(true)}
         onOpenFurniture={() => {
@@ -425,7 +442,7 @@ export default function App() {
         />
       )}
 
-      {/* Diegetic Fashion Boutique Modal (Triggered inside Cửa Hàng) */}
+      {/* Diegetic Fashion Boutique Modal (Tina inside Cửa Hàng) */}
       {boutiqueOpen && (
         <BoutiqueModal
           avatar={avatar}
@@ -434,6 +451,17 @@ export default function App() {
           onBuyItem={handleBuyShopItem}
           onEquipAvatar={handleEquipAvatar}
           onClose={() => setBoutiqueOpen(false)}
+        />
+      )}
+
+      {/* Bob's Furniture Shop Modal (Bob inside Cửa Hàng) */}
+      {furnitureShopOpen && (
+        <FurnitureShopModal
+          coins={stats.coins}
+          inventory={furnitureInventory}
+          placed={placedFurniture}
+          onBuyItem={handleBuyFurnitureItem}
+          onClose={() => setFurnitureShopOpen(false)}
         />
       )}
 
