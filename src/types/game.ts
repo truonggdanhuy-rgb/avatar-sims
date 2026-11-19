@@ -139,3 +139,52 @@ export interface DailyQuestProgress {
     dressup: boolean;
   };
 }
+
+export type FurnitureCategory = 'living' | 'bedroom' | 'kitchen' | 'bath' | 'wall' | 'decor';
+
+export type FurnitureKind =
+  | 'sofa'
+  | 'armchair'
+  | 'coffee_table'
+  | 'tv_stand'
+  | 'rug_round'
+  | 'bed'
+  | 'wardrobe'
+  | 'nightstand'
+  | 'bookshelf'
+  | 'dining_table'
+  | 'dining_chair'
+  | 'fridge'
+  | 'dish_cabinet'
+  | 'floor_lamp'
+  | 'potted_plant'
+  | 'bathtub'
+  | 'vanity_sink'
+  | 'window_single'
+  | 'window_double'
+  | 'window_curtain'
+  | 'wall_clock';
+
+export interface FurnitureCatalogItem {
+  id: string;
+  kind: FurnitureKind;
+  category: FurnitureCategory;
+  name: string;
+  color: string;
+  accentColor?: string;
+  halfW: number;
+  halfD: number;
+  walkable?: boolean;
+  wallMount?: boolean;
+  mountHeight?: number;
+  interactive?: 'wardrobe' | 'bed' | 'sofa';
+}
+
+export interface PlacedFurniture {
+  instanceId: string;
+  catalogId: string;
+  x: number;
+  z: number;
+  rotY: number;
+}
+
