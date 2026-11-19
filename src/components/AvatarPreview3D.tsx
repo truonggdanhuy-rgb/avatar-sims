@@ -61,9 +61,9 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
     scene.environmentIntensity = 0.42;
     pmrem.dispose();
 
-    const camera = new THREE.PerspectiveCamera(32, width / height, 0.1, 30);
-    camera.position.set(0, 1.24, 3.75);
-    camera.lookAt(0, 0.88, 0);
+    const camera = new THREE.PerspectiveCamera(34, width / height, 0.1, 30);
+    camera.position.set(0, 1.28, 4.05);
+    camera.lookAt(0, 0.94, 0);
 
     const hemi = new THREE.HemisphereLight('#FFF8EE', '#B89578', 0.58);
     scene.add(hemi);
