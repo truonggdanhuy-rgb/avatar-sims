@@ -6,15 +6,15 @@ export function createCobblestoneTexture(): THREE.CanvasTexture {
   canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = '#E6D6BC';
+  ctx.fillStyle = '#D8C19F';
   ctx.fillRect(0, 0, 256, 256);
 
   const stones = [
-    '#EFE3CE',
-    '#DFCBB0',
-    '#E8D9C1',
-    '#D7C1A3',
-    '#F2E8D5',
+    '#E6D2B5',
+    '#D2B792',
+    '#DEC6A4',
+    '#C7A981',
+    '#EBDBC1',
   ];
 
   for (let row = 0; row < 8; row++) {
@@ -26,7 +26,7 @@ export function createCobblestoneTexture(): THREE.CanvasTexture {
       ctx.beginPath();
       ctx.roundRect(x + 2, y + 2, 27, 26, 7);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(138, 108, 78, 0.18)';
+      ctx.strokeStyle = 'rgba(110, 82, 54, 0.25)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
@@ -40,7 +40,7 @@ export function createCobblestoneTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-export function createWoodPlankTexture(base = '#D9AA79', seam = '#B98654'): THREE.CanvasTexture {
+export function createWoodPlankTexture(base = '#CC965E', seam = '#9E6C3B'): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 256;
@@ -93,19 +93,19 @@ export function createGrassTexture(): THREE.CanvasTexture {
   canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = '#86CA6E';
+  ctx.fillStyle = '#6EB856';
   ctx.fillRect(0, 0, 256, 256);
 
-  // Soft meadow color variation patches
+  // Rich meadow color variation patches
   for (let i = 0; i < 180; i++) {
     const x = (i * 73) % 256;
     const y = (i * 137) % 256;
     ctx.fillStyle =
       i % 4 === 0
-        ? 'rgba(255, 255, 220, 0.08)'
+        ? 'rgba(245, 240, 175, 0.1)'
         : i % 2 === 0
-          ? 'rgba(72, 138, 56, 0.09)'
-          : 'rgba(155, 220, 118, 0.09)';
+          ? 'rgba(54, 118, 42, 0.13)'
+          : 'rgba(134, 202, 94, 0.12)';
     ctx.beginPath();
     ctx.arc(x, y, (i % 6) + 3, 0, Math.PI * 2);
     ctx.fill();
@@ -115,7 +115,7 @@ export function createGrassTexture(): THREE.CanvasTexture {
   for (let i = 0; i < 90; i++) {
     const x = (i * 97 + 19) % 256;
     const y = (i * 53 + 41) % 256;
-    ctx.fillStyle = i % 3 === 0 ? 'rgba(255,248,196,0.22)' : 'rgba(58,115,44,0.16)';
+    ctx.fillStyle = i % 3 === 0 ? 'rgba(255,246,178,0.24)' : 'rgba(44,98,34,0.22)';
     ctx.fillRect(x, y, 2, 4);
   }
 
