@@ -7,7 +7,7 @@ import {
 
 export const DEFAULT_AVATAR: AvatarConfig = {
   name: 'Mây Nhỏ',
-  skinTone: '#FDE2CC',
+  skinTone: '#F4C49F',
   hairBack: 'long_wave',
   hairFront: 'air_bangs',
   hairColor: '#5B3A29',
@@ -30,7 +30,7 @@ export const DEFAULT_AVATAR: AvatarConfig = {
 
 export const TINA_AVATAR: AvatarConfig = {
   name: 'Tina',
-  skinTone: '#FFF0E5',
+  skinTone: '#F8CCA8',
   hairBack: 'ponytail',
   hairFront: 'side_sweep',
   hairColor: '#C88A4B',
@@ -53,7 +53,7 @@ export const TINA_AVATAR: AvatarConfig = {
 
 export const BOB_AVATAR: AvatarConfig = {
   name: 'Bob',
-  skinTone: '#F8D4B8',
+  skinTone: '#F2C29B',
   hairBack: 'boy_1',
   hairFront: 'side_sweep',
   hairColor: '#252124',
