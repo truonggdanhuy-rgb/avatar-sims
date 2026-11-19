@@ -490,7 +490,8 @@ function createPleatedSkirtGeometry(
     const v = iy / heightSegs;
     const y = (0.5 - v) * height;
     const baseR = waistR + (hemR - waistR) * Math.pow(v, 0.92);
-    const amp = pleatAmp * (0.2 + 0.8 * v);
+    // Start pleat wave at 0 at the waistband so the top ring never pokes through shirts/cardigans
+    const amp = pleatAmp * Math.pow(v, 0.85);
 
     for (let ir = 0; ir <= radSegs; ir++) {
       const u = ir / radSegs;
@@ -527,16 +528,16 @@ function createPleatedSkirtGeometry(
   return geom;
 }
 
-function createTorsoProfilePoints(scaleOffset = 0, yMin = -0.22, yMax = 0.21): THREE.Vector2[] {
+function createTorsoProfilePoints(scaleOffset = 0, yMin = -0.195, yMax = 0.21): THREE.Vector2[] {
   const basePts: [number, number][] = [
     [0.01, yMin],
-    [0.232 + scaleOffset, yMin],
-    [0.234 + scaleOffset, -0.15],
-    [0.214 + scaleOffset, -0.05],
+    [0.218 + scaleOffset, yMin],
+    [0.222 + scaleOffset, -0.14],
+    [0.212 + scaleOffset, -0.05],
     [0.204 + scaleOffset, 0.05],
-    [0.205 + scaleOffset, 0.13],
-    [0.18 + scaleOffset, 0.172],
-    [0.118 + scaleOffset * 0.6, 0.198],
+    [0.202 + scaleOffset, 0.128],
+    [0.174 + scaleOffset, 0.17],
+    [0.114 + scaleOffset * 0.6, 0.198],
     [0.075, yMax],
   ];
   return basePts.map(([r, y]) => new THREE.Vector2(Math.max(0.005, r), y));
@@ -810,31 +811,37 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   shadowDisc.position.y = 0.004;
   root.add(shadowDisc);
 
-  // ========== LEGS & GROUNDED SHOES ==========
+  // ========== LEGS, SOCKS & GROUNDED SHOES ==========
+  const sockMat = clayMat('#FFF8EE', 0.72, 0.01);
   const makeLeg = (xOffset: number) => {
     const legPivot = new THREE.Group();
     legPivot.position.set(xOffset, 0.52, 0);
 
+    // Continuous tapered leg extending deep inside the shoe so there is never an empty ankle gap
+    const legMat = config.bottom === 'wide_trousers' ? bottomMat : skinMat;
+    const hipCap = new THREE.Mesh(new THREE.SphereGeometry(0.078, 14, 12), legMat);
+    legPivot.add(hipCap);
+
     const legMesh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.068, 0.27, 8, 12),
-      config.bottom === 'wide_trousers' ? bottomMat : skinMat,
+      new THREE.CylinderGeometry(0.078, 0.056, 0.44, 18),
+      legMat,
     );
-    legMesh.position.y = -0.19;
+    legMesh.position.y = -0.22;
     legPivot.add(legMesh);
 
     if (config.bottom === 'wide_trousers') {
       const pantCyl = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.095, 0.115, 0.35, 18),
+        new THREE.CylinderGeometry(0.094, 0.114, 0.395, 18),
         bottomMat,
       );
-      pantCyl.position.y = -0.185;
+      pantCyl.position.y = -0.202;
       legPivot.add(pantCyl);
 
       const cuff = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.119, 0.121, 0.044, 18),
+        new THREE.CylinderGeometry(0.118, 0.12, 0.044, 18),
         bottomDarkMat,
       );
-      cuff.position.y = -0.355;
+      cuff.position.y = -0.395;
       legPivot.add(cuff);
     } else if (config.bottom === 'denim_shorts') {
       const shortMesh = new THREE.Mesh(
@@ -852,28 +859,43 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
       legPivot.add(hem);
     }
 
-    // Shoe planted flush on ground (0.52 - 0.512 = 0.008 right above shadowDisc!)
+    // Knit ankle sock + rolled cuff bridging the lower shin smoothly into shoes
+    if (config.bottom !== 'wide_trousers' && config.shoes !== 'boots') {
+      const sockTube = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.062, 0.059, 0.105, 18),
+        sockMat,
+      );
+      sockTube.position.y = -0.39;
+      const sockCuff = new THREE.Mesh(
+        new THREE.TorusGeometry(0.06, 0.011, 8, 18),
+        sockMat,
+      );
+      sockCuff.rotation.x = Math.PI / 2;
+      sockCuff.position.y = -0.338;
+      legPivot.add(sockTube, sockCuff);
+    }
+
+    // Shoe planted flush on ground (0.52 - 0.512 = 0.008 right above shadowDisc)
     const shoeMat = glossyClayMat(config.shoeColor || '#3A2B2B', 0.34);
     const isSneaker = config.shoes === 'sneakers';
     const shoeBase = new THREE.Mesh(
-      new RoundedBoxGeometry(0.148, isSneaker ? 0.084 : 0.096, 0.22, 3, isSneaker ? 0.038 : 0.044),
+      new RoundedBoxGeometry(0.154, isSneaker ? 0.092 : 0.102, 0.23, 4, isSneaker ? 0.04 : 0.044),
       shoeMat,
     );
-    shoeBase.position.set(0, isSneaker ? -0.456 : -0.466, 0.036);
+    shoeBase.position.set(0, isSneaker ? -0.454 : -0.46, 0.036);
     legPivot.add(shoeBase);
 
-    const toeCap = new THREE.Mesh(new THREE.SphereGeometry(0.071, 14, 10), shoeMat);
-    toeCap.scale.set(1.0, isSneaker ? 0.58 : 0.65, 1.04);
-    toeCap.position.set(0, isSneaker ? -0.46 : -0.47, 0.112);
+    const toeCap = new THREE.Mesh(new THREE.SphereGeometry(0.074, 14, 10), shoeMat);
+    toeCap.scale.set(1.0, isSneaker ? 0.6 : 0.68, 1.05);
+    toeCap.position.set(0, isSneaker ? -0.46 : -0.466, 0.114);
     legPivot.add(toeCap);
 
     if (isSneaker) {
-      // Smooth contoured oval sneaker cup-sole (zero square corners sticking out on the ground!)
       const outsole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.068, 0.067, 0.022, 22),
+        new THREE.CylinderGeometry(0.07, 0.069, 0.022, 22),
         clayMat('#EBE5DB', 0.48),
       );
-      outsole.scale.set(1.02, 1, 1.56);
+      outsole.scale.set(1.04, 1, 1.56);
       outsole.position.set(0, -0.499, 0.056);
       legPivot.add(outsole);
 
@@ -882,36 +904,48 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
           new RoundedBoxGeometry(0.064, 0.014, 0.02, 2, 0.005),
           clayMat('#FFFFFF', 0.4),
         );
-        lace.position.set(0, -0.412, 0.042 + i * 0.04);
+        lace.position.set(0, -0.408, 0.042 + i * 0.04);
         legPivot.add(lace);
       }
     } else if (config.shoes === 'boots') {
       const bootShaft = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.084, 0.088, 0.16, 14),
+        new THREE.CylinderGeometry(0.084, 0.088, 0.165, 16),
         shoeMat,
       );
       bootShaft.position.set(0, -0.37, 0);
       const collar = new THREE.Mesh(
-        new THREE.TorusGeometry(0.084, 0.015, 8, 14),
+        new THREE.TorusGeometry(0.084, 0.015, 8, 16),
         clayMat(shadeHex(config.shoeColor || '#3A2B2B', -0.08).getHex(), 0.45),
       );
       collar.rotation.x = Math.PI / 2;
-      collar.position.set(0, -0.29, 0);
+      collar.position.set(0, -0.288, 0);
       legPivot.add(bootShaft, collar);
     } else if (config.shoes === 'mary_janes') {
+      const collarRim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.064, 0.012, 8, 18),
+        shoeMat,
+      );
+      collarRim.rotation.x = Math.PI / 2;
+      collarRim.position.set(0, -0.41, 0.005);
       const strap = new THREE.Mesh(
-        new RoundedBoxGeometry(0.144, 0.02, 0.03, 2, 0.008),
+        new RoundedBoxGeometry(0.148, 0.02, 0.03, 2, 0.008),
         clayMat(shadeHex(config.shoeColor || '#3A2B2B', 0.08).getHex(), 0.35),
       );
-      strap.position.set(0, -0.42, 0.028);
-      legPivot.add(strap);
+      strap.position.set(0, -0.415, 0.032);
+      legPivot.add(collarRim, strap);
     } else if (config.shoes === 'loafers') {
+      const collarRim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.064, 0.012, 8, 18),
+        shoeMat,
+      );
+      collarRim.rotation.x = Math.PI / 2;
+      collarRim.position.set(0, -0.41, 0.005);
       const saddle = new THREE.Mesh(
-        new RoundedBoxGeometry(0.136, 0.02, 0.05, 2, 0.008),
+        new RoundedBoxGeometry(0.14, 0.02, 0.052, 2, 0.008),
         clayMat(shadeHex(config.shoeColor || '#D8B894', -0.14).getHex(), 0.4),
       );
-      saddle.position.set(0, -0.418, 0.052);
-      legPivot.add(saddle);
+      saddle.position.set(0, -0.412, 0.054);
+      legPivot.add(collarRim, saddle);
     }
 
     return legPivot;
@@ -934,7 +968,7 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   const isHoodie = config.top === 'hoodie';
   const torsoMesh = new THREE.Mesh(
     new THREE.LatheGeometry(
-      createTorsoProfilePoints(isHoodie ? 0.026 : 0, isHoodie ? -0.228 : -0.22, 0.21),
+      createTorsoProfilePoints(isHoodie ? 0.024 : 0, isHoodie ? -0.215 : -0.195, 0.21),
       28,
     ),
     baseTorsoMat,
@@ -943,35 +977,44 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
 
   if (config.top === 'cardigan_vest') {
     const vestProfile = [
-      new THREE.Vector2(0.234, -0.19),
-      new THREE.Vector2(0.238, -0.14),
-      new THREE.Vector2(0.218, -0.05),
-      new THREE.Vector2(0.21, 0.05),
-      new THREE.Vector2(0.208, 0.135),
-      new THREE.Vector2(0.186, 0.172),
+      new THREE.Vector2(0.232, -0.165),
+      new THREE.Vector2(0.234, -0.13),
+      new THREE.Vector2(0.222, -0.05),
+      new THREE.Vector2(0.212, 0.05),
+      new THREE.Vector2(0.21, 0.13),
+      new THREE.Vector2(0.184, 0.172),
     ];
     const vestMesh = new THREE.Mesh(
-      new THREE.LatheGeometry(vestProfile, 24, 0.34, Math.PI * 2 - 0.68),
+      new THREE.LatheGeometry(vestProfile, 26, 0.33, Math.PI * 2 - 0.66),
       topMat,
     );
     torsoGroup.add(vestMesh);
 
+    // Clean vertical knit placket trims framing the front opening
     [-1, 1].forEach((s) => {
+      const placket = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.015, 0.29, 6, 10),
+        topDarkMat,
+      );
+      placket.position.set(s * 0.068, -0.015, 0.205);
+      placket.rotation.x = 0.06;
+      torsoGroup.add(placket);
+
       const collar = new THREE.Mesh(
-        new RoundedBoxGeometry(0.078, 0.048, 0.036, 2, 0.014),
+        new RoundedBoxGeometry(0.082, 0.048, 0.04, 2, 0.015),
         topTrimMat,
       );
-      collar.position.set(s * 0.06, 0.2, 0.115);
-      collar.rotation.z = -s * 0.35;
+      collar.position.set(s * 0.06, 0.198, 0.114);
+      collar.rotation.z = -s * 0.34;
       collar.rotation.y = s * 0.32;
       torsoGroup.add(collar);
     });
 
     const ribHem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.236, 0.24, 0.048, 24),
+      new THREE.CylinderGeometry(0.234, 0.238, 0.044, 26),
       topDarkMat,
     );
-    ribHem.position.set(0, -0.195, 0);
+    ribHem.position.set(0, -0.17, 0);
     torsoGroup.add(ribHem);
 
     for (let i = 0; i < 3; i++) {
@@ -980,22 +1023,22 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
         clayMat('#5C3E2B', 0.4),
       );
       btn.rotation.x = Math.PI / 2;
-      btn.position.set(0, 0.075 - i * 0.085, 0.208 + i * 0.01);
+      btn.position.set(0, 0.08 - i * 0.082, 0.208 + i * 0.008);
       torsoGroup.add(btn);
     }
 
     [-1, 1].forEach((s) => {
       const pocket = new THREE.Mesh(
-        new RoundedBoxGeometry(0.075, 0.068, 0.022, 2, 0.008),
+        new RoundedBoxGeometry(0.075, 0.066, 0.022, 2, 0.008),
         topLightMat,
       );
-      pocket.position.set(s * 0.115, -0.075, 0.202);
-      pocket.rotation.y = s * 0.46;
+      pocket.position.set(s * 0.122, -0.065, 0.198);
+      pocket.rotation.y = s * 0.48;
       torsoGroup.add(pocket);
     });
   } else if (config.top === 'sailor_blouse') {
     const backFlap = new THREE.Mesh(
-      new RoundedBoxGeometry(0.37, 0.11, 0.27, 3, 0.03),
+      new RoundedBoxGeometry(0.36, 0.11, 0.26, 3, 0.03),
       topMat,
     );
     backFlap.position.set(0, 0.145, -0.045);
@@ -1003,7 +1046,7 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     torsoGroup.add(backFlap);
 
     const stripeTrim = new THREE.Mesh(
-      new RoundedBoxGeometry(0.378, 0.02, 0.278, 2, 0.008),
+      new RoundedBoxGeometry(0.368, 0.02, 0.268, 2, 0.008),
       topTrimMat,
     );
     stripeTrim.position.set(0, 0.105, -0.048);
@@ -1073,10 +1116,10 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
 
     [-1, 1].forEach((side) => {
       const shoulderFold = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.056, 0.12, 8, 12),
+        new THREE.CapsuleGeometry(0.054, 0.11, 8, 12),
         topDarkMat,
       );
-      shoulderFold.position.set(side * 0.135, 0.005, 0.045);
+      shoulderFold.position.set(side * 0.13, 0.005, 0.045);
       shoulderFold.rotation.z = side * 0.55;
       shoulderFold.rotation.x = 0.38;
       backHoodGroup.add(shoulderFold);
@@ -1085,31 +1128,31 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
 
     // Wide Tapered Ribbed Waistband
     const ribHem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.258, 0.246, 0.056, 26),
+      new THREE.CylinderGeometry(0.252, 0.244, 0.052, 26),
       topDarkMat,
     );
-    ribHem.position.set(0, -0.2, 0);
+    ribHem.position.set(0, -0.186, 0);
     torsoGroup.add(ribHem);
 
     // Detailed Kangaroo Front Pocket + Angled Side Entry Shadow Recesses
     const pocket = new THREE.Mesh(
-      new RoundedBoxGeometry(0.275, 0.125, 0.055, 3, 0.022),
+      new RoundedBoxGeometry(0.27, 0.12, 0.055, 3, 0.022),
       topLightMat,
     );
-    pocket.position.set(0, -0.075, 0.228);
+    pocket.position.set(0, -0.072, 0.224);
     const pocketTopTrim = new THREE.Mesh(
-      new RoundedBoxGeometry(0.22, 0.018, 0.058, 2, 0.006),
+      new RoundedBoxGeometry(0.215, 0.018, 0.058, 2, 0.006),
       topDarkMat,
     );
-    pocketTopTrim.position.set(0, -0.016, 0.23);
+    pocketTopTrim.position.set(0, -0.014, 0.226);
     torsoGroup.add(pocket, pocketTopTrim);
 
     [-1, 1].forEach((s) => {
       const sideSlit = new THREE.Mesh(
-        new RoundedBoxGeometry(0.024, 0.095, 0.045, 2, 0.008),
+        new RoundedBoxGeometry(0.024, 0.092, 0.045, 2, 0.008),
         topDarkMat,
       );
-      sideSlit.position.set(s * 0.132, -0.078, 0.222);
+      sideSlit.position.set(s * 0.13, -0.075, 0.218);
       sideSlit.rotation.z = s * 0.24;
       sideSlit.rotation.y = s * 0.35;
       torsoGroup.add(sideSlit);
@@ -1151,15 +1194,15 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     torsoGroup.add(collar);
 
     const chestBand = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.208, 0.212, 0.044, 24),
+      new THREE.CylinderGeometry(0.206, 0.21, 0.044, 24),
       topLightMat,
     );
     chestBand.position.set(0, 0.045, 0);
     const ribHem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.234, 0.238, 0.048, 24),
+      new THREE.CylinderGeometry(0.232, 0.236, 0.044, 26),
       topDarkMat,
     );
-    ribHem.position.set(0, -0.195, 0);
+    ribHem.position.set(0, -0.17, 0);
     torsoGroup.add(chestBand, ribHem);
   } else if (config.top === 'sundress') {
     const chestSkin = new THREE.Mesh(
@@ -1185,32 +1228,32 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     neckTrim.rotation.x = Math.PI / 2;
     neckTrim.position.set(0, 0.115, 0);
     const waistSash = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.222, 0.228, 0.044, 24),
+      new THREE.CylinderGeometry(0.22, 0.226, 0.044, 24),
       topTrimMat,
     );
     waistSash.position.set(0, -0.09, 0);
     torsoGroup.add(neckTrim, waistSash);
   }
 
-  // Bottoms on Torso
+  // Bottoms on Torso (clean radial hierarchy so skirts & trousers never clip through tops)
   if (config.bottom === 'pleated_skirt' || config.bottom === 'midi_skirt') {
     const isMidi = config.bottom === 'midi_skirt';
     const waistband = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.224, 0.232, 0.056, 24),
+      new THREE.CylinderGeometry(0.214, 0.22, 0.048, 26),
       bottomDarkMat,
     );
-    waistband.position.set(0, -0.145, 0);
+    waistband.position.set(0, -0.158, 0);
     torsoGroup.add(waistband);
 
     const skirtGeo = createPleatedSkirtGeometry(
-      0.226,
+      0.216,
       isMidi ? 0.325 : 0.285,
       isMidi ? 0.33 : 0.23,
       isMidi ? 12 : 16,
       isMidi ? 0.011 : 0.016,
     );
     const skirtMesh = new THREE.Mesh(skirtGeo, bottomMat);
-    skirtMesh.position.set(0, isMidi ? -0.325 : -0.275, 0);
+    skirtMesh.position.set(0, isMidi ? -0.34 : -0.288, 0);
     torsoGroup.add(skirtMesh);
 
     const hemRing = new THREE.Mesh(
@@ -1218,14 +1261,14 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
       bottomLightMat,
     );
     hemRing.rotation.x = Math.PI / 2;
-    hemRing.position.set(0, isMidi ? -0.475 : -0.375, 0);
+    hemRing.position.set(0, isMidi ? -0.49 : -0.388, 0);
     torsoGroup.add(hemRing);
   } else {
     const waist = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.228, 0.232, 0.082, 24),
+      new THREE.CylinderGeometry(0.22, 0.224, 0.078, 26),
       bottomDarkMat,
     );
-    waist.position.set(0, -0.21, 0);
+    waist.position.set(0, -0.206, 0);
     torsoGroup.add(waist);
 
     const button = new THREE.Mesh(
@@ -1233,11 +1276,11 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
       clayMat('#E8C476', 0.35),
     );
     button.rotation.x = Math.PI / 2;
-    button.position.set(0, -0.205, 0.23);
+    button.position.set(0, -0.205, 0.224);
     torsoGroup.add(button);
   }
 
-  // ========== ARTICULATED ARMS + REAL HANDHELD GRIP & UMBRELLA OUTWARD POSE ==========
+  // ========== SEAMLESS ARTICULATED ARMS + REAL HANDHELD GRIP ==========
   const isShortSleeve = config.top === 'sailor_blouse';
   const isSleeveless = config.top === 'sundress';
   const handheld = config.handheld && config.handheld !== 'none' ? config.handheld : null;
@@ -1250,83 +1293,120 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
         : 'carry_front';
 
   const makeArm = (side: -1 | 1) => {
+    // Embedded flush inside the sculpted shoulder slope so arms connect organically to torso
     const shoulderPivot = new THREE.Group();
-    shoulderPivot.position.set(side * (isHoodie ? 0.244 : 0.225), 0.91, 0);
-    shoulderPivot.rotation.z = side * (isHoodie ? 0.24 : 0.22);
+    shoulderPivot.position.set(side * (isHoodie ? 0.204 : 0.184), 0.896, 0);
+    shoulderPivot.rotation.z = side * (isHoodie ? 0.28 : 0.26);
 
     const upperMat = isSleeveless ? skinMat : isShortSleeve ? topTrimMat : topMat;
-    const upperR = isHoodie ? 0.059 : 0.05;
-    const forearmR = isHoodie ? 0.055 : 0.047;
-    const shoulderJoint = new THREE.Mesh(new THREE.SphereGeometry(upperR + 0.002, 12, 10), upperMat);
-    shoulderPivot.add(shoulderJoint);
-
-    const upperArm = new THREE.Mesh(
-      new THREE.CapsuleGeometry(upperR, 0.11, 8, 12),
-      upperMat,
-    );
-    upperArm.position.y = -0.075;
-    shoulderPivot.add(upperArm);
+    const upperR = isHoodie ? 0.06 : isShortSleeve ? 0.048 : 0.052;
+    const midR = isHoodie ? 0.053 : isShortSleeve ? 0.043 : 0.046;
+    const wristR = isHoodie ? 0.049 : isShortSleeve ? 0.04 : 0.042;
 
     if (isShortSleeve) {
-      const cuff = new THREE.Mesh(
-        new THREE.TorusGeometry(0.053, 0.012, 8, 14),
+      // Short puff sleeve cap over continuous skin upper arm
+      const sleeveCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.056, 14, 12),
+        topTrimMat,
+      );
+      const sleeveTube = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.056, 0.062, 0.118, 16),
+        topTrimMat,
+      );
+      sleeveTube.position.y = -0.059;
+      const sleeveCuff = new THREE.Mesh(
+        new THREE.TorusGeometry(0.061, 0.011, 8, 16),
         topMat,
       );
-      cuff.rotation.x = Math.PI / 2;
-      cuff.position.y = -0.13;
-      shoulderPivot.add(cuff);
+      sleeveCuff.rotation.x = Math.PI / 2;
+      sleeveCuff.position.y = -0.118;
+      shoulderPivot.add(sleeveCap, sleeveTube, sleeveCuff);
+
+      const innerSkinUpper = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, midR, 0.148, 16),
+        skinMat,
+      );
+      innerSkinUpper.position.y = -0.074;
+      shoulderPivot.add(innerSkinUpper);
+    } else {
+      const shoulderJoint = new THREE.Mesh(
+        new THREE.SphereGeometry(upperR, 14, 12),
+        upperMat,
+      );
+      const upperArm = new THREE.Mesh(
+        new THREE.CylinderGeometry(upperR, midR, 0.148, 16),
+        upperMat,
+      );
+      upperArm.position.y = -0.074;
+      shoulderPivot.add(shoulderJoint, upperArm);
     }
 
     const elbowPivot = new THREE.Group();
-    elbowPivot.position.set(0, -0.15, 0);
+    elbowPivot.position.set(0, -0.148, 0);
     elbowPivot.rotation.x = -0.1;
     elbowPivot.rotation.z = side * 0.03;
     shoulderPivot.add(elbowPivot);
 
     const forearmMat = isSleeveless || isShortSleeve ? skinMat : topMat;
-    const elbowJoint = new THREE.Mesh(new THREE.SphereGeometry(forearmR + 0.002, 12, 10), forearmMat);
-    elbowPivot.add(elbowJoint);
-
-    const forearm = new THREE.Mesh(
-      new THREE.CapsuleGeometry(forearmR, 0.1, 8, 12),
+    // Exact radius match (midR) between upperArm, elbowJoint, and forearm eliminates ring seams!
+    const elbowJoint = new THREE.Mesh(
+      new THREE.SphereGeometry(midR, 14, 12),
       forearmMat,
     );
-    forearm.position.y = -0.068;
-    elbowPivot.add(forearm);
+    const forearm = new THREE.Mesh(
+      new THREE.CylinderGeometry(midR, wristR, 0.128, 16),
+      forearmMat,
+    );
+    forearm.position.y = -0.064;
+    elbowPivot.add(elbowJoint, forearm);
 
     if (!isSleeveless && !isShortSleeve) {
+      const cuffMat = config.top === 'cardigan_vest' ? topTrimMat : topDarkMat;
       const wristCuff = new THREE.Mesh(
-        new THREE.CylinderGeometry(isHoodie ? 0.058 : 0.05, isHoodie ? 0.054 : 0.052, isHoodie ? 0.036 : 0.032, 14),
-        config.top === 'cardigan_vest' ? topTrimMat : topDarkMat,
+        new THREE.TorusGeometry(wristR + 0.005, 0.012, 8, 16),
+        cuffMat,
       );
+      wristCuff.rotation.x = Math.PI / 2;
       wristCuff.position.y = -0.122;
-      elbowPivot.add(wristCuff);
+      const cuffInner = new THREE.Mesh(
+        new THREE.CylinderGeometry(wristR + 0.002, wristR + 0.004, 0.024, 14),
+        cuffMat,
+      );
+      cuffInner.position.y = -0.118;
+      elbowPivot.add(wristCuff, cuffInner);
     }
 
+    const wristBridge = new THREE.Mesh(
+      new THREE.CylinderGeometry(wristR * 0.78, 0.032, 0.036, 12),
+      skinMat,
+    );
+    wristBridge.position.y = -0.136;
+    elbowPivot.add(wristBridge);
+
     const handGroup = new THREE.Group();
-    handGroup.position.set(0, -0.165, 0);
+    handGroup.position.set(0, -0.158, 0);
     elbowPivot.add(handGroup);
 
-    const palm = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12), skinMat);
-    palm.scale.set(0.88, 1.04, 0.85);
+    const palm = new THREE.Mesh(new THREE.SphereGeometry(0.048, 12, 12), skinMat);
+    palm.scale.set(0.88, 1.05, 0.85);
     handGroup.add(palm);
 
     const thumb = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.016, 0.025, 6, 8),
+      new THREE.CapsuleGeometry(0.015, 0.024, 6, 8),
       skinMat,
     );
-    thumb.position.set(-side * 0.032, 0.006, 0.032);
+    thumb.position.set(-side * 0.03, 0.006, 0.03);
     thumb.rotation.z = side * 0.52;
     thumb.rotation.x = -0.45;
     handGroup.add(thumb);
 
     if (side === 1 && handheld) {
       const curlFingers = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.02, 0.046, 6, 10),
+        new THREE.CapsuleGeometry(0.019, 0.044, 6, 10),
         skinMat,
       );
       curlFingers.rotation.z = Math.PI / 2;
-      curlFingers.position.set(-0.016, -0.016, 0.036);
+      curlFingers.position.set(-0.016, -0.016, 0.034);
       handGroup.add(curlFingers);
     }
 
@@ -2003,13 +2083,13 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     [-1, 1].forEach((side) => {
       addPointBlade(
         [
-          headSurfacePoint(68, side * 72, 0.032),
-          [side * 0.34, 0.24, 0.06],
-          [side * 0.32, 0.08, 0.05],
-          [side * 0.29, -0.05, 0.03],
+          headSurfacePoint(68, side * 70, 0.03),
+          [side * 0.308, 0.24, 0.055],
+          [side * 0.295, 0.08, 0.045],
+          [side * 0.268, -0.05, 0.025],
         ],
-        [0.032, 0.038, 0.03, 0.012],
-        1.55,
+        [0.032, 0.04, 0.034, 0.015],
+        1.65,
         0.68,
         16,
       );
@@ -2021,12 +2101,12 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     [-1, 1].forEach((side) => {
       addPointBlade(
         [
-          headSurfacePoint(66, side * 74, 0.032),
-          [side * 0.34, 0.22, 0.06],
-          [side * 0.3, 0.08, 0.06],
+          headSurfacePoint(66, side * 72, 0.03),
+          [side * 0.31, 0.22, 0.055],
+          [side * 0.282, 0.08, 0.055],
         ],
-        [0.032, 0.038, 0.015],
-        1.5,
+        [0.032, 0.039, 0.016],
+        1.6,
         0.66,
         14,
       );
