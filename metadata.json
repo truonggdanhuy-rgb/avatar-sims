@@ -1,0 +1,6 @@
+{
+  "name": "Thị Trấn Mây - Avatar Sims",
+  "description": "Trò chơi Avatar Sims màn dọc với bản đồ thị trấn tương tác trực quan, các tiểu khu sinh động và nhân vật tùy biến nhiều lớp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

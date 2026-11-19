@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Bricolage Grotesque', sans-serif;
+    --font-body: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: var(--font-body);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Avatar & World Micro-Animations (compositor-only transform/opacity) */
+@keyframes avatar-breathe {
+  0%, 100% {
+    transform: translateY(0px) scaleY(1);
+  }
+  50% {
+    transform: translateY(-1.5px) scaleY(1.018);
+  }
+}
+
+@keyframes avatar-walk-bob {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-4px) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-4px) rotate(2deg);
+  }
+}
+
+@keyframes avatar-blink {
+  0%, 92%, 100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes float-cloud {
+  0% {
+    transform: translateX(-12px);
+  }
+  50% {
+    transform: translateX(14px);
+  }
+  100% {
+    transform: translateX(-12px);
+  }
+}
+
+@keyframes smoke-rise {
+  0% {
+    transform: translateY(0px) scale(0.75);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.65;
+  }
+  100% {
+    transform: translateY(-22px) translateX(6px) scale(1.45);
+    opacity: 0;
+  }
+}
+
+@keyframes water-ripple {
+  0%, 100% {
+    transform: scale(0.92);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.35;
+  }
+}
+
+@keyframes gentle-sway {
+  0%, 100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+}
+
+@keyframes float-zzz {
+  0% {
+    transform: translate(0, 0) scale(0.7);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(12px, -24px) scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    transform: scale(0.88) translateY(6px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.anim-breathe {
+  animation: avatar-breathe 2.6s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+.anim-walk {
+  animation: avatar-walk-bob 0.38s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+.anim-blink {
+  animation: avatar-blink 4.2s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.anim-cloud {
+  animation: float-cloud 16s ease-in-out infinite;
+}
+
+.anim-smoke {
+  animation: smoke-rise 3.4s ease-out infinite;
+}
+
+.anim-ripple {
+  animation: water-ripple 2.8s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.anim-sway {
+  animation: gentle-sway 3.6s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+.anim-zzz {
+  animation: float-zzz 2.4s ease-out infinite;
+}
+
+.anim-pop {
+  animation: pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom thin scrollbar inside wardrobe/settings modals */
+.custom-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: rgba(120, 95, 70, 0.25);
+  border-radius: 999px;
+}
