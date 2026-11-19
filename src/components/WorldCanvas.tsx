@@ -467,7 +467,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 0.96;
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = false;
 
@@ -482,12 +482,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#BFE6F7');
-    scene.fog = new THREE.FogExp2('#BFE6F7', 0.0056);
+    scene.background = new THREE.Color('#B2DDF2');
+    scene.fog = new THREE.FogExp2('#B2DDF2', 0.0056);
 
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = envTex;
+    scene.environmentIntensity = 0.42;
     pmrem.dispose();
 
     const initCam = getResponsiveCameraSettings(stateRef.current.zone, width / height);
@@ -515,16 +516,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
     controls.addEventListener('start', onControlsStart);
 
-    // 3-Point Studio Outdoor Lighting Rig
-    const hemiLight = new THREE.HemisphereLight('#E6F5FF', '#8FA876', 0.88);
+    // Balanced 3-Point Studio Outdoor Lighting Rig (crisp, rich vinyl colors)
+    const hemiLight = new THREE.HemisphereLight('#DCEFFF', '#6A8C58', 0.58);
     scene.add(hemiLight);
 
-    const sunLight = new THREE.DirectionalLight('#FFF3DA', 1.45);
+    const sunLight = new THREE.DirectionalLight('#FFF2D8', 1.22);
     sunLight.position.set(16, 25, 18);
     sunLight.castShadow = false;
     scene.add(sunLight);
 
-    const rimLight = new THREE.DirectionalLight('#B8DCFF', 0.42);
+    const rimLight = new THREE.DirectionalLight('#A8D2FF', 0.42);
     rimLight.position.set(-10, 8, -12);
     scene.add(rimLight);
 
@@ -1189,8 +1190,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         tod === 'night'
           ? 0x1e284b
           : tod === 'sunset'
-            ? 0xf0a682
-            : 0xbfe6f7;
+            ? 0xeb9c76
+            : 0xb2ddf2;
       _bgColorTarget.setHex(targetBg);
       (scene.background as THREE.Color).lerp(_bgColorTarget, 0.08);
       if (scene.fog instanceof THREE.FogExp2) {
@@ -1198,15 +1199,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
       sunLight.intensity = THREE.MathUtils.damp(
         sunLight.intensity,
-        tod === 'night' ? 0.55 : tod === 'sunset' ? 1.25 : 1.48,
+        tod === 'night' ? 0.52 : tod === 'sunset' ? 1.04 : 1.22,
         5,
         delta,
       );
-      _sunColorTarget.set(tod === 'night' ? '#A3C4FF' : tod === 'sunset' ? '#FFAE70' : '#FFF3DA');
+      _sunColorTarget.set(tod === 'night' ? '#A3C4FF' : tod === 'sunset' ? '#FFAE70' : '#FFF2D8');
       sunLight.color.lerp(_sunColorTarget, 0.08);
       hemiLight.intensity = THREE.MathUtils.damp(
         hemiLight.intensity,
-        tod === 'night' ? 0.45 : 0.88,
+        tod === 'night' ? 0.34 : 0.58,
         5,
         delta,
       );

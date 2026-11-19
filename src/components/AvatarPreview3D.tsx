@@ -45,7 +45,7 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 0.96;
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = false;
 
@@ -58,21 +58,22 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = envTex;
+    scene.environmentIntensity = 0.42;
     pmrem.dispose();
 
     const camera = new THREE.PerspectiveCamera(32, width / height, 0.1, 30);
     camera.position.set(0, 1.24, 3.75);
     camera.lookAt(0, 0.88, 0);
 
-    const hemi = new THREE.HemisphereLight('#FFFDF8', '#D9B99B', 0.85);
+    const hemi = new THREE.HemisphereLight('#FFF8EE', '#B89578', 0.58);
     scene.add(hemi);
 
-    const key = new THREE.DirectionalLight('#FFF3DC', 1.4);
+    const key = new THREE.DirectionalLight('#FFF1D6', 1.2);
     key.position.set(2.5, 4.5, 3.5);
     key.castShadow = false;
     scene.add(key);
 
-    const rim = new THREE.DirectionalLight('#CBE8FF', 0.55);
+    const rim = new THREE.DirectionalLight('#B8DCFF', 0.44);
     rim.position.set(-2.5, 2.5, -2.5);
     scene.add(rim);
 
