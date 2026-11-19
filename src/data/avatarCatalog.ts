@@ -51,6 +51,29 @@ export const TINA_AVATAR: AvatarConfig = {
   handheldColor: '#F4A261',
 };
 
+export const BOB_AVATAR: AvatarConfig = {
+  name: 'Bob',
+  skinTone: '#F8D4B8',
+  hairBack: 'boy_1',
+  hairFront: 'side_sweep',
+  hairColor: '#252124',
+  eyeStyle: 'cheerful',
+  eyeColor: '#4A3628',
+  expression: 'smile',
+  top: 'cardigan_vest',
+  topColor: '#5C8A72',
+  bottom: 'wide_trousers',
+  bottomColor: '#3B4D63',
+  shoes: 'boots',
+  shoeColor: '#5C3D2E',
+  headItem: 'none',
+  headItemColor: '#5C8A72',
+  accessory: 'none',
+  accessoryColor: '#4A3628',
+  handheld: 'none',
+  handheldColor: '#E8B84B',
+};
+
 export const FASHION_CATEGORIES: {key: ShopCategory; label: string}[] = [
   {key: 'tops', label: 'Áo'},
   {key: 'bottoms', label: 'Quần'},
