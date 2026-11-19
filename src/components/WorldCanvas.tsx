@@ -1,9 +1,24 @@
 import React, {useEffect, useRef, useState} from 'react';
+import {
+  Armchair,
+  Check,
+  DoorClosed,
+  DoorOpen,
+  Move,
+  PackageMinus,
+  RotateCw,
+} from 'lucide-react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
+import {FURNITURE_BY_ID} from '../data/furnitureCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
-import {buildSubzoneScene, SubzoneWorld} from '../three/subzonesBuilder';
+import {
+  buildSubzoneScene,
+  HouseDoorHandle,
+  HouseWallSurface,
+  SubzoneWorld,
+} from '../three/subzonesBuilder';
 import {
   buildTownScene,
   getTownGroundHeight,
@@ -18,6 +33,7 @@ import {
   CropType,
   GameStats,
   GardenPlotState,
+  PlacedFurniture,
   TimeOfDay,
   ZoneId,
 } from '../types/game';
@@ -29,11 +45,21 @@ interface WorldCanvasProps {
   stats: GameStats;
   timeOfDay: TimeOfDay;
   plots: GardenPlotState[];
+  placedFurniture: PlacedFurniture[];
+  editFurnitureMode: boolean;
+  selectedFurnitureId: string | null;
+  homeSpotRef: React.MutableRefObject<{x: number; z: number}>;
   onChangeZone: (next: ZoneId) => void;
   onOpenWardrobe: () => void;
   onOpenShop: () => void;
   onOpenSettings: () => void;
   onOpenDailyQuests: () => void;
+  onOpenFurniture: () => void;
+  onToggleEditFurniture: () => void;
+  onSelectFurniture: (id: string | null) => void;
+  onMoveFurniture: (id: string, x: number, z: number, rotY?: number) => void;
+  onRotateFurniture: (id: string) => void;
+  onStowFurniture: (id: string) => void;
   onFishCaught: () => void;
   onRestoreEnergy: () => void;
   onBoostMood: () => void;
@@ -100,10 +126,86 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
     return {fov, pos: [0, 16.5, 25.5] as const, look: [0, 0.9, 0] as const};
   }
 
+  if (zone === 'home') {
+    if (isPortrait) {
+      return {fov, pos: [-1.8, 14.2, 19.8] as const, look: [-1.8, 0.7, 0.8] as const};
+    }
+    if (isSquare) {
+      return {fov, pos: [-1.8, 13.4, 18.4] as const, look: [-1.8, 0.7, 0.4] as const};
+    }
+    return {fov, pos: [-1.8, 12.6, 17.2] as const, look: [-1.8, 0.7, 0.2] as const};
+  }
+
   if (isPortrait) {
     return {fov, pos: [0, 6.8, 10.6] as const, look: [0, 0.75, -0.35] as const};
   }
   return {fov, pos: [0, 6.3, 9.5] as const, look: [0, 0.75, -0.35] as const};
+}
+
+function getZoneWalkBounds(zone: ZoneId) {
+  if (zone === 'town') {
+    return {minX: -29.5, maxX: 29.5, minZ: -31.5, maxZ: 27.5};
+  }
+  if (zone === 'home') {
+    return {minX: -12.85, maxX: 9.85, minZ: -8.95, maxZ: 6.95};
+  }
+  return {minX: -3.45, maxX: 3.45, minZ: -4.05, maxZ: 4.05};
+}
+
+function snapPointToNearestWall(
+  px: number,
+  pz: number,
+  catHalfW: number,
+  cameraPos: THREE.Vector3,
+  surfaces: HouseWallSurface[],
+): {x: number; z: number; rotY: number} | null {
+  const upSurfaces = surfaces.filter((s) => s.isUp());
+  const candidates = upSurfaces.length > 0 ? upSurfaces : surfaces;
+  if (candidates.length === 0) return null;
+
+  let best: HouseWallSurface | null = null;
+  let bestSpan = 0;
+  let bestDist = Infinity;
+
+  for (const w of candidates) {
+    const pad = Math.min(catHalfW * 0.5, (w.maxSpan - w.minSpan) * 0.35);
+    const rawSpan = w.axis === 'z' ? px : pz;
+    const clampedSpan = THREE.MathUtils.clamp(rawSpan, w.minSpan + pad, w.maxSpan - pad);
+    const wx = w.axis === 'z' ? clampedSpan : w.pos;
+    const wz = w.axis === 'z' ? w.pos : clampedSpan;
+    const dist = Math.hypot(px - wx, pz - wz);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = w;
+      bestSpan = clampedSpan;
+    }
+  }
+
+  if (!best) return null;
+  const side =
+    best.outerSide !== undefined
+      ? -best.outerSide
+      : best.axis === 'z'
+        ? cameraPos.z >= best.pos
+          ? 1
+          : -1
+        : cameraPos.x >= best.pos
+          ? 1
+          : -1;
+  const offset = best.thickness / 2 + 0.03;
+
+  if (best.axis === 'z') {
+    return {
+      x: bestSpan,
+      z: best.pos + side * offset,
+      rotY: side > 0 ? 0 : Math.PI,
+    };
+  }
+  return {
+    x: best.pos + side * offset,
+    z: bestSpan,
+    rotY: side > 0 ? Math.PI / 2 : -Math.PI / 2,
+  };
 }
 
 function resolvePointAgainstColliders(
@@ -190,11 +292,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   stats,
   timeOfDay,
   plots,
+  placedFurniture,
+  editFurnitureMode,
+  selectedFurnitureId,
+  homeSpotRef,
   onChangeZone,
   onOpenWardrobe,
   onOpenShop,
   onOpenSettings,
   onOpenDailyQuests,
+  onOpenFurniture,
+  onToggleEditFurniture,
+  onSelectFurniture,
+  onMoveFurniture,
+  onRotateFurniture,
+  onStowFurniture,
   onFishCaught,
   onRestoreEnergy,
   onBoostMood,
@@ -210,6 +322,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [miniActive, setMiniActive] = useState(false);
   const [miniScore, setMiniScore] = useState(0);
   const [starPos, setStarPos] = useState({x: 50, y: 50});
+  const [nearbyDoor, setNearbyDoor] = useState<{id: string; label: string; isOpen: boolean} | null>(
+    null,
+  );
   const [webglError, setWebglError] = useState(false);
 
   const stateRef = useRef({
@@ -219,8 +334,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     timeOfDay,
     plots,
     fishingState,
+    placedFurniture,
+    editFurnitureMode,
+    selectedFurnitureId,
   });
-  stateRef.current = {zone, avatar, stats, timeOfDay, plots, fishingState};
+  stateRef.current = {
+    zone,
+    avatar,
+    stats,
+    timeOfDay,
+    plots,
+    fishingState,
+    placedFurniture,
+    editFurnitureMode,
+    selectedFurnitureId,
+  };
 
   const callbacksRef = useRef({
     onChangeZone,
@@ -228,6 +356,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onOpenShop,
     onOpenSettings,
     onOpenDailyQuests,
+    onOpenFurniture,
+    onToggleEditFurniture,
+    onSelectFurniture,
+    onMoveFurniture,
+    onRotateFurniture,
+    onStowFurniture,
     onFishCaught,
     onRestoreEnergy,
     onBoostMood,
@@ -240,6 +374,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onOpenShop,
     onOpenSettings,
     onOpenDailyQuests,
+    onOpenFurniture,
+    onToggleEditFurniture,
+    onSelectFurniture,
+    onMoveFurniture,
+    onRotateFurniture,
+    onStowFurniture,
     onFishCaught,
     onRestoreEnergy,
     onBoostMood,
@@ -252,6 +392,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const playerBubbleRef = useRef<BubbleState | null>(null);
   const bubbleTimerRef = useRef<number | null>(null);
   const fishTimerRef = useRef<number | null>(null);
+  const openDoorsRef = useRef<Record<string, boolean>>({});
+  const activeDoorsRef = useRef<HouseDoorHandle[]>([]);
+  const nearbyDoorKeyRef = useRef<string>('');
 
   const showBubble = (text: string, x: number, y: number, z: number) => {
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
@@ -263,8 +406,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   };
 
   useEffect(() => {
+    if (zone !== 'home') {
+      openDoorsRef.current = {};
+      activeDoorsRef.current = [];
+      nearbyDoorKeyRef.current = '';
+      setNearbyDoor(null);
+    }
+  }, [zone]);
+
+  useEffect(() => {
     rebuildSceneTriggerRef.current?.();
-  }, [zone, plots, fishingState]);
+  }, [zone, plots, fishingState, placedFurniture]);
 
   useEffect(() => {
     rebuildAvatarTriggerRef.current?.(avatar);
@@ -395,10 +547,25 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let currentColliders: WorldCollider[] = [];
     let currentPlazaRadius = 6.8;
     let currentGrounds: THREE.Object3D[] = [];
+    let currentWallSurfaces: HouseWallSurface[] = [];
     let prevGroundY = 0.14;
 
+    const selectionRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.76, 0.96, 32),
+      new THREE.MeshBasicMaterial({
+        color: '#FFD166',
+        transparent: true,
+        opacity: 0.92,
+        side: THREE.DoubleSide,
+      }),
+    );
+    selectionRing.rotation.x = -Math.PI / 2;
+    selectionRing.position.y = 0.03;
+    selectionRing.visible = false;
+    scene.add(selectionRing);
+
     const loadCurrentWorld = () => {
-      const {zone: z, plots: pl, fishingState: fs} = stateRef.current;
+      const {zone: z, plots: pl, fishingState: fs, placedFurniture: pf} = stateRef.current;
 
       if (activeTown) {
         scene.remove(activeTown.group);
@@ -419,6 +586,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         currentColliders = activeTown.colliders;
         currentPlazaRadius = activeTown.plazaRadius;
         currentGrounds = activeTown.groundMeshes;
+        activeDoorsRef.current = [];
+        currentWallSurfaces = [];
         if (activeZoneLoaded !== 'town') {
           activeTarget = null;
           activeSeat = null;
@@ -443,21 +612,33 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         activeSubzone = buildSubzoneScene(z, {
           plots: pl,
           fishingState: fs,
+          placedFurniture: z === 'home' ? pf : undefined,
+          openDoors: z === 'home' ? openDoorsRef.current : undefined,
         });
         scene.add(activeSubzone.group);
         currentAnchors = activeSubzone.labelAnchors;
         currentClickTargets = [...activeSubzone.clickTargets, playerProxy];
         currentColliders = activeSubzone.colliders;
         currentGrounds = [activeSubzone.groundMesh];
+        activeDoorsRef.current = activeSubzone.doors ?? [];
+        currentWallSurfaces = activeSubzone.wallSurfaces ?? [];
         if (activeZoneLoaded !== z) {
           activeTarget = null;
           activeSeat = null;
-          playerPos.x = 0;
-          playerPos.z = 2.6;
-          playerPos.rotY = 0;
+          if (z === 'home') {
+            playerPos.x = -1.8;
+            playerPos.z = 5.2;
+            playerPos.rotY = Math.PI;
+            homeSpotRef.current = {x: -1.8, z: 5.2};
+          } else {
+            playerPos.x = 0;
+            playerPos.z = 2.6;
+            playerPos.rotY = 0;
+          }
           playerPos.pose = 'idle';
           prevGroundY = 0;
           playerRig.root.position.set(playerPos.x, 0, playerPos.z);
+          playerRig.root.rotation.y = playerPos.rotY;
           cameraTransitionActive = true;
         }
       }
@@ -505,6 +686,60 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(pointer, camera);
+
+      // 0. House Edit Mode: select furniture or move selected furniture (with wall snap for wall-mounted items)
+      if (stateRef.current.zone === 'home' && stateRef.current.editFurnitureMode) {
+        const hits = raycaster.intersectObjects(currentClickTargets, true);
+        let firstWallHitPoint: THREE.Vector3 | null = null;
+        for (const h of hits) {
+          let obj: THREE.Object3D | null = h.object;
+          while (obj && (!obj.userData || !obj.userData.kind)) {
+            obj = obj.parent;
+          }
+          if (obj && obj.userData.furnitureId) {
+            soundFX.tap();
+            callbacksRef.current.onSelectFurniture(obj.userData.furnitureId as string);
+            return;
+          }
+          if (!firstWallHitPoint && obj && obj.userData.kind === 'house_wall') {
+            firstWallHitPoint = h.point;
+          }
+        }
+
+        const selId = stateRef.current.selectedFurnitureId;
+        if (selId) {
+          const selPlaced = stateRef.current.placedFurniture.find((p) => p.instanceId === selId);
+          const selCat = selPlaced ? FURNITURE_BY_ID[selPlaced.catalogId] : null;
+          if (selCat?.wallMount) {
+            let refPt = firstWallHitPoint;
+            if (!refPt && currentGrounds.length > 0) {
+              const groundHits = raycaster.intersectObjects(currentGrounds, false);
+              if (groundHits.length > 0) refPt = groundHits[0].point;
+            }
+            if (refPt) {
+              const snapped = snapPointToNearestWall(
+                refPt.x,
+                refPt.z,
+                selCat.halfW,
+                camera.position,
+                currentWallSurfaces,
+              );
+              if (snapped) {
+                soundFX.tap();
+                callbacksRef.current.onMoveFurniture(selId, snapped.x, snapped.z, snapped.rotY);
+              }
+            }
+          } else if (currentGrounds.length > 0) {
+            const groundHits = raycaster.intersectObjects(currentGrounds, false);
+            if (groundHits.length > 0) {
+              const pt = groundHits[0].point;
+              soundFX.tap();
+              callbacksRef.current.onMoveFurniture(selId, pt.x, pt.z);
+            }
+          }
+        }
+        return;
+      }
 
       // 1. Check interactive buildings/objects/NPCs/player
       const hits = raycaster.intersectObjects(currentClickTargets, true);
@@ -787,6 +1022,45 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
+          if (kind === 'house_door') {
+            const doorId = data.doorId as string;
+            const door = activeDoorsRef.current.find((d) => d.id === doorId);
+            if (door) {
+              const dist = Math.hypot(playerPos.x - door.x, playerPos.z - door.z);
+              if (dist < 2.65) {
+                const nextOpen = !door.isOpen;
+                door.setOpen(nextOpen);
+                openDoorsRef.current[door.id] = nextOpen;
+                soundFX.enterDoor();
+                nearbyDoorKeyRef.current = `${door.id}:${nextOpen}`;
+                setNearbyDoor({id: door.id, label: door.label, isOpen: nextOpen});
+              } else {
+                soundFX.tap();
+                const dx = playerPos.x - door.x;
+                const dz = playerPos.z - door.z;
+                const len = Math.hypot(dx, dz) || 1;
+                activeTarget = {
+                  x: door.x + (dx / len) * 1.15,
+                  z: door.z + (dz / len) * 1.15,
+                  arrivePose: 'idle',
+                  onArrive: () => {
+                    const nextOpen = !door.isOpen;
+                    door.setOpen(nextOpen);
+                    openDoorsRef.current[door.id] = nextOpen;
+                    soundFX.enterDoor();
+                    nearbyDoorKeyRef.current = `${door.id}:${nextOpen}`;
+                    setNearbyDoor({id: door.id, label: door.label, isOpen: nextOpen});
+                  },
+                };
+              }
+            }
+            return;
+          }
+
+          if (kind === 'furniture' || kind === 'house_wall') {
+            return;
+          }
+
           if (kind === 'open_shop') {
             soundFX.tap();
             activeTarget = {
@@ -809,18 +1083,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         if (groundHits.length > 0) {
           releaseSeatIfNeeded();
           const pt = groundHits[0].point;
-          const isTown = stateRef.current.zone === 'town';
-          const boundX = isTown ? 29.5 : 3.45;
-          const boundZMin = isTown ? -31.5 : -4.05;
-          const boundZMax = isTown ? 27.5 : 4.05;
-          const clampedX = THREE.MathUtils.clamp(pt.x, -boundX, boundX);
-          const clampedZ = THREE.MathUtils.clamp(pt.z, boundZMin, boundZMax);
+          const b = getZoneWalkBounds(stateRef.current.zone);
+          const clampedX = THREE.MathUtils.clamp(pt.x, b.minX, b.maxX);
+          const clampedZ = THREE.MathUtils.clamp(pt.z, b.minZ, b.maxZ);
           const safeTarget = resolvePointAgainstColliders(clampedX, clampedZ, currentColliders);
           stallTimer = 0;
           prevDistToTarget = Infinity;
           activeTarget = {
-            x: THREE.MathUtils.clamp(safeTarget.x, -boundX, boundX),
-            z: THREE.MathUtils.clamp(safeTarget.z, boundZMin, boundZMax),
+            x: THREE.MathUtils.clamp(safeTarget.x, b.minX, b.maxX),
+            z: THREE.MathUtils.clamp(safeTarget.z, b.minZ, b.maxZ),
             arrivePose: 'idle',
           };
         }
@@ -918,8 +1189,18 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const camCfg = getResponsiveCameraSettings(z, w / h);
         camera.fov = THREE.MathUtils.damp(camera.fov, camCfg.fov, 6, delta);
         camera.updateProjectionMatrix();
-        const camOffX = z === 'town' ? playerPos.x * 0.65 : 0;
-        const camOffZ = z === 'town' ? (playerPos.z - 3.6) * 0.65 : 0;
+        const camOffX =
+          z === 'town'
+            ? playerPos.x * 0.65
+            : z === 'home'
+              ? (playerPos.x + 1.8) * 0.65
+              : 0;
+        const camOffZ =
+          z === 'town'
+            ? (playerPos.z - 3.6) * 0.65
+            : z === 'home'
+              ? (playerPos.z - 5.2) * 0.65
+              : 0;
         _camPosTarget.set(
           camCfg.pos[0] + camOffX,
           camCfg.pos[1],
@@ -995,12 +1276,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             resolved = distA <= distB ? optA : optB;
           }
 
-          const isTown = z === 'town';
-          const boundX = isTown ? 29.5 : 3.45;
-          const boundZMin = isTown ? -31.5 : -4.05;
-          const boundZMax = isTown ? 27.5 : 4.05;
-          const nextX = THREE.MathUtils.clamp(resolved.x, -boundX, boundX);
-          const nextZ = THREE.MathUtils.clamp(resolved.z, boundZMin, boundZMax);
+          const b = getZoneWalkBounds(z);
+          const nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
+          const nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
 
           const moveX = nextX - playerPos.x;
           const moveZ = nextZ - playerPos.z;
@@ -1057,12 +1335,39 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         prevGroundY = groundOffset;
       }
 
+      if (z === 'home') {
+        homeSpotRef.current.x = playerPos.x;
+        homeSpotRef.current.z = playerPos.z;
+      }
+
+      if (z === 'home' && stateRef.current.editFurnitureMode && stateRef.current.selectedFurnitureId) {
+        const sel = stateRef.current.placedFurniture.find(
+          (p) => p.instanceId === stateRef.current.selectedFurnitureId,
+        );
+        const cat = sel ? FURNITURE_BY_ID[sel.catalogId] : null;
+        if (sel && cat) {
+          selectionRing.visible = true;
+          selectionRing.position.set(sel.x, 0.03, sel.z);
+          const ringRadius =
+            Math.max(cat.halfW, cat.halfD) * 1.28 + Math.sin(elapsed * 5) * 0.035;
+          selectionRing.scale.set(ringRadius, ringRadius, 1);
+        } else {
+          selectionRing.visible = false;
+        }
+      } else {
+        selectionRing.visible = false;
+      }
+
       playerRig.root.position.set(playerPos.x, groundOffset, playerPos.z);
       playerRig.root.rotation.y = playerPos.rotY;
       updateAvatarRigAnimation(playerRig, playerPos.pose, elapsed, av.eyeStyle === 'cozy');
 
       activeTown?.update(elapsed, tod);
-      activeSubzone?.update(elapsed, tod);
+      activeSubzone?.update(
+        elapsed,
+        tod,
+        z === 'home' ? {cameraPos: camera.position, playerPos} : undefined,
+      );
 
       renderer.render(scene, camera);
 
@@ -1089,6 +1394,30 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         } else if (lastHadTags) {
           setTags([]);
           lastHadTags = false;
+        }
+
+        if (z === 'home' && activeDoorsRef.current.length > 0) {
+          let closest: HouseDoorHandle | null = null;
+          let bestD = 2.45;
+          for (const d of activeDoorsRef.current) {
+            const dist = Math.hypot(playerPos.x - d.x, playerPos.z - d.z);
+            if (dist < bestD) {
+              bestD = dist;
+              closest = d;
+            }
+          }
+          const nextKey = closest ? `${closest.id}:${closest.isOpen}` : '';
+          if (nextKey !== nearbyDoorKeyRef.current) {
+            nearbyDoorKeyRef.current = nextKey;
+            setNearbyDoor(
+              closest
+                ? {id: closest.id, label: closest.label, isOpen: closest.isOpen}
+                : null,
+            );
+          }
+        } else if (nearbyDoorKeyRef.current !== '') {
+          nearbyDoorKeyRef.current = '';
+          setNearbyDoor(null);
         }
 
         if (playerBubbleRef.current) {
@@ -1128,6 +1457,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       window.removeEventListener('orientationchange', handleResize);
       activeTown?.dispose();
       activeSubzone?.dispose();
+      selectionRing.geometry.dispose();
+      (selectionRing.material as THREE.Material).dispose();
       envTex.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === container) {
@@ -1148,6 +1479,26 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       setStarPos({x: 20 + Math.random() * 60, y: 20 + Math.random() * 60});
     }
   };
+
+  const handleToggleNearbyDoor = () => {
+    if (!nearbyDoor) return;
+    const door = activeDoorsRef.current.find((d) => d.id === nearbyDoor.id);
+    if (!door) return;
+    const nextOpen = !door.isOpen;
+    door.setOpen(nextOpen);
+    openDoorsRef.current[door.id] = nextOpen;
+    soundFX.enterDoor();
+    nearbyDoorKeyRef.current = `${door.id}:${nextOpen}`;
+    setNearbyDoor({id: door.id, label: door.label, isOpen: nextOpen});
+  };
+
+  const selectedPlacedItem =
+    zone === 'home' && editFurnitureMode && selectedFurnitureId
+      ? placedFurniture.find((p) => p.instanceId === selectedFurnitureId)
+      : null;
+  const selectedCatalogItem = selectedPlacedItem
+    ? FURNITURE_BY_ID[selectedPlacedItem.catalogId]
+    : null;
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -1181,6 +1532,123 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           </div>
         )}
       </div>
+
+      {/* Top-corner 2 small buttons inside House: Tủ nội thất & Di chuyển */}
+      {zone === 'home' && (
+        <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              soundFX.tap();
+              onOpenFurniture();
+            }}
+            className="flex min-h-[38px] items-center gap-1.5 rounded-xl border-2 border-[#8C6239] bg-[#FFF8EB] px-3 py-1.5 text-xs font-bold text-[#4A3525] shadow-md transition-transform active:scale-95"
+          >
+            <Armchair className="h-4 w-4 text-[#9A5B25]" />
+            <span>Tủ nội thất</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              soundFX.tap();
+              onToggleEditFurniture();
+            }}
+            className={`flex min-h-[38px] items-center gap-1.5 rounded-xl border-2 px-3 py-1.5 text-xs font-bold shadow-md transition-transform active:scale-95 ${
+              editFurnitureMode
+                ? 'border-[#B95D3B] bg-[#DF7B57] text-white'
+                : 'border-[#8C6239] bg-[#FFF8EB] text-[#4A3525]'
+            }`}
+          >
+            <Move className="h-4 w-4" />
+            <span>{editFurnitureMode ? 'Xong' : 'Di chuyển'}</span>
+          </button>
+        </div>
+      )}
+
+      {/* Proximity Door Toggle Button inside House */}
+      {zone === 'home' && !editFurnitureMode && nearbyDoor && (
+        <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
+          <button
+            type="button"
+            onClick={handleToggleNearbyDoor}
+            className="anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 border-[#7A5230] bg-[#FFF8EB] px-4 py-2 text-xs font-bold text-[#4A3525] shadow-lg transition-transform active:scale-95"
+          >
+            {nearbyDoor.isOpen ? (
+              <DoorClosed className="h-4 w-4 text-[#B95D3B]" />
+            ) : (
+              <DoorOpen className="h-4 w-4 text-[#4B8A66]" />
+            )}
+            <span>
+              {nearbyDoor.isOpen ? `Đóng ${nearbyDoor.label}` : `Mở ${nearbyDoor.label}`}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Bottom Action Bar in Furniture Move Mode */}
+      {zone === 'home' && editFurnitureMode && (
+        <div className="absolute bottom-4 left-1/2 z-30 flex w-[min(94vw,440px)] -translate-x-1/2 flex-col items-center gap-1.5">
+          {selectedCatalogItem && selectedPlacedItem ? (
+            <>
+              <span className="rounded-lg bg-[#4A3525]/85 px-2.5 py-0.5 text-[11px] font-semibold text-amber-50 shadow-xs">
+                {selectedCatalogItem.wallMount
+                  ? `Chạm tường để đặt "${selectedCatalogItem.name}" · Chạm đồ khác để chọn`
+                  : `Chạm sàn để đặt "${selectedCatalogItem.name}" · Chạm đồ khác để chọn`}
+              </span>
+              <div className="flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-[#8C6239] bg-[#FFF8EB] p-2 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    onRotateFurniture(selectedPlacedItem.instanceId);
+                  }}
+                  className="flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#6F4E37] px-3 text-xs font-bold text-amber-50 transition-transform active:scale-95"
+                >
+                  <RotateCw className="h-4 w-4" />
+                  <span>Xoay</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    onStowFurniture(selectedPlacedItem.instanceId);
+                  }}
+                  className="flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#E7D4BA] px-3 text-xs font-bold text-[#4A3525] transition-transform active:scale-95"
+                >
+                  <PackageMinus className="h-4 w-4" />
+                  <span>Cất vào tủ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    onToggleEditFurniture();
+                  }}
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-[#6BA383] px-3.5 text-xs font-bold text-white transition-transform active:scale-95"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>Xong</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-3 rounded-2xl border-2 border-[#8C6239] bg-[#FFF8EB] px-4 py-2 text-xs font-bold text-[#4A3525] shadow-xl">
+              <span>Chạm vào một món nội thất để di chuyển hoặc xoay</span>
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  onToggleEditFurniture();
+                }}
+                className="rounded-xl bg-[#6BA383] px-3 py-1.5 text-white transition-transform active:scale-95"
+              >
+                Xong
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {miniActive && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-stone-950/70 p-4">
