@@ -4,7 +4,14 @@ import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
 import {buildSubzoneScene, SubzoneWorld} from '../three/subzonesBuilder';
-import {buildTownScene, TownAnchor, TownWorld, WorldCollider} from '../three/townBuilder';
+import {
+  buildTownScene,
+  getTownGroundHeight,
+  TOWN_ZONE_ENTRANCES,
+  TownAnchor,
+  TownWorld,
+  WorldCollider,
+} from '../three/townBuilder';
 import {
   AvatarConfig,
   AvatarPose,
@@ -296,8 +303,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.08;
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = !isSoftwareGl;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = false;
 
     const width = container.clientWidth || window.innerWidth || 800;
     const height = container.clientHeight || window.innerHeight || 600;
@@ -311,7 +317,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#BFE6F7');
-    scene.fog = new THREE.FogExp2('#BFE6F7', 0.0085);
+    scene.fog = new THREE.FogExp2('#BFE6F7', 0.0056);
 
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -319,7 +325,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     pmrem.dispose();
 
     const initCam = getResponsiveCameraSettings(stateRef.current.zone, width / height);
-    const camera = new THREE.PerspectiveCamera(initCam.fov, width / height, 0.4, 140);
+    const camera = new THREE.PerspectiveCamera(initCam.fov, width / height, 0.4, 190);
     camera.position.set(initCam.pos[0], initCam.pos[1], initCam.pos[2]);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -332,7 +338,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     controls.rotateSpeed = 0.78;
     controls.zoomSpeed = 0.9;
     controls.minDistance = 4.8;
-    controls.maxDistance = 56;
+    controls.maxDistance = 68;
     controls.minPolarAngle = Math.PI * 0.14;
     controls.maxPolarAngle = Math.PI * 0.46;
     controls.update();
@@ -349,16 +355,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     const sunLight = new THREE.DirectionalLight('#FFF3DA', 1.45);
     sunLight.position.set(16, 25, 18);
-    sunLight.castShadow = !isSoftwareGl;
-    sunLight.shadow.mapSize.set(1024, 1024);
-    sunLight.shadow.camera.left = -30;
-    sunLight.shadow.camera.right = 30;
-    sunLight.shadow.camera.top = 30;
-    sunLight.shadow.camera.bottom = -30;
-    sunLight.shadow.camera.near = 1;
-    sunLight.shadow.camera.far = 75;
-    sunLight.shadow.bias = -0.0005;
-    sunLight.shadow.normalBias = 0.02;
+    sunLight.castShadow = false;
     scene.add(sunLight);
 
     const rimLight = new THREE.DirectionalLight('#B8DCFF', 0.42);
@@ -396,8 +393,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let currentAnchors: TownAnchor[] = [];
     let currentClickTargets: THREE.Object3D[] = [];
     let currentColliders: WorldCollider[] = [];
-    let currentPlazaRadius = 6.2;
-    let currentGround: THREE.Mesh | null = null;
+    let currentPlazaRadius = 6.8;
+    let currentGrounds: THREE.Object3D[] = [];
+    let prevGroundY = 0.14;
 
     const loadCurrentWorld = () => {
       const {zone: z, plots: pl, fishingState: fs} = stateRef.current;
@@ -420,15 +418,25 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         currentClickTargets = [...activeTown.clickTargets, playerProxy];
         currentColliders = activeTown.colliders;
         currentPlazaRadius = activeTown.plazaRadius;
-        currentGround = activeTown.groundMesh;
+        currentGrounds = activeTown.groundMeshes;
         if (activeZoneLoaded !== 'town') {
           activeTarget = null;
           activeSeat = null;
-          playerPos.x = 0;
-          playerPos.z = 3.6;
-          playerPos.rotY = 0;
+          if (activeZoneLoaded !== null) {
+            const exitSpawn = TOWN_ZONE_ENTRANCES[activeZoneLoaded];
+            playerPos.x = exitSpawn.tx;
+            playerPos.z = exitSpawn.tz;
+            playerPos.rotY = exitSpawn.exitRotY;
+          } else {
+            playerPos.x = 0;
+            playerPos.z = 3.6;
+            playerPos.rotY = 0;
+          }
           playerPos.pose = 'idle';
-          playerRig.root.position.set(playerPos.x, 0.14, playerPos.z);
+          const spawnY = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+          prevGroundY = spawnY;
+          playerRig.root.position.set(playerPos.x, spawnY, playerPos.z);
+          playerRig.root.rotation.y = playerPos.rotY;
           cameraTransitionActive = true;
         }
       } else {
@@ -440,7 +448,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         currentAnchors = activeSubzone.labelAnchors;
         currentClickTargets = [...activeSubzone.clickTargets, playerProxy];
         currentColliders = activeSubzone.colliders;
-        currentGround = activeSubzone.groundMesh;
+        currentGrounds = [activeSubzone.groundMesh];
         if (activeZoneLoaded !== z) {
           activeTarget = null;
           activeSeat = null;
@@ -448,6 +456,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           playerPos.z = 2.6;
           playerPos.rotY = 0;
           playerPos.pose = 'idle';
+          prevGroundY = 0;
           playerRig.root.position.set(playerPos.x, 0, playerPos.z);
           cameraTransitionActive = true;
         }
@@ -467,7 +476,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       });
       playerRig = buildAvatarRig(cfg);
-      playerRig.root.position.set(playerPos.x, stateRef.current.zone === 'town' ? 0.14 : 0, playerPos.z);
+      const curY =
+        stateRef.current.zone === 'town'
+          ? getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius)
+          : 0;
+      playerRig.root.position.set(playerPos.x, curY, playerPos.z);
       playerRig.root.rotation.y = playerPos.rotY;
       playerRig.root.add(playerProxy);
       scene.add(playerRig.root);
@@ -510,7 +523,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             showBubble(
               `${s.coins} Xu · Năng lượng ${s.energy}% · Vui vẻ ${s.mood}%`,
               playerPos.x,
-              2.2,
+              playerRig.root.position.y + 2.05,
               playerPos.z,
             );
             return;
@@ -790,16 +803,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
-      // 2. Tap on walkable ground -> nudge outside any obstacle & walk there
-      if (currentGround) {
-        const groundHits = raycaster.intersectObject(currentGround, false);
+      // 2. Tap on walkable ground or hill -> nudge outside any obstacle & walk there
+      if (currentGrounds.length > 0) {
+        const groundHits = raycaster.intersectObjects(currentGrounds, false);
         if (groundHits.length > 0) {
           releaseSeatIfNeeded();
           const pt = groundHits[0].point;
           const isTown = stateRef.current.zone === 'town';
-          const boundX = isTown ? 21.5 : 3.45;
-          const boundZMin = isTown ? -20.5 : -4.05;
-          const boundZMax = isTown ? 20.5 : 4.05;
+          const boundX = isTown ? 29.5 : 3.45;
+          const boundZMin = isTown ? -31.5 : -4.05;
+          const boundZMax = isTown ? 27.5 : 4.05;
           const clampedX = THREE.MathUtils.clamp(pt.x, -boundX, boundX);
           const clampedZ = THREE.MathUtils.clamp(pt.z, boundZMin, boundZMax);
           const safeTarget = resolvePointAgainstColliders(clampedX, clampedZ, currentColliders);
@@ -905,8 +918,18 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const camCfg = getResponsiveCameraSettings(z, w / h);
         camera.fov = THREE.MathUtils.damp(camera.fov, camCfg.fov, 6, delta);
         camera.updateProjectionMatrix();
-        _camPosTarget.set(camCfg.pos[0], camCfg.pos[1], camCfg.pos[2]);
-        _camLookTarget.set(camCfg.look[0], camCfg.look[1], camCfg.look[2]);
+        const camOffX = z === 'town' ? playerPos.x * 0.65 : 0;
+        const camOffZ = z === 'town' ? (playerPos.z - 3.6) * 0.65 : 0;
+        _camPosTarget.set(
+          camCfg.pos[0] + camOffX,
+          camCfg.pos[1],
+          camCfg.pos[2] + camOffZ,
+        );
+        _camLookTarget.set(
+          camCfg.look[0] + camOffX,
+          camCfg.look[1],
+          camCfg.look[2] + camOffZ,
+        );
         camera.position.x = THREE.MathUtils.damp(camera.position.x, _camPosTarget.x, 6, delta);
         camera.position.y = THREE.MathUtils.damp(camera.position.y, _camPosTarget.y, 6, delta);
         camera.position.z = THREE.MathUtils.damp(camera.position.z, _camPosTarget.z, 6, delta);
@@ -973,9 +996,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
 
           const isTown = z === 'town';
-          const boundX = isTown ? 21.5 : 3.45;
-          const boundZMin = isTown ? -20.5 : -4.05;
-          const boundZMax = isTown ? 20.5 : 4.05;
+          const boundX = isTown ? 29.5 : 3.45;
+          const boundZMin = isTown ? -31.5 : -4.05;
+          const boundZMax = isTown ? 27.5 : 4.05;
           const nextX = THREE.MathUtils.clamp(resolved.x, -boundX, boundX);
           const nextZ = THREE.MathUtils.clamp(resolved.z, boundZMin, boundZMax);
 
@@ -1021,8 +1044,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         groundOffset = activeSeat.seatY - 0.245;
       } else if (playerPos.pose === 'sleep' && activeSeat?.isBed) {
         groundOffset = 0;
-      } else if (z === 'town' && Math.hypot(playerPos.x, playerPos.z) < currentPlazaRadius + 0.25) {
-        groundOffset = 0.14;
+      } else if (z === 'town') {
+        groundOffset = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+      }
+
+      if (z === 'town') {
+        const dGroundY = groundOffset - prevGroundY;
+        if (!cameraTransitionActive && Math.abs(dGroundY) > 0.0001) {
+          camera.position.y += dGroundY * 0.65;
+          controls.target.y += dGroundY * 0.65;
+        }
+        prevGroundY = groundOffset;
       }
 
       playerRig.root.position.set(playerPos.x, groundOffset, playerPos.z);

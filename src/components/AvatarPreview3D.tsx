@@ -47,8 +47,7 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = !isSoftwareGl;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = false;
 
     const width = container.clientWidth || 260;
     const height = container.clientHeight || 190;
@@ -70,7 +69,7 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
 
     const key = new THREE.DirectionalLight('#FFF3DC', 1.4);
     key.position.set(2.5, 4.5, 3.5);
-    key.castShadow = !isSoftwareGl;
+    key.castShadow = false;
     scene.add(key);
 
     const rim = new THREE.DirectionalLight('#CBE8FF', 0.55);
