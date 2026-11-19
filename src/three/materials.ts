@@ -93,16 +93,30 @@ export function createGrassTexture(): THREE.CanvasTexture {
   canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = '#8ACD72';
+  ctx.fillStyle = '#86CA6E';
   ctx.fillRect(0, 0, 256, 256);
 
-  for (let i = 0; i < 160; i++) {
+  // Soft meadow color variation patches
+  for (let i = 0; i < 180; i++) {
     const x = (i * 73) % 256;
     const y = (i * 137) % 256;
-    ctx.fillStyle = i % 3 === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(65,125,52,0.09)';
+    ctx.fillStyle =
+      i % 4 === 0
+        ? 'rgba(255, 255, 220, 0.08)'
+        : i % 2 === 0
+          ? 'rgba(72, 138, 56, 0.09)'
+          : 'rgba(155, 220, 118, 0.09)';
     ctx.beginPath();
-    ctx.arc(x, y, (i % 5) + 3, 0, Math.PI * 2);
+    ctx.arc(x, y, (i % 6) + 3, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // Subtle static clover / blade speckles
+  for (let i = 0; i < 90; i++) {
+    const x = (i * 97 + 19) % 256;
+    const y = (i * 53 + 41) % 256;
+    ctx.fillStyle = i % 3 === 0 ? 'rgba(255,248,196,0.22)' : 'rgba(58,115,44,0.16)';
+    ctx.fillRect(x, y, 2, 4);
   }
 
   const tex = new THREE.CanvasTexture(canvas);
