@@ -170,6 +170,7 @@ export interface FurnitureCatalogItem {
   kind: FurnitureKind;
   category: FurnitureCategory;
   name: string;
+  price: number;
   color: string;
   accentColor?: string;
   halfW: number;
