@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import {TINA_AVATAR} from '../data/avatarCatalog';
+import {BOB_AVATAR, TINA_AVATAR} from '../data/avatarCatalog';
 import {FURNITURE_BY_ID} from '../data/furnitureCatalog';
 import {GardenPlotState, PlacedFurniture, TimeOfDay, ZoneId} from '../types/game';
 import {buildAvatarRig, updateAvatarRigAnimation} from './avatar3d';
@@ -1193,8 +1193,9 @@ export function buildSubzoneScene(
 
     group.add(createExitDoorway('Ra Thị Trấn', [0, 0, 4.45], '#E86F74', clickTargets, labelAnchors));
   } else if (zone === 'boutique') {
+    // Expanded boutique floor (12.8 x 11.6) housing Tina (Thời Trang) & Bob (Nội Thất)
     const floor = new THREE.Mesh(
-      new RoundedBoxGeometry(8.4, 0.4, 10.6, 2, 0.08),
+      new RoundedBoxGeometry(12.8, 0.4, 11.6, 2, 0.08),
       clayMat('#EBD6CB', 0.72),
     );
     floor.position.y = -0.2;
@@ -1203,32 +1204,42 @@ export function buildSubzoneScene(
     group.add(floor);
 
     const wall = new THREE.Mesh(
-      new RoundedBoxGeometry(8.4, 1.45, 0.32, 2, 0.06),
+      new RoundedBoxGeometry(12.8, 1.55, 0.32, 2, 0.06),
       clayMat('#FCEEEF', 0.75),
     );
-    wall.position.set(0, 0.72, -5.18);
+    wall.position.set(0, 0.76, -5.68);
     group.add(wall);
 
-    const rug = new THREE.Mesh(
-      new THREE.CylinderGeometry(2.4, 2.45, 0.05, 26),
+    // Subtle left/right wing rugs under Tina & Bob zones
+    const rugTina = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.15, 2.2, 0.05, 24),
       clayMat('#F5C6CE', 0.88),
     );
-    rug.scale.set(1.15, 1, 0.85);
-    rug.position.set(0, 0.025, 0.35);
-    group.add(rug);
+    rugTina.scale.set(1.12, 1, 0.85);
+    rugTina.position.set(-2.7, 0.025, 0.25);
+    group.add(rugTina);
 
-    const counter = new THREE.Group();
-    counter.position.set(0, 0, -1.65);
-    const desk = new THREE.Mesh(
+    const rugBob = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.15, 2.2, 0.05, 24),
+      clayMat('#CBE3D5', 0.88),
+    );
+    rugBob.scale.set(1.12, 1, 0.85);
+    rugBob.position.set(2.7, 0.025, 0.25);
+    group.add(rugBob);
+
+    // === LEFT COUNTER: TINA (FASHION) ===
+    const tinaCounter = new THREE.Group();
+    tinaCounter.position.set(-2.7, 0, -2.0);
+    const tinaDesk = new THREE.Mesh(
       new RoundedBoxGeometry(2.8, 0.96, 0.95, 3, 0.08),
       clayMat('#D9788A', 0.58),
     );
-    desk.position.y = 0.48;
-    const deskTop = new THREE.Mesh(
+    tinaDesk.position.y = 0.48;
+    const tinaDeskTop = new THREE.Mesh(
       new RoundedBoxGeometry(2.98, 0.14, 1.1, 2, 0.05),
       clayMat('#FFF9F2', 0.5),
     );
-    deskTop.position.y = 0.98;
+    tinaDeskTop.position.y = 0.98;
     const registerBase = new THREE.Mesh(
       new RoundedBoxGeometry(0.55, 0.24, 0.42, 2, 0.04),
       clayMat('#F7D7A8', 0.55),
@@ -1239,42 +1250,96 @@ export function buildSubzoneScene(
       glossyClayMat('#FFD166', 0.25),
     );
     catalogBook.position.set(-0.55, 1.1, 0.1);
-    counter.add(desk, deskTop, registerBase, catalogBook);
+    tinaCounter.add(tinaDesk, tinaDeskTop, registerBase, catalogBook);
     addBoxProxy(
-      counter,
+      tinaCounter,
       [3.0, 1.5, 1.35],
       [0, 0.75, 0],
-      {kind: 'open_shop', tx: 0, tz: -0.25},
+      {kind: 'open_shop', tx: -2.7, tz: -0.55},
       clickTargets,
     );
-    colliders.push({type: 'box', x: 0, z: -1.65, hw: 1.52, hd: 0.62});
-    labelAnchors.push({
-      id: 'shop_counter',
-      label: 'Quầy Cửa Hàng',
-      worldPos: new THREE.Vector3(0, 1.55, -1.65),
-    });
-    group.add(counter);
+    colliders.push({type: 'box', x: -2.7, z: -2.0, hw: 1.52, hd: 0.62});
+    group.add(tinaCounter);
 
     const tinaRig = buildAvatarRig(TINA_AVATAR);
-    tinaRig.root.position.set(0, 0, -2.6);
+    tinaRig.root.position.set(-2.7, 0, -2.95);
     tinaRig.root.rotation.y = 0;
     updateAvatarRigAnimation(tinaRig, 'idle', 0, false);
     group.add(tinaRig.root);
     addBoxProxy(
       group,
       [1.2, 2.0, 1.2],
-      [0, 1.0, -2.6],
-      {kind: 'open_shop', tx: 0, tz: -0.25},
+      [-2.7, 1.0, -2.95],
+      {kind: 'open_shop', tx: -2.7, tz: -0.55},
       clickTargets,
     );
-    colliders.push({type: 'circle', x: 0, z: -2.6, r: 0.45});
+    colliders.push({type: 'circle', x: -2.7, z: -2.95, r: 0.45});
     labelAnchors.push({
       id: 'tina_npc',
       label: 'Tina',
-      worldPos: new THREE.Vector3(0, 2.15, -2.6),
+      worldPos: new THREE.Vector3(-2.7, 2.15, -2.95),
     });
 
-    group.add(createExitDoorway('Cửa Ra Phố', [0, 0, 4.45], '#E58E9A', clickTargets, labelAnchors));
+    // === RIGHT COUNTER: BOB (FURNITURE) ===
+    const bobCounter = new THREE.Group();
+    bobCounter.position.set(2.7, 0, -2.0);
+    const bobDesk = new THREE.Mesh(
+      new RoundedBoxGeometry(2.8, 0.96, 0.95, 3, 0.08),
+      clayMat('#769E84', 0.6),
+    );
+    bobDesk.position.y = 0.48;
+    const bobDeskTop = new THREE.Mesh(
+      new RoundedBoxGeometry(2.98, 0.14, 1.1, 2, 0.05),
+      clayMat('#E8C398', 0.54),
+    );
+    bobDeskTop.position.y = 0.98;
+    // Mini furniture catalog + desk lamp accent
+    const furnCatalog = new THREE.Mesh(
+      new RoundedBoxGeometry(0.68, 0.1, 0.48, 2, 0.03),
+      glossyClayMat('#74BFA9', 0.28),
+    );
+    furnCatalog.position.set(-0.55, 1.1, 0.1);
+    const lampStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.06, 0.28, 10),
+      clayMat('#9C683D', 0.55),
+    );
+    lampStem.position.set(0.8, 1.18, -0.05);
+    const lampShade = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.2, 0.18, 12),
+      clayMat('#FFE6A7', 0.45),
+    );
+    lampShade.position.set(0.8, 1.38, -0.05);
+    bobCounter.add(bobDesk, bobDeskTop, furnCatalog, lampStem, lampShade);
+    addBoxProxy(
+      bobCounter,
+      [3.0, 1.5, 1.35],
+      [0, 0.75, 0],
+      {kind: 'open_furniture_shop', tx: 2.7, tz: -0.55},
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: 2.7, z: -2.0, hw: 1.52, hd: 0.62});
+    group.add(bobCounter);
+
+    const bobRig = buildAvatarRig(BOB_AVATAR);
+    bobRig.root.position.set(2.7, 0, -2.95);
+    bobRig.root.rotation.y = 0;
+    updateAvatarRigAnimation(bobRig, 'idle', 0, false);
+    group.add(bobRig.root);
+    addBoxProxy(
+      group,
+      [1.2, 2.0, 1.2],
+      [2.7, 1.0, -2.95],
+      {kind: 'open_furniture_shop', tx: 2.7, tz: -0.55},
+      clickTargets,
+    );
+    colliders.push({type: 'circle', x: 2.7, z: -2.95, r: 0.45});
+    labelAnchors.push({
+      id: 'bob_npc',
+      label: 'Bob',
+      worldPos: new THREE.Vector3(2.7, 2.15, -2.95),
+    });
+
+    group.add(createExitDoorway('Cửa Ra Phố', [0, 0, 4.95], '#E58E9A', clickTargets, labelAnchors));
   }
 
   return {
