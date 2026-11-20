@@ -335,6 +335,34 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 120,
     patch: {headItem: 'beret', headItemColor: '#F4EDE2'},
   },
+  {
+    id: 'head_cap_sky',
+    category: 'head',
+    name: 'Mũ Lưỡi Trai Xanh Mây',
+    price: 0,
+    patch: {headItem: 'cap', headItemColor: '#4B86B4'},
+  },
+  {
+    id: 'head_beanie_ochre',
+    category: 'head',
+    name: 'Mũ Len Vàng Ấm',
+    price: 0,
+    patch: {headItem: 'beanie', headItemColor: '#D89A48'},
+  },
+  {
+    id: 'head_clip_peach',
+    category: 'head',
+    name: 'Kẹp Tóc Đôi San Hô',
+    price: 0,
+    patch: {headItem: 'hair_clip', headItemColor: '#F4A261'},
+  },
+  {
+    id: 'head_flower_daisy',
+    category: 'head',
+    name: 'Hoa Cúc Cài Tóc',
+    price: 0,
+    patch: {headItem: 'flower_pin', headItemColor: '#FFF9F0'},
+  },
 
   // ========== 5. PHỤ KIỆN ==========
   {

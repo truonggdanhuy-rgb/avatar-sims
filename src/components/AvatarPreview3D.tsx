@@ -1,4 +1,4 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import * as THREE from 'three';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
@@ -8,21 +8,53 @@ import {AvatarConfig} from '../types/game';
 interface AvatarPreview3DProps {
   avatar: AvatarConfig;
   className?: string;
+  showInspectorControls?: boolean;
 }
+
+type AngleKey = 'front' | 'angle45' | 'side90' | 'back';
+
+const ANGLE_VALUES: Record<AngleKey, {label: string; rotY: number}> = {
+  front: {label: 'Chính diện', rotY: 0},
+  angle45: {label: '45°', rotY: Math.PI * 0.25},
+  side90: {label: '90°', rotY: Math.PI * 0.5},
+  back: {label: 'Sau', rotY: Math.PI},
+};
 
 export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
   avatar,
   className = '',
+  showInspectorControls = true,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const avatarRef = useRef<AvatarConfig>(avatar);
   const rebuildFnRef = useRef<((cfg: AvatarConfig) => void) | null>(null);
-  const rotYRef = useRef(0.2);
+  const rotYRef = useRef(0.25);
+  const targetRotYRef = useRef<number | null>(null);
+  const autoSpinRef = useRef(true);
+  const headZoomRef = useRef(false);
+
+  const [activeAngle, setActiveAngle] = useState<AngleKey | null>(null);
+  const [headZoom, setHeadZoom] = useState(false);
 
   useEffect(() => {
     avatarRef.current = avatar;
     rebuildFnRef.current?.(avatar);
   }, [avatar]);
+
+  const handleSelectAngle = (key: AngleKey) => {
+    autoSpinRef.current = false;
+    const base = ANGLE_VALUES[key].rotY;
+    const twoPi = Math.PI * 2;
+    targetRotYRef.current =
+      base + Math.round((rotYRef.current - base) / twoPi) * twoPi;
+    setActiveAngle(key);
+  };
+
+  const handleToggleZoom = () => {
+    const next = !headZoom;
+    headZoomRef.current = next;
+    setHeadZoom(next);
+  };
 
   useEffect(() => {
     const container = mountRef.current;
@@ -45,7 +77,7 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.96;
+    renderer.toneMappingExposure = 0.98;
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = false;
 
@@ -62,18 +94,18 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
     pmrem.dispose();
 
     const camera = new THREE.PerspectiveCamera(34, width / height, 0.1, 30);
-    camera.position.set(0, 1.28, 4.05);
-    camera.lookAt(0, 0.94, 0);
+    camera.position.set(0, 1.25, 4.25);
+    camera.lookAt(0, 0.96, 0);
 
-    const hemi = new THREE.HemisphereLight('#FFF8EE', '#B89578', 0.58);
+    const hemi = new THREE.HemisphereLight('#FFF8EE', '#B89578', 0.6);
     scene.add(hemi);
 
-    const key = new THREE.DirectionalLight('#FFF1D6', 1.2);
+    const key = new THREE.DirectionalLight('#FFF1D6', 1.22);
     key.position.set(2.5, 4.5, 3.5);
     key.castShadow = false;
     scene.add(key);
 
-    const rim = new THREE.DirectionalLight('#B8DCFF', 0.44);
+    const rim = new THREE.DirectionalLight('#B8DCFF', 0.48);
     rim.position.set(-2.5, 2.5, -2.5);
     scene.add(rim);
 
@@ -109,6 +141,9 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
     let lastX = 0;
     const onPointerDown = (e: PointerEvent) => {
       dragging = true;
+      autoSpinRef.current = false;
+      targetRotYRef.current = null;
+      setActiveAngle(null);
       lastX = e.clientX;
     };
     const onPointerMove = (e: PointerEvent) => {
@@ -141,6 +176,10 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
     let frameId = 0;
     let disposed = false;
     const clock = new THREE.Clock();
+    let lastNow = performance.now();
+    let camY = 1.25;
+    let camZ = 4.25;
+    let lookY = 0.96;
 
     function afterDraw(cb: () => void) {
       const gl = renderer.getContext() as WebGL2RenderingContext;
@@ -161,10 +200,33 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
 
     function tick() {
       if (disposed) return;
+      const now = performance.now();
+      const delta = Math.min((now - lastNow) / 1000, 0.1);
+      lastNow = now;
       const elapsed = clock.getElapsedTime();
+
       if (!dragging) {
-        rotYRef.current += 0.004;
+        if (targetRotYRef.current !== null) {
+          rotYRef.current = THREE.MathUtils.damp(
+            rotYRef.current,
+            targetRotYRef.current,
+            10,
+            delta,
+          );
+        } else if (autoSpinRef.current) {
+          rotYRef.current += 0.004;
+        }
       }
+
+      const wantCamY = headZoomRef.current ? 1.36 : 1.25;
+      const wantCamZ = headZoomRef.current ? 2.18 : 4.25;
+      const wantLookY = headZoomRef.current ? 1.28 : 0.96;
+      camY = THREE.MathUtils.damp(camY, wantCamY, 8, delta);
+      camZ = THREE.MathUtils.damp(camZ, wantCamZ, 8, delta);
+      lookY = THREE.MathUtils.damp(lookY, wantLookY, 8, delta);
+      camera.position.set(0, camY, camZ);
+      camera.lookAt(0, lookY, 0);
+
       currentRig.root.rotation.y = rotYRef.current;
       updateAvatarRigAnimation(
         currentRig,
@@ -197,9 +259,42 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
   }, []);
 
   return (
-    <div
-      ref={mountRef}
-      className={`cursor-grab active:cursor-grabbing ${className}`}
-    />
+    <div className={`relative ${className}`}>
+      <div
+        ref={mountRef}
+        className="h-full w-full cursor-grab active:cursor-grabbing"
+      />
+      {showInspectorControls && (
+        <div className="pointer-events-auto absolute inset-x-2 top-2 flex flex-wrap items-center justify-between gap-1">
+          <div className="flex items-center gap-1 rounded-xl border border-[#DFC7A5] bg-[#FFF8EB]/95 p-0.5 shadow-xs">
+            {(Object.keys(ANGLE_VALUES) as AngleKey[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => handleSelectAngle(key)}
+                className={`rounded-lg px-2 py-1 text-[10px] font-bold whitespace-nowrap transition-colors ${
+                  activeAngle === key
+                    ? 'bg-[#6F4E37] text-amber-50'
+                    : 'text-[#6F4E37] hover:bg-[#EFE0C9]'
+                }`}
+              >
+                {ANGLE_VALUES[key].label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleZoom}
+            className={`rounded-xl border px-2 py-1 text-[10px] font-bold whitespace-nowrap shadow-xs transition-colors ${
+              headZoom
+                ? 'border-[#6F4E37] bg-[#6F4E37] text-amber-50'
+                : 'border-[#DFC7A5] bg-[#FFF8EB]/95 text-[#6F4E37] hover:bg-[#EFE0C9]'
+            }`}
+          >
+            {headZoom ? 'Toàn thân' : 'Soi tóc'}
+          </button>
+        </div>
+      )}
+    </div>
   );
 };

@@ -98,26 +98,30 @@ export const BoutiqueModal: React.FC<BoutiqueModalProps> = ({
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
           {/* Live 3D Fitting Preview */}
-          <div className="relative flex h-44 shrink-0 flex-col items-center justify-center border-b border-[#E5D5BE] bg-gradient-to-b from-[#FFFDF9] to-[#F7E5DF] md:h-full md:w-[300px] md:border-r md:border-b-0">
+          <div className="relative flex h-48 shrink-0 flex-col items-center justify-center border-b border-[#E5D5BE] bg-gradient-to-b from-[#FFFDF9] to-[#F7E5DF] sm:h-52 md:h-full md:w-[300px] md:border-r md:border-b-0">
             <AvatarPreview3D avatar={previewAvatar} className="h-full w-full" />
-            <div className="pointer-events-none absolute bottom-2 flex items-center gap-2">
+            <div
+              className={`pointer-events-none absolute inset-x-2.5 bottom-2 flex items-center gap-2 ${
+                isPreviewDirty ? 'justify-between' : 'justify-center'
+              }`}
+            >
               <span className="text-[11px] font-semibold text-[#6F4E37]">
                 Kéo nhân vật để xoay 360°
               </span>
+              {isPreviewDirty && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setPreviewAvatar(avatar);
+                  }}
+                  className="pointer-events-auto flex min-h-[32px] items-center gap-1 rounded-xl border border-[#DFC7A5] bg-[#FFF8EB]/95 px-2.5 text-[11px] font-bold text-[#6F4E37] shadow-xs transition-transform active:scale-95"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Hoàn tác</span>
+                </button>
+              )}
             </div>
-            {isPreviewDirty && (
-              <button
-                type="button"
-                onClick={() => {
-                  soundFX.tap();
-                  setPreviewAvatar(avatar);
-                }}
-                className="absolute right-2.5 bottom-2 flex min-h-[34px] items-center gap-1 rounded-xl border border-[#DFC7A5] bg-[#FFF8EB] px-2.5 text-[11px] font-bold text-[#6F4E37] shadow-xs transition-transform active:scale-95 md:top-2.5 md:bottom-auto"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span>Hoàn tác</span>
-              </button>
-            )}
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

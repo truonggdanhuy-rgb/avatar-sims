@@ -73,7 +73,7 @@ export const WardrobeModal: React.FC<WardrobeModalProps> = ({
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
           {/* Live 3D Mirror Character Preview */}
-          <div className="relative flex h-44 shrink-0 flex-col items-center justify-center border-b border-[#E5D5BE] bg-gradient-to-b from-[#FFFDF9] to-[#F4E7D3] md:h-full md:w-[300px] md:border-r md:border-b-0">
+          <div className="relative flex h-48 shrink-0 flex-col items-center justify-center border-b border-[#E5D5BE] bg-gradient-to-b from-[#FFFDF9] to-[#F4E7D3] sm:h-52 md:h-full md:w-[300px] md:border-r md:border-b-0">
             <AvatarPreview3D avatar={avatar} className="h-full w-full" />
             <span className="pointer-events-none absolute bottom-2 text-[11px] font-semibold text-[#6F4E37]">
               Kéo nhân vật để xoay 360°

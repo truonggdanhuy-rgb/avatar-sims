@@ -375,6 +375,53 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             </g>
           );
         }
+        if (style === 'cap') {
+          return (
+            <g>
+              <path d="M18 46 C18 24, 58 24, 58 46 Z" fill={col} stroke={outline} strokeWidth="2.2" />
+              <path d="M22 46 Q46 53 68 47 Q54 41 22 46 Z" fill="#F4EFE6" stroke={outline} strokeWidth="2" />
+              <circle cx="38" cy="26" r="2.6" fill="#F4EFE6" stroke={outline} strokeWidth="1.4" />
+            </g>
+          );
+        }
+        if (style === 'beanie') {
+          return (
+            <g>
+              <circle cx="40" cy="18" r="6" fill="#F8F4EC" stroke={outline} strokeWidth="2" />
+              <path d="M20 44 C20 22, 60 22, 60 44 Z" fill={col} stroke={outline} strokeWidth="2.2" />
+              <rect x="17" y="42" width="46" height="10" rx="5" fill={shade(col, -16)} stroke={outline} strokeWidth="2" />
+            </g>
+          );
+        }
+        if (style === 'hair_clip') {
+          return (
+            <g>
+              <rect x="18" y="31" width="44" height="7" rx="3.5" transform="rotate(-6 40 34)" fill={col} stroke={outline} strokeWidth="2" />
+              <rect x="18" y="43" width="44" height="7" rx="3.5" transform="rotate(6 40 46)" fill="#FDF2D6" stroke={outline} strokeWidth="2" />
+              <circle cx="54" cy="33" r="3" fill="#FFFDF8" stroke={outline} strokeWidth="1.5" />
+            </g>
+          );
+        }
+        if (style === 'flower_pin') {
+          return (
+            <g transform="translate(40,40)">
+              {[0, 72, 144, 216, 288].map((deg) => (
+                <ellipse
+                  key={deg}
+                  cx="0"
+                  cy="-12"
+                  rx="7"
+                  ry="9"
+                  transform={`rotate(${deg})`}
+                  fill={col}
+                  stroke={outline}
+                  strokeWidth="1.8"
+                />
+              ))}
+              <circle cx="0" cy="0" r="6.5" fill="#F4B942" stroke={outline} strokeWidth="1.8" />
+            </g>
+          );
+        }
         // ribbon_bow
         return (
           <g>

@@ -44,9 +44,13 @@ export type HeadItemStyle =
   | 'none'
   | 'beret'
   | 'sunhat'
+  | 'cap'
+  | 'beanie'
   | 'cat_ears'
   | 'flower_crown'
-  | 'ribbon_bow';
+  | 'ribbon_bow'
+  | 'hair_clip'
+  | 'flower_pin';
 
 export type AccessoryStyle =
   | 'none'

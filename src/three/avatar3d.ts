@@ -1259,111 +1259,282 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   const hairAssembly = buildCharacterHair(config, hairMat, topMat);
   headPivot.add(hairAssembly.root);
 
-  // ========== STANDARDIZED HEADWEAR ON HAT ATTACHMENT POINTS ==========
-  const {crownTop, crownTilted, headbandArc} = hairAssembly.attachments;
+  // ========== STANDARDIZED HEADWEAR & ACCESSORIES ON HAT ATTACHMENT POINTS ==========
+  const {crownTop, crownTilted, headbandArc, templeLeft, templeRight} =
+    hairAssembly.attachments;
+  const accGroup = hairAssembly.hairAccessories;
   const headItemCol = config.headItemColor || config.topColor;
+
   if (config.headItem === 'beret') {
-    const beretMat = clayMat(headItemCol, 0.62);
-    const beretBody = new THREE.Mesh(
-      new THREE.SphereGeometry(0.275, 24, 16),
-      beretMat,
-    );
-    beretBody.scale.set(1.06, 0.38, 1.04);
+    const beretMat = clayMat(headItemCol, 0.66);
+    const rimMat = clayMat(shadeHex(headItemCol, -0.14).getHex(), 0.72);
+    const pts = [
+      new THREE.Vector2(0.0, 0.115),
+      new THREE.Vector2(0.09, 0.122),
+      new THREE.Vector2(0.24, 0.114),
+      new THREE.Vector2(0.325, 0.072),
+      new THREE.Vector2(0.315, 0.022),
+      new THREE.Vector2(0.268, 0.0),
+      new THREE.Vector2(0.25, 0.0),
+    ];
+    const beretGeo = new THREE.LatheGeometry(pts, 28);
+    beretGeo.scale(1.06, 0.94, 1.0);
+    const beretBody = new THREE.Mesh(beretGeo, beretMat);
     beretBody.position.set(
       crownTilted.position.x,
-      crownTilted.position.y - 0.016,
+      crownTilted.position.y - 0.078,
       crownTilted.position.z,
     );
     beretBody.rotation.copy(crownTilted.rotation);
-    const stem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.014, 0.016, 0.055, 8),
-      clayMat('#3A2B28'),
+
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.262, 0.02, 10, 28), rimMat);
+    band.rotation.x = Math.PI / 2;
+    band.scale.set(1.04, 0.98, 1.0);
+    const bandHolder = new THREE.Group();
+    bandHolder.position.set(
+      crownTilted.position.x,
+      crownTilted.position.y - 0.074,
+      crownTilted.position.z,
     );
+    bandHolder.rotation.copy(crownTilted.rotation);
+    bandHolder.add(band);
+
+    const stem = new THREE.Mesh(new THREE.CapsuleGeometry(0.011, 0.026, 6, 8), rimMat);
     stem.position.set(
-      crownTilted.position.x + 0.022,
-      crownTilted.position.y + 0.084,
+      crownTilted.position.x + 0.018,
+      crownTilted.position.y + 0.044,
       crownTilted.position.z,
     );
     stem.rotation.copy(crownTilted.rotation);
-    headPivot.add(beretBody, stem);
+    accGroup.add(beretBody, bandHolder, stem);
   } else if (config.headItem === 'sunhat') {
-    const hatMat = clayMat(headItemCol || '#EBD08E', 0.78);
-    const brimY = crownTop.position.y - 0.044;
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.5, 0.032, 24), hatMat);
-    brim.position.set(crownTop.position.x, brimY, crownTop.position.z);
-    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.245, 0.295, 0.165, 20), hatMat);
-    crown.position.set(crownTop.position.x, brimY + 0.08, crownTop.position.z);
-    const ribbon = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.299, 0.303, 0.042, 20),
-      clayMat('#E57A6B'),
-    );
-    ribbon.position.set(crownTop.position.x, brimY + 0.03, crownTop.position.z);
-    headPivot.add(brim, crown, ribbon);
+    const hatMat = clayMat(headItemCol || '#EBD08E', 0.74);
+    const ribbonMat = clayMat('#E57A6B', 0.65);
+    const pts = [
+      new THREE.Vector2(0.0, 0.145),
+      new THREE.Vector2(0.16, 0.14),
+      new THREE.Vector2(0.245, 0.118),
+      new THREE.Vector2(0.278, 0.018),
+      new THREE.Vector2(0.43, -0.008),
+      new THREE.Vector2(0.515, -0.028),
+      new THREE.Vector2(0.516, -0.042),
+      new THREE.Vector2(0.42, -0.022),
+      new THREE.Vector2(0.262, 0.006),
+    ];
+    const hatGeo = new THREE.LatheGeometry(pts, 32);
+    hatGeo.scale(1.06, 1.0, 0.98);
+    const pos = hatGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const r = Math.hypot(x, z);
+      if (r > 0.28) {
+        pos.setY(i, y + Math.sin(Math.atan2(z, x) * 2) * 0.015 * ((r - 0.28) / 0.23));
+      }
+    }
+    hatGeo.computeVertexNormals();
+
+    const sunhat = new THREE.Mesh(hatGeo, hatMat);
+    sunhat.position.set(crownTop.position.x, crownTop.position.y - 0.068, crownTop.position.z);
+    sunhat.rotation.copy(crownTop.rotation);
+
+    const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(0.274, 0.282, 0.036, 24), ribbonMat);
+    ribbon.scale.set(1.06, 1, 0.98);
+    ribbon.position.set(crownTop.position.x, crownTop.position.y - 0.036, crownTop.position.z);
+    ribbon.rotation.copy(crownTop.rotation);
+    accGroup.add(sunhat, ribbon);
+  } else if (config.headItem === 'cap') {
+    const capCol = headItemCol || '#4B86B4';
+    const capMat = clayMat(capCol, 0.62);
+    const trimMat = clayMat('#F4EFE6', 0.65);
+
+    const capGrp = new THREE.Group();
+    capGrp.position.set(crownTop.position.x, crownTop.position.y - 0.145, crownTop.position.z);
+    capGrp.rotation.set(-0.1, 0, 0);
+
+    const domeGeo = new THREE.SphereGeometry(1, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.54);
+    domeGeo.scale(0.34, 0.19, 0.322);
+    const dome = new THREE.Mesh(domeGeo, capMat);
+
+    const cuffGeo = new THREE.TorusGeometry(1, 0.045, 10, 28);
+    cuffGeo.rotateX(Math.PI / 2);
+    cuffGeo.scale(0.335, 1, 0.316);
+    const cuff = new THREE.Mesh(cuffGeo, capMat);
+
+    const visorShape = new THREE.Shape();
+    visorShape.moveTo(-0.24, 0);
+    visorShape.quadraticCurveTo(-0.23, 0.18, 0, 0.22);
+    visorShape.quadraticCurveTo(0.23, 0.18, 0.24, 0);
+    visorShape.quadraticCurveTo(0, 0.06, -0.24, 0);
+
+    const visorGeo = new THREE.ExtrudeGeometry(visorShape, {
+      depth: 0.018,
+      bevelEnabled: true,
+      bevelThickness: 0.008,
+      bevelSize: 0.008,
+      bevelSegments: 2,
+      curveSegments: 14,
+    });
+    visorGeo.rotateX(Math.PI / 2 + 0.14);
+    const vPos = visorGeo.attributes.position;
+    for (let i = 0; i < vPos.count; i++) {
+      const vx = vPos.getX(i);
+      vPos.setY(i, vPos.getY(i) - vx * vx * 0.56);
+    }
+    visorGeo.computeVertexNormals();
+    const visor = new THREE.Mesh(visorGeo, trimMat);
+    visor.position.set(0, 0.01, 0.245);
+
+    const btn = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), trimMat);
+    btn.scale.set(1, 0.55, 1);
+    btn.position.set(0, 0.19, 0);
+
+    capGrp.add(dome, cuff, visor, btn);
+    accGroup.add(capGrp);
+  } else if (config.headItem === 'beanie') {
+    const knitCol = headItemCol || '#D89A48';
+    const knitMat = clayMat(knitCol, 0.78);
+    const cuffMat = clayMat(shadeHex(knitCol, -0.1).getHex(), 0.8);
+    const pomMat = clayMat('#F8F4EC', 0.82);
+
+    const beanieGrp = new THREE.Group();
+    beanieGrp.position.set(crownTop.position.x, crownTop.position.y - 0.088, crownTop.position.z);
+    beanieGrp.rotation.set(-0.1, 0, 0);
+
+    const pts = [
+      new THREE.Vector2(0.0, 0.15),
+      new THREE.Vector2(0.12, 0.144),
+      new THREE.Vector2(0.24, 0.102),
+      new THREE.Vector2(0.312, 0.015),
+      new THREE.Vector2(0.322, -0.068),
+      new THREE.Vector2(0.295, -0.068),
+    ];
+    const domeGeo = new THREE.LatheGeometry(pts, 28);
+    domeGeo.scale(1.06, 1.0, 0.98);
+    const dome = new THREE.Mesh(domeGeo, knitMat);
+
+    const cuffGeo = new THREE.TorusGeometry(0.305, 0.038, 12, 28);
+    cuffGeo.rotateX(Math.PI / 2);
+    cuffGeo.scale(1.06, 1.0, 0.98);
+    const cuff = new THREE.Mesh(cuffGeo, cuffMat);
+    cuff.position.y = -0.056;
+
+    const pom = new THREE.Mesh(new THREE.SphereGeometry(0.058, 14, 12), pomMat);
+    pom.position.set(0, 0.165, -0.01);
+
+    beanieGrp.add(dome, cuff, pom);
+    accGroup.add(beanieGrp);
   } else if (config.headItem === 'cat_ears') {
     const bandR = headbandArc.radius;
     const band = new THREE.Mesh(
-      new THREE.TorusGeometry(bandR, 0.02, 8, 24, Math.PI),
-      clayMat('#3A2B28'),
+      new THREE.TorusGeometry(bandR, 0.02, 10, 26, Math.PI),
+      clayMat('#3A2B28', 0.65),
     );
     band.position.copy(headbandArc.center);
     band.rotation.x = headbandArc.tiltX;
-    headPivot.add(band);
+    accGroup.add(band);
 
-    const earTopY =
-      headbandArc.center.y +
-      bandR * Math.cos(headbandArc.tiltX) -
-      0.01;
-    const earZ =
-      headbandArc.center.z - bandR * Math.sin(headbandArc.tiltX) * 0.5 + 0.025;
+    const earTopY = headbandArc.center.y + bandR * Math.cos(headbandArc.tiltX) - 0.01;
+    const earZ = headbandArc.center.z - bandR * Math.sin(headbandArc.tiltX) * 0.5 + 0.02;
     [-1, 1].forEach((side) => {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.086, 0.15, 12), clayMat('#FFF8F2'));
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.084, 0.145, 14), clayMat('#FFF8F2'));
+      ear.scale.set(1.0, 1.0, 0.62);
       ear.position.set(side * 0.205, earTopY, earZ);
       ear.rotation.z = -side * 0.3;
       ear.rotation.x = headbandArc.tiltX;
       const inner = new THREE.Mesh(
-        new THREE.ConeGeometry(0.048, 0.098, 10),
+        new THREE.ConeGeometry(0.046, 0.095, 12),
         clayMat(headItemCol || '#F497AC'),
       );
-      inner.position.set(side * 0.205, earTopY - 0.015, earZ + 0.03);
+      inner.scale.set(1.0, 1.0, 0.52);
+      inner.position.set(side * 0.205, earTopY - 0.012, earZ + 0.022);
       inner.rotation.z = -side * 0.3;
       inner.rotation.x = headbandArc.tiltX;
-      headPivot.add(ear, inner);
+      accGroup.add(ear, inner);
     });
   } else if (config.headItem === 'flower_crown') {
-    const ringR = headbandArc.radius - 0.036;
-    const band = new THREE.Mesh(new THREE.TorusGeometry(ringR, 0.02, 8, 24), clayMat('#5E9E69'));
-    band.rotation.x = Math.PI / 2 - 0.16;
-    band.position.set(0, 0.505, -0.006);
-    headPivot.add(band);
-    for (let i = 0; i < 6; i++) {
-      const ang = -1.0 + i * 0.4;
-      const fl = new THREE.Mesh(
-        new THREE.SphereGeometry(0.042, 10, 10),
-        clayMat(i % 2 === 0 ? headItemCol || '#F7A8B8' : '#FFE082'),
-      );
-      fl.position.set(Math.sin(ang) * (ringR + 0.008), 0.525, Math.cos(ang) * (ringR + 0.008) - 0.006);
-      headPivot.add(fl);
-    }
-  } else if (config.headItem === 'ribbon_bow') {
-    const bowMat = clayMat(headItemCol || '#6BAEE6', 0.52);
     const bandR = headbandArc.radius;
     const band = new THREE.Mesh(
-      new THREE.TorusGeometry(bandR, 0.02, 8, 24, Math.PI),
+      new THREE.TorusGeometry(bandR, 0.018, 10, 26, Math.PI),
+      clayMat('#5E9E69', 0.72),
+    );
+    band.position.copy(headbandArc.center);
+    band.rotation.x = headbandArc.tiltX;
+    accGroup.add(band);
+
+    for (let i = 0; i < 5; i++) {
+      const ang = -1.1 + i * 0.55;
+      const fx = Math.sin(ang) * (bandR + 0.015);
+      const fy = headbandArc.center.y + Math.cos(ang) * (bandR + 0.015) * Math.cos(headbandArc.tiltX);
+      const fz = headbandArc.center.z - Math.cos(ang) * (bandR + 0.015) * Math.sin(headbandArc.tiltX);
+      const fl = new THREE.Mesh(
+        new THREE.SphereGeometry(0.038, 12, 10),
+        clayMat(i % 2 === 0 ? headItemCol || '#F7A8B8' : '#FFE082'),
+      );
+      fl.position.set(fx, fy, fz);
+      accGroup.add(fl);
+    }
+  } else if (config.headItem === 'ribbon_bow') {
+    const bowMat = clayMat(headItemCol || '#6BAEE6', 0.56);
+    const bandR = headbandArc.radius;
+    const band = new THREE.Mesh(
+      new THREE.TorusGeometry(bandR, 0.02, 10, 26, Math.PI),
       bowMat,
     );
     band.position.copy(headbandArc.center);
     band.rotation.x = headbandArc.tiltX;
     const bowY = headbandArc.center.y + bandR * 0.9;
-    const wingL = new THREE.Mesh(new THREE.SphereGeometry(0.072, 10, 10), bowMat);
+    const wingL = new THREE.Mesh(new THREE.SphereGeometry(0.072, 12, 10), bowMat);
     wingL.scale.set(1.2, 0.72, 0.52);
-    wingL.position.set(0.145, bowY + 0.015, 0.078);
+    wingL.position.set(0.145, bowY + 0.015, 0.072);
     wingL.rotation.z = -0.25;
     const wingR = wingL.clone();
-    wingR.position.set(0.245, bowY - 0.025, 0.078);
+    wingR.position.set(0.245, bowY - 0.025, 0.072);
     wingR.rotation.z = 0.25;
     const knot = new THREE.Mesh(new THREE.SphereGeometry(0.034, 10, 10), bowMat);
-    knot.position.set(0.195, bowY - 0.005, 0.1);
-    headPivot.add(band, wingL, wingR, knot);
+    knot.position.set(0.195, bowY - 0.005, 0.095);
+    accGroup.add(band, wingL, wingR, knot);
+  } else if (config.headItem === 'hair_clip') {
+    const clipMat1 = clayMat(headItemCol || '#F4A261', 0.45);
+    const clipMat2 = clayMat('#FDF2D6', 0.48);
+    const clipGrp = new THREE.Group();
+    clipGrp.position.copy(templeRight.position);
+    clipGrp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), templeRight.normal);
+
+    const barGeo = new THREE.CapsuleGeometry(0.011, 0.068, 6, 10);
+    barGeo.rotateZ(Math.PI / 2);
+    const bar1 = new THREE.Mesh(barGeo, clipMat1);
+    bar1.position.set(0, 0.013, 0.006);
+    bar1.rotation.z = 0.08;
+    const bar2 = new THREE.Mesh(barGeo, clipMat2);
+    bar2.position.set(0, -0.013, 0.006);
+    bar2.rotation.z = -0.06;
+    const gem = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), clipMat2);
+    gem.position.set(0.028, 0.013, 0.01);
+    clipGrp.add(bar1, bar2, gem);
+    accGroup.add(clipGrp);
+  } else if (config.headItem === 'flower_pin') {
+    const petalMat = clayMat(headItemCol || '#FFF9F0', 0.58);
+    const coreMat = clayMat('#F4B942', 0.54);
+    const pinGrp = new THREE.Group();
+    pinGrp.position.copy(templeLeft.position);
+    pinGrp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), templeLeft.normal);
+
+    const petalGeo = new THREE.SphereGeometry(0.022, 10, 10);
+    petalGeo.scale(0.85, 1.15, 0.45);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const p = new THREE.Mesh(petalGeo, petalMat);
+      p.position.set(Math.cos(a) * 0.026, Math.sin(a) * 0.026, 0.005);
+      p.rotation.z = a - Math.PI / 2;
+      pinGrp.add(p);
+    }
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 8), coreMat);
+    core.scale.set(1, 1, 0.65);
+    core.position.set(0, 0, 0.011);
+    pinGrp.add(core);
+    accGroup.add(pinGrp);
   }
 
   // ========== SCULPTED ACCESSORIES ==========
