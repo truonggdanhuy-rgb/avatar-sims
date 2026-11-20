@@ -44,6 +44,8 @@ import {FishBasketPanel} from '../FishBasketPanel';
 import {
   FishBasketIcon,
   FishIllustration,
+  MountCarIcon,
+  PetCatFaceIcon,
   RodAndNetIcon,
   WoodenRodIcon,
 } from '../FishingIcons';
@@ -61,7 +63,7 @@ interface PhoneMenuModalProps {
   fishBasket: CaughtFishItem[];
   fishDex: Partial<Record<RiverFishSpeciesId, FishDexRecord>>;
   initialTab?: 'menu' | 'guide' | 'bag' | 'fishdex';
-  initialBagSubTab?: 'list' | 'tools' | 'basket';
+  initialBagSubTab?: 'list' | 'tools' | 'pets' | 'mounts';
   onToggleEquipRod: () => void;
   onToggleFishLock: (fishId: string) => void;
   onSellFish: (fishId: string) => void;
@@ -76,7 +78,8 @@ interface PhoneMenuModalProps {
 }
 
 type PhoneTab = 'menu' | 'guide' | 'bag' | 'fishdex';
-type BagSubTab = 'list' | 'tools' | 'basket';
+type BagSubTab = 'list' | 'tools' | 'pets' | 'mounts';
+type FishDexSubView = 'catalog' | 'basket';
 
 const ZONE_LABELS: Record<ZoneId, string> = {
   town: 'Thị Trấn',
@@ -122,6 +125,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
 }) => {
   const [tab, setTab] = useState<PhoneTab>(initialTab);
   const [bagSubTab, setBagSubTab] = useState<BagSubTab>(initialBagSubTab);
+  const [fishDexView, setFishDexView] = useState<FishDexSubView>('catalog');
   const [fishDexWater, setFishDexWater] = useState<FishWaterType>('river');
   const [deviceTime, setDeviceTime] = useState<string>(() => formatDeviceTime());
 
@@ -280,7 +284,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </span>
                 </button>
 
-                {/* 2. Túi Đồ (Bag Icon - Cần & Vợt + Giỏ Cá) */}
+                {/* 2. Túi Đồ (Cần & Vợt · Pets · Cưỡi) */}
                 <button
                   type="button"
                   onClick={() => {
@@ -290,9 +294,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   }}
                   className="group relative flex flex-col items-center gap-1.5 transition-transform active:scale-95"
                 >
-                  {fishBasket.length > 0 && (
-                    <span className="absolute -top-1 right-2.5 z-10 rounded-md bg-[#3C95AD] px-1.5 py-0.5 text-[9px] font-extrabold text-white shadow-xs">
-                      {fishBasket.length}
+                  {fishingRod.equipped && (
+                    <span className="absolute -top-1 right-2 z-10 rounded-md bg-[#45A168] px-1.5 py-0.5 text-[9px] font-extrabold text-white shadow-xs">
+                      Đang cầm
                     </span>
                   )}
                   <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#E5C9A8] bg-gradient-to-br from-[#FFF4E3] to-[#F2D8B6] text-[#9A5B25] shadow-sm transition-transform group-hover:-translate-y-0.5">
@@ -303,15 +307,21 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </span>
                 </button>
 
-                {/* 3. Sổ Cá (Fish Icon - Empty FishDex placeholder) */}
+                {/* 3. Sổ Cá (Catalog + Giỏ Cá) */}
                 <button
                   type="button"
                   onClick={() => {
                     soundFX.tap();
+                    setFishDexView('catalog');
                     setTab('fishdex');
                   }}
-                  className="group flex flex-col items-center gap-1.5 transition-transform active:scale-95"
+                  className="group relative flex flex-col items-center gap-1.5 transition-transform active:scale-95"
                 >
+                  {fishBasket.length > 0 && (
+                    <span className="absolute -top-1 right-2.5 z-10 rounded-md bg-[#3C95AD] px-1.5 py-0.5 text-[9px] font-extrabold text-white shadow-xs">
+                      {fishBasket.length}
+                    </span>
+                  )}
                   <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#BFE0F5] bg-gradient-to-br from-[#EAF6FE] to-[#C8E8FC] text-[#286B94] shadow-sm transition-transform group-hover:-translate-y-0.5">
                     <Fish className="h-7 w-7" strokeWidth={2.1} />
                   </div>
@@ -439,7 +449,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                     ? 'Túi Đồ'
                     : bagSubTab === 'tools'
                       ? 'Cần & Vợt'
-                      : 'Giỏ Cá'}
+                      : bagSubTab === 'pets'
+                        ? 'Pets'
+                        : 'Cưỡi'}
                 </span>
                 <span className="w-16" />
               </div>
@@ -448,9 +460,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 <div className="space-y-3">
                   <div className="rounded-2xl border border-[#E5D4BA] bg-white p-3.5">
                     <div className="mb-3 text-[11px] font-bold text-[#7B6247]">
-                      Chọn mục trong túi bằng biểu tượng bên dưới:
+                      Chọn mục trong túi đồ:
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2.5">
                       {/* Icon 1: Combined Fishing Rod + Bug Net icon */}
                       <button
                         type="button"
@@ -473,25 +485,37 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                         </span>
                       </button>
 
-                      {/* Icon 2: Fish Basket */}
+                      {/* Icon 2: Pets (Cat Face Icon) */}
                       <button
                         type="button"
                         onClick={() => {
                           soundFX.tap();
-                          setBagSubTab('basket');
+                          setBagSubTab('pets');
                         }}
-                        className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#3C95AD] active:scale-95"
+                        className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#E08A58] active:scale-95"
                       >
-                        {fishBasket.length > 0 && (
-                          <span className="absolute -top-1.5 right-1 rounded-full bg-[#3C95AD] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
-                            {fishBasket.length}
-                          </span>
-                        )}
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
-                          <FishBasketIcon className="h-11 w-11" />
+                          <PetCatFaceIcon className="h-10 w-10" />
                         </div>
                         <span className="text-[11px] font-extrabold text-[#4A3525]">
-                          Giỏ Cá
+                          Pets
+                        </span>
+                      </button>
+
+                      {/* Icon 3: Cưỡi (Vehicle / Car Icon) */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFX.tap();
+                          setBagSubTab('mounts');
+                        }}
+                        className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#4F8FB5] active:scale-95"
+                      >
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
+                          <MountCarIcon className="h-10 w-10" />
+                        </div>
+                        <span className="text-[11px] font-extrabold text-[#4A3525]">
+                          Cưỡi
                         </span>
                       </button>
                     </div>
@@ -617,163 +641,244 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 </div>
               )}
 
-              {bagSubTab === 'basket' && (
-                <FishBasketPanel
-                  fishBasket={fishBasket}
-                  onToggleLock={onToggleFishLock}
-                  onSellFish={onSellFish}
-                  onSellAllUnlocked={onSellAllUnlocked}
-                  compact
-                />
-              )}
-            </div>
-          )}
-
-          {tab === 'fishdex' && (
-            <div className="flex h-full flex-col space-y-2.5">
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFX.tap();
-                    setTab('menu');
-                  }}
-                  className="flex min-h-[36px] items-center gap-1 rounded-xl bg-[#EFE0C9] px-2.5 py-1 text-xs font-bold text-[#5B422E] active:scale-95"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  <span>Quay lại</span>
-                </button>
-                <span className="text-xs font-extrabold text-[#4A3525]">Sổ Cá</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFX.tap();
-                    setTab('bag');
-                    setBagSubTab('basket');
-                  }}
-                  className="rounded-xl bg-[#3C95AD] px-2.5 py-1.5 text-[11px] font-extrabold text-white active:scale-95"
-                >
-                  Giỏ ({fishBasket.length})
-                </button>
-              </div>
-
-              {/* River vs Sea Tabs */}
-              <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-[#DACAA9] bg-[#E9DEC8] p-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFX.tap();
-                    setFishDexWater('river');
-                  }}
-                  className={`rounded-xl py-1.5 text-xs font-extrabold transition ${
-                    fishDexWater === 'river'
-                      ? 'bg-[#3C95AD] text-white shadow-xs'
-                      : 'text-[#6A5138]'
-                  }`}
-                >
-                  Cá Sông ({RIVER_FISH_LIST.filter((s) => (fishDex[s.id]?.caughtCount ?? 0) > 0).length}/{RIVER_FISH_LIST.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFX.tap();
-                    setFishDexWater('sea');
-                  }}
-                  className={`rounded-xl py-1.5 text-xs font-extrabold transition ${
-                    fishDexWater === 'sea'
-                      ? 'bg-[#466C9C] text-white shadow-xs'
-                      : 'text-[#6A5138]'
-                  }`}
-                >
-                  Cá Biển (Sắp ra mắt)
-                </button>
-              </div>
-
-              {fishDexWater === 'sea' ? (
-                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#A8CBE0] bg-[#EDF5FA] p-5 text-center">
-                  <div className="text-sm font-black text-[#2E5573]">
-                    Bộ Sưu Tập Cá Biển · Coming Soon
+              {bagSubTab === 'pets' && (
+                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#E8CBB0] bg-[#FFF8F0] p-5 text-center">
+                  <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-xs border border-[#F0D9C2]">
+                    <PetCatFaceIcon className="h-12 w-12" />
                   </div>
-                  <p className="mt-1.5 text-xs font-semibold leading-relaxed text-[#567996]">
-                    Các loài cá biển sẽ được mở rộng trong bản cập nhật tới. Hiện tại hãy sưu tầm đủ 8 loài Cá Sông nhé!
+                  <div className="text-sm font-black text-[#5C3D24]">
+                    Thú Cưng Đồng Hành (Pets)
+                  </div>
+                  <span className="mt-1 rounded-full bg-[#FCE7D2] px-2.5 py-0.5 text-[10px] font-extrabold text-[#A85F24]">
+                    Sắp ra mắt
+                  </span>
+                  <p className="mt-2 text-xs font-semibold leading-relaxed text-[#7D6147]">
+                    Bạn sẽ sớm có thể nuôi và dẫn các bé thú cưng đáng yêu đi dạo khắp thị trấn!
                   </p>
                 </div>
-              ) : (
-                <div className="space-y-2 pb-1">
-                  {RIVER_FISH_LIST.map((species) => {
-                    const ownedCount = fishBasket.filter(
-                      (f) => f.speciesId === species.id,
-                    ).length;
-                    const dex = fishDex[species.id];
-                    const totalCaught = dex?.caughtCount ?? 0;
-                    const maxWeight = dex?.maxWeightKg ?? 0;
-                    const isRare = species.rarity === 'rare';
+              )}
 
-                    return (
-                      <div
-                        key={species.id}
-                        className={`flex items-center justify-between gap-2.5 rounded-2xl border p-2.5 ${
-                          totalCaught > 0
-                            ? isRare
-                              ? 'border-[#D7B8F2] bg-[#FAF2FF]'
-                              : 'border-[#D8E7EE] bg-white'
-                            : 'border-[#E6DAC5] bg-[#F7F0E3] opacity-75'
-                        }`}
-                      >
-                        <div className="flex min-w-0 items-center gap-2.5">
-                          <div
-                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${
-                              isRare
-                                ? 'border-[#D8B4F6] bg-[#F1DEFF]'
-                                : 'border-[#C7E4EE] bg-[#EAF6FA]'
-                            }`}
-                          >
-                            <FishIllustration
-                              speciesId={species.id}
-                              className="h-9 w-9"
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate text-xs font-black text-[#3B2A1A]">
-                                {species.name}
-                              </span>
-                              <span
-                                className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-black ${
-                                  isRare
-                                    ? 'bg-[#8E44AD] text-white'
-                                    : 'bg-[#DCEFE3] text-[#2F6F49]'
-                                }`}
-                              >
-                                {isRare ? 'Hiếm' : 'Thường'}
-                              </span>
-                            </div>
-                            <div className="mt-0.5 text-[10px] font-bold text-[#7A6048]">
-                              {totalCaught > 0
-                                ? `Đã câu: ${totalCaught} · Kỷ lục: ${maxWeight.toFixed(2)} kg`
-                                : `Chưa câu được (${species.minKg}–${species.maxKg} kg)`}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0 text-right">
-                          <span
-                            className={`inline-block rounded-xl px-2.5 py-1 text-xs font-black ${
-                              ownedCount > 0
-                                ? 'bg-[#3C95AD] text-white'
-                                : 'bg-[#E9DEC8] text-[#856C4F]'
-                            }`}
-                          >
-                            x{ownedCount}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+              {bagSubTab === 'mounts' && (
+                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#BBD6EA] bg-[#F2F8FC] p-5 text-center">
+                  <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-xs border border-[#CCE2F2]">
+                    <MountCarIcon className="h-12 w-12" />
+                  </div>
+                  <div className="text-sm font-black text-[#2C5370]">
+                    Phương Tiện Cưỡi &amp; Xe
+                  </div>
+                  <span className="mt-1 rounded-full bg-[#DCEEFB] px-2.5 py-0.5 text-[10px] font-extrabold text-[#2B6894]">
+                    Sắp ra mắt
+                  </span>
+                  <p className="mt-2 text-xs font-semibold leading-relaxed text-[#577994]">
+                    Các loại xe đạp, xe hơi mini và thú cưỡi sẽ được mở bán ở bản cập nhật sắp tới!
+                  </p>
                 </div>
               )}
             </div>
           )}
+
+          {tab === 'fishdex' && (() => {
+            const discoveredCount = RIVER_FISH_LIST.filter(
+              (s) => (fishDex[s.id]?.caughtCount ?? 0) > 0,
+            ).length;
+            const totalSpecies = RIVER_FISH_LIST.length;
+            const pct = Math.round((discoveredCount / Math.max(1, totalSpecies)) * 100);
+
+            return (
+              <div className="flex h-full flex-col space-y-2.5">
+                {/* Header + Integrated Sổ Cá / Giỏ Cá Switcher */}
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFX.tap();
+                      setTab('menu');
+                    }}
+                    className="flex min-h-[34px] items-center gap-1 rounded-xl bg-[#EFE0C9] px-2.5 py-1 text-xs font-bold text-[#5B422E] active:scale-95"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    <span>Quay lại</span>
+                  </button>
+
+                  <div className="grid grid-cols-2 gap-1 rounded-xl border border-[#D8C7AB] bg-[#ECE0CA] p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFX.tap();
+                        setFishDexView('catalog');
+                      }}
+                      className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition ${
+                        fishDexView === 'catalog'
+                          ? 'bg-[#2E7D99] text-white shadow-xs'
+                          : 'text-[#6A5138]'
+                      }`}
+                    >
+                      <Fish className="h-3 w-3" />
+                      <span>Sổ Cá</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFX.tap();
+                        setFishDexView('basket');
+                      }}
+                      className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition ${
+                        fishDexView === 'basket'
+                          ? 'bg-[#D67D2C] text-white shadow-xs'
+                          : 'text-[#6A5138]'
+                      }`}
+                    >
+                      <FishBasketIcon className="h-3.5 w-3.5" />
+                      <span>Giỏ ({fishBasket.length})</span>
+                    </button>
+                  </div>
+                </div>
+
+                {fishDexView === 'basket' ? (
+                  <FishBasketPanel
+                    fishBasket={fishBasket}
+                    onToggleLock={onToggleFishLock}
+                    onSellFish={onSellFish}
+                    onSellAllUnlocked={onSellAllUnlocked}
+                    compact
+                  />
+                ) : (
+                  <>
+                    {/* Compact Collection Progress Card */}
+                    <div className="rounded-2xl border border-[#CCE2EC] bg-white px-3 py-2.5 shadow-xs">
+                      <div className="flex items-center justify-between text-[11px] font-extrabold text-[#2A5970]">
+                        <span>Bộ Sưu Tập Cá</span>
+                        <span className="tabular-nums text-[#3C95AD]">
+                          {discoveredCount}/{totalSpecies} loài ({pct}%)
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[#E6F2F7]">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-[#45A8C4] to-[#5CC8A1] transition-all"
+                          style={{width: `${pct}%`}}
+                        />
+                      </div>
+
+                      {/* River vs Sea Clean Switcher */}
+                      <div className="mt-2 grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFX.tap();
+                            setFishDexWater('river');
+                          }}
+                          className={`rounded-xl py-1 text-[11px] font-extrabold transition ${
+                            fishDexWater === 'river'
+                              ? 'bg-[#3C95AD] text-white shadow-xs'
+                              : 'bg-[#F3ECE0] text-[#6A5138]'
+                          }`}
+                        >
+                          Cá Sông ({discoveredCount}/{totalSpecies})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFX.tap();
+                            setFishDexWater('sea');
+                          }}
+                          className={`rounded-xl py-1 text-[11px] font-extrabold transition ${
+                            fishDexWater === 'sea'
+                              ? 'bg-[#466C9C] text-white shadow-xs'
+                              : 'bg-[#F3ECE0] text-[#6A5138]'
+                          }`}
+                        >
+                          Cá Biển (Sắp có)
+                        </button>
+                      </div>
+                    </div>
+
+                    {fishDexWater === 'sea' ? (
+                      <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#A8CBE0] bg-[#EDF5FA] p-5 text-center">
+                        <div className="text-sm font-black text-[#2E5573]">
+                          Bộ Sưu Tập Cá Biển · Sắp Ra Mắt
+                        </div>
+                        <p className="mt-1.5 text-xs font-semibold leading-relaxed text-[#567996]">
+                          Các loài cá biển sẽ được mở rộng trong bản cập nhật tới. Hiện tại hãy sưu tầm đủ 8 loài Cá Sông nhé!
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 pb-1">
+                        {RIVER_FISH_LIST.map((species) => {
+                          const ownedCount = fishBasket.filter(
+                            (f) => f.speciesId === species.id,
+                          ).length;
+                          const dex = fishDex[species.id];
+                          const totalCaught = dex?.caughtCount ?? 0;
+                          const maxWeight = dex?.maxWeightKg ?? 0;
+                          const isRare = species.rarity === 'rare';
+                          const discovered = totalCaught > 0;
+
+                          return (
+                            <div
+                              key={species.id}
+                              className={`flex flex-col justify-between rounded-2xl border p-2.5 transition ${
+                                discovered
+                                  ? isRare
+                                    ? 'border-[#D7B8F2] bg-[#FCF7FF]'
+                                    : 'border-[#CFE3EC] bg-white'
+                                  : 'border-[#E6DAC5] bg-[#F5EDE0]/80 opacity-80'
+                              }`}
+                            >
+                              {/* Top Badges */}
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  className={`rounded-md px-1.5 py-0.5 text-[9px] font-black ${
+                                    isRare
+                                      ? 'bg-[#8E44AD] text-white'
+                                      : 'bg-[#DFF2E7] text-[#2F6F49]'
+                                  }`}
+                                >
+                                  {isRare ? 'Hiếm' : 'Thường'}
+                                </span>
+                                {ownedCount > 0 && (
+                                  <span className="rounded-md bg-[#3C95AD] px-1.5 py-0.5 text-[9px] font-black text-white tabular-nums">
+                                    x{ownedCount}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Centered Fish Illustration */}
+                              <div
+                                className={`my-2 mx-auto flex h-12 w-full items-center justify-center rounded-xl ${
+                                  discovered
+                                    ? isRare
+                                      ? 'bg-[#F3E4FF]/70'
+                                      : 'bg-[#EAF6FA]'
+                                    : 'bg-[#EAE0CE]/60 grayscale opacity-60'
+                                }`}
+                              >
+                                <FishIllustration
+                                  speciesId={species.id}
+                                  className="h-10 w-10"
+                                />
+                              </div>
+
+                              {/* Name & Record */}
+                              <div>
+                                <div className="truncate text-[11px] font-black text-[#3B2A1A]">
+                                  {species.name}
+                                </div>
+                                <div className="mt-0.5 truncate text-[10px] font-bold text-[#7A6048] tabular-nums">
+                                  {discovered
+                                    ? `Kỷ lục ${maxWeight.toFixed(2)}kg · ${totalCaught} con`
+                                    : `${species.minKg}–${species.maxKg} kg`}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {tab === 'guide' && (
             <div className="divide-y divide-[#EFE2CF] rounded-2xl border border-[#E0CEB6] bg-white">

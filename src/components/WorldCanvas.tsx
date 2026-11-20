@@ -683,7 +683,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.96;
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
+    const isTouchDevice =
+      typeof window !== 'undefined' &&
+      (window.matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0);
+    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, isTouchDevice ? 1.25 : 1.5));
     renderer.shadowMap.enabled = false;
 
     const width = container.clientWidth || window.innerWidth || 800;
@@ -701,7 +704,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     scene.fog = new THREE.FogExp2('#B2DDF2', 0.0021);
 
     const pmrem = new THREE.PMREMGenerator(renderer);
-    const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const roomEnv = new RoomEnvironment();
+    const envTex = pmrem.fromScene(roomEnv, 0.04).texture;
+    roomEnv.dispose();
     scene.environment = envTex;
     scene.environmentIntensity = 0.42;
     pmrem.dispose();
@@ -713,16 +718,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(initCam.look[0], initCam.look[1], initCam.look[2]);
     controls.enableDamping = !isSoftwareGl;
-    controls.dampingFactor = 0.08;
+    controls.dampingFactor = 0.09;
     controls.enableRotate = true;
     controls.enableZoom = true;
-    controls.enablePan = true;
-    controls.rotateSpeed = 0.78;
-    controls.zoomSpeed = 0.9;
-    controls.minDistance = 4.8;
-    controls.maxDistance = 115;
-    controls.minPolarAngle = Math.PI * 0.14;
-    controls.maxPolarAngle = Math.PI * 0.46;
+    controls.enablePan = false;
+    controls.touches = {ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN};
+    controls.rotateSpeed = 0.68;
+    controls.zoomSpeed = 0.85;
+    controls.minDistance = 6.5;
+    controls.maxDistance = 42;
+    controls.minPolarAngle = Math.PI * 0.16;
+    controls.maxPolarAngle = Math.PI * 0.43;
     controls.update();
 
     let cameraTransitionActive = false;
@@ -815,6 +821,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
 
       if (z === 'town') {
+        controls.minDistance = 6.5;
+        controls.maxDistance = 42;
         activeTown = buildTownScene();
         activeTownRef.current = activeTown;
         activeTown.setFishingState?.(legacyFs);
@@ -847,6 +855,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           cameraTransitionActive = true;
         }
       } else {
+        controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : 4.5;
+        controls.maxDistance = z === 'garden' || z === 'home' ? 26 : 18;
         activeSubzone = buildSubzoneScene(z, {
           plots: pl,
           fishingState: legacyFs,
@@ -1894,11 +1904,48 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
     };
 
+    let fullscreenUnavailable = false;
+    const tryEnterBrowserFullscreen = () => {
+      if (fullscreenUnavailable) return;
+      try {
+        const doc = document as Document & {
+          webkitFullscreenElement?: Element | null;
+          webkitFullscreenEnabled?: boolean;
+        };
+        if (doc.fullscreenElement || doc.webkitFullscreenElement) return;
+        const el = document.documentElement as HTMLElement & {
+          webkitRequestFullscreen?: () => Promise<void> | void;
+        };
+        if (typeof el.requestFullscreen === 'function') {
+          if (doc.fullscreenEnabled === false) {
+            fullscreenUnavailable = true;
+            return;
+          }
+          const req = el.requestFullscreen();
+          if (req && typeof req.catch === 'function') {
+            req.catch(() => {
+              // Blocked by browser/iframe policy — ignore cleanly
+            });
+          }
+        } else if (typeof el.webkitRequestFullscreen === 'function') {
+          el.webkitRequestFullscreen();
+        } else {
+          fullscreenUnavailable = true;
+        }
+      } catch {
+        fullscreenUnavailable = true;
+      }
+    };
+
     let downX = 0;
     let downY = 0;
     const onPointerDown = (e: PointerEvent) => {
       downX = e.clientX;
       downY = e.clientY;
+      tryEnterBrowserFullscreen();
+    };
+    const onWindowGameTouch = () => {
+      tryEnterBrowserFullscreen();
     };
     const onPointerUp = (e: PointerEvent) => {
       const tapLimit = fishCtrl.phase === 'bite' ? 36 : 12;
@@ -1908,6 +1955,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointerdown', onWindowGameTouch, {passive: true});
 
     const handleResize = () => {
       if (!container) return;
@@ -1922,6 +1970,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
+    document.addEventListener('fullscreenchange', handleResize);
+    document.addEventListener('webkitfullscreenchange', handleResize);
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(container);
 
@@ -1953,6 +2003,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     function tick() {
       if (disposed) return;
+      if (document.hidden) {
+        clock.getDelta();
+        frameId = window.setTimeout(() => {
+          if (!disposed) frameId = requestAnimationFrame(tick);
+        }, 250);
+        return;
+      }
       const delta = Math.min(clock.getDelta(), 0.05);
       const elapsed = clock.getElapsedTime();
       const {zone: z, timeOfDay: tod, avatar: av} = stateRef.current;
@@ -2048,38 +2105,20 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const camCfg = getResponsiveCameraSettings(z, w / h);
         camera.fov = THREE.MathUtils.damp(camera.fov, camCfg.fov, 6, delta);
         camera.updateProjectionMatrix();
-        const camOffX =
-          z === 'town'
-            ? playerPos.x
-            : z === 'garden'
-              ? playerPos.x * 0.65
-              : z === 'home'
-                ? (playerPos.x + 1.8) * 0.65
-                : 0;
-        const camOffZ =
-          z === 'town'
-            ? playerPos.z - 3.6
-            : z === 'home'
-              ? (playerPos.z - 5.2) * 0.65
-              : z === 'garden'
-                ? (playerPos.z - 10.2) * 0.65
-                : 0;
+        const spawnGroundY =
+          z === 'town' ? getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius) : 0;
+        _camLookTarget.set(playerPos.x, spawnGroundY + 0.92, playerPos.z);
         _camPosTarget.set(
-          camCfg.pos[0] + camOffX,
-          camCfg.pos[1],
-          camCfg.pos[2] + camOffZ,
+          playerPos.x + (camCfg.pos[0] - camCfg.look[0]),
+          spawnGroundY + camCfg.pos[1],
+          playerPos.z + (camCfg.pos[2] - camCfg.look[2]),
         );
-        _camLookTarget.set(
-          camCfg.look[0] + camOffX,
-          camCfg.look[1],
-          camCfg.look[2] + camOffZ,
-        );
-        camera.position.x = THREE.MathUtils.damp(camera.position.x, _camPosTarget.x, 6, delta);
-        camera.position.y = THREE.MathUtils.damp(camera.position.y, _camPosTarget.y, 6, delta);
-        camera.position.z = THREE.MathUtils.damp(camera.position.z, _camPosTarget.z, 6, delta);
-        controls.target.x = THREE.MathUtils.damp(controls.target.x, _camLookTarget.x, 6, delta);
-        controls.target.y = THREE.MathUtils.damp(controls.target.y, _camLookTarget.y, 6, delta);
-        controls.target.z = THREE.MathUtils.damp(controls.target.z, _camLookTarget.z, 6, delta);
+        camera.position.x = THREE.MathUtils.damp(camera.position.x, _camPosTarget.x, 7, delta);
+        camera.position.y = THREE.MathUtils.damp(camera.position.y, _camPosTarget.y, 7, delta);
+        camera.position.z = THREE.MathUtils.damp(camera.position.z, _camPosTarget.z, 7, delta);
+        controls.target.x = THREE.MathUtils.damp(controls.target.x, _camLookTarget.x, 7, delta);
+        controls.target.y = THREE.MathUtils.damp(controls.target.y, _camLookTarget.y, 7, delta);
+        controls.target.z = THREE.MathUtils.damp(controls.target.z, _camLookTarget.z, 7, delta);
         if (
           camera.position.distanceTo(_camPosTarget) < 0.08 &&
           controls.target.distanceTo(_camLookTarget) < 0.08
@@ -2148,14 +2187,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           playerPos.x = nextX;
           playerPos.z = nextZ;
 
-          if (!cameraTransitionActive) {
-            const trackFactor = z === 'town' ? 1.0 : 0.65;
-            camera.position.x += moveX * trackFactor;
-            camera.position.z += moveZ * trackFactor;
-            controls.target.x += moveX * trackFactor;
-            controls.target.z += moveZ * trackFactor;
-          }
-
           if (Math.hypot(moveX, moveZ) > 0.002) {
             const targetRot = Math.atan2(moveX, moveZ);
             let diff = targetRot - playerPos.rotY;
@@ -2179,8 +2210,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
-      controls.update();
-
       let groundOffset = 0.02;
       if (playerPos.pose === 'sit' && activeSeat) {
         groundOffset = activeSeat.seatY - 0.245;
@@ -2191,15 +2220,27 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       } else if (z === 'garden' && playerPos.x > 9.35 && playerPos.x < 15.9 && Math.abs(playerPos.z - 3.0) < 0.98) {
         groundOffset = 0.36;
       }
+      prevGroundY = groundOffset;
 
-      if (z === 'town') {
-        const dGroundY = groundOffset - prevGroundY;
-        if (!cameraTransitionActive && Math.abs(dGroundY) > 0.0001) {
-          camera.position.y += dGroundY;
-          controls.target.y += dGroundY;
-        }
-        prevGroundY = groundOffset;
+      // Keep camera & OrbitControls always centered smoothly on the player character
+      if (!cameraTransitionActive) {
+        const focusX = playerPos.x;
+        const focusY = groundOffset + 0.92;
+        const focusZ = playerPos.z;
+        const followAlpha = 1 - Math.exp(-16 * delta);
+        const nextTx = THREE.MathUtils.lerp(controls.target.x, focusX, followAlpha);
+        const nextTy = THREE.MathUtils.lerp(controls.target.y, focusY, followAlpha);
+        const nextTz = THREE.MathUtils.lerp(controls.target.z, focusZ, followAlpha);
+        const dCamX = nextTx - controls.target.x;
+        const dCamY = nextTy - controls.target.y;
+        const dCamZ = nextTz - controls.target.z;
+        controls.target.set(nextTx, nextTy, nextTz);
+        camera.position.x += dCamX;
+        camera.position.y += dCamY;
+        camera.position.z += dCamZ;
       }
+
+      controls.update();
 
       if (z === 'home') {
         homeSpotRef.current.x = playerPos.x;
@@ -2620,8 +2661,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointerdown', onWindowGameTouch);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
+      document.removeEventListener('fullscreenchange', handleResize);
+      document.removeEventListener('webkitfullscreenchange', handleResize);
       activeTown?.dispose();
       activeSubzone?.dispose();
       selectionRing.geometry.dispose();

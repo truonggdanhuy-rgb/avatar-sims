@@ -2394,7 +2394,7 @@ export function buildTownScene(): TownWorld {
   let lakePierNightLight: THREE.PointLight | null = null;
   let lakeFishingVisuals: FishingSpotVisuals | null = null;
   let reedClumpIM: THREE.InstancedMesh | null = null;
-  const reedClumpBaseMats: THREE.Matrix4[] = [];
+  const reedClumpBaseTfs: {pos: THREE.Vector3; quat: THREE.Quaternion; scale: THREE.Vector3}[] = [];
   const FIREFLY_COUNT = 38;
   let fireflyCoreIM: THREE.InstancedMesh | null = null;
   let fireflyHaloIM: THREE.InstancedMesh | null = null;
@@ -2870,7 +2870,11 @@ export function buildTownScene(): TownWorld {
       _instDummy.scale.setScalar(1.0 + (i % 4) * 0.18);
       _instDummy.updateMatrix();
       reedClumpIM!.setMatrixAt(i, _instDummy.matrix);
-      reedClumpBaseMats.push(_instDummy.matrix.clone());
+      reedClumpBaseTfs.push({
+        pos: _instDummy.position.clone(),
+        quat: _instDummy.quaternion.clone(),
+        scale: _instDummy.scale.clone(),
+      });
       _instColor.set(reedColors[i % reedColors.length]);
       reedClumpIM!.setColorAt(i, _instColor);
     });
@@ -4078,7 +4082,7 @@ export function buildTownScene(): TownWorld {
     treeLampPoolIM.computeBoundingSphere();
     group.add(treeLampBracketIM, treeLampBulbIM, treeLampHaloIM, treeLampPoolIM);
 
-    // 8 softly distributed warm PointLights positioned directly beneath real outer & mid tree lanterns (removed floating hill light!)
+    // 6 softly distributed warm PointLights positioned directly beneath outer & mid tree lanterns
     const districtLanternLightPos: [number, number][] = [
       [-44.5, -18.5],
       [51.5, -18.5],
@@ -4086,13 +4090,12 @@ export function buildTownScene(): TownWorld {
       [45.0, 16.5],
       [-37.5, 36.0],
       [36.5, 35.5],
-      [-55.0, 10.5],
-      [55.5, 10.5],
     ];
     districtLanternLightPos.forEach(([lx, lz]) => {
       const ly = getTownGroundHeight(lx, lz) + 2.35;
-      const pl = new THREE.PointLight('#FFB85E', 0, 24, 1.3);
+      const pl = new THREE.PointLight('#FFB85E', 0, 26, 1.28);
       pl.position.set(lx, ly, lz);
+      pl.visible = false;
       group.add(pl);
       ambientLanternLights.push(pl);
     });
@@ -4587,78 +4590,158 @@ export function buildTownScene(): TownWorld {
     group.add(teleGroup);
   }
 
-  // ========== 5C. STATIC INSTANCED GROUND FLORA (BỒN HOA, BỤI HOA, CỎ LỚN BÉ & HOA DẠI) ==========
-  // A. Raised Timber & Stone Flower Beds (6 Bồn Hoa xinh xắn quanh quảng trường & lối dạo)
+  // ========== 5C. STATIC INSTANCED GROUND FLORA (BỒN HOA CONG QUẢNG TRƯỜNG, BỤI HOA, CỎ LỚN BÉ & HOA DẠI) ==========
+  // A. Two Smooth Curved Neck-High Plaza Flower Beds (Bồn hoa bo cong hai bên quảng trường theo 2 cây đèn mỗi bên, cao ngang cổ nhân vật)
   {
-    const bedCoords: [number, number, number][] = [
-      [-10.2, 8.2, 0.2],
-      [10.2, 8.2, -0.2],
-      [-19.5, -14.8, 0],
-      [19.5, -14.8, 0],
-      [-19.5, 24.4, 0],
-      [19.5, 24.4, 0],
-    ];
-    const bedFrameGeo = new RoundedBoxGeometry(2.15, 0.3, 1.05, 2, 0.05);
-    bedFrameGeo.translate(0, 0.15, 0);
-    const bedSoilGeo = new RoundedBoxGeometry(1.92, 0.1, 0.82, 2, 0.02);
-    bedSoilGeo.translate(0, 0.27, 0);
+    const ARC_MID_R = 8.02;
+    const ARC_SPAN = THREE.MathUtils.degToRad(46); // -46°..+46° each side -> leaves wide 11.1m N & S entrances open!
 
-    const bedFrameIM = new THREE.InstancedMesh(bedFrameGeo, getMat('#B88456', 0.78), bedCoords.length);
-    const bedSoilIM = new THREE.InstancedMesh(bedSoilGeo, getMat('#664830', 0.92), bedCoords.length);
+    const buildCurvedPlanterShape = (
+      innerR: number,
+      outerR: number,
+      startAngle: number,
+      endAngle: number,
+    ) => {
+      const midR = (innerR + outerR) * 0.5;
+      const capR = (outerR - innerR) * 0.5;
+      const shape = new THREE.Shape();
+      // Start on outer arc at startAngle -> trace outer arc to endAngle
+      shape.absarc(0, 0, outerR, startAngle, endAngle, false);
+      // Smooth semicircle rounded end-cap at endAngle
+      const endCx = Math.cos(endAngle) * midR;
+      const endCy = Math.sin(endAngle) * midR;
+      shape.absarc(endCx, endCy, capR, endAngle, endAngle + Math.PI, false);
+      // Trace inner arc back from endAngle to startAngle
+      shape.absarc(0, 0, innerR, endAngle, startAngle, true);
+      // Smooth semicircle rounded end-cap at startAngle
+      const startCx = Math.cos(startAngle) * midR;
+      const startCy = Math.sin(startAngle) * midR;
+      shape.absarc(startCx, startCy, capR, startAngle + Math.PI, startAngle + Math.PI * 2, false);
+      shape.closePath();
+      return shape;
+    };
 
-    const bedLeafParts: THREE.BufferGeometry[] = [];
-    const bedFlowerParts: THREE.BufferGeometry[] = [];
-    for (let f = 0; f < 6; f++) {
-      const fx = -0.68 + (f % 3) * 0.68;
-      const fz = f < 3 ? -0.18 : 0.18;
-      const lf = new THREE.SphereGeometry(0.18, 7, 5);
-      lf.scale(1.2, 0.65, 1.1);
-      lf.translate(fx, 0.36, fz);
-      bedLeafParts.push(lf);
-      const fl = new THREE.SphereGeometry(0.11, 6, 5);
-      fl.scale(1.1, 0.72, 1.1);
-      fl.translate(fx, 0.47, fz);
-      bedFlowerParts.push(fl);
-    }
-    const bedLeafGeo = mergeParts(bedLeafParts);
-    const bedFlowerGeo = mergeParts(bedFlowerParts);
-    const bedLeafIM = new THREE.InstancedMesh(bedLeafGeo, getMat('#56AD5E', 0.74), bedCoords.length);
-    const bedFlowerMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.56});
-    const bedFlowerIM = new THREE.InstancedMesh(bedFlowerGeo, bedFlowerMat, bedCoords.length);
-    const bedPalette = ['#FF9BB0', '#FFD166', '#A0D8F5', '#D6B4FC', '#FF8F70', '#FFF2A6'];
+    const makeExtrudedArcGeo = (
+      innerR: number,
+      outerR: number,
+      height: number,
+      bevel = 0.03,
+      anglePad = 0,
+    ) => {
+      const shape = buildCurvedPlanterShape(
+        innerR,
+        outerR,
+        -ARC_SPAN - anglePad,
+        ARC_SPAN + anglePad,
+      );
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: Math.max(0.02, height - bevel * 2),
+        bevelEnabled: bevel > 0,
+        bevelThickness: bevel,
+        bevelSize: bevel,
+        bevelSegments: 2,
+        curveSegments: 28,
+      });
+      geo.rotateX(-Math.PI / 2);
+      geo.translate(0, bevel, 0);
+      return geo;
+    };
 
-    bedCoords.forEach(([bx, bz, rot], i) => {
-      const by = getTownGroundHeight(bx, bz) - 0.02;
-      _instDummy.position.set(bx, by, bz);
-      _instDummy.rotation.set(0, rot, 0);
-      _instDummy.scale.setScalar(1);
-      _instDummy.updateMatrix();
-      bedFrameIM.setMatrixAt(i, _instDummy.matrix);
-      bedSoilIM.setMatrixAt(i, _instDummy.matrix);
-      bedLeafIM.setMatrixAt(i, _instDummy.matrix);
-      bedFlowerIM.setMatrixAt(i, _instDummy.matrix);
-      _instColor.set(bedPalette[i % bedPalette.length]);
-      bedFlowerIM.setColorAt(i, _instColor);
-      colliders.push({type: 'box', id: `flower_bed_${i}`, x: bx, z: bz, hw: 1.12, hd: 0.58, rotY: rot});
+    // Neck-high profile (~0.98m rim = character neck height HEAD_PIVOT_Y = 0.968)
+    const plinthGeo = makeExtrudedArcGeo(7.52, 8.52, 0.18, 0.025, 0.008);
+    const wallGeo = makeExtrudedArcGeo(7.58, 8.46, 0.72, 0.02, 0);
+    const capRimGeo = makeExtrudedArcGeo(7.53, 8.51, 0.12, 0.028, 0.006);
+    const soilGeo = makeExtrudedArcGeo(7.68, 8.36, 0.08, 0.01, -0.012);
+
+    const plinthMat = getMat('#D6CCBC', 0.8);
+    const wallMat = getMat('#F4E8D6', 0.72);
+    const capRimMat = getMat('#E5D5BE', 0.68);
+    const soilMat = getMat('#5D412C', 0.92);
+
+    // Build Right (+X) and Left (-X, rotated Math.PI) curved beds sharing exact geometries
+    [0, Math.PI].forEach((sideRotY, sideIdx) => {
+      const sideBed = new THREE.Group();
+      sideBed.rotation.y = sideRotY;
+
+      const plinthMesh = new THREE.Mesh(plinthGeo, plinthMat);
+      const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+      wallMesh.position.y = 0.16;
+      const capRimMesh = new THREE.Mesh(capRimGeo, capRimMat);
+      capRimMesh.position.y = 0.86;
+      const soilMesh = new THREE.Mesh(soilGeo, soilMat);
+      soilMesh.position.y = 0.91;
+
+      sideBed.add(plinthMesh, wallMesh, capRimMesh, soilMesh);
+      group.add(sideBed);
+
+      // Smooth overlapping circle colliders tracing the curved planter arc
+      const colSteps = 9;
+      for (let c = 0; c <= colSteps; c++) {
+        const a = THREE.MathUtils.lerp(-ARC_SPAN, ARC_SPAN, c / colSteps) + sideRotY;
+        colliders.push({
+          type: 'circle',
+          id: `plaza_curved_bed_${sideIdx}_${c}`,
+          x: Math.cos(a) * ARC_MID_R,
+          z: Math.sin(a) * ARC_MID_R,
+          r: 0.56,
+        });
+      }
     });
-    bedFrameIM.instanceMatrix.needsUpdate = true;
-    bedSoilIM.instanceMatrix.needsUpdate = true;
-    bedLeafIM.instanceMatrix.needsUpdate = true;
-    bedFlowerIM.instanceMatrix.needsUpdate = true;
-    if (bedFlowerIM.instanceColor) bedFlowerIM.instanceColor.needsUpdate = true;
-    bedFrameIM.computeBoundingSphere();
-    bedSoilIM.computeBoundingSphere();
-    bedLeafIM.computeBoundingSphere();
-    bedFlowerIM.computeBoundingSphere();
-    group.add(bedFrameIM, bedSoilIM, bedLeafIM, bedFlowerIM);
+
+    // Static repeatable InstancedMesh foliage cushions & vibrant flowers along both curved beds (2 draw calls)
+    const tuftPerSide = 22;
+    const totalBedTufts = tuftPerSide * 2;
+    const bedFoliageGeo = new THREE.SphereGeometry(0.32, 8, 6);
+    bedFoliageGeo.scale(1.16, 0.62, 1.16);
+    bedFoliageGeo.translate(0, 0.08, 0);
+    const bedFoliageIM = new THREE.InstancedMesh(bedFoliageGeo, getMat('#54AC5C', 0.76), totalBedTufts);
+
+    const bf1 = new THREE.SphereGeometry(0.115, 6, 5);
+    bf1.scale(1.15, 0.68, 1.15);
+    bf1.translate(-0.1, 0.25, 0.06);
+    const bf2 = new THREE.SphereGeometry(0.105, 6, 5);
+    bf2.scale(1.15, 0.68, 1.15);
+    bf2.translate(0.11, 0.24, -0.07);
+    const bf3 = new THREE.SphereGeometry(0.095, 6, 5);
+    bf3.scale(1.15, 0.68, 1.15);
+    bf3.translate(0.01, 0.29, -0.02);
+    const bedBloomGeo = mergeParts([bf1, bf2, bf3]);
+    const bedBloomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.54});
+    const bedBloomIM = new THREE.InstancedMesh(bedBloomGeo, bedBloomMat, totalBedTufts);
+    const bedBloomPalette = ['#FF9BB0', '#FFD166', '#FF8F70', '#D6B4FC', '#A8E0FF'];
+
+    let bIdx = 0;
+    [0, Math.PI].forEach((sideRotY) => {
+      for (let t = 0; t < tuftPerSide; t++) {
+        const u = t / (tuftPerSide - 1);
+        const ang = THREE.MathUtils.lerp(-ARC_SPAN * 0.96, ARC_SPAN * 0.96, u) + sideRotY;
+        const rOff = (t % 2 === 0 ? -0.09 : 0.09);
+        const r = ARC_MID_R + rOff;
+        _instDummy.position.set(Math.cos(ang) * r, 0.96, Math.sin(ang) * r);
+        _instDummy.rotation.set(0, -ang + t * 0.7, 0);
+        _instDummy.scale.setScalar(0.92 + (t % 3) * 0.12);
+        _instDummy.updateMatrix();
+        bedFoliageIM.setMatrixAt(bIdx, _instDummy.matrix);
+        bedBloomIM.setMatrixAt(bIdx, _instDummy.matrix);
+        _instColor.set(bedBloomPalette[bIdx % bedBloomPalette.length]);
+        bedBloomIM.setColorAt(bIdx, _instColor);
+        bIdx++;
+      }
+    });
+    bedFoliageIM.instanceMatrix.needsUpdate = true;
+    bedBloomIM.instanceMatrix.needsUpdate = true;
+    if (bedBloomIM.instanceColor) bedBloomIM.instanceColor.needsUpdate = true;
+    bedFoliageIM.computeBoundingSphere();
+    bedBloomIM.computeBoundingSphere();
+    group.add(bedFoliageIM, bedBloomIM);
   }
 
   // B. Small & Medium Flowering Bushes (Bụi hoa nhỏ & vừa)
   const bushCoords: [number, number, string, number?][] = [
-    [-7.8, -3.2, '#F28482', 0.85],
-    [7.8, -3.2, '#F9C74F', 0.88],
-    [-7.8, 3.2, '#F7A8B8', 0.82],
-    [7.8, 3.2, '#A8D8EA', 0.86],
+    [-9.2, -7.8, '#F28482', 0.86],
+    [9.2, -7.8, '#F9C74F', 0.88],
+    [-9.2, 7.8, '#F7A8B8', 0.84],
+    [9.2, 7.8, '#A8D8EA', 0.86],
     [-38.2, -25.2, '#F9C74F', 0.95],
     [-25.8, -25.8, '#F28482', 0.92],
     [25.6, -25.8, '#F7A8B8', 0.94],
@@ -5021,9 +5104,6 @@ export function buildTownScene(): TownWorld {
   // Track last applied timeOfDay so emissive updates only run when changed
   let lastAppliedTod: TimeOfDay | null = null;
   let currentTod: TimeOfDay = 'morning';
-  const _swayPos = new THREE.Vector3();
-  const _swayQuat = new THREE.Quaternion();
-  const _swayScale = new THREE.Vector3();
   const _swayEuler = new THREE.Euler();
   const _swayRotQ = new THREE.Quaternion();
 
@@ -5070,22 +5150,28 @@ export function buildTownScene(): TownWorld {
       }
       moonGroup.visible = isNight;
       starPoints.visible = isNight;
+      const showLights = isNight || isSunset;
       ambientLanternLights.forEach((pl) => {
-        pl.intensity = isNight ? 2.65 : isSunset ? 1.05 : 0;
+        pl.visible = showLights;
+        pl.intensity = isNight ? 2.85 : isSunset ? 1.1 : 0;
       });
       if (stringBulbMat) {
         stringBulbMat.emissiveIntensity = isNight ? 2.8 : isSunset ? 1.4 : 0.16;
       }
       if (patioNightLight) {
+        patioNightLight.visible = showLights;
         patioNightLight.intensity = isNight ? 5.2 : isSunset ? 2.2 : 0;
       }
       if (plazaNightLight) {
+        plazaNightLight.visible = showLights;
         plazaNightLight.intensity = isNight ? 3.8 : isSunset ? 1.6 : 0;
       }
       if (lakePierNightLight) {
+        lakePierNightLight.visible = showLights;
         lakePierNightLight.intensity = isNight ? 3.4 : isSunset ? 1.5 : 0;
       }
       if (homePorchNightLight) {
+        homePorchNightLight.visible = showLights;
         homePorchNightLight.intensity = isNight ? 2.6 : isSunset ? 1.15 : 0;
       }
       if (lakeWaterMat) {
@@ -5164,20 +5250,19 @@ export function buildTownScene(): TownWorld {
       fallingPetalIM.instanceMatrix.needsUpdate = true;
     }
 
-    // 5. Gentle Wind Sway on Lake Aquatic Grass / Reeds
-    if (reedClumpIM && reedClumpBaseMats.length > 0) {
-      for (let i = 0; i < reedClumpBaseMats.length; i++) {
-        reedClumpBaseMats[i].decompose(_swayPos, _swayQuat, _swayScale);
+    // 5. Gentle Wind Sway on Lake Aquatic Grass / Reeds (zero matrix decompositions!)
+    if (reedClumpIM && reedClumpBaseTfs.length > 0) {
+      for (let i = 0; i < reedClumpBaseTfs.length; i++) {
+        const tf = reedClumpBaseTfs[i];
         _swayEuler.set(
           Math.sin(elapsed * 1.6 + i * 0.7) * 0.06,
           0,
           Math.cos(elapsed * 1.3 + i * 0.5) * 0.06,
         );
         _swayRotQ.setFromEuler(_swayEuler);
-        _swayQuat.multiply(_swayRotQ);
-        _instDummy.position.copy(_swayPos);
-        _instDummy.quaternion.copy(_swayQuat);
-        _instDummy.scale.copy(_swayScale);
+        _instDummy.position.copy(tf.pos);
+        _instDummy.quaternion.copy(tf.quat).multiply(_swayRotQ);
+        _instDummy.scale.copy(tf.scale);
         _instDummy.updateMatrix();
         reedClumpIM.setMatrixAt(i, _instDummy.matrix);
       }

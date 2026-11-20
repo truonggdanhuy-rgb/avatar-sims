@@ -288,7 +288,7 @@ export default function App() {
   const [farmShopOpen, setFarmShopOpen] = useState(false);
   const [koiShopOpen, setKoiShopOpen] = useState(false);
   const [phoneInitialTab, setPhoneInitialTab] = useState<'menu' | 'guide' | 'bag' | 'fishdex'>('menu');
-  const [phoneBagSubTab, setPhoneBagSubTab] = useState<'list' | 'tools' | 'basket'>('list');
+  const [phoneBagSubTab, setPhoneBagSubTab] = useState<'list' | 'tools' | 'pets' | 'mounts'>('list');
   const [nearPond, setNearPond] = useState(false);
   const [pondFeedPulse, setPondFeedPulse] = useState(0);
   const [farmPondFishPulse, setFarmPondFishPulse] = useState(0);

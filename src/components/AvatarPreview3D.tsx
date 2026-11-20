@@ -80,7 +80,7 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.98;
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = false;
 
     const width = container.clientWidth || 260;
@@ -90,7 +90,9 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
 
     const scene = new THREE.Scene();
     const pmrem = new THREE.PMREMGenerator(renderer);
-    const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const roomEnv = new RoomEnvironment();
+    const envTex = pmrem.fromScene(roomEnv, 0.04).texture;
+    roomEnv.dispose();
     scene.environment = envTex;
     scene.environmentIntensity = 0.42;
     pmrem.dispose();

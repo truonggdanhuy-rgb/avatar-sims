@@ -132,6 +132,122 @@ export function WoodenRodIcon({className = 'w-10 h-10'}: {className?: string}) {
 }
 
 /**
+ * Cute Cat Face icon for Pets bag category (Mặt mèo)
+ */
+export function PetCatFaceIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Cat ears */}
+      <path
+        d="M15 28 L12 10 L28 19 Z"
+        fill="#F8C888"
+        stroke="#8C582B"
+        strokeWidth="2.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M49 28 L52 10 L36 19 Z"
+        fill="#F8C888"
+        stroke="#8C582B"
+        strokeWidth="2.6"
+        strokeLinejoin="round"
+      />
+      {/* Pink inner ears */}
+      <path d="M17 24 L16 14.5 L25 20 Z" fill="#F59AB0" />
+      <path d="M47 24 L48 14.5 L39 20 Z" fill="#F59AB0" />
+      {/* Plump cat face */}
+      <ellipse
+        cx="32"
+        cy="36"
+        rx="21"
+        ry="17.5"
+        fill="#FFE2B3"
+        stroke="#8C582B"
+        strokeWidth="2.6"
+      />
+      {/* Forehead stripes */}
+      <path
+        d="M32 19 V24 M26 20 L27 24 M38 20 L37 24"
+        stroke="#D99B58"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+      {/* Eyes */}
+      <circle cx="23.5" cy="34.5" r="2.7" fill="#3B2818" />
+      <circle cx="40.5" cy="34.5" r="2.7" fill="#3B2818" />
+      <circle cx="22.7" cy="33.6" r="0.9" fill="#FFFFFF" />
+      <circle cx="39.7" cy="33.6" r="0.9" fill="#FFFFFF" />
+      {/* Rosy cheeks */}
+      <ellipse cx="18" cy="39.5" rx="3.2" ry="1.9" fill="#F79CB1" opacity="0.78" />
+      <ellipse cx="46" cy="39.5" rx="3.2" ry="1.9" fill="#F79CB1" opacity="0.78" />
+      {/* Cute nose & ':3' mouth */}
+      <polygon points="32,37 29.5,34.5 34.5,34.5" fill="#EA7B93" />
+      <path
+        d="M27.5 40 Q29.8 43 32 39.5 Q34.2 43 36.5 40"
+        stroke="#8C582B"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Whiskers */}
+      <path
+        d="M15 35 L7 33.5 M15 39 L7 40.5 M49 35 L57 33.5 M49 39 L57 40.5"
+        stroke="#A47449"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Cute Mini Car icon for Mounts bag category (Cưỡi / Xe)
+ */
+export function MountCarIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Car roof cabin */}
+      <path
+        d="M17 31 L22 18 C23 15.8 25 15 27.5 15 H36.5 C39 15 41 15.8 42 18 L47 31 Z"
+        fill="#7CC5E8"
+        stroke="#366280"
+        strokeWidth="2.4"
+        strokeLinejoin="round"
+      />
+      {/* Windshield highlight */}
+      <path
+        d="M21 29 L24.5 19.5 H39.5 L43 29 Z"
+        fill="#E5F6FF"
+        stroke="#4B85A8"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      {/* Car body */}
+      <rect
+        x="8"
+        y="29"
+        width="48"
+        height="15"
+        rx="6"
+        fill="#F47C7C"
+        stroke="#8E3535"
+        strokeWidth="2.4"
+      />
+      {/* Center bumper trim */}
+      <path d="M12 37 H52" stroke="#FFD670" strokeWidth="2.6" strokeLinecap="round" />
+      {/* Headlights */}
+      <circle cx="13" cy="34" r="2.6" fill="#FFF3B0" stroke="#8E3535" strokeWidth="1.4" />
+      <circle cx="51" cy="34" r="2.6" fill="#FFF3B0" stroke="#8E3535" strokeWidth="1.4" />
+      {/* Front & Rear Wheels */}
+      <circle cx="19" cy="45.5" r="6" fill="#3D4652" stroke="#222830" strokeWidth="2" />
+      <circle cx="19" cy="45.5" r="2.4" fill="#E6ECF2" />
+      <circle cx="45" cy="45.5" r="6" fill="#3D4652" stroke="#222830" strokeWidth="2" />
+      <circle cx="45" cy="45.5" r="2.4" fill="#E6ECF2" />
+    </svg>
+  );
+}
+
+/**
  * Custom recognizable illustration for each of the 8 River Fish species
  */
 export function FishIllustration({

@@ -2293,6 +2293,7 @@ export function updateAvatarRigAnimation(
     rig.headPivot.position.y = HEAD_PIVOT_Y;
     rig.bodyPivot.position.y = Math.abs(Math.cos(elapsed * 12)) * 0.075;
     rig.bodyPivot.rotation.x = 0.06;
+    rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = Math.sin(elapsed * 6) * 0.03;
   } else if (pose === 'fish_cast') {
     const u = THREE.MathUtils.clamp(poseProgress, 0, 1);
@@ -2321,6 +2322,7 @@ export function updateAvatarRigAnimation(
     rig.headPivot.position.y = HEAD_PIVOT_Y;
     rig.bodyPivot.position.y = 0;
     rig.bodyPivot.rotation.x = torsoLean;
+    rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = 0;
   } else if (pose === 'fish_wait') {
     const breathe = Math.sin(elapsed * 2.2) * 0.018;
@@ -2334,6 +2336,7 @@ export function updateAvatarRigAnimation(
     rig.headPivot.position.y = HEAD_PIVOT_Y;
     rig.bodyPivot.position.y = 0;
     rig.bodyPivot.rotation.x = 0.03;
+    rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = 0;
   } else if (pose === 'fish_pull') {
     const u = THREE.MathUtils.clamp(poseProgress, 0, 1);
@@ -2348,6 +2351,7 @@ export function updateAvatarRigAnimation(
     rig.headPivot.position.y = HEAD_PIVOT_Y;
     rig.bodyPivot.position.y = 0.02 * snap;
     rig.bodyPivot.rotation.x = -0.14 * snap;
+    rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = 0;
   } else if (pose === 'sit') {
     rig.leftLeg.rotation.x = -1.36;
@@ -2373,6 +2377,7 @@ export function updateAvatarRigAnimation(
     rig.headPivot.position.y = HEAD_PIVOT_Y;
     rig.bodyPivot.position.y = -0.18;
     rig.bodyPivot.rotation.x = 0;
+    rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = 0;
   } else if (pose === 'sleep') {
     rig.leftLeg.rotation.x = 0;
@@ -2385,33 +2390,39 @@ export function updateAvatarRigAnimation(
     rig.headPivot.position.y = HEAD_PIVOT_Y;
     rig.bodyPivot.position.y = 0.36;
     rig.bodyPivot.rotation.x = -Math.PI / 2;
+    rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = 0;
   } else {
-    // Calm static Idle: planted cleanly on the ground with zero jitter/idle sway
+    // Gentle breathing Idle: subtle body bob & soft breathing rhythm
+    const breathPhase = elapsed * 2.15;
+    const breath = Math.sin(breathPhase);
+    const breath01 = 0.5 + 0.5 * breath;
+
     rig.leftLeg.rotation.x = 0;
     rig.rightLeg.rotation.x = 0;
-    rig.bodyPivot.position.y = 0;
-    rig.bodyPivot.rotation.x = 0;
+    rig.bodyPivot.position.y = breath01 * 0.016;
+    rig.bodyPivot.rotation.x = breath * 0.012;
 
-    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
-    rig.headPivot.position.y = HEAD_PIVOT_Y;
-    rig.headPivot.rotation.z = 0;
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77 + breath01 * 0.014;
+    rig.headPivot.position.y = HEAD_PIVOT_Y + breath01 * 0.018;
+    rig.headPivot.rotation.x = Math.sin(breathPhase - 0.5) * 0.024;
+    rig.headPivot.rotation.z = Math.sin(elapsed * 0.95) * 0.016;
 
-    rig.leftArm.rotation.x = 0;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.none.elbowX;
+    rig.leftArm.rotation.x = Math.sin(breathPhase - 0.3) * 0.024;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.none.elbowX - breath01 * 0.03;
 
     if (hold === 'carry_umbrella') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX;
+      rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + breath * 0.014;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
     } else if (hold === 'carry_front') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_front.armX;
+      rig.rightArm.rotation.x = HAND_POSES.carry_front.armX + breath * 0.014;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX;
     } else if (hold === 'carry_bag') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX;
+      rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX + breath * 0.014;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
     } else {
-      rig.rightArm.rotation.x = 0;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.none.elbowX;
+      rig.rightArm.rotation.x = -Math.sin(breathPhase - 0.3) * 0.024;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.none.elbowX - breath01 * 0.03;
     }
   }
 }
