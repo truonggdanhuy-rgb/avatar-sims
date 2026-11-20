@@ -30,6 +30,8 @@ import {
 import {
   AvatarConfig,
   AvatarPose,
+  CoopKind,
+  CoopTroughs,
   GameStats,
   GardenPlotState,
   LivestockAnimalState,
@@ -47,6 +49,7 @@ interface WorldCanvasProps {
   timeOfDay: TimeOfDay;
   plots: GardenPlotState[];
   livestock: LivestockAnimalState[];
+  troughs: CoopTroughs;
   pondFish: PondFishState[];
   placedFurniture: PlacedFurniture[];
   editFurnitureMode: boolean;
@@ -71,7 +74,7 @@ interface WorldCanvasProps {
   onOpenPlot: (plotId: number) => void;
   onOpenWorkshop: (tab: 'mill' | 'kitchen') => void;
   onOpenOrders: () => void;
-  onOpenPasture: () => void;
+  onOpenPasture: (coop?: CoopKind) => void;
   onOpenPond: () => void;
   onAddCoins: (amount: number) => void;
 }
@@ -319,6 +322,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   timeOfDay,
   plots,
   livestock,
+  troughs,
   pondFish,
   placedFurniture,
   editFurnitureMode,
@@ -368,6 +372,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     timeOfDay,
     plots,
     livestock,
+    troughs,
     pondFish,
     fishingState,
     placedFurniture,
@@ -381,6 +386,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     timeOfDay,
     plots,
     livestock,
+    troughs,
     pondFish,
     fishingState,
     placedFurniture,
@@ -472,8 +478,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     .join('|');
 
   const livestockVisualKey = livestock
-    .map((a) => `${a.id}:${a.type}:${a.sick ? 1 : 0}:${a.hasProduce ? 1 : 0}`)
+    .map((a) => `${a.id}:${a.type}:${a.stage}:${a.sick ? 1 : 0}:${a.hasProduce ? 1 : 0}`)
     .join('|');
+
+  const troughsVisualKey = `${troughs.poultry}:${troughs.cattle}`;
 
   const pondFishVisualKey = pondFish
     .map((f) => `${f.id}:${f.species}:${f.stage}:${f.sick ? 1 : 0}`)
@@ -481,7 +489,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
   useEffect(() => {
     rebuildSceneTriggerRef.current?.();
-  }, [zone, plotVisualKey, livestockVisualKey, pondFishVisualKey, fishingState, placedFurniture]);
+  }, [zone, plotVisualKey, livestockVisualKey, troughsVisualKey, pondFishVisualKey, fishingState, placedFurniture]);
 
   useEffect(() => {
     rebuildAvatarTriggerRef.current?.(avatar);
@@ -681,6 +689,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           placedFurniture: z === 'home' ? pf : undefined,
           openDoors: z === 'home' ? openDoorsRef.current : undefined,
           livestock: z === 'garden' ? stateRef.current.livestock : undefined,
+          troughs: z === 'garden' ? stateRef.current.troughs : undefined,
           pondFish: z === 'garden' ? stateRef.current.pondFish : undefined,
         });
         scene.add(activeSubzone.group);
@@ -1054,13 +1063,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'pasture_spot') {
             soundFX.tap();
+            const targetCoop = data.coop as CoopKind | undefined;
             activeTarget = {
               x: data.tx as number,
               z: data.tz as number,
               arrivePose: 'idle',
               onArrive: () => {
                 soundFX.sparkle();
-                callbacksRef.current.onOpenPasture();
+                callbacksRef.current.onOpenPasture(targetCoop);
               },
             };
             return;

@@ -14,22 +14,27 @@ import {
   ANIMAL_LIST,
   ANIMAL_PRODUCTS,
   ANIMALS,
-  MAX_PASTURE_ANIMALS,
+  MAX_COOP_ANIMALS,
   SUPPLY_PRICES,
 } from '../../data/farmCatalog';
 import {
   AnimalType,
+  CoopKind,
+  CoopTroughs,
   FarmInventory,
   LivestockAnimalState,
 } from '../../types/game';
 import {soundFX} from '../../utils/sound';
 
 interface LivestockModalProps {
+  initialCoop?: CoopKind;
   coins: number;
   animals: LivestockAnimalState[];
+  troughs: CoopTroughs;
   inventory: FarmInventory;
   onBuyAnimal: (type: AnimalType) => void;
   onFeedAnimal: (animalId: string) => void;
+  onRefillTrough: (coop: CoopKind, amount?: number) => void;
   onCureAnimal: (animalId: string) => void;
   onCollectProduce: (animalId: string) => void;
   onSellAnimal: (animalId: string) => void;
@@ -38,19 +43,27 @@ interface LivestockModalProps {
   onClose: () => void;
 }
 
-function formatShortTime(ms: number): string {
+function formatDuration(ms: number): string {
   const sec = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(sec / 60);
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
-  return m > 0 ? `${m}p ${s.toString().padStart(2, '0')}s` : `${s}s`;
+  if (d > 0) return `${d}n ${h}g`;
+  if (h > 0) return `${h}g ${m}p`;
+  if (m > 0) return `${m}p ${s.toString().padStart(2, '0')}s`;
+  return `${s}s`;
 }
 
 export const LivestockModal: React.FC<LivestockModalProps> = ({
+  initialCoop = 'poultry',
   coins,
   animals,
+  troughs,
   inventory,
   onBuyAnimal,
   onFeedAnimal,
+  onRefillTrough,
   onCureAnimal,
   onCollectProduce,
   onSellAnimal,
@@ -58,7 +71,7 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
   onCraftFeedFromCrop,
   onClose,
 }) => {
-  const [tab, setTab] = useState<'pasture' | 'market'>('pasture');
+  const [tab, setTab] = useState<'poultry' | 'cattle' | 'market'>(initialCoop);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -66,10 +79,17 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
     return () => window.clearInterval(id);
   }, []);
 
+  const poultryAnimals = animals.filter((a) => a.coop === 'poultry');
+  const cattleAnimals = animals.filter((a) => a.coop === 'cattle');
   const readyCount = animals.filter((a) => a.hasProduce).length;
   const sickCount = animals.filter((a) => a.sick).length;
   const wheatQty = inventory.crops.wheat || 0;
   const cornQty = inventory.crops.corn || 0;
+
+  const activeCoop: CoopKind = tab === 'cattle' ? 'cattle' : 'poultry';
+  const coopAnimals = activeCoop === 'poultry' ? poultryAnimals : cattleAnimals;
+  const coopCap = MAX_COOP_ANIMALS[activeCoop];
+  const troughQty = troughs[activeCoop];
 
   return (
     <div
@@ -86,10 +106,11 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
             <Wheat className="h-5 w-5 text-[#8A5B32]" />
             <div>
               <h2 className="font-display text-base font-bold text-[#4A3525]">
-                Khu Chăn Nuôi Tự Do ({animals.length}/{MAX_PASTURE_ANIMALS})
+                Trang Trại Chăn Nuôi (Gia Cầm {poultryAnimals.length}/{MAX_COOP_ANIMALS.poultry} · Gia Súc{' '}
+                {cattleAnimals.length}/{MAX_COOP_ANIMALS.cattle})
               </h2>
               <p className="text-[11px] text-[#7A6048]">
-                Gà, Lợn & Bò tự do đi lại · Cho ăn & trị bệnh để thu hoạch đều đặn
+                2 chuồng riêng biệt · Bỏ cám vào máng, trị bệnh & thu hoạch +2 sản phẩm/lứa
               </p>
             </div>
           </div>
@@ -116,13 +137,13 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
         {/* Supply summary strip */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#EADBC5] bg-[#F6ECDC] px-4 py-2 text-xs text-[#5B422E]">
           <div className="flex flex-wrap items-center gap-3 font-semibold tabular-nums">
-            <span>Thức ăn thú: {inventory.supplies.animalFeed}</span>
+            <span>Cám trong kho: {inventory.supplies.animalFeed}</span>
             <span>Thuốc thú y: {inventory.supplies.animalMedicine}</span>
           </div>
           {(readyCount > 0 || sickCount > 0) && (
             <div className="flex items-center gap-2 text-[11px] font-bold">
               {readyCount > 0 && (
-                <span className="text-[#4B8A5B]">{readyCount} sản phẩm sẵn sàng!</span>
+                <span className="text-[#4B8A5B]">{readyCount} lứa sẵn sàng!</span>
               )}
               {sickCount > 0 && (
                 <span className="text-[#C2515E]">{sickCount} con đang mệt!</span>
@@ -132,20 +153,34 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="flex shrink-0 items-center gap-2 border-b border-[#E5D5BE] bg-[#FAF3E8] px-4 py-2">
+        <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-[#E5D5BE] bg-[#FAF3E8] px-4 py-2">
           <button
             type="button"
             onClick={() => {
               soundFX.tap();
-              setTab('pasture');
+              setTab('poultry');
             }}
-            className={`min-h-[38px] rounded-xl px-4 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
-              tab === 'pasture'
+            className={`min-h-[38px] shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+              tab === 'poultry'
                 ? 'bg-[#8C5B32] text-white shadow-xs'
                 : 'bg-[#EADBC6] text-[#5B422E] hover:bg-[#DFCCB0]'
             }`}
           >
-            Đàn Vật Nuôi ({animals.length})
+            Chuồng Gia Cầm ({poultryAnimals.length}/{MAX_COOP_ANIMALS.poultry})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              soundFX.tap();
+              setTab('cattle');
+            }}
+            className={`min-h-[38px] shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+              tab === 'cattle'
+                ? 'bg-[#8C5B32] text-white shadow-xs'
+                : 'bg-[#EADBC6] text-[#5B422E] hover:bg-[#DFCCB0]'
+            }`}
+          >
+            Chuồng Gia Súc ({cattleAnimals.length}/{MAX_COOP_ANIMALS.cattle})
           </button>
           <button
             type="button"
@@ -153,211 +188,315 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
               soundFX.tap();
               setTab('market');
             }}
-            className={`min-h-[38px] rounded-xl px-4 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+            className={`min-h-[38px] shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
               tab === 'market'
-                ? 'bg-[#8C5B32] text-white shadow-xs'
+                ? 'bg-[#6BA383] text-white shadow-xs'
                 : 'bg-[#EADBC6] text-[#5B422E] hover:bg-[#DFCCB0]'
             }`}
           >
-            Mua Giống, Thức Ăn & Thuốc
+            Mua Giống, Cám & Thuốc
           </button>
         </div>
 
         <div className="custom-scroll flex-1 overflow-y-auto p-4 text-[#4A3525]">
-          {tab === 'pasture' ? (
-            animals.length === 0 ? (
-              <div className="flex h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-[#DFCCB0] bg-white p-6 text-center">
-                <div className="text-sm font-bold text-[#6F4E37]">Khu chăn nuôi đang trống</div>
-                <div className="mt-1 text-xs text-[#8A6D53]">
-                  Sang tab &quot;Mua Giống, Thức Ăn & Thuốc&quot; để thả Gà, Lợn hoặc Bò vào đồng cỏ nhé!
+          {tab !== 'market' ? (
+            <div className="space-y-3">
+              {/* Coop Trough Strip */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#DFC7A5] bg-white px-3.5 py-2.5">
+                <div className="text-xs">
+                  <span className="font-bold text-[#4A3525]">
+                    Máng Cám {activeCoop === 'poultry' ? 'Chuồng Gia Cầm' : 'Chuồng Gia Súc'}:{' '}
+                  </span>
+                  <span
+                    className={`font-bold tabular-nums ${
+                      troughQty > 0 ? 'text-[#4B8A5B]' : 'text-[#C2515E]'
+                    }`}
+                  >
+                    {troughQty} phần
+                  </span>
+                  <div className="text-[11px] text-[#7A6048]">
+                    Vật nuôi tự ăn khi đói nếu máng còn cám · Tối đa {coopCap} con trong chuồng
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={
+                      inventory.supplies.animalFeed <= 0 && coins < SUPPLY_PRICES.animalFeed
+                    }
+                    onClick={() => {
+                      soundFX.tap();
+                      onRefillTrough(activeCoop, 1);
+                    }}
+                    className="flex min-h-[34px] items-center gap-1 rounded-xl bg-[#E09B3D] px-3 text-xs font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
+                  >
+                    <Utensils className="h-3.5 w-3.5" />
+                    <span>
+                      {inventory.supplies.animalFeed > 0
+                        ? 'Đổ +1 Cám'
+                        : `Đổ +1 (${SUPPLY_PRICES.animalFeed} Xu)`}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      inventory.supplies.animalFeed < 3 && coins < SUPPLY_PRICES.animalFeed * 3
+                    }
+                    onClick={() => {
+                      soundFX.tap();
+                      onRefillTrough(activeCoop, 3);
+                    }}
+                    className="flex min-h-[34px] items-center rounded-xl bg-[#8C5B32] px-2.5 text-xs font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
+                  >
+                    ×3
+                  </button>
                 </div>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {animals.map((ani) => {
-                  const def = ANIMALS[ani.type];
-                  const prod = ANIMAL_PRODUCTS[def.produceId];
-                  const hungerInt = Math.round(ani.hunger);
-                  const pct = ani.hasProduce
-                    ? 100
-                    : Math.min(
-                        99,
-                        Math.max(4, Math.round((1 - ani.remainingMs / ani.cycleMs) * 100)),
-                      );
 
-                  return (
-                    <div
-                      key={ani.id}
-                      className={`flex flex-col justify-between gap-3 rounded-2xl border bg-white p-3.5 ${
-                        ani.sick
-                          ? 'border-[#E8A3AD] bg-[#FFF6F7]'
-                          : ani.hasProduce
-                            ? 'border-[#9AC99E] bg-[#F5FBF6]'
-                            : 'border-[#E0CEB6]'
-                      }`}
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
+              {coopAnimals.length === 0 ? (
+                <div className="flex h-44 flex-col items-center justify-center rounded-2xl border border-dashed border-[#DFCCB0] bg-white p-6 text-center">
+                  <div className="text-sm font-bold text-[#6F4E37]">
+                    {activeCoop === 'poultry'
+                      ? 'Chuồng Gia Cầm đang trống'
+                      : 'Chuồng Gia Súc đang trống'}
+                  </div>
+                  <div className="mt-1 text-xs text-[#8A6D53]">
+                    Sang tab &quot;Mua Giống, Cám & Thuốc&quot; để thả thêm{' '}
+                    {activeCoop === 'poultry' ? 'Gà hoặc Vịt' : 'Lợn hoặc Bò Sữa'} nhé!
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {coopAnimals.map((ani) => {
+                    const def = ANIMALS[ani.type];
+                    const prod = ANIMAL_PRODUCTS[def.produceId];
+                    const hungerInt = Math.round(ani.hunger);
+                    const isBaby = ani.stage === 'baby';
+                    const isRetired = ani.stage === 'retired';
+                    const pct = isBaby
+                      ? Math.min(
+                          99,
+                          Math.max(
+                            3,
+                            Math.round((1 - ani.growRemainingMs / ani.growDurationMs) * 100),
+                          ),
+                        )
+                      : ani.hasProduce
+                        ? 100
+                        : isRetired
+                          ? 100
+                          : Math.min(
+                              99,
+                              Math.max(
+                                4,
+                                Math.round((1 - ani.produceRemainingMs / ani.produceCycleMs) * 100),
+                              ),
+                            );
+
+                    const sellPrice = isBaby
+                      ? Math.round(def.buyPrice * 0.7)
+                      : def.adultSellPrice;
+
+                    return (
+                      <div
+                        key={ani.id}
+                        className={`flex flex-col justify-between gap-3 rounded-2xl border bg-white p-3.5 ${
+                          ani.sick
+                            ? 'border-[#E8A3AD] bg-[#FFF6F7]'
+                            : ani.hasProduce
+                              ? 'border-[#9AC99E] bg-[#F5FBF6]'
+                              : isRetired
+                                ? 'border-[#E6C79C] bg-[#FFF9EE]'
+                                : 'border-[#E0CEB6]'
+                        }`}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="h-4 w-4 shrink-0 rounded-full border border-black/15"
+                                style={{backgroundColor: def.color}}
+                              />
+                              <div>
+                                <div className="flex items-center gap-1.5 text-sm font-bold text-[#4A3525]">
+                                  <span>{ani.name}</span>
+                                  <span className="rounded-md bg-[#F2E5D2] px-1.5 py-0.5 text-[10px] font-semibold text-[#6F4E37]">
+                                    {isBaby ? 'Con non' : isRetired ? 'Hết kỳ đẻ' : 'Trưởng thành'}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-[#7A6048]">
+                                  {def.name} · +2 {prod.name} ({prod.sellPrice} Xu/món)
+                                </div>
+                              </div>
+                            </div>
+
                             <span
-                              className="h-4 w-4 shrink-0 rounded-full border border-black/15"
-                              style={{backgroundColor: def.color}}
-                            />
-                            <div>
-                              <div className="text-sm font-bold text-[#4A3525]">
-                                {ani.name}
-                              </div>
-                              <div className="text-[11px] text-[#7A6048]">
-                                {def.name} · Tạo {prod.name} ({prod.directSellPrice} Xu)
-                              </div>
+                              className={`text-xs font-bold tabular-nums ${
+                                ani.hasProduce
+                                  ? 'text-[#4B8A5B]'
+                                  : ani.sick
+                                    ? 'text-[#C2515E]'
+                                    : isRetired
+                                      ? 'text-[#B2772F]'
+                                      : 'text-[#8C5B32]'
+                              }`}
+                            >
+                              {ani.hasProduce
+                                ? 'Thu hoạch!'
+                                : ani.sick
+                                  ? 'Đang mệt'
+                                  : isBaby
+                                    ? formatDuration(ani.growRemainingMs)
+                                    : isRetired
+                                      ? 'Xuất chuồng'
+                                      : formatDuration(ani.produceRemainingMs)}
+                            </span>
+                          </div>
+
+                          <div>
+                            <div className="mb-1 flex justify-between text-[11px] text-[#7A6048]">
+                              <span>
+                                {isBaby
+                                  ? 'Tiến độ lớn'
+                                  : isRetired
+                                    ? `Đã hoàn thành ${def.activeDays} ngày sản xuất`
+                                    : `Tạo ${prod.name} (còn ${formatDuration(ani.activeRemainingMs)})`}
+                              </span>
+                              <span className="font-bold tabular-nums">{pct}%</span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFE4D3]">
+                              <div
+                                className={`h-full rounded-full ${
+                                  ani.hasProduce
+                                    ? 'bg-[#5FA86B]'
+                                    : isBaby
+                                      ? 'bg-[#6BA383]'
+                                      : isRetired
+                                        ? 'bg-[#D99B58]'
+                                        : 'bg-[#C9925D]'
+                                }`}
+                                style={{width: `${pct}%`}}
+                              />
                             </div>
                           </div>
 
-                          <span
-                            className={`text-xs font-bold tabular-nums ${
-                              ani.hasProduce
-                                ? 'text-[#4B8A5B]'
-                                : ani.sick
-                                  ? 'text-[#C2515E]'
-                                  : 'text-[#8C5B32]'
-                            }`}
-                          >
-                            {ani.hasProduce
-                              ? 'Thu hoạch!'
-                              : ani.sick
-                                ? 'Đang mệt'
-                                : formatShortTime(ani.remainingMs)}
-                          </span>
+                          <div>
+                            <div className="mb-1 flex justify-between text-[11px] text-[#7A6048]">
+                              <span>Độ no</span>
+                              <span
+                                className={`font-bold tabular-nums ${
+                                  hungerInt <= 25 ? 'text-[#C2515E]' : 'text-[#6F4E37]'
+                                }`}
+                              >
+                                {hungerInt}%
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#EFE4D3]">
+                              <div
+                                className={`h-full rounded-full ${
+                                  hungerInt <= 25 ? 'bg-[#D96B59]' : 'bg-[#E5A93C]'
+                                }`}
+                                style={{width: `${hungerInt}%`}}
+                              />
+                            </div>
+                          </div>
+
+                          {ani.sick && (
+                            <div className="flex items-center gap-1.5 rounded-xl border border-[#EAB1B9] bg-[#FFEBEF] px-2.5 py-1.5 text-[11px] font-semibold text-[#A43245]">
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                              <span>Vật nuôi bị ốm, cần Thuốc Thú Y để hồi phục!</span>
+                            </div>
+                          )}
                         </div>
 
-                        <div>
-                          <div className="mb-1 flex justify-between text-[11px] text-[#7A6048]">
-                            <span>Tiến độ tạo {prod.name}</span>
-                            <span className="font-bold tabular-nums">{pct}%</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFE4D3]">
-                            <div
-                              className={`h-full rounded-full ${
-                                ani.hasProduce ? 'bg-[#5FA86B]' : 'bg-[#C9925D]'
-                              }`}
-                              style={{width: `${pct}%`}}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="mb-1 flex justify-between text-[11px] text-[#7A6048]">
-                            <span>Độ no</span>
-                            <span
-                              className={`font-bold tabular-nums ${
-                                hungerInt <= 25 ? 'text-[#C2515E]' : 'text-[#6F4E37]'
-                              }`}
+                        <div className="flex flex-wrap gap-1.5">
+                          {ani.hasProduce && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                soundFX.sparkle();
+                                onCollectProduce(ani.id);
+                              }}
+                              className="flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-xl bg-[#5FA86B] px-3 text-xs font-bold text-white shadow-xs transition-transform active:scale-95"
                             >
-                              {hungerInt}%
-                            </span>
-                          </div>
-                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#EFE4D3]">
-                            <div
-                              className={`h-full rounded-full ${
-                                hungerInt <= 25 ? 'bg-[#D96B59]' : 'bg-[#E5A93C]'
-                              }`}
-                              style={{width: `${hungerInt}%`}}
-                            />
-                          </div>
-                        </div>
+                              <PackageCheck className="h-4 w-4" />
+                              <span>Thu +2 {prod.name}</span>
+                            </button>
+                          )}
 
-                        {ani.sick && (
-                          <div className="flex items-center gap-1.5 rounded-xl border border-[#EAB1B9] bg-[#FFEBEF] px-2.5 py-1.5 text-[11px] font-semibold text-[#A43245]">
-                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                            <span>Vật nuôi bị ốm, cần Thuốc Thú Y để hồi phục!</span>
-                          </div>
-                        )}
-                      </div>
+                          {ani.sick && (
+                            <button
+                              type="button"
+                              disabled={
+                                inventory.supplies.animalMedicine <= 0 &&
+                                coins < SUPPLY_PRICES.animalMedicine
+                              }
+                              onClick={() => {
+                                soundFX.sparkle();
+                                onCureAnimal(ani.id);
+                              }}
+                              className="flex min-h-[36px] flex-1 items-center justify-center gap-1 rounded-xl bg-[#D95970] px-2.5 text-[11px] font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
+                            >
+                              <HeartPulse className="h-3.5 w-3.5" />
+                              <span>
+                                {inventory.supplies.animalMedicine > 0
+                                  ? 'Chữa Bệnh (1 Thuốc)'
+                                  : `Chữa (${SUPPLY_PRICES.animalMedicine} Xu)`}
+                              </span>
+                            </button>
+                          )}
 
-                      <div className="flex flex-wrap gap-1.5">
-                        {ani.hasProduce && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              soundFX.sparkle();
-                              onCollectProduce(ani.id);
-                            }}
-                            className="flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-xl bg-[#5FA86B] px-3 text-xs font-bold text-white shadow-xs transition-transform active:scale-95"
-                          >
-                            <PackageCheck className="h-4 w-4" />
-                            <span>Thu +1 {prod.name}</span>
-                          </button>
-                        )}
-
-                        {ani.sick && (
                           <button
                             type="button"
                             disabled={
-                              inventory.supplies.animalMedicine <= 0 &&
-                              coins < SUPPLY_PRICES.animalMedicine
+                              hungerInt >= 95 ||
+                              (inventory.supplies.animalFeed <= 0 &&
+                                coins < SUPPLY_PRICES.animalFeed)
                             }
                             onClick={() => {
-                              soundFX.sparkle();
-                              onCureAnimal(ani.id);
+                              soundFX.tap();
+                              onFeedAnimal(ani.id);
                             }}
-                            className="flex min-h-[36px] flex-1 items-center justify-center gap-1 rounded-xl bg-[#D95970] px-2.5 text-[11px] font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
+                            className="flex min-h-[36px] flex-1 items-center justify-center gap-1 rounded-xl bg-[#E09B3D] px-2.5 text-[11px] font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
                           >
-                            <HeartPulse className="h-3.5 w-3.5" />
+                            <Utensils className="h-3.5 w-3.5" />
                             <span>
-                              {inventory.supplies.animalMedicine > 0
-                                ? 'Chữa Bệnh (1 Thuốc)'
-                                : `Chữa (${SUPPLY_PRICES.animalMedicine} Xu)`}
+                              {inventory.supplies.animalFeed > 0
+                                ? 'Cho Ăn (1 Cám)'
+                                : `Cho Ăn (${SUPPLY_PRICES.animalFeed} Xu)`}
                             </span>
                           </button>
-                        )}
 
-                        <button
-                          type="button"
-                          disabled={
-                            hungerInt >= 95 ||
-                            (inventory.supplies.animalFeed <= 0 &&
-                              coins < SUPPLY_PRICES.animalFeed)
-                          }
-                          onClick={() => {
-                            soundFX.tap();
-                            onFeedAnimal(ani.id);
-                          }}
-                          className="flex min-h-[36px] flex-1 items-center justify-center gap-1 rounded-xl bg-[#E09B3D] px-2.5 text-[11px] font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
-                        >
-                          <Utensils className="h-3.5 w-3.5" />
-                          <span>
-                            {inventory.supplies.animalFeed > 0
-                              ? 'Cho Ăn (1 Cám)'
-                              : `Cho Ăn (${SUPPLY_PRICES.animalFeed} Xu)`}
-                          </span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            soundFX.sparkle();
-                            onSellAnimal(ani.id);
-                          }}
-                          className="flex min-h-[36px] items-center justify-center rounded-xl border border-[#DFCCB0] bg-[#FAF3E8] px-2.5 text-[11px] font-semibold text-[#6F4E37] transition-transform active:scale-95"
-                        >
-                          Bán ({def.sellAnimalPrice} Xu)
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundFX.sparkle();
+                              onSellAnimal(ani.id);
+                            }}
+                            className="flex min-h-[36px] items-center justify-center rounded-xl border border-[#DFCCB0] bg-[#FAF3E8] px-2.5 text-[11px] font-semibold text-[#6F4E37] transition-transform active:scale-95"
+                          >
+                            Bán ({sellPrice} Xu)
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="space-y-4">
               {/* Animals Market */}
               <div className="space-y-2">
                 <div className="text-xs font-bold text-[#6F4E37]">
-                  Mua Con Giống Thả Tự Do (Tối đa {MAX_PASTURE_ANIMALS} con trong khu rào)
+                  Mua Con Giống (Gia Cầm tối đa {MAX_COOP_ANIMALS.poultry} · Gia Súc tối đa{' '}
+                  {MAX_COOP_ANIMALS.cattle})
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {ANIMAL_LIST.map((def) => {
-                    const full = animals.length >= MAX_PASTURE_ANIMALS;
+                    const currentInCoop =
+                      def.coop === 'poultry' ? poultryAnimals.length : cattleAnimals.length;
+                    const full = currentInCoop >= MAX_COOP_ANIMALS[def.coop];
                     const canBuy = !full && coins >= def.buyPrice;
                     return (
                       <div
@@ -365,13 +504,18 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                         className="flex flex-col justify-between gap-3 rounded-2xl border border-[#E0CEB6] bg-white p-3.5"
                       >
                         <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="h-4 w-4 shrink-0 rounded-full border border-black/15"
-                              style={{backgroundColor: def.color}}
-                            />
-                            <span className="text-sm font-bold text-[#4A3525]">
-                              {def.name}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="h-4 w-4 shrink-0 rounded-full border border-black/15"
+                                style={{backgroundColor: def.color}}
+                              />
+                              <span className="text-sm font-bold text-[#4A3525]">
+                                {def.name}
+                              </span>
+                            </div>
+                            <span className="rounded-md bg-[#F2E5D2] px-2 py-0.5 text-[10px] font-semibold text-[#6F4E37]">
+                              {def.coop === 'poultry' ? 'Gia Cầm' : 'Gia Súc'}
                             </span>
                           </div>
                           <div className="text-[11px] text-[#7A6048]">{def.description}</div>
@@ -383,7 +527,7 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                           onClick={() => {
                             soundFX.sparkle();
                             onBuyAnimal(def.type);
-                            setTab('pasture');
+                            setTab(def.coop);
                           }}
                           className={`flex min-h-[38px] w-full items-center justify-center rounded-xl px-3 text-xs font-bold tabular-nums transition-transform active:scale-95 ${
                             canBuy
@@ -391,7 +535,7 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                               : 'cursor-not-allowed bg-[#E6DDD1] text-[#9B8C7E]'
                           }`}
                         >
-                          {full ? 'Chuồng Đã Đầy' : `Mua · ${def.buyPrice} Xu`}
+                          {full ? 'Chuồng Đã Đầy' : `Mua Con Non · ${def.buyPrice} Xu`}
                         </button>
                       </div>
                     );
@@ -411,7 +555,7 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                         Thức Ăn Chăn Nuôi (Có: {inventory.supplies.animalFeed})
                       </div>
                       <div className="mt-0.5 text-[11px] text-[#7A6048]">
-                        Cho thú ăn giúp tăng nhanh tiến độ ra Trứng, Thịt & Sữa.
+                        Đổ vào máng chuồng hoặc cho ăn trực tiếp để tăng nhanh tiến độ lớn & ra sản phẩm.
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -474,7 +618,7 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                         Thuốc Thú Y (Có: {inventory.supplies.animalMedicine})
                       </div>
                       <div className="mt-0.5 text-[11px] text-[#7A6048]">
-                        Dùng để chữa bệnh cho Gà, Lợn hoặc Bò khi thời tiết thay đổi.
+                        Dùng để chữa bệnh cho Gà, Vịt, Lợn hoặc Bò Sữa khi thời tiết thay đổi.
                       </div>
                     </div>
                     <div className="flex gap-1.5">

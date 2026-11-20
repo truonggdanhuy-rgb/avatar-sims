@@ -38,7 +38,7 @@ export const OrderBoardModal: React.FC<OrderBoardModalProps> = ({
     const qty = getFarmItemCount(inventory, 'crop', c.id);
     if (qty > 0) stockItems.push({kind: 'crop', id: c.id, qty});
   }
-  for (const prodId of ['egg', 'pork', 'milk'] as const) {
+  for (const prodId of ['chicken_egg', 'duck_egg', 'pork', 'milk'] as const) {
     const qty = getFarmItemCount(inventory, 'animal_product', prodId);
     if (qty > 0) stockItems.push({kind: 'animal_product', id: prodId, qty});
   }

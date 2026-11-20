@@ -14,18 +14,20 @@ import {WorldCanvas} from './components/WorldCanvas';
 import {DEFAULT_AVATAR, SHOP_ITEMS, STARTER_OWNED_IDS} from './data/avatarCatalog';
 import {
   ANIMALS,
+  createAnimalInstance,
   createInitialFarmInventory,
   createInitialLivestock,
   createInitialOrders,
   createInitialPlots,
   createInitialPondFish,
   createInitialSupplies,
+  createInitialTroughs,
   createSingleFarmOrder,
   CROPS,
   getFarmItemCount,
   getFarmItemDirectSellPrice,
   KITCHEN_RECIPES,
-  MAX_PASTURE_ANIMALS,
+  MAX_COOP_ANIMALS,
   MAX_POND_FISH,
   PLOT_COUNT,
   PLOT_LEVELS,
@@ -42,6 +44,8 @@ import {
   AnimalProduceId,
   AnimalType,
   AvatarConfig,
+  CoopKind,
+  CoopTroughs,
   CropType,
   DailyQuestProgress,
   FarmInventory,
@@ -194,7 +198,7 @@ export default function App() {
   const [activePlotId, setActivePlotId] = useState<number | null>(null);
   const [workshopTab, setWorkshopTab] = useState<'mill' | 'kitchen' | null>(null);
   const [orderBoardOpen, setOrderBoardOpen] = useState(false);
-  const [pastureOpen, setPastureOpen] = useState(false);
+  const [pastureCoop, setPastureCoop] = useState<CoopKind | null>(null);
   const [pondOpen, setPondOpen] = useState(false);
   const [editFurnitureMode, setEditFurnitureMode] = useState(false);
   const [selectedFurnitureId, setSelectedFurnitureId] = useState<string | null>(null);
@@ -250,9 +254,17 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.farmInventory && typeof parsed.farmInventory === 'object') {
+          const rawProducts = {...(parsed.farmInventory.animalProducts || {})} as Record<
+            string,
+            number
+          >;
+          if (typeof rawProducts.egg === 'number' && rawProducts.egg > 0) {
+            rawProducts.chicken_egg = (rawProducts.chicken_egg || 0) + rawProducts.egg;
+            delete rawProducts.egg;
+          }
           return {
             crops: parsed.farmInventory.crops || {},
-            animalProducts: parsed.farmInventory.animalProducts || {},
+            animalProducts: rawProducts as FarmInventory['animalProducts'],
             processed: parsed.farmInventory.processed || {},
             dishes: parsed.farmInventory.dishes || {},
             supplies: {
@@ -274,7 +286,34 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed.livestock)) {
-          return parsed.livestock;
+          const now = Date.now();
+          return parsed.livestock
+            .filter(
+              (a: Partial<LivestockAnimalState>) =>
+                a && typeof a.type === 'string' && a.type in ANIMALS,
+            )
+            .map((a: Partial<LivestockAnimalState>, idx: number) => {
+              const type = a.type as AnimalType;
+              const def = ANIMALS[type];
+              if (
+                a.coop &&
+                a.stage &&
+                typeof a.growRemainingMs === 'number' &&
+                typeof a.activeRemainingMs === 'number' &&
+                typeof a.produceRemainingMs === 'number'
+              ) {
+                return a as LivestockAnimalState;
+              }
+              const migrated = createAnimalInstance(type, idx + 1, now, true);
+              return {
+                ...migrated,
+                id: typeof a.id === 'string' ? a.id : migrated.id,
+                name: typeof a.name === 'string' ? a.name : migrated.name,
+                hunger: typeof a.hunger === 'number' ? a.hunger : migrated.hunger,
+                sick: Boolean(a.sick),
+                hasProduce: Boolean(a.hasProduce),
+              };
+            });
         }
       }
     } catch {
@@ -282,6 +321,26 @@ export default function App() {
     }
     return createInitialLivestock();
   });
+
+  const [troughs, setTroughs] = useState<CoopTroughs>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.troughs && typeof parsed.troughs === 'object') {
+          return {
+            poultry: Math.max(0, Number(parsed.troughs.poultry) || 0),
+            cattle: Math.max(0, Number(parsed.troughs.cattle) || 0),
+          };
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return createInitialTroughs();
+  });
+  const troughsRef = useRef(troughs);
+  troughsRef.current = troughs;
 
   const [pondFish, setPondFish] = useState<PondFishState[]>(() => {
     try {
@@ -443,7 +502,9 @@ export default function App() {
         return changed ? next : prev;
       });
 
-      // 2. Livestock (chickens, pigs, cows)
+      // 2. Livestock (2 coops: poultry & cattle, baby -> adult -> retired)
+      const currentTroughs = {...troughsRef.current};
+      let troughsConsumed = false;
       setLivestock((prev) => {
         if (prev.length === 0) return prev;
         let changed = false;
@@ -452,41 +513,75 @@ export default function App() {
           if (dt < 800) return ani;
           changed = true;
 
-          // Hunger drops ~6% per minute of active play, capped fairly
-          const hungerDrop = (dt / 60000) * 6;
-          const nextHunger = Math.max(0, ani.hunger - hungerDrop);
+          // Hunger drops ~4% per hour; eats automatically from coop trough if hungry
+          const hungerDrop = (dt / 3600000) * 4;
+          let nextHunger = Math.max(0, ani.hunger - hungerDrop);
+          let nextMeals = ani.mealsRemaining;
+          if (nextHunger < 45 && nextMeals > 0 && currentTroughs[ani.coop] > 0) {
+            currentTroughs[ani.coop] -= 1;
+            troughsConsumed = true;
+            nextMeals -= 1;
+            nextHunger = 100;
+          }
+
           let nextSick = ani.sick;
-          let nextRem = ani.remainingMs;
+          let nextStage = ani.stage;
+          let nextGrowRem = ani.growRemainingMs;
+          let nextActiveRem = ani.activeRemainingMs;
+          let nextProdRem = ani.produceRemainingMs;
           let nextHasProduce = ani.hasProduce;
 
-          if (!nextHasProduce) {
+          if (nextStage !== 'retired') {
             if (!nextSick && dt >= 1000) {
-              // Small periodic disease check (~10% per minute if fed, ~25% if hungry)
-              const pPerSec = nextHunger < 30 ? 0.0045 : 0.0018;
+              const pPerSec = nextHunger < 30 ? 0.0016 : 0.0004;
               if (Math.random() < 1 - Math.pow(1 - pPerSec, Math.min(dt / 1000, 120))) {
                 nextSick = true;
               }
             }
+
             if (!nextSick) {
               const speed = nextHunger <= 15 ? 0.5 : 1.0;
-              nextRem = Math.max(0, ani.remainingMs - dt * speed);
-              if (nextRem <= 0) {
-                nextHasProduce = true;
+              const effDt = dt * speed;
+
+              if (nextStage === 'baby') {
+                nextGrowRem = Math.max(0, nextGrowRem - effDt);
+                if (nextGrowRem <= 0) {
+                  nextStage = 'adult';
+                }
+              } else {
+                nextActiveRem = Math.max(0, nextActiveRem - effDt);
+                if (!nextHasProduce) {
+                  nextProdRem = Math.max(0, nextProdRem - effDt);
+                  if (nextProdRem <= 0) {
+                    nextHasProduce = true;
+                  }
+                }
+                if (nextActiveRem <= 0) {
+                  nextStage = 'retired';
+                }
               }
             }
           }
 
           return {
             ...ani,
+            stage: nextStage,
+            growRemainingMs: nextGrowRem,
+            activeRemainingMs: nextActiveRem,
+            mealsRemaining: nextMeals,
             hunger: nextHunger,
             sick: nextSick,
-            remainingMs: nextRem,
             hasProduce: nextHasProduce,
+            produceRemainingMs: nextProdRem,
             lastTickAt: now,
           };
         });
         return changed ? next : prev;
       });
+      if (troughsConsumed) {
+        troughsRef.current = currentTroughs;
+        setTroughs(currentTroughs);
+      }
 
       // 3. 24h / 48h Pond Aquaculture Fish
       setPondFish((prev) => {
@@ -562,6 +657,7 @@ export default function App() {
           plots,
           farmInventory,
           livestock,
+          troughs,
           pondFish,
           farmOrders,
           ownedIds,
@@ -579,6 +675,7 @@ export default function App() {
     plots,
     farmInventory,
     livestock,
+    troughs,
     pondFish,
     farmOrders,
     ownedIds,
@@ -598,7 +695,7 @@ export default function App() {
       setActivePlotId(null);
       setWorkshopTab(null);
       setOrderBoardOpen(false);
-      setPastureOpen(false);
+      setPastureCoop(null);
       setPondOpen(false);
     }
   };
@@ -821,33 +918,19 @@ export default function App() {
     setStats((prev) => ({...prev, coins: prev.coins + earn}));
   };
 
-  // === LIVESTOCK (CHICKENS, PIGS, COWS) HANDLERS ===
+  // === LIVESTOCK (2 COOPS: POULTRY & CATTLE) HANDLERS ===
   const handleBuyAnimal = (type: AnimalType) => {
     const def = ANIMALS[type];
-    if (livestock.length >= MAX_PASTURE_ANIMALS || stats.coins < def.buyPrice) return;
+    const coopCount = livestock.filter((a) => a.coop === def.coop).length;
+    if (coopCount >= MAX_COOP_ANIMALS[def.coop] || stats.coins < def.buyPrice) return;
     const now = Date.now();
     const countOfType = livestock.filter((a) => a.type === type).length + 1;
-    const labelBase = type === 'chicken' ? 'Gà Mái' : type === 'pig' ? 'Lợn Hồng' : 'Bò Sữa';
     setStats((prev) => ({
       ...prev,
       coins: prev.coins - def.buyPrice,
       mood: Math.min(100, prev.mood + 5),
     }));
-    setLivestock((prev) => [
-      ...prev,
-      {
-        id: `ani_${now.toString(36)}_${Math.random().toString(36).slice(2, 5)}`,
-        type,
-        name: `${labelBase} #${countOfType}`,
-        boughtAt: now,
-        hunger: 100,
-        sick: false,
-        hasProduce: false,
-        remainingMs: def.cycleSeconds * 1000,
-        cycleMs: def.cycleSeconds * 1000,
-        lastTickAt: now,
-      },
-    ]);
+    setLivestock((prev) => [...prev, createAnimalInstance(type, countOfType, now, false)]);
   };
 
   const handleFeedAnimal = (animalId: string) => {
@@ -866,15 +949,49 @@ export default function App() {
     setLivestock((prev) =>
       prev.map((a) => {
         if (a.id !== animalId) return a;
-        const speedUp = a.hasProduce ? a.remainingMs : Math.max(0, Math.round(a.remainingMs * 0.72));
+        if (a.stage === 'baby') {
+          const nextGrow = Math.max(0, Math.round(a.growRemainingMs * 0.72));
+          return {
+            ...a,
+            hunger: Math.min(100, a.hunger + 65),
+            growRemainingMs: nextGrow,
+            stage: nextGrow <= 0 ? 'adult' : 'baby',
+          };
+        }
+        const nextProd = a.hasProduce
+          ? a.produceRemainingMs
+          : Math.max(0, Math.round(a.produceRemainingMs * 0.72));
         return {
           ...a,
           hunger: Math.min(100, a.hunger + 65),
-          remainingMs: speedUp,
-          hasProduce: a.hasProduce || speedUp <= 0,
+          produceRemainingMs: nextProd,
+          hasProduce: a.hasProduce || (a.stage === 'adult' && nextProd <= 0),
         };
       }),
     );
+  };
+
+  const handleRefillTrough = (coop: CoopKind, amount = 1) => {
+    const inBag = farmInventory.supplies.animalFeed;
+    const fromBag = Math.min(inBag, amount);
+    const needBuy = amount - fromBag;
+    const cost = needBuy * SUPPLY_PRICES.animalFeed;
+    if (stats.coins < cost) return;
+
+    if (fromBag > 0) {
+      setFarmInventory((prev) => ({
+        ...prev,
+        supplies: {...prev.supplies, animalFeed: prev.supplies.animalFeed - fromBag},
+      }));
+    }
+    if (cost > 0) {
+      setStats((prev) => ({...prev, coins: prev.coins - cost}));
+    }
+    setTroughs((prev) => {
+      const next = {...prev, [coop]: prev[coop] + amount};
+      troughsRef.current = next;
+      return next;
+    });
   };
 
   const handleCureAnimal = (animalId: string) => {
@@ -901,7 +1018,7 @@ export default function App() {
     const def = ANIMALS[ani.type];
 
     setFarmInventory((prev) =>
-      adjustFarmInventory(prev, [{kind: 'animal_product', id: def.produceId, delta: 1}]),
+      adjustFarmInventory(prev, [{kind: 'animal_product', id: def.produceId, delta: 2}]),
     );
     setLivestock((prev) =>
       prev.map((a) =>
@@ -909,7 +1026,7 @@ export default function App() {
           ? {
               ...a,
               hasProduce: false,
-              remainingMs: a.cycleMs,
+              produceRemainingMs: a.produceCycleMs,
               lastTickAt: Date.now(),
             }
           : a,
@@ -927,8 +1044,10 @@ export default function App() {
     const ani = livestock.find((a) => a.id === animalId);
     if (!ani) return;
     const def = ANIMALS[ani.type];
+    const sellPrice =
+      ani.stage === 'baby' ? Math.round(def.buyPrice * 0.7) : def.adultSellPrice;
     setLivestock((prev) => prev.filter((a) => a.id !== animalId));
-    setStats((prev) => ({...prev, coins: prev.coins + def.sellAnimalPrice}));
+    setStats((prev) => ({...prev, coins: prev.coins + sellPrice}));
   };
 
   const handleBuyLivestockSupply = (supply: 'animalFeed' | 'animalMedicine', qty = 1) => {
@@ -1229,6 +1348,7 @@ export default function App() {
         timeOfDay={timeOfDay}
         plots={plots}
         livestock={livestock}
+        troughs={troughs}
         pondFish={pondFish}
         placedFurniture={placedFurniture}
         editFurnitureMode={editFurnitureMode}
@@ -1261,7 +1381,7 @@ export default function App() {
         onOpenPlot={(plotId) => setActivePlotId(plotId)}
         onOpenWorkshop={(tab) => setWorkshopTab(tab)}
         onOpenOrders={() => setOrderBoardOpen(true)}
-        onOpenPasture={() => setPastureOpen(true)}
+        onOpenPasture={(coop) => setPastureCoop(coop ?? 'poultry')}
         onOpenPond={() => setPondOpen(true)}
         onAddCoins={addCoins}
       />
@@ -1319,19 +1439,23 @@ export default function App() {
         />
       )}
 
-      {zone === 'garden' && pastureOpen && (
+      {zone === 'garden' && pastureCoop && (
         <LivestockModal
+          key={pastureCoop}
+          initialCoop={pastureCoop}
           coins={stats.coins}
           animals={livestock}
+          troughs={troughs}
           inventory={farmInventory}
           onBuyAnimal={handleBuyAnimal}
           onFeedAnimal={handleFeedAnimal}
+          onRefillTrough={handleRefillTrough}
           onCureAnimal={handleCureAnimal}
           onCollectProduce={handleCollectProduce}
           onSellAnimal={handleSellAnimal}
           onBuySupply={handleBuyLivestockSupply}
           onCraftFeedFromCrop={handleCraftFeedFromCrop}
-          onClose={() => setPastureOpen(false)}
+          onClose={() => setPastureCoop(null)}
         />
       )}
 

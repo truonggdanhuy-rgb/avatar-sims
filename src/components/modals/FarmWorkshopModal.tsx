@@ -233,7 +233,7 @@ export const FarmWorkshopModal: React.FC<FarmWorkshopModalProps> = ({
                       </div>
 
                       <div className="text-[11px] text-[#7A6048]">
-                        {rec.categoryLabel} · Đơn hàng ~{rec.orderValue} Xu
+                        {rec.categoryLabel} · Giá bán {rec.sellPrice} Xu
                       </div>
 
                       <div className="space-y-1 pt-1 text-xs">
