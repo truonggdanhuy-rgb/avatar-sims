@@ -15,7 +15,7 @@ interface SettingsModalProps {
 
 const TOWN_DIRECTORY = [
   {zone: 'Nhà Của Tôi', detail: 'Tủ thay đồ, giường hồi năng lượng, sofa & biển Nhiệm vụ ngày'},
-  {zone: 'Nhà Kính Vườn Xanh', detail: 'Gieo hạt, tưới nước và thu hoạch nông sản'},
+  {zone: 'Nông Trại Rộng Mở', detail: 'Trồng trọt, ép mía, nấu bếp nông trại, ao cá & khu chăn nuôi'},
   {zone: 'Hồ Câu Cá', detail: 'Cầu gỗ bờ hồ để quăng cần câu cá kiếm xu'},
   {zone: 'Tiệm Minigame', detail: 'Máy game thùng vui nhộn tăng điểm tâm trạng'},
   {zone: 'Tiệm Thời Trang', detail: 'Khám phá mẫu phối mới và đồ trang trí'},

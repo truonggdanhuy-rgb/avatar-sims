@@ -17,8 +17,8 @@ const QUEST_LIST: {
 }[] = [
   {
     key: 'garden',
-    title: 'Chăm Sóc Nhà Kính',
-    desc: 'Gieo hạt hoặc thu hoạch 1 ô cây tại Khu Vườn.',
+    title: 'Chăm Sóc Nông Trại',
+    desc: 'Gieo hạt hoặc thu hoạch 1 ô cây tại Nông Trại.',
     reward: 25,
   },
   {

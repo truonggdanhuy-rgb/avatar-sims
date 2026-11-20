@@ -30,10 +30,11 @@ import {
 import {
   AvatarConfig,
   AvatarPose,
-  CropType,
   GameStats,
   GardenPlotState,
+  LivestockAnimalState,
   PlacedFurniture,
+  PondFishState,
   TimeOfDay,
   ZoneId,
 } from '../types/game';
@@ -45,6 +46,8 @@ interface WorldCanvasProps {
   stats: GameStats;
   timeOfDay: TimeOfDay;
   plots: GardenPlotState[];
+  livestock: LivestockAnimalState[];
+  pondFish: PondFishState[];
   placedFurniture: PlacedFurniture[];
   editFurnitureMode: boolean;
   selectedFurnitureId: string | null;
@@ -64,7 +67,12 @@ interface WorldCanvasProps {
   onFishCaught: () => void;
   onRestoreEnergy: () => void;
   onBoostMood: () => void;
-  onUpdatePlot: (plotId: number, next: GardenPlotState) => void;
+  onDrinkWellWater: () => void;
+  onOpenPlot: (plotId: number) => void;
+  onOpenWorkshop: (tab: 'mill' | 'kitchen') => void;
+  onOpenOrders: () => void;
+  onOpenPasture: () => void;
+  onOpenPond: () => void;
   onAddCoins: (amount: number) => void;
 }
 
@@ -90,17 +98,11 @@ interface SeatTarget {
   isBed?: boolean;
 }
 
-const CROP_CYCLE: CropType[] = ['strawberry', 'sunflower', 'carrot'];
-const CROP_LABELS: Record<CropType, string> = {
-  strawberry: 'Dâu Tây',
-  sunflower: 'Hướng Dương',
-  carrot: 'Cà Rốt',
-};
 const FISH_LIST = [
-  {name: 'Cá Chép Vàng', coins: 20},
-  {name: 'Cá Bảy Màu', coins: 15},
-  {name: 'Cá Ngựa Sao', coins: 35},
-  {name: 'Cá Rồng Nhí', coins: 45},
+  {name: 'Cá Bảy Màu', coins: 10},
+  {name: 'Cá Chép Vàng', coins: 14},
+  {name: 'Cá Ngựa Sao', coins: 20},
+  {name: 'Cá Rồng Nhí', coins: 26},
 ];
 
 const PLAYER_RADIUS = 0.34;
@@ -137,6 +139,16 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
     return {fov, pos: [-1.8, 12.6, 17.2] as const, look: [-1.8, 0.7, 0.2] as const};
   }
 
+  if (zone === 'garden') {
+    if (isPortrait) {
+      return {fov, pos: [0, 16.5, 22.8] as const, look: [0, 0.8, 0.5] as const};
+    }
+    if (isSquare) {
+      return {fov, pos: [0, 15.2, 20.8] as const, look: [0, 0.8, 0.2] as const};
+    }
+    return {fov, pos: [0, 14.0, 18.8] as const, look: [0, 0.8, 0] as const};
+  }
+
   if (zone === 'boutique') {
     if (isPortrait) {
       return {fov, pos: [0, 8.6, 13.4] as const, look: [0, 0.75, -0.45] as const};
@@ -156,6 +168,9 @@ function getZoneWalkBounds(zone: ZoneId) {
   }
   if (zone === 'home') {
     return {minX: -12.85, maxX: 9.85, minZ: -8.95, maxZ: 6.95};
+  }
+  if (zone === 'garden') {
+    return {minX: -14.5, maxX: 14.5, minZ: -12.4, maxZ: 12.4};
   }
   if (zone === 'boutique') {
     return {minX: -5.6, maxX: 5.6, minZ: -4.8, maxZ: 4.9};
@@ -303,6 +318,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   stats,
   timeOfDay,
   plots,
+  livestock,
+  pondFish,
   placedFurniture,
   editFurnitureMode,
   selectedFurnitureId,
@@ -322,7 +339,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onFishCaught,
   onRestoreEnergy,
   onBoostMood,
-  onUpdatePlot,
+  onDrinkWellWater,
+  onOpenPlot,
+  onOpenWorkshop,
+  onOpenOrders,
+  onOpenPasture,
+  onOpenPond,
   onAddCoins,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -345,6 +367,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     stats,
     timeOfDay,
     plots,
+    livestock,
+    pondFish,
     fishingState,
     placedFurniture,
     editFurnitureMode,
@@ -356,6 +380,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     stats,
     timeOfDay,
     plots,
+    livestock,
+    pondFish,
     fishingState,
     placedFurniture,
     editFurnitureMode,
@@ -378,7 +404,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onFishCaught,
     onRestoreEnergy,
     onBoostMood,
-    onUpdatePlot,
+    onDrinkWellWater,
+    onOpenPlot,
+    onOpenWorkshop,
+    onOpenOrders,
+    onOpenPasture,
+    onOpenPond,
     onAddCoins,
   });
   callbacksRef.current = {
@@ -397,7 +428,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onFishCaught,
     onRestoreEnergy,
     onBoostMood,
-    onUpdatePlot,
+    onDrinkWellWater,
+    onOpenPlot,
+    onOpenWorkshop,
+    onOpenOrders,
+    onOpenPasture,
+    onOpenPond,
     onAddCoins,
   };
 
@@ -428,9 +464,24 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     }
   }, [zone]);
 
+  const plotVisualKey = plots
+    .map(
+      (p) =>
+        `${p.id}:${p.stage}:${p.crop ?? ''}:${p.watered ? 1 : 0}:${p.hasPest ? 1 : 0}:${p.level}`,
+    )
+    .join('|');
+
+  const livestockVisualKey = livestock
+    .map((a) => `${a.id}:${a.type}:${a.sick ? 1 : 0}:${a.hasProduce ? 1 : 0}`)
+    .join('|');
+
+  const pondFishVisualKey = pondFish
+    .map((f) => `${f.id}:${f.species}:${f.stage}:${f.sick ? 1 : 0}`)
+    .join('|');
+
   useEffect(() => {
     rebuildSceneTriggerRef.current?.();
-  }, [zone, plots, fishingState, placedFurniture]);
+  }, [zone, plotVisualKey, livestockVisualKey, pondFishVisualKey, fishingState, placedFurniture]);
 
   useEffect(() => {
     rebuildAvatarTriggerRef.current?.(avatar);
@@ -629,6 +680,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           fishingState: fs,
           placedFurniture: z === 'home' ? pf : undefined,
           openDoors: z === 'home' ? openDoorsRef.current : undefined,
+          livestock: z === 'garden' ? stateRef.current.livestock : undefined,
+          pondFish: z === 'garden' ? stateRef.current.pondFish : undefined,
         });
         scene.add(activeSubzone.group);
         currentAnchors = activeSubzone.labelAnchors;
@@ -645,6 +698,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             playerPos.z = 5.2;
             playerPos.rotY = Math.PI;
             homeSpotRef.current = {x: -1.8, z: 5.2};
+          } else if (z === 'garden') {
+            playerPos.x = 0;
+            playerPos.z = 10.2;
+            playerPos.rotY = Math.PI;
           } else {
             playerPos.x = 0;
             playerPos.z = 2.6;
@@ -931,7 +988,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               arrivePose: 'idle',
               onArrive: () => {
                 soundFX.splash();
-                showBubble('Bình tưới đã đầy nước mát!', data.tx as number, 2.0, data.tz as number);
+                callbacksRef.current.onDrinkWellWater();
+                showBubble('Nước giếng mát lành! (+15 Năng lượng)', data.tx as number, 2.0, data.tz as number);
               },
             };
             return;
@@ -945,29 +1003,78 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               z: data.tz as number,
               arrivePose: 'idle',
               onArrive: () => {
-                const plot = stateRef.current.plots.find((p) => p.id === plotId);
-                if (!plot) return;
-                if (plot.stage === 'empty') {
-                  const chosen = CROP_CYCLE[plot.id % CROP_CYCLE.length];
-                  callbacksRef.current.onUpdatePlot(plot.id, {...plot, stage: 'planted', crop: chosen});
-                  soundFX.sparkle();
-                  showBubble(`Đã gieo ${CROP_LABELS[chosen]}!`, playerPos.x, 2.1, playerPos.z);
-                } else if (plot.stage === 'planted') {
-                  callbacksRef.current.onUpdatePlot(plot.id, {...plot, stage: 'watered'});
-                  soundFX.splash();
-                  showBubble('Đang tưới nước...', playerPos.x, 2.1, playerPos.z);
-                  window.setTimeout(() => {
-                    callbacksRef.current.onUpdatePlot(plot.id, {...plot, stage: 'ready'});
-                  }, 1300);
-                } else if (plot.stage === 'watered') {
-                  callbacksRef.current.onUpdatePlot(plot.id, {...plot, stage: 'ready'});
-                } else if (plot.stage === 'ready') {
-                  const cropName = plot.crop ? CROP_LABELS[plot.crop] : 'Nông sản';
-                  callbacksRef.current.onUpdatePlot(plot.id, {id: plot.id, stage: 'empty', crop: null});
-                  callbacksRef.current.onAddCoins(25);
-                  soundFX.sparkle();
-                  showBubble(`Thu hoạch ${cropName}! +25 Xu`, playerPos.x, 2.1, playerPos.z);
-                }
+                soundFX.sparkle();
+                callbacksRef.current.onOpenPlot(plotId);
+              },
+            };
+            return;
+          }
+
+          if (kind === 'farm_mill') {
+            soundFX.tap();
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'idle',
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onOpenWorkshop('mill');
+              },
+            };
+            return;
+          }
+
+          if (kind === 'farm_kitchen') {
+            soundFX.tap();
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'idle',
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onOpenWorkshop('kitchen');
+              },
+            };
+            return;
+          }
+
+          if (kind === 'order_board') {
+            soundFX.tap();
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'idle',
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onOpenOrders();
+              },
+            };
+            return;
+          }
+
+          if (kind === 'pasture_spot') {
+            soundFX.tap();
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'idle',
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onOpenPasture();
+              },
+            };
+            return;
+          }
+
+          if (kind === 'pond_spot') {
+            soundFX.tap();
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'idle',
+              onArrive: () => {
+                soundFX.splash();
+                callbacksRef.current.onOpenPond();
               },
             };
             return;
@@ -989,7 +1096,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                   fishTimerRef.current = window.setTimeout(() => {
                     setFishingState('bite');
                     soundFX.sparkle();
-                  }, 1700);
+                  }, 2600);
                 } else if (curFs === 'bite') {
                   const fish = FISH_LIST[Math.floor(Math.random() * FISH_LIST.length)];
                   setFishingState('idle');
@@ -1030,8 +1137,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               arrivePose: 'idle',
               onArrive: () => {
                 soundFX.sparkle();
-                callbacksRef.current.onAddCoins(10);
-                showBubble('Gắp trúng Gấu Bông! +10 Xu', playerPos.x, 2.1, playerPos.z);
+                callbacksRef.current.onAddCoins(8);
+                showBubble('Gắp trúng Gấu Bông! +8 Xu', playerPos.x, 2.1, playerPos.z);
               },
             };
             return;
@@ -1219,7 +1326,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         camera.fov = THREE.MathUtils.damp(camera.fov, camCfg.fov, 6, delta);
         camera.updateProjectionMatrix();
         const camOffX =
-          z === 'town'
+          z === 'town' || z === 'garden'
             ? playerPos.x * 0.65
             : z === 'home'
               ? (playerPos.x + 1.8) * 0.65
@@ -1229,7 +1336,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             ? (playerPos.z - 3.6) * 0.65
             : z === 'home'
               ? (playerPos.z - 5.2) * 0.65
-              : 0;
+              : z === 'garden'
+                ? (playerPos.z - 10.2) * 0.65
+                : 0;
         _camPosTarget.set(
           camCfg.pos[0] + camOffX,
           camCfg.pos[1],
@@ -1353,6 +1462,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         groundOffset = 0;
       } else if (z === 'town') {
         groundOffset = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+      } else if (z === 'garden' && playerPos.x > 8.1 && Math.abs(playerPos.z - 2.1) < 0.92) {
+        groundOffset = 0.22;
       }
 
       if (z === 'town') {
@@ -1501,8 +1612,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     soundFX.sparkle();
     if (next >= 5) {
       setMiniActive(false);
-      onAddCoins(30);
-      showBubble('Phá đảo Bắt Sao! +30 Xu', -1.95, 2.1, -1.35);
+      onAddCoins(15);
+      showBubble('Phá đảo Bắt Sao! +15 Xu', -1.95, 2.1, -1.35);
     } else {
       setMiniScore(next);
       setStarPos({x: 20 + Math.random() * 60, y: 20 + Math.random() * 60});

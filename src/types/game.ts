@@ -112,12 +112,148 @@ export interface ShopItem {
   patch: Partial<AvatarConfig>;
 }
 
-export type CropType = 'strawberry' | 'sunflower' | 'carrot';
+export type CropType =
+  | 'wheat'
+  | 'carrot'
+  | 'corn'
+  | 'strawberry'
+  | 'tomato'
+  | 'lemon'
+  | 'sugarcane'
+  | 'watermelon'
+  | 'pumpkin'
+  | 'cacao'
+  | 'coffee';
+
+export type PlotStage = 'empty' | 'growing' | 'ready';
+
+export type PlotLevel = 1 | 2 | 3;
 
 export interface GardenPlotState {
   id: number;
-  stage: 'empty' | 'planted' | 'watered' | 'ready';
+  level: PlotLevel;
+  stage: PlotStage;
   crop: CropType | null;
+  watered: boolean;
+  hasPest: boolean;
+  pestRolled: boolean;
+  plantedAt: number | null;
+  readyAt: number | null;
+  durationMs: number;
+}
+
+export type CoopKind = 'poultry' | 'cattle';
+
+export type AnimalType = 'chicken' | 'duck' | 'pig' | 'cow';
+
+export type AnimalProduceId = 'chicken_egg' | 'duck_egg' | 'pork' | 'milk';
+
+export type AnimalLifecycleStage = 'baby' | 'adult' | 'retired';
+
+export interface LivestockAnimalState {
+  id: string;
+  type: AnimalType;
+  coop: CoopKind;
+  name: string;
+  stage: AnimalLifecycleStage;
+  boughtAt: number;
+  growRemainingMs: number;
+  growDurationMs: number;
+  activeRemainingMs: number; // 3 days poultry / 4 days cattle after reaching adult
+  activeDurationMs: number;
+  mealsRemaining: number; // Eats ~2 times across whole lifespan
+  nextMealElapsedMs: number;
+  hunger: number; // 0..100
+  sick: boolean;
+  hasProduce: boolean;
+  produceRemainingMs: number;
+  produceCycleMs: number;
+  lastTickAt: number;
+}
+
+export interface CoopTroughs {
+  poultry: number;
+  cattle: number;
+}
+
+export type PondFishSpecies = 'carp_24h' | 'tilapia_24h' | 'salmon_48h' | 'sturgeon_48h';
+
+export interface PondFishState {
+  id: string;
+  species: PondFishSpecies;
+  stage: 'growing' | 'ready';
+  stockedAt: number;
+  remainingMs: number;
+  totalDurationMs: number;
+  hunger: number; // 0..100
+  sick: boolean;
+  lastCareCheckAt: number;
+  lastTickAt: number;
+}
+
+export interface FarmSupplies {
+  bugSpray: number; // 2 Xu / bình
+  animalFeed: number; // 2 Xu / túi
+  animalMedicine: number;
+  fishFeed: number;
+  fishMedicine: number;
+  pondBooster: number;
+}
+
+export type ProcessedId =
+  | 'brown_sugar'
+  | 'cane_syrup'
+  | 'flour'
+  | 'berry_jam'
+  | 'roasted_coffee'
+  | 'cacao_powder'
+  | 'cheese';
+
+export type RecipeId =
+  | 'sugarcane_juice'
+  | 'watermelon_juice'
+  | 'honey_lemonade'
+  | 'strawberry_tea'
+  | 'pumpkin_smoothie'
+  | 'corn_milk'
+  | 'hot_cacao'
+  | 'milk_coffee'
+  | 'butter_bread'
+  | 'strawberry_cake'
+  | 'pumpkin_pie'
+  | 'egg_tart'
+  | 'duck_egg_flan'
+  | 'cacao_brownie'
+  | 'berry_cheesecake'
+  | 'carrot_soup'
+  | 'tomato_pasta'
+  | 'glazed_carrot'
+  | 'cheese_omelet'
+  | 'salted_duck_porridge'
+  | 'roasted_pork_corn';
+
+export type FarmItemKind = 'crop' | 'animal_product' | 'processed' | 'dish';
+
+export interface FarmInventory {
+  crops: Partial<Record<CropType, number>>;
+  animalProducts: Partial<Record<AnimalProduceId, number>>;
+  processed: Partial<Record<ProcessedId, number>>;
+  dishes: Partial<Record<RecipeId, number>>;
+  supplies: FarmSupplies;
+}
+
+export interface FarmOrderRequirement {
+  kind: FarmItemKind;
+  id: string;
+  qty: number;
+}
+
+export interface FarmOrder {
+  id: string;
+  customerName: string;
+  title: string;
+  requirements: FarmOrderRequirement[];
+  rewardCoins: number;
 }
 
 export interface GameStats {
