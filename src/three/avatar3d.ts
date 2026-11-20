@@ -2758,6 +2758,44 @@ export function updateAvatarRigAnimation(
     rig.bodyPivot.rotation.x = 0.02 + sitBreath * 0.008;
     rig.headPivot.rotation.x = Math.sin(elapsed * 1.9 - 0.5) * 0.015;
     rig.headPivot.rotation.z = Math.sin(elapsed * 0.85) * 0.01;
+  } else if (pose === 'bath') {
+    const bathBreath = Math.sin(elapsed * 1.65);
+    const breath01 = 0.5 + 0.5 * bathBreath;
+
+    rig.leftLeg.position.z = 0.036;
+    rig.rightLeg.position.z = 0.036;
+    rig.leftLeg.rotation.x = -1.46;
+    rig.rightLeg.rotation.x = -1.46;
+    rig.leftLeg.rotation.z = -0.02;
+    rig.rightLeg.rotation.z = 0.02;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.08;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.08;
+
+    if (rig.skirtPivot) {
+      rig.skirtPivot.rotation.x = 0;
+      rig.skirtPivot.position.set(0, -0.158, 0);
+      rig.skirtPivot.scale.set(1, 1, 1);
+    }
+    if (rig.skirtDeformMeshes) {
+      for (let i = 0; i < rig.skirtDeformMeshes.length; i++) {
+        const pair = rig.skirtDeformMeshes[i];
+        if (pair.mesh.geometry !== pair.sitGeo) {
+          pair.mesh.geometry = pair.sitGeo;
+        }
+      }
+    }
+
+    rig.leftArm.rotation.x = -0.3 + bathBreath * 0.03;
+    rig.rightArm.rotation.x = -0.3 - bathBreath * 0.03;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.38;
+    if (rig.rightElbow) rig.rightElbow.rotation.x = -0.38;
+
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77 + breath01 * 0.01;
+    rig.headPivot.position.y = HEAD_PIVOT_Y + breath01 * 0.012;
+    rig.bodyPivot.position.y = -0.245;
+    rig.bodyPivot.rotation.x = -0.04 + bathBreath * 0.01;
+    rig.headPivot.rotation.x = Math.sin(elapsed * 1.65 - 0.4) * 0.018;
+    rig.headPivot.rotation.z = Math.sin(elapsed * 0.75) * 0.012;
   } else if (pose === 'sleep') {
     rig.leftLeg.rotation.x = 0;
     rig.rightLeg.rotation.x = 0;

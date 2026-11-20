@@ -35,13 +35,21 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
         </svg>
       );
     case 'coffee_table':
-    case 'dining_table':
       return (
         <svg width="64" height="54" viewBox="0 0 64 54">
           <rect x="8" y="20" width="48" height="8" rx="3" fill={c} />
           <rect x="14" y="28" width="5" height="16" rx="2" fill={a} />
           <rect x="45" y="28" width="5" height="16" rx="2" fill={a} />
           <rect x="24" y="14" width="16" height="6" rx="2" fill={a} opacity="0.7" />
+        </svg>
+      );
+    case 'dining_table':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="7" y="18" width="50" height="7" rx="2.5" fill={c} />
+          <path d="M16,17 H48 L50,28 L44,25 L38,28 L32,25 L26,28 L20,25 L14,28 Z" fill={a} />
+          <rect x="13" y="25" width="5" height="20" rx="1.5" fill="#9A673B" />
+          <rect x="46" y="25" width="5" height="20" rx="1.5" fill="#9A673B" />
         </svg>
       );
     case 'tv_stand':
@@ -118,26 +126,37 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
     case 'dish_cabinet':
       return (
         <svg width="64" height="54" viewBox="0 0 64 54">
-          <rect x="14" y="8" width="36" height="20" rx="3" fill={c} />
-          <rect x="18" y="11" width="12" height="14" rx="1.5" fill={a} />
-          <rect x="34" y="11" width="12" height="14" rx="1.5" fill={a} />
-          <rect x="12" y="28" width="40" height="18" rx="3" fill={c} />
+          <rect x="14" y="7" width="36" height="22" rx="2.5" fill="#EDE0CE" stroke={c} strokeWidth="2.5" />
+          <line x1="15" y1="18" x2="49" y2="18" stroke="#8F5F39" strokeWidth="2" />
+          <ellipse cx="22" cy="15" rx="4" ry="2.2" fill="#FFFFFF" />
+          <ellipse cx="22" cy="13" rx="4" ry="2" fill="#9CD6EE" />
+          <rect x="36" y="11" width="3.5" height="6" rx="1" fill="#8FD8EC" />
+          <rect x="42" y="10" width="3.5" height="7" rx="1" fill="#E3A65B" />
+          <circle cx="24" cy="24" r="3" fill="#9AD1B3" />
+          <rect x="36" y="21" width="4" height="6" rx="1" fill="#FFFFFF" />
+          <rect x="12" y="29" width="40" height="18" rx="3" fill={c} />
+          <rect x="16" y="33" width="14" height="11" rx="1.5" fill="#EFE0CA" />
+          <rect x="34" y="33" width="14" height="11" rx="1.5" fill="#EFE0CA" />
         </svg>
       );
     case 'bathtub':
       return (
         <svg width="64" height="54" viewBox="0 0 64 54">
-          <rect x="10" y="20" width="44" height="18" rx="8" fill={c} stroke="#CBD5DF" strokeWidth="1.5" />
-          <ellipse cx="32" cy="22" rx="17" ry="4" fill={a} />
-          <rect x="45" y="12" width="4" height="9" rx="1" fill="#B8C4CE" />
+          <circle cx="17" cy="40" r="2.5" fill="#E6BC5A" />
+          <circle cx="47" cy="40" r="2.5" fill="#E6BC5A" />
+          <path d="M12,23 H52 L49,38 Q32,42 15,38 Z" fill={c} stroke="#CBD5DF" strokeWidth="1.5" />
+          <rect x="9" y="20" width="46" height="5" rx="2.5" fill={c} stroke="#CBD5DF" strokeWidth="1.2" />
+          <ellipse cx="32" cy="22" rx="16" ry="3.2" fill={a} />
+          <path d="M47,20 V13 A4,4 0 0,0 39,13" fill="none" stroke="#B8C4CE" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="22" cy="18" r="2.4" fill="#FFD447" />
         </svg>
       );
     case 'vanity_sink':
       return (
         <svg width="64" height="54" viewBox="0 0 64 54">
-          <rect x="20" y="8" width="24" height="18" rx="3" fill={a} stroke="#C7B6A0" strokeWidth="1.5" />
-          <rect x="15" y="28" width="34" height="18" rx="3" fill={c} stroke="#D5C6B2" strokeWidth="1.5" />
-          <ellipse cx="32" cy="28" rx="8" ry="3" fill="#FFFFFF" />
+          <path d="M21,26 V14 A11,10 0 0,1 43,14 V26 Z" fill={a} stroke="#B98452" strokeWidth="2" />
+          <rect x="15" y="28" width="34" height="17" rx="3" fill={c} stroke="#D5C6B2" strokeWidth="1.5" />
+          <ellipse cx="32" cy="28" rx="8" ry="3" fill="#FFFFFF" stroke="#D5C6B2" strokeWidth="1" />
         </svg>
       );
     case 'floor_lamp':
@@ -146,6 +165,22 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
           <polygon points="24,8 40,8 45,22 19,22" fill={c} />
           <rect x="30" y="22" width="4" height="22" fill={a} />
           <ellipse cx="32" cy="45" rx="10" ry="3.5" fill={a} />
+        </svg>
+      );
+    case 'table_lamp':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <polygon points="22,12 42,12 47,28 17,28" fill={c} stroke="#E4C170" strokeWidth="1.2" />
+          <rect x="30" y="28" width="4" height="7" fill="#E6BC5A" />
+          <ellipse cx="32" cy="40" rx="8" ry="7" fill={a} />
+        </svg>
+      );
+    case 'wall_lamp':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="14" y="18" width="6" height="16" rx="2" fill={a} />
+          <line x1="20" y1="26" x2="31" y2="26" stroke="#E6BC5A" strokeWidth="3" />
+          <polygon points="26,14 42,14 46,27 22,27" fill={c} stroke="#E4C170" strokeWidth="1.2" />
         </svg>
       );
     case 'potted_plant':
@@ -292,12 +327,15 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
     case 'succulent_shelf':
       return (
         <svg width="64" height="54" viewBox="0 0 64 54">
-          <circle cx="19" cy="24" r="5" fill={a} />
+          <circle cx="19" cy="24" r="4.8" fill={a} />
+          <circle cx="19" cy="24" r="2.2" fill="#9EE0AC" />
           <rect x="15" y="26" width="8" height="7" rx="1.5" fill="#D98C5F" />
-          <circle cx="32" cy="23" r="5.5" fill="#8FC99E" />
+          <circle cx="32" cy="23" r="5.2" fill="#82C79A" />
+          <circle cx="32" cy="23" r="2.4" fill="#BDEBC9" />
           <rect x="28" y="26" width="8" height="7" rx="1.5" fill="#EFE4D2" />
-          <circle cx="45" cy="24" r="5" fill="#5EA374" />
-          <rect x="41" y="26" width="8" height="7" rx="1.5" fill="#D98C5F" />
+          <circle cx="45" cy="24" r="4.8" fill="#569D72" />
+          <circle cx="45" cy="24" r="2.2" fill="#8CD4A5" />
+          <rect x="41" y="26" width="8" height="7" rx="1.5" fill="#C47E58" />
           <rect x="10" y="33" width="44" height="5" rx="2" fill={c} />
         </svg>
       );

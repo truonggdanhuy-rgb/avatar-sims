@@ -9,6 +9,8 @@ import {
   DoorClosed,
   DoorOpen,
   Fish,
+  Lightbulb,
+  LightbulbOff,
   Move,
   PackageMinus,
   RotateCw,
@@ -35,6 +37,7 @@ import {FishingVisualFrame} from '../three/fishingVisuals3d';
 import {
   buildSubzoneScene,
   HouseDoorHandle,
+  HouseLampInfo,
   HouseWallSurface,
   SubzoneWorld,
 } from '../three/subzonesBuilder';
@@ -110,7 +113,7 @@ interface WorldCanvasProps {
   onOpenFurniture: () => void;
   onToggleEditFurniture: () => void;
   onSelectFurniture: (id: string | null) => void;
-  onMoveFurniture: (id: string, x: number, z: number, rotY?: number) => void;
+  onMoveFurniture: (id: string, x: number, z: number, rotY?: number, y?: number) => void;
   onRotateFurniture: (id: string) => void;
   onStowFurniture: (id: string) => void;
   onCatchRiverFish: (preRolled?: {
@@ -199,6 +202,7 @@ interface SeatTarget {
   standZ: number;
   isBed?: boolean;
   isSwing?: boolean;
+  isBath?: boolean;
 }
 
 type CatchCelebrationData =
@@ -338,23 +342,75 @@ function getZoneWalkBounds(zone: ZoneId) {
   return {minX: -3.45, maxX: 3.45, minZ: -4.05, maxZ: 4.05};
 }
 
+function getWallItemHalfHeight(kind: string): number {
+  switch (kind) {
+    case 'wall_clock':
+      return 0.42;
+    case 'wall_calendar':
+      return 0.44;
+    case 'succulent_shelf':
+      return 0.28;
+    case 'wall_lamp':
+      return 0.24;
+    case 'wall_tv':
+      return 0.56;
+    default:
+      return 0.65;
+  }
+}
+
+function getFloorObstacleMaxTop(
+  cat: (typeof FURNITURE_BY_ID)[string],
+  baseY: number,
+): number {
+  switch (cat.kind) {
+    case 'wardrobe':
+      return baseY + 2.82;
+    case 'fridge':
+      return baseY + 2.32;
+    case 'vanity_sink':
+      return baseY + 2.38;
+    case 'dish_cabinet':
+      return baseY + 2.22;
+    case 'bookshelf':
+      return baseY + 2.1;
+    case 'floor_lamp':
+      return baseY + 2.1;
+    case 'kitchen_l_counter':
+      return baseY + 1.12;
+    default:
+      return baseY + (cat.surfaceHeight ?? 1.05);
+  }
+}
+
 function snapPointToNearestWall(
   px: number,
   pz: number,
-  catHalfW: number,
+  cat: (typeof FURNITURE_BY_ID)[string],
   cameraPos: THREE.Vector3,
   surfaces: HouseWallSurface[],
-): {x: number; z: number; rotY: number} | null {
+  placedFurniture: PlacedFurniture[],
+  selectedId: string,
+  preferredWallId?: string,
+  hitY?: number,
+  currentOffsetY?: number,
+): {x: number; z: number; rotY: number; y?: number; blocked?: boolean} {
   const upSurfaces = surfaces.filter((s) => s.isUp());
-  const candidates = upSurfaces.length > 0 ? upSurfaces : surfaces;
-  if (candidates.length === 0) return null;
+  let candidates = upSurfaces.length > 0 ? upSurfaces : surfaces;
+  if (preferredWallId) {
+    const wallMatched = candidates.filter((s) => s.wallGroupId === preferredWallId);
+    if (wallMatched.length > 0) candidates = wallMatched;
+  }
+  if (candidates.length === 0) return {x: px, z: pz, rotY: 0, blocked: true};
 
   let best: HouseWallSurface | null = null;
   let bestSpan = 0;
   let bestDist = Infinity;
 
   for (const w of candidates) {
-    const pad = Math.min(catHalfW * 0.5, (w.maxSpan - w.minSpan) * 0.35);
+    const spanLen = w.maxSpan - w.minSpan;
+    if (spanLen < cat.halfW * 1.75) continue;
+    const pad = Math.min(cat.halfW + 0.04, spanLen * 0.45);
     const rawSpan = w.axis === 'z' ? px : pz;
     const clampedSpan = THREE.MathUtils.clamp(rawSpan, w.minSpan + pad, w.maxSpan - pad);
     const wx = w.axis === 'z' ? clampedSpan : w.pos;
@@ -367,7 +423,8 @@ function snapPointToNearestWall(
     }
   }
 
-  if (!best) return null;
+  if (!best) return {x: px, z: pz, rotY: 0, blocked: true};
+
   const side =
     best.outerSide !== undefined
       ? -best.outerSide
@@ -379,18 +436,79 @@ function snapPointToNearestWall(
           ? 1
           : -1;
   const offset = best.thickness / 2 + 0.03;
+  const rotY =
+    best.axis === 'z' ? (side > 0 ? 0 : Math.PI) : side > 0 ? Math.PI / 2 : -Math.PI / 2;
+  const outX = best.axis === 'z' ? bestSpan : best.pos + side * offset;
+  const outZ = best.axis === 'z' ? best.pos + side * offset : bestSpan;
 
-  if (best.axis === 'z') {
-    return {
-      x: bestSpan,
-      z: best.pos + side * offset,
-      rotY: side > 0 ? 0 : Math.PI,
-    };
+  const baseMountY = cat.mountHeight ?? 1.8;
+  const halfH = getWallItemHalfHeight(cat.kind);
+  const minCenterY = cat.kind.startsWith('window_') ? 1.35 : 0.65 + halfH;
+  const maxCenterY = 2.95 - halfH;
+  const desiredCenterY =
+    hitY !== undefined && hitY > 0.3
+      ? THREE.MathUtils.clamp(hitY, minCenterY, maxCenterY)
+      : THREE.MathUtils.clamp(baseMountY + (currentOffsetY ?? 0), minCenterY, maxCenterY);
+  const nextYOffset = Number((desiredCenterY - baseMountY).toFixed(2));
+
+  // Obstacle Check 1: Other wall-mounted items on the same wall
+  for (const other of placedFurniture) {
+    if (other.instanceId === selectedId) continue;
+    const oCat = FURNITURE_BY_ID[other.catalogId];
+    if (!oCat || oCat.kind === 'floor_paint' || oCat.kind === 'wall_paint' || oCat.walkable) {
+      continue;
+    }
+
+    if (oCat.wallMount) {
+      const distToWallPlane =
+        best.axis === 'z' ? Math.abs(other.z - best.pos) : Math.abs(other.x - best.pos);
+      if (distToWallPlane > best.thickness / 2 + 0.35) continue;
+
+      const sameSideOrWindow =
+        cat.kind.startsWith('window_') ||
+        oCat.kind.startsWith('window_') ||
+        (best.axis === 'z'
+          ? Math.sign(other.z - best.pos) === side
+          : Math.sign(other.x - best.pos) === side);
+      if (!sameSideOrWindow) continue;
+
+      const otherSpan = best.axis === 'z' ? other.x : other.z;
+      const otherHalfH = getWallItemHalfHeight(oCat.kind);
+      const otherCenterY = (oCat.mountHeight ?? 1.8) + (other.y ?? 0);
+      if (
+        Math.abs(otherSpan - bestSpan) < cat.halfW + oCat.halfW + 0.04 &&
+        Math.abs(otherCenterY - desiredCenterY) < halfH + otherHalfH + 0.04
+      ) {
+        return {x: outX, z: outZ, rotY, blocked: true};
+      }
+    } else {
+      // Obstacle Check 2: Tall floor furniture pressed against the wall below/across the mount height
+      const otherTopY = getFloorObstacleMaxTop(oCat, other.y ?? 0);
+      if (otherTopY <= desiredCenterY - halfH + 0.04) continue;
+
+      const sinR = Math.abs(Math.sin(other.rotY));
+      const cosR = Math.abs(Math.cos(other.rotY));
+      const effHalfX = oCat.halfW * cosR + oCat.halfD * sinR;
+      const effHalfZ = oCat.halfW * sinR + oCat.halfD * cosR;
+      const perpDist =
+        best.axis === 'z' ? (other.z - best.pos) * side : (other.x - best.pos) * side;
+      const perpExtent = best.axis === 'z' ? effHalfZ : effHalfX;
+      if (perpDist > -0.15 && perpDist - perpExtent < best.thickness / 2 + 0.55) {
+        const otherSpan = best.axis === 'z' ? other.x : other.z;
+        const otherSpanHalf = best.axis === 'z' ? effHalfX : effHalfZ;
+        if (Math.abs(otherSpan - bestSpan) < cat.halfW + otherSpanHalf - 0.05) {
+          return {x: outX, z: outZ, rotY, blocked: true};
+        }
+      }
+    }
   }
+
   return {
-    x: best.pos + side * offset,
-    z: bestSpan,
-    rotY: side > 0 ? Math.PI / 2 : -Math.PI / 2,
+    x: outX,
+    z: outZ,
+    rotY,
+    y: Math.abs(nextYOffset) > 0.01 ? nextYOffset : 0,
+    blocked: false,
   };
 }
 
@@ -884,6 +1002,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [nearbyDoor, setNearbyDoor] = useState<{id: string; label: string; isOpen: boolean} | null>(
     null,
   );
+  const [nearbyLightSwitch, setNearbyLightSwitch] = useState<boolean | null>(null);
+  const [nearbyLamp, setNearbyLamp] = useState<HouseLampInfo | null>(null);
   const [nearPond, setNearPond] = useState(false);
   const [confirmPondFeed, setConfirmPondFeed] = useState(false);
   const [homeToolsOpen, setHomeToolsOpen] = useState(false);
@@ -1011,8 +1131,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const catchTimerRef = useRef<number | null>(null);
   const fishTimerRef = useRef<number | null>(null);
   const openDoorsRef = useRef<Record<string, boolean>>({});
+  const houseLightsOnRef = useRef<boolean>(true);
+  const lampStatesRef = useRef<Record<string, boolean>>({});
+  const activeBathtubIdRef = useRef<string | null>(null);
   const activeDoorsRef = useRef<HouseDoorHandle[]>([]);
   const nearbyDoorKeyRef = useRef<string>('');
+  const nearbyLightSwitchKeyRef = useRef<string>('');
+  const nearbyLampKeyRef = useRef<string>('');
   const nearPondRef = useRef<boolean>(false);
   const homeExitTriggeredRef = useRef<boolean>(false);
   const selectedPlotRef = useRef<{plotId: number; worldPos: THREE.Vector3} | null>(null);
@@ -1047,8 +1172,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     if (zone !== 'home') {
       openDoorsRef.current = {};
       activeDoorsRef.current = [];
+      activeBathtubIdRef.current = null;
       nearbyDoorKeyRef.current = '';
+      nearbyLightSwitchKeyRef.current = '';
+      nearbyLampKeyRef.current = '';
       setNearbyDoor(null);
+      setNearbyLightSwitch(null);
+      setNearbyLamp(null);
       setHomeToolsOpen(false);
     }
     if (zone !== 'garden') {
@@ -1383,11 +1513,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           placedFurniture: z === 'home' ? pf : undefined,
           editFurnitureMode: z === 'home' ? stateRef.current.editFurnitureMode : undefined,
           openDoors: z === 'home' ? openDoorsRef.current : undefined,
+          houseLightsOn: z === 'home' ? houseLightsOnRef.current : undefined,
+          lampStates: z === 'home' ? lampStatesRef.current : undefined,
           livestock: z === 'garden' ? stateRef.current.livestock : undefined,
           troughs: z === 'garden' ? stateRef.current.troughs : undefined,
           pondFish: z === 'garden' ? stateRef.current.pondFish : undefined,
         });
         activeSubzoneRef.current = activeSubzone;
+        if (z === 'home' && activeBathtubIdRef.current) {
+          activeSubzone.setActiveBathtub?.(activeBathtubIdRef.current);
+        }
         scene.add(activeSubzone.group);
         currentAnchors = activeSubzone.labelAnchors;
         currentClickTargets = [...activeSubzone.clickTargets, playerProxy];
@@ -1674,6 +1809,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     const releaseSeatIfNeeded = () => {
       if (activeSeat) {
+        if (activeSeat.isBath) {
+          activeBathtubIdRef.current = null;
+          activeSubzone?.setActiveBathtub?.(null);
+        }
         playerPos.x = activeSeat.standX;
         playerPos.z = activeSeat.standZ;
         activeSeat = null;
@@ -1825,6 +1964,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         );
 
         let firstWallHitPoint: THREE.Vector3 | null = null;
+        let firstWallHitId: string | undefined;
         for (const h of hits) {
           let obj: THREE.Object3D | null = h.object;
           while (obj && (!obj.userData || !obj.userData.kind)) {
@@ -1855,11 +1995,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
           if (!firstWallHitPoint && obj && obj.userData.kind === 'house_wall') {
             firstWallHitPoint = h.point;
+            firstWallHitId = obj.userData.wallId as string | undefined;
           }
         }
 
         if (selId) {
-          if (selCat?.wallMount) {
+          if (selCat?.wallMount && selPlaced) {
             let refPt = firstWallHitPoint;
             if (!refPt && currentGrounds.length > 0) {
               const groundHits = raycaster.intersectObjects(currentGrounds, false);
@@ -1869,13 +2010,27 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               const snapped = snapPointToNearestWall(
                 refPt.x,
                 refPt.z,
-                selCat.halfW,
+                selCat,
                 camera.position,
                 currentWallSurfaces,
+                stateRef.current.placedFurniture,
+                selId,
+                firstWallHitPoint ? firstWallHitId : undefined,
+                firstWallHitPoint ? firstWallHitPoint.y : undefined,
+                selPlaced.y,
               );
-              if (snapped) {
+              if (snapped.blocked) {
                 soundFX.tap();
-                callbacksRef.current.onMoveFurniture(selId, snapped.x, snapped.z, snapped.rotY);
+                showBubble('Chỗ tường này đang có vật cản (cửa hoặc đồ cao)!');
+              } else {
+                soundFX.tap();
+                callbacksRef.current.onMoveFurniture(
+                  selId,
+                  snapped.x,
+                  snapped.z,
+                  snapped.rotY,
+                  snapped.y,
+                );
               }
             }
           } else if (currentGrounds.length > 0) {
@@ -2058,7 +2213,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const sofaSeat: SeatTarget = {
               seatX: (data.seatX as number) ?? -2.38,
               seatZ: (data.seatZ as number) ?? 1.3,
-              seatY: (data.seatY as number) ?? 0.62,
+              seatY: (data.seatY as number) ?? 0.52,
               rotY: (data.sitRotY as number) ?? Math.PI / 2,
               standX: data.tx as number,
               standZ: data.tz as number,
@@ -2068,6 +2223,78 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               callbacksRef.current.onBoostMood();
               showBubble('Thư giãn thật thích! (+Vui vẻ)', sofaSeat.seatX, 2.0, sofaSeat.seatZ);
             });
+            return;
+          }
+
+          if (kind === 'bathtub') {
+            soundFX.tap();
+            const tubId = data.furnitureId as string;
+            const bathSeat: SeatTarget = {
+              seatX: (data.seatX as number) ?? 9.2,
+              seatZ: (data.seatZ as number) ?? -7.8,
+              seatY: (data.seatY as number) ?? 0.245,
+              rotY: (data.sitRotY as number) ?? Math.PI / 2,
+              standX: data.tx as number,
+              standZ: data.tz as number,
+              isBath: true,
+            };
+            startWalkTo(data.tx as number, data.tz as number, 'bath', bathSeat, () => {
+              soundFX.splash();
+              activeBathtubIdRef.current = tubId;
+              activeSubzone?.setActiveBathtub?.(tubId);
+              callbacksRef.current.onBoostMood();
+              showBubble(
+                'Ngâm bồn nước ấm ngập tới cổ thật sảng khoái! (+Vui vẻ)',
+                bathSeat.seatX,
+                2.0,
+                bathSeat.seatZ,
+              );
+            });
+            return;
+          }
+
+          if (kind === 'light_switch') {
+            const doToggleSwitch = () => {
+              const nextOn = !houseLightsOnRef.current;
+              houseLightsOnRef.current = nextOn;
+              activeSubzone?.setHouseLightsOn?.(nextOn);
+              soundFX.tap();
+              nearbyLightSwitchKeyRef.current = String(nextOn);
+              setNearbyLightSwitch(nextOn);
+              showBubble(
+                nextOn
+                  ? 'Đã bật đèn phòng sáng trưng!'
+                  : 'Đã tắt đèn phòng — bật từng chiếc đèn để chill nhé!',
+              );
+            };
+            const dist = Math.hypot(playerPos.x - -0.42, playerPos.z - 7.08);
+            if (dist < 2.65) {
+              doToggleSwitch();
+            } else {
+              soundFX.tap();
+              startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, doToggleSwitch);
+            }
+            return;
+          }
+
+          if (kind === 'lamp') {
+            const fid = data.furnitureId as string;
+            const label = (data.label as string) || 'Đèn';
+            const doToggleLamp = () => {
+              const cur = lampStatesRef.current[fid] ?? true;
+              const nextOn = !cur;
+              lampStatesRef.current[fid] = nextOn;
+              activeSubzone?.setLampOn?.(fid, nextOn);
+              soundFX.tap();
+              showBubble(nextOn ? `Đã bật ${label}!` : `Đã tắt ${label}.`);
+            };
+            const dist = Math.hypot(playerPos.x - (data.tx as number), playerPos.z - (data.tz as number));
+            if (dist < 2.4) {
+              doToggleLamp();
+            } else {
+              soundFX.tap();
+              startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, doToggleLamp);
+            }
             return;
           }
 
@@ -2518,8 +2745,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const {zone: z, timeOfDay: tod, avatar: av} = stateRef.current;
 
       const isIndoor = z === 'home' || z === 'boutique' || z === 'arcade' || z === 'petshop';
-      const targetBg =
-        tod === 'night'
+      const isHomeDark = z === 'home' && !houseLightsOnRef.current;
+      const targetBg = isHomeDark
+        ? 0x0c1324
+        : tod === 'night'
           ? isIndoor
             ? 0x161c30
             : 0x101e38
@@ -2532,73 +2761,95 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         scene.fog.color.copy(scene.background as THREE.Color);
         scene.fog.density = THREE.MathUtils.damp(
           scene.fog.density,
-          tod === 'night' && !isIndoor ? 0.0025 : 0.0021,
+          (tod === 'night' && !isIndoor) || isHomeDark ? 0.0025 : 0.0021,
           5,
           delta,
         );
       }
       scene.environmentIntensity = THREE.MathUtils.damp(
         scene.environmentIntensity,
-        tod === 'night' ? (isIndoor ? 0.28 : 0.16) : tod === 'sunset' ? 0.34 : 0.42,
+        isHomeDark
+          ? 0.08
+          : tod === 'night'
+            ? isIndoor
+              ? 0.28
+              : 0.16
+            : tod === 'sunset'
+              ? 0.34
+              : 0.42,
         5,
         delta,
       );
       renderer.toneMappingExposure = THREE.MathUtils.damp(
         renderer.toneMappingExposure,
-        tod === 'night' ? 0.88 : 0.96,
+        isHomeDark ? 0.78 : tod === 'night' ? 0.88 : 0.96,
         5,
         delta,
       );
       sunLight.intensity = THREE.MathUtils.damp(
         sunLight.intensity,
-        tod === 'night' ? (isIndoor ? 0.65 : 0.52) : tod === 'sunset' ? 1.04 : 1.22,
+        isHomeDark
+          ? 0.2
+          : tod === 'night'
+            ? isIndoor
+              ? 0.65
+              : 0.52
+            : tod === 'sunset'
+              ? 1.04
+              : 1.22,
         5,
         delta,
       );
       _sunColorTarget.set(
-        tod === 'night'
-          ? isIndoor
-            ? '#CBD8F5'
-            : '#BFD6FF'
-          : tod === 'sunset'
-            ? '#FFAE70'
-            : '#FFF2D8',
+        isHomeDark
+          ? '#7B96D4'
+          : tod === 'night'
+            ? isIndoor
+              ? '#CBD8F5'
+              : '#BFD6FF'
+            : tod === 'sunset'
+              ? '#FFAE70'
+              : '#FFF2D8',
       );
       sunLight.color.lerp(_sunColorTarget, 0.08);
       hemiLight.intensity = THREE.MathUtils.damp(
         hemiLight.intensity,
-        tod === 'night' ? 0.38 : tod === 'sunset' ? 0.48 : 0.58,
+        isHomeDark ? 0.16 : tod === 'night' ? 0.38 : tod === 'sunset' ? 0.48 : 0.58,
         5,
         delta,
       );
       _hemiSkyTarget.set(
-        tod === 'night'
-          ? isIndoor
-            ? '#7A90BF'
-            : '#5478B8'
-          : tod === 'sunset'
-            ? '#FFD6BA'
-            : '#DCEFFF',
+        isHomeDark
+          ? '#3F568D'
+          : tod === 'night'
+            ? isIndoor
+              ? '#7A90BF'
+              : '#5478B8'
+            : tod === 'sunset'
+              ? '#FFD6BA'
+              : '#DCEFFF',
       );
       _hemiGroundTarget.set(
-        tod === 'night'
-          ? isIndoor
-            ? '#3F3A36'
-            : '#223B3E'
-          : tod === 'sunset'
-            ? '#6D6854'
-            : '#6A8C58',
+        isHomeDark
+          ? '#1E2334'
+          : tod === 'night'
+            ? isIndoor
+              ? '#3F3A36'
+              : '#223B3E'
+            : tod === 'sunset'
+              ? '#6D6854'
+              : '#6A8C58',
       );
       hemiLight.color.lerp(_hemiSkyTarget, 0.08);
       hemiLight.groundColor.lerp(_hemiGroundTarget, 0.08);
       rimLight.intensity = THREE.MathUtils.damp(
         rimLight.intensity,
-        tod === 'night' ? 0.26 : tod === 'sunset' ? 0.34 : 0.42,
+        isHomeDark ? 0.14 : tod === 'night' ? 0.26 : tod === 'sunset' ? 0.34 : 0.42,
         5,
         delta,
       );
       _rimColorTarget.set(
-        tod === 'night' ? '#87B0F0' : tod === 'sunset' ? '#FFB585' : '#A8D2FF',
+        isHomeDark || tod === 'night' ? '#87B0F0' : tod === 'sunset' ? '#FFB585' : '#A8D2FF',
       );
       rimLight.color.lerp(_rimColorTarget, 0.08);
 
@@ -2835,7 +3086,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
 
       let groundOffset = 0.02;
-      if (playerPos.pose === 'sit' && activeSeat) {
+      if ((playerPos.pose === 'sit' || playerPos.pose === 'bath') && activeSeat) {
         groundOffset = activeSeat.seatY - 0.245;
       } else if (playerPos.pose === 'sleep' && activeSeat?.isBed) {
         groundOffset = 0;
@@ -2906,7 +3157,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const cat = sel ? FURNITURE_BY_ID[sel.catalogId] : null;
         if (sel && cat) {
           selectionRing.visible = true;
-          selectionRing.position.set(sel.x, (sel.y ?? 0) + 0.03, sel.z);
+          selectionRing.position.set(sel.x, cat.wallMount ? 0.03 : (sel.y ?? 0) + 0.03, sel.z);
           const ringRadius =
             Math.max(cat.halfW, cat.halfD) * 1.28 + Math.sin(elapsed * 5) * 0.035;
           selectionRing.scale.set(ringRadius, ringRadius, 1);
@@ -3355,6 +3606,40 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           setNearbyDoor(null);
         }
 
+        if (z === 'home') {
+          const switchDist = Math.hypot(playerPos.x - -0.42, playerPos.z - 7.08);
+          const nextSwitchKey = switchDist < 2.65 ? String(houseLightsOnRef.current) : '';
+          if (nextSwitchKey !== nearbyLightSwitchKeyRef.current) {
+            nearbyLightSwitchKeyRef.current = nextSwitchKey;
+            setNearbyLightSwitch(switchDist < 2.65 ? houseLightsOnRef.current : null);
+          }
+
+          const houseLamps = activeSubzoneRef.current?.getHouseLamps?.() ?? [];
+          let closestLamp: HouseLampInfo | null = null;
+          let bestLampD = 2.35;
+          for (const l of houseLamps) {
+            const d = Math.hypot(playerPos.x - l.x, playerPos.z - l.z);
+            if (d < bestLampD) {
+              bestLampD = d;
+              closestLamp = l;
+            }
+          }
+          const nextLampKey = closestLamp ? `${closestLamp.id}:${closestLamp.isOn}` : '';
+          if (nextLampKey !== nearbyLampKeyRef.current) {
+            nearbyLampKeyRef.current = nextLampKey;
+            setNearbyLamp(closestLamp);
+          }
+        } else {
+          if (nearbyLightSwitchKeyRef.current !== '') {
+            nearbyLightSwitchKeyRef.current = '';
+            setNearbyLightSwitch(null);
+          }
+          if (nearbyLampKeyRef.current !== '') {
+            nearbyLampKeyRef.current = '';
+            setNearbyLamp(null);
+          }
+        }
+
         const isNearPondNow =
           z === 'garden' &&
           playerPos.x >= 8.4 &&
@@ -3448,6 +3733,31 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     soundFX.enterDoor();
     nearbyDoorKeyRef.current = `${door.id}:${nextOpen}`;
     setNearbyDoor({id: door.id, label: door.label, isOpen: nextOpen});
+  };
+
+  const handleToggleHouseLights = () => {
+    const nextOn = !houseLightsOnRef.current;
+    houseLightsOnRef.current = nextOn;
+    activeSubzoneRef.current?.setHouseLightsOn?.(nextOn);
+    soundFX.tap();
+    nearbyLightSwitchKeyRef.current = String(nextOn);
+    setNearbyLightSwitch(nextOn);
+    showBubble(
+      nextOn
+        ? 'Đã bật đèn phòng sáng trưng!'
+        : 'Đã tắt đèn phòng — bật từng chiếc đèn để chill nhé!',
+    );
+  };
+
+  const handleToggleNearbyLamp = () => {
+    if (!nearbyLamp) return;
+    const nextOn = !nearbyLamp.isOn;
+    lampStatesRef.current[nearbyLamp.id] = nextOn;
+    activeSubzoneRef.current?.setLampOn?.(nearbyLamp.id, nextOn);
+    soundFX.tap();
+    nearbyLampKeyRef.current = `${nearbyLamp.id}:${nextOn}`;
+    setNearbyLamp({...nearbyLamp, isOn: nextOn});
+    showBubble(nextOn ? `Đã bật ${nearbyLamp.name}!` : `Đã tắt ${nearbyLamp.name}.`);
   };
 
   const selectedPlacedItem =
@@ -3613,23 +3923,63 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {/* Proximity Door Toggle Button inside House */}
-      {zone === 'home' && !editFurnitureMode && nearbyDoor && (
-        <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
-          <button
-            type="button"
-            onClick={handleToggleNearbyDoor}
-            className="anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 border-[#7A5230] bg-[#FFF8EB] px-4 py-2 text-xs font-bold text-[#4A3525] shadow-lg transition-transform active:scale-95"
-          >
-            {nearbyDoor.isOpen ? (
-              <DoorClosed className="h-4 w-4 text-[#B95D3B]" />
-            ) : (
-              <DoorOpen className="h-4 w-4 text-[#4B8A66]" />
-            )}
-            <span>
-              {nearbyDoor.isOpen ? `Đóng ${nearbyDoor.label}` : `Mở ${nearbyDoor.label}`}
-            </span>
-          </button>
+      {/* Proximity Door / Light Switch / Lamp Controls inside House */}
+      {zone === 'home' && !editFurnitureMode && (nearbyDoor || nearbyLightSwitch !== null || nearbyLamp) && (
+        <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
+          {nearbyLightSwitch !== null && (
+            <button
+              type="button"
+              onClick={handleToggleHouseLights}
+              className={`anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 px-4 py-2 text-xs font-bold shadow-lg transition-transform active:scale-95 ${
+                nearbyLightSwitch
+                  ? 'border-[#C9963B] bg-[#FFF8EB] text-[#4A3525]'
+                  : 'border-[#4D648D] bg-[#1E2B45] text-[#F8E7B9]'
+              }`}
+            >
+              {nearbyLightSwitch ? (
+                <LightbulbOff className="h-4 w-4 text-[#C26A38]" />
+              ) : (
+                <Lightbulb className="h-4 w-4 text-[#FFD166]" />
+              )}
+              <span>{nearbyLightSwitch ? 'Tắt Đèn Phòng' : 'Bật Đèn Phòng'}</span>
+            </button>
+          )}
+
+          {nearbyLamp && (
+            <button
+              type="button"
+              onClick={handleToggleNearbyLamp}
+              className={`anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 px-4 py-2 text-xs font-bold shadow-lg transition-transform active:scale-95 ${
+                nearbyLamp.isOn
+                  ? 'border-[#C9963B] bg-[#FFF8EB] text-[#4A3525]'
+                  : 'border-[#5F7396] bg-[#24324E] text-[#FFE8A3]'
+              }`}
+            >
+              {nearbyLamp.isOn ? (
+                <LightbulbOff className="h-4 w-4 text-[#C26A38]" />
+              ) : (
+                <Lightbulb className="h-4 w-4 text-[#FFD166]" />
+              )}
+              <span>{nearbyLamp.isOn ? `Tắt ${nearbyLamp.name}` : `Bật ${nearbyLamp.name}`}</span>
+            </button>
+          )}
+
+          {nearbyDoor && (
+            <button
+              type="button"
+              onClick={handleToggleNearbyDoor}
+              className="anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 border-[#7A5230] bg-[#FFF8EB] px-4 py-2 text-xs font-bold text-[#4A3525] shadow-lg transition-transform active:scale-95"
+            >
+              {nearbyDoor.isOpen ? (
+                <DoorClosed className="h-4 w-4 text-[#B95D3B]" />
+              ) : (
+                <DoorOpen className="h-4 w-4 text-[#4B8A66]" />
+              )}
+              <span>
+                {nearbyDoor.isOpen ? `Đóng ${nearbyDoor.label}` : `Mở ${nearbyDoor.label}`}
+              </span>
+            </button>
+          )}
         </div>
       )}
 

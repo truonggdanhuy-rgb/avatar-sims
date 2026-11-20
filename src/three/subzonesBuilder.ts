@@ -44,6 +44,7 @@ export interface HouseDoorHandle {
 
 export interface HouseWallSurface {
   id: string;
+  wallGroupId: string;
   axis: 'x' | 'z';
   pos: number;
   minSpan: number;
@@ -51,6 +52,14 @@ export interface HouseWallSurface {
   thickness: number;
   outerSide?: 1 | -1;
   isUp: () => boolean;
+}
+
+export interface HouseLampInfo {
+  id: string;
+  name: string;
+  x: number;
+  z: number;
+  isOn: boolean;
 }
 
 export interface SubzoneUpdateContext {
@@ -66,6 +75,11 @@ export interface SubzoneWorld {
   colliders: WorldCollider[];
   doors?: HouseDoorHandle[];
   wallSurfaces?: HouseWallSurface[];
+  setHouseLightsOn?: (on: boolean) => void;
+  getHouseLightsOn?: () => boolean;
+  setLampOn?: (instanceId: string, on: boolean) => void;
+  getHouseLamps?: () => HouseLampInfo[];
+  setActiveBathtub?: (instanceId: string | null) => void;
   triggerPondFeed?: () => void;
   setFishingState?: (state: 'idle' | 'waiting' | 'bite') => void;
   updateFishingVisuals?: (frame: FishingVisualFrame, elapsed: number) => void;
@@ -174,6 +188,8 @@ export function buildSubzoneScene(
     placedFurniture?: PlacedFurniture[];
     editFurnitureMode?: boolean;
     openDoors?: Record<string, boolean>;
+    houseLightsOn?: boolean;
+    lampStates?: Record<string, boolean>;
     livestock?: LivestockAnimalState[];
     troughs?: CoopTroughs;
     pondFish?: PondFishState[];
@@ -186,6 +202,11 @@ export function buildSubzoneScene(
   const disposables: THREE.Texture[] = [];
   let doors: HouseDoorHandle[] | undefined;
   let wallSurfaces: HouseWallSurface[] | undefined;
+  let setHouseLightsOnFn: ((on: boolean) => void) | undefined;
+  let getHouseLightsOnFn: (() => boolean) | undefined;
+  let setLampOnFn: ((instanceId: string, on: boolean) => void) | undefined;
+  let getHouseLampsFn: (() => HouseLampInfo[]) | undefined;
+  let setActiveBathtubFn: ((instanceId: string | null) => void) | undefined;
   let triggerPondFeedFn: (() => void) | undefined;
   let currentFishingState: 'idle' | 'waiting' | 'bite' = options.fishingState ?? 'idle';
   let subzoneFishingVisuals: FishingSpotVisuals | null = null;
@@ -412,7 +433,9 @@ export function buildSubzoneScene(
         baseboardMat,
       );
       baseMesh.position.set(x, BASE_H / 2, z);
+      baseMesh.userData = {kind: 'house_wall', wallId: sw.id};
       group.add(baseMesh);
+      clickTargets.push(baseMesh);
 
       const upperMesh = new THREE.Mesh(
         new THREE.BoxGeometry(w, UPPER_H, d),
@@ -431,6 +454,7 @@ export function buildSubzoneScene(
           snapSegments.forEach(([sMin, sMax], idx) => {
             wallSnapList.push({
               id: `${sw.id}_snap_${idx}`,
+              wallGroupId: sw.id,
               axis: sw.axis,
               pos: sw.pos,
               minSpan: sMin,
@@ -445,10 +469,11 @@ export function buildSubzoneScene(
           const centerSpan = sw.axis === 'z' ? x : z;
           wallSnapList.push({
             id: `${sw.id}_snap`,
+            wallGroupId: sw.id,
             axis: sw.axis,
             pos: sw.pos,
-            minSpan: centerSpan - halfSpan + 0.45,
-            maxSpan: centerSpan + halfSpan - 0.45,
+            minSpan: centerSpan - halfSpan + 0.18,
+            maxSpan: centerSpan + halfSpan - 0.18,
             thickness,
             outerSide: sw.outerSide,
             isUp: () => sw.upperGroup.visible && sw.currentScaleY > 0.55,
@@ -498,13 +523,13 @@ export function buildSubzoneScene(
       maxSpan: 10.5,
       outerSide: -1,
     });
-    addWallSegment(wallBack, -9.195, -9.5, 8.89, 0.28, outerWallMat, 'wall_back_bed', true, [[-12.6, -5.5]], {
+    addWallSegment(wallBack, -9.195, -9.5, 8.89, 0.28, outerWallMat, 'wall_back_bed', true, undefined, {
       posZ: 'bedroom',
     });
-    addWallSegment(wallBack, -0.375, -9.5, 8.75, 0.28, outerWallMat, 'wall_back_mid', true, [[-4.0, 3.3]], {
+    addWallSegment(wallBack, -0.375, -9.5, 8.75, 0.28, outerWallMat, 'wall_back_mid', true, undefined, {
       posZ: 'backroom',
     });
-    addWallSegment(wallBack, 7.32, -9.5, 6.64, 0.28, outerWallMat, 'wall_back_bath', true, [[4.7, 9.7]], {
+    addWallSegment(wallBack, 7.32, -9.5, 6.64, 0.28, outerWallMat, 'wall_back_bath', true, undefined, {
       posZ: 'bath',
     });
 
@@ -516,10 +541,10 @@ export function buildSubzoneScene(
       maxSpan: 7.5,
       outerSide: -1,
     });
-    addWallSegment(wallLeft, -13.5, -4.93, 0.28, 8.86, outerWallMat, 'wall_left_bed', true, [[-8.7, -1.2]], {
+    addWallSegment(wallLeft, -13.5, -4.93, 0.28, 8.86, outerWallMat, 'wall_left_bed', true, undefined, {
       posX: 'bedroom',
     });
-    addWallSegment(wallLeft, -13.5, 3.43, 0.28, 7.86, outerWallMat, 'wall_left_liv', true, [[0.3, 6.7]], {
+    addWallSegment(wallLeft, -13.5, 3.43, 0.28, 7.86, outerWallMat, 'wall_left_liv', true, undefined, {
       posX: 'living',
     });
 
@@ -531,10 +556,10 @@ export function buildSubzoneScene(
       maxSpan: 7.5,
       outerSide: 1,
     });
-    addWallSegment(wallRight, 10.5, -4.93, 0.28, 8.86, outerWallMat, 'wall_right_bath', true, [[-8.7, -1.2]], {
+    addWallSegment(wallRight, 10.5, -4.93, 0.28, 8.86, outerWallMat, 'wall_right_bath', true, undefined, {
       negX: 'bath',
     });
-    addWallSegment(wallRight, 10.5, 3.43, 0.28, 7.86, outerWallMat, 'wall_right_kit', true, [[4.9, 6.8]], {
+    addWallSegment(wallRight, 10.5, 3.43, 0.28, 7.86, outerWallMat, 'wall_right_kit', true, undefined, {
       negX: 'kitchen',
     });
 
@@ -547,13 +572,13 @@ export function buildSubzoneScene(
       outerSide: 1,
       initHidden: true,
     });
-    addWallSegment(wallFront, -8.27, 7.5, 10.74, 0.28, outerWallMat, 'wall_front_l', true, [[-12.6, -3.4]], {
+    addWallSegment(wallFront, -8.27, 7.5, 10.74, 0.28, outerWallMat, 'wall_front_l', true, undefined, {
       negZ: 'living',
     });
-    addWallSegment(wallFront, 1.65, 7.5, 4.7, 0.28, outerWallMat, 'wall_front_r1', true, [[-0.2, 3.4]], {
+    addWallSegment(wallFront, 1.65, 7.5, 4.7, 0.28, outerWallMat, 'wall_front_r1', true, undefined, {
       negZ: 'living',
     });
-    addWallSegment(wallFront, 7.32, 7.5, 6.64, 0.28, outerWallMat, 'wall_front_r2', true, [[4.7, 9.7]], {
+    addWallSegment(wallFront, 7.32, 7.5, 6.64, 0.28, outerWallMat, 'wall_front_r2', true, undefined, {
       negZ: 'kitchen',
     });
     addHeaderAboveOpening(wallFront, -1.8, 7.5, 2.2, 0.28, outerWallMat, {negZ: 'living'});
@@ -808,6 +833,78 @@ export function buildSubzoneScene(
 
     doors = doorControllers.map((d) => d.handle);
 
+    // ========== ROOM LIGHT SWITCH NEAR FRONT DOOR + DYNAMIC HOUSE LIGHTS / CLOCKS / BATHTUBS ==========
+    let houseLightsOn = options.houseLightsOn ?? true;
+    let activeBathtubId: string | null = null;
+    const clockControllers: {
+      hourPivot: THREE.Object3D;
+      minPivot: THREE.Object3D;
+      secPivot?: THREE.Object3D;
+    }[] = [];
+    const lampControllers: {
+      id: string;
+      name: string;
+      x: number;
+      z: number;
+      isOn: boolean;
+      pointLight: THREE.PointLight;
+      shadeMat?: THREE.MeshStandardMaterial;
+      baseColor: string;
+    }[] = [];
+    const bathtubControllers: {
+      id: string;
+      waterMesh: THREE.Mesh;
+      streamMesh: THREE.Mesh;
+      rippleMesh: THREE.Mesh;
+      levelY: number;
+    }[] = [];
+
+    // Doorframe light switch post right beside the front entrance mat (always visible & accessible)
+    const switchGroup = new THREE.Group();
+    switchGroup.position.set(-0.42, 0, 7.08);
+    const switchPost = new THREE.Mesh(
+      new RoundedBoxGeometry(0.16, 1.34, 0.14, 2, 0.03),
+      clayMat('#9E6A3E', 0.72),
+    );
+    switchPost.position.y = 0.67;
+    const switchPlate = new THREE.Mesh(
+      new RoundedBoxGeometry(0.22, 0.3, 0.05, 2, 0.015),
+      clayMat('#FAF5EC', 0.55),
+    );
+    switchPlate.position.set(0, 1.12, -0.075);
+    const switchRocker = new THREE.Mesh(
+      new RoundedBoxGeometry(0.09, 0.13, 0.04, 2, 0.01),
+      clayMat('#E8DFD1', 0.5),
+    );
+    switchRocker.position.set(0, 1.11, -0.1);
+    switchRocker.rotation.x = houseLightsOn ? -0.26 : 0.26;
+    const switchLedMat = new THREE.MeshStandardMaterial({
+      color: houseLightsOn ? '#FFD166' : '#475569',
+      emissive: houseLightsOn ? '#FFB703' : '#1E293B',
+      emissiveIntensity: houseLightsOn ? 0.9 : 0.08,
+      roughness: 0.35,
+    });
+    const switchLed = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), switchLedMat);
+    switchLed.position.set(0, 1.22, -0.1);
+    switchGroup.add(switchPost, switchPlate, switchRocker, switchLed);
+    group.add(switchGroup);
+    addBoxProxy(
+      group,
+      [0.62, 1.48, 0.62],
+      [-0.42, 0.74, 7.08],
+      {kind: 'light_switch', tx: -0.78, tz: 6.45},
+      clickTargets,
+    );
+
+    setHouseLightsOnFn = (on: boolean) => {
+      houseLightsOn = on;
+      switchRocker.rotation.x = on ? -0.26 : 0.26;
+      switchLedMat.color.set(on ? '#FFD166' : '#475569');
+      switchLedMat.emissive.set(on ? '#FFB703' : '#1E293B');
+      switchLedMat.emissiveIntensity = on ? 0.9 : 0.08;
+    };
+    getHouseLightsOnFn = () => houseLightsOn;
+
     // ========== DYNAMIC PLACED FURNITURE ITEMS (FLOOR + STACKED + WALL MOUNT + PAINTS) ==========
     placedList.forEach((pf) => {
       const cat = FURNITURE_BY_ID[pf.catalogId];
@@ -848,24 +945,106 @@ export function buildSubzoneScene(
         wz: pf.z - lx * sinR + lz * cosR,
       });
 
+      if (meshGroup.userData.clockHourPivot && meshGroup.userData.clockMinPivot) {
+        clockControllers.push({
+          hourPivot: meshGroup.userData.clockHourPivot as THREE.Object3D,
+          minPivot: meshGroup.userData.clockMinPivot as THREE.Object3D,
+          secPivot: meshGroup.userData.clockSecPivot as THREE.Object3D | undefined,
+        });
+      }
+
+      if (
+        meshGroup.userData.tubWaterMesh &&
+        meshGroup.userData.tubStreamMesh &&
+        meshGroup.userData.tubRippleMesh
+      ) {
+        bathtubControllers.push({
+          id: pf.instanceId,
+          waterMesh: meshGroup.userData.tubWaterMesh as THREE.Mesh,
+          streamMesh: meshGroup.userData.tubStreamMesh as THREE.Mesh,
+          rippleMesh: meshGroup.userData.tubRippleMesh as THREE.Mesh,
+          levelY: 0.28,
+        });
+      }
+
+      const isLampItem =
+        cat.interactive === 'lamp' || cat.name.toLowerCase().includes('đèn');
+      if (isLampItem) {
+        const isOn = options.lampStates?.[pf.instanceId] ?? true;
+        const localLight = (meshGroup.userData.lampLightLocalPos as [number, number, number]) || [
+          0,
+          1.4,
+          0,
+        ];
+        const lPos = toWorld(localLight[0], localLight[2]);
+        const pointLight = new THREE.PointLight('#FFD896', isOn ? 18 : 0, 18, 1.15);
+        pointLight.position.set(lPos.wx, posY + localLight[1], lPos.wz);
+        group.add(pointLight);
+
+        const shadeMat = meshGroup.userData.lampShadeMat as THREE.MeshStandardMaterial | undefined;
+        if (shadeMat) {
+          shadeMat.emissiveIntensity = isOn ? 0.78 : 0.04;
+          shadeMat.color.set(isOn ? cat.color : '#B8ADA0');
+        }
+        lampControllers.push({
+          id: pf.instanceId,
+          name: cat.name,
+          x: pf.x,
+          z: pf.z,
+          isOn,
+          pointLight,
+          shadeMat,
+          baseColor: cat.color,
+        });
+      }
+
       let proxyData: Record<string, unknown> = {
         kind: 'furniture',
         furnitureId: pf.instanceId,
         catalogId: pf.catalogId,
       };
 
-      if (cat.interactive === 'sofa') {
+      if (isLampItem) {
+        const stand = toWorld(0, cat.wallMount ? 0.65 : cat.halfD + 0.52);
+        proxyData = {
+          kind: 'lamp',
+          furnitureId: pf.instanceId,
+          catalogId: pf.catalogId,
+          label: cat.name,
+          tx: THREE.MathUtils.clamp(stand.wx, -12.7, 9.7),
+          tz: THREE.MathUtils.clamp(stand.wz, -8.8, 6.8),
+        };
+      } else if (cat.interactive === 'sofa') {
         const front = toWorld(0, cat.halfD + 0.45);
+        const seatLocalZ =
+          cat.kind === 'sofa' ? 0.22 : cat.kind === 'armchair' ? 0.21 : 0.11;
+        const seatPos = toWorld(0, seatLocalZ);
+        const seatTopY = posY + (cat.surfaceHeight ?? 0.52);
         proxyData = {
           kind: 'sofa',
           furnitureId: pf.instanceId,
           catalogId: pf.catalogId,
           tx: front.wx,
           tz: front.wz,
-          seatX: pf.x,
-          seatZ: pf.z,
-          seatY: posY + 0.58,
+          seatX: seatPos.wx,
+          seatZ: seatPos.wz,
+          seatY: seatTopY,
           sitRotY: pf.rotY,
+          colliderId: pf.instanceId,
+        };
+      } else if (cat.interactive === 'bathtub') {
+        const side = toWorld(0, cat.halfD + 0.48);
+        const tubSeat = toWorld(-0.2, 0);
+        proxyData = {
+          kind: 'bathtub',
+          furnitureId: pf.instanceId,
+          catalogId: pf.catalogId,
+          tx: THREE.MathUtils.clamp(side.wx, -12.7, 9.7),
+          tz: THREE.MathUtils.clamp(side.wz, -8.8, 6.8),
+          seatX: tubSeat.wx,
+          seatZ: tubSeat.wz,
+          seatY: posY + 0.245,
+          sitRotY: pf.rotY + Math.PI / 2,
           colliderId: pf.instanceId,
         };
       } else if (cat.interactive === 'bed') {
@@ -943,6 +1122,28 @@ export function buildSubzoneScene(
       }
     });
 
+    setLampOnFn = (instanceId: string, on: boolean) => {
+      const lamp = lampControllers.find((l) => l.id === instanceId);
+      if (!lamp) return;
+      lamp.isOn = on;
+      lamp.pointLight.intensity = on ? 18 : 0;
+      if (lamp.shadeMat) {
+        lamp.shadeMat.emissiveIntensity = on ? 0.78 : 0.04;
+        lamp.shadeMat.color.set(on ? lamp.baseColor : '#B8ADA0');
+      }
+    };
+    getHouseLampsFn = () =>
+      lampControllers.map((l) => ({
+        id: l.id,
+        name: l.name,
+        x: l.x,
+        z: l.z,
+        isOn: l.isOn,
+      }));
+    setActiveBathtubFn = (instanceId: string | null) => {
+      activeBathtubId = instanceId;
+    };
+
     // Clear open front exit doormat (no signboard blocking doorway & no floating "Ra Thị Trấn" text)
     const doormat = new THREE.Mesh(
       new RoundedBoxGeometry(1.85, 0.03, 0.92, 2, 0.015),
@@ -968,7 +1169,45 @@ export function buildSubzoneScene(
       const dt = Math.min(Math.max(elapsed - prevElapsed, 0.001), 0.05);
       prevElapsed = elapsed;
 
-      // 1. Smooth door swing animation
+      // 1. Live wall clock hands
+      if (clockControllers.length > 0) {
+        const now = new Date();
+        const sec = now.getSeconds() + now.getMilliseconds() / 1000;
+        const min = now.getMinutes() + sec / 60;
+        const hr = (now.getHours() % 12) + min / 60;
+        const secAng = -(sec / 60) * Math.PI * 2;
+        const minAng = -(min / 60) * Math.PI * 2;
+        const hrAng = -(hr / 12) * Math.PI * 2;
+        for (const ck of clockControllers) {
+          ck.hourPivot.rotation.z = hrAng;
+          ck.minPivot.rotation.z = minAng;
+          if (ck.secPivot) ck.secPivot.rotation.z = secAng;
+        }
+      }
+
+      // 2. Flowing faucet stream & automatic neck-deep soaking water in bathtub
+      for (const tb of bathtubControllers) {
+        const isBathing = activeBathtubId === tb.id;
+        const targetWaterY = isBathing ? 0.645 : 0.28;
+        tb.levelY = THREE.MathUtils.damp(tb.levelY, targetWaterY, isBathing ? 4.8 : 3.5, dt);
+        tb.waterMesh.position.y = tb.levelY + Math.sin(elapsed * 2.4) * 0.004;
+
+        const waterSurfaceY = tb.waterMesh.position.y + 0.03;
+        const streamLen = Math.max(0.08, 1.04 - waterSurfaceY);
+        const pulse = 1 + Math.sin(elapsed * 14) * 0.08;
+        const thickness = (isBathing ? 1.22 : 0.86) * pulse;
+        tb.streamMesh.scale.set(thickness, streamLen / 0.72, thickness);
+        tb.streamMesh.position.y = waterSurfaceY + streamLen * 0.5;
+
+        const ripCycle = (elapsed * 1.35) % 1;
+        const ripScale = 0.7 + ripCycle * (isBathing ? 3.2 : 2.1);
+        tb.rippleMesh.scale.setScalar(ripScale);
+        tb.rippleMesh.position.y = waterSurfaceY + 0.008;
+        const ripMat = tb.rippleMesh.material as THREE.MeshBasicMaterial;
+        ripMat.opacity = (1 - ripCycle) * (isBathing ? 0.85 : 0.62);
+      }
+
+      // 3. Smooth door swing animation
       for (const dc of doorControllers) {
         const target = dc.handle.isOpen ? dc.openAngle : dc.closedAngle;
         if (Math.abs(dc.currentAngle - target) > 0.002) {
@@ -977,7 +1216,7 @@ export function buildSubzoneScene(
         }
       }
 
-      // 2. Smart Wall Cutaway (Outer camera-facing walls + interior walls occluding the avatar)
+      // 4. Smart Wall Cutaway (Outer camera-facing walls + interior walls occluding the avatar)
       const camPos = context?.cameraPos;
       const pPos = context?.playerPos;
       if (camPos) {
@@ -3921,6 +4160,11 @@ export function buildSubzoneScene(
     colliders,
     doors,
     wallSurfaces,
+    setHouseLightsOn: setHouseLightsOnFn,
+    getHouseLightsOn: getHouseLightsOnFn,
+    setLampOn: setLampOnFn,
+    getHouseLamps: getHouseLampsFn,
+    setActiveBathtub: setActiveBathtubFn,
     triggerPondFeed: triggerPondFeedFn,
     setFishingState: setFishingStateFn,
     updateFishingVisuals: updateFishingVisualsFn,

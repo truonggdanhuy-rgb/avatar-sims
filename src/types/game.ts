@@ -75,6 +75,7 @@ export type AvatarPose =
   | 'creep'
   | 'jump'
   | 'sit'
+  | 'bath'
   | 'sleep'
   | 'fish_cast'
   | 'fish_wait'
@@ -356,6 +357,8 @@ export type FurnitureKind =
   | 'dish_cabinet'
   | 'kitchen_l_counter'
   | 'floor_lamp'
+  | 'table_lamp'
+  | 'wall_lamp'
   | 'potted_plant'
   | 'plant_fiddle'
   | 'plant_snake'
@@ -403,7 +406,7 @@ export interface FurnitureCatalogItem {
   mountHeight?: number;
   surfaceHeight?: number;
   paintSpec?: PaintStyleSpec;
-  interactive?: 'wardrobe' | 'bed' | 'sofa';
+  interactive?: 'wardrobe' | 'bed' | 'sofa' | 'bathtub' | 'lamp';
 }
 
 export interface PlacedFurniture {

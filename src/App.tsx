@@ -2367,6 +2367,9 @@ export default function App() {
         spawnZ = -9.32;
       } else {
         spawnX = Math.max(-3.6, Math.min(3.3, homeSpotRef.current.x));
+        if (spawnX > -1.6 && spawnX < 0.8) {
+          spawnX = homeSpotRef.current.x >= -0.4 ? 2.1 : -2.6;
+        }
         spawnZ = -0.35;
       }
     } else if (cat.kind === 'floor_paint' || cat.kind === 'wall_paint') {
@@ -2407,15 +2410,28 @@ export default function App() {
     setSelectedFurnitureId(instanceId);
   };
 
-  const handleMoveFurniture = (instanceId: string, x: number, z: number, rotY?: number) => {
+  const handleMoveFurniture = (
+    instanceId: string,
+    x: number,
+    z: number,
+    rotY?: number,
+    y?: number,
+  ) => {
     setPlacedFurniture((prev) => {
       const target = prev.find((item) => item.instanceId === instanceId);
       if (!target) return prev;
       const cat = FURNITURE_BY_ID[target.catalogId];
       if (cat?.wallMount && rotY !== undefined) {
+        const nextMountY = y !== undefined ? Number(y.toFixed(2)) : target.y;
         return prev.map((item) =>
           item.instanceId === instanceId
-            ? {...item, x: Number(x.toFixed(2)), z: Number(z.toFixed(2)), rotY, y: undefined}
+            ? {
+                ...item,
+                x: Number(x.toFixed(2)),
+                z: Number(z.toFixed(2)),
+                rotY,
+                y: nextMountY && Math.abs(nextMountY) > 0.01 ? nextMountY : undefined,
+              }
             : item,
         );
       }
