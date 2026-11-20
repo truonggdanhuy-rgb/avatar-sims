@@ -12,6 +12,7 @@ import {
 import {CROP_LIST, CROPS, PLOT_LEVELS} from '../data/farmCatalog';
 import {CropType, GardenPlotState, PlotLevel} from '../types/game';
 import {soundFX} from '../utils/sound';
+import {FarmItemIcon} from './FarmItemIcon';
 
 interface PlotArcMenuProps {
   plot: GardenPlotState;
@@ -58,126 +59,6 @@ const CaterpillarSvgIcon: React.FC = () => (
     <path d="M18 8.8L19.6 6.8M16.4 9L15.8 6.8" stroke="#EAFCD9" strokeWidth="1.4" strokeLinecap="round" />
   </svg>
 );
-
-const CropSvgIcon: React.FC<{crop: CropType}> = ({crop}) => {
-  switch (crop) {
-    case 'wheat':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <path d="M12 20V6" stroke="#B68324" strokeWidth="2" strokeLinecap="round" />
-          <ellipse cx="9.5" cy="9" rx="2.2" ry="3.2" transform="rotate(-25 9.5 9)" fill="#E7B94B" />
-          <ellipse cx="14.5" cy="9" rx="2.2" ry="3.2" transform="rotate(25 14.5 9)" fill="#E7B94B" />
-          <ellipse cx="10" cy="13.5" rx="2" ry="2.8" transform="rotate(-25 10 13.5)" fill="#DDA734" />
-          <ellipse cx="14" cy="13.5" rx="2" ry="2.8" transform="rotate(25 14 13.5)" fill="#DDA734" />
-          <ellipse cx="12" cy="5" rx="1.8" ry="2.6" fill="#F2CA5E" />
-        </svg>
-      );
-    case 'scallion':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <ellipse cx="12" cy="17.8" rx="2.8" ry="2.6" fill="#F6F1E6" />
-          <path d="M11 16L9.5 6.5M12 16V4.5M13 16L15 6" stroke="#4D9C52" strokeWidth="2.1" strokeLinecap="round" />
-        </svg>
-      );
-    case 'rice':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <path d="M12 20C12 13 13 9 16 6" stroke="#629B4E" strokeWidth="2" strokeLinecap="round" />
-          <path d="M12 19C10.5 14 9 10 7 7" stroke="#538A42" strokeWidth="1.8" strokeLinecap="round" />
-          <ellipse cx="15.8" cy="7.5" rx="2.1" ry="1.3" transform="rotate(25 15.8 7.5)" fill="#E8C95A" />
-          <ellipse cx="14" cy="10.2" rx="2.1" ry="1.3" transform="rotate(20 14 10.2)" fill="#E2BE48" />
-          <ellipse cx="7.4" cy="8.2" rx="2" ry="1.2" transform="rotate(-25 7.4 8.2)" fill="#E8C95A" />
-        </svg>
-      );
-    case 'carrot':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <path d="M12 7C12 4.5 9.5 3.5 8 4M12 7C12 4.2 14.5 3.5 16 4M12 7V3" stroke="#4E9A4E" strokeWidth="2" strokeLinecap="round" />
-          <path d="M8.5 8.5C8.5 7 15.5 7 15.5 8.5L13 19.5C12.7 20.6 11.3 20.6 11 19.5L8.5 8.5Z" fill="#EF8432" />
-        </svg>
-      );
-    case 'corn':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <ellipse cx="12" cy="10.5" rx="3.8" ry="6.2" fill="#F2C94C" />
-          <path d="M7.5 11.5C7.5 16.5 9.5 20 12 20C14.5 20 16.5 16.5 16.5 11.5C14.5 14 13 15.5 12 15.5C11 15.5 9.5 14 7.5 11.5Z" fill="#5BA355" />
-        </svg>
-      );
-    case 'strawberry':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <path d="M8 7.5C8 5.8 16 5.8 16 7.5L13.6 18.2C13 20.2 11 20.2 10.4 18.2L8 7.5Z" fill="#E54E63" />
-          <path d="M7.5 7L12 5L16.5 7L14 8.5L12 7.5L10 8.5L7.5 7Z" fill="#4E9A4E" />
-          <circle cx="10.8" cy="11.5" r="0.7" fill="#FFE09C" />
-          <circle cx="13.4" cy="12" r="0.7" fill="#FFE09C" />
-          <circle cx="12" cy="15.2" r="0.7" fill="#FFE09C" />
-        </svg>
-      );
-    case 'tomato':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <circle cx="12" cy="13" r="6.5" fill="#DF483B" />
-          <path d="M9 7.5L12 5L15 7.5L12 9L9 7.5Z" fill="#4C924B" />
-          <circle cx="10" cy="11" r="1.3" fill="#FF897E" opacity="0.65" />
-        </svg>
-      );
-    case 'lemon':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <ellipse cx="12" cy="12.5" rx="6.6" ry="5.2" transform="rotate(-20 12 12.5)" fill="#F7D44C" />
-          <path d="M15.5 6.5C17 5 19 5.5 19 7.2C17.2 8 15.8 7.6 15.5 6.5Z" fill="#569D4F" />
-        </svg>
-      );
-    case 'vanilla':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <path d="M8.5 19.5C9.5 13 11 9.5 14.5 6.5" stroke="#5A3A24" strokeWidth="2.4" strokeLinecap="round" />
-          <path d="M12.5 19.5C13.2 14.5 14.2 11 16.8 8.5" stroke="#6E472D" strokeWidth="2.1" strokeLinecap="round" />
-          <circle cx="12" cy="7.5" r="3" fill="#FFF2C6" stroke="#DFC068" strokeWidth="1" />
-          <circle cx="12" cy="7.5" r="1" fill="#E6A935" />
-        </svg>
-      );
-    case 'sugarcane':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <path d="M9 20L11 7M15 20L14 6" stroke="#76B856" strokeWidth="3.2" strokeLinecap="round" />
-          <path d="M8.5 14H12M13 13H16.5" stroke="#DCE49D" strokeWidth="1.4" strokeLinecap="round" />
-          <path d="M11 7C9 5 7 5.5 6 7M14 6C16 4 18 4.5 19 6" stroke="#4C9A4E" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      );
-    case 'watermelon':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <circle cx="12" cy="12.5" r="6.5" fill="#469C53" />
-          <path d="M9 6.8C10 10.5 10 14.5 9 18.2M12 6C13 10.5 13 14.5 12 19M15 6.8C14 10.5 14 14.5 15 18.2" stroke="#1E5E2A" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      );
-    case 'pumpkin':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <path d="M12 6.5C12 4.8 13.5 4 14.5 4.5" stroke="#4C8444" strokeWidth="2.2" strokeLinecap="round" />
-          <ellipse cx="9" cy="13.5" rx="4.2" ry="5.5" fill="#DF6B1D" />
-          <ellipse cx="15" cy="13.5" rx="4.2" ry="5.5" fill="#DF6B1D" />
-          <ellipse cx="12" cy="13.5" rx="3.4" ry="5.8" fill="#F08332" />
-        </svg>
-      );
-    case 'cacao':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <ellipse cx="12" cy="12.5" rx="5.2" ry="7.2" fill="#A5633C" />
-          <path d="M12 5.5V19.5M9.5 7C8.5 10.5 8.5 14.5 9.5 18M14.5 7C15.5 10.5 15.5 14.5 14.5 18" stroke="#753E21" strokeWidth="1.3" strokeLinecap="round" />
-        </svg>
-      );
-    case 'coffee':
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <circle cx="9.2" cy="13.5" r="3.8" fill="#C83E4D" />
-          <circle cx="15" cy="14" r="3.6" fill="#B23240" />
-          <path d="M12 10L12 6.5M12 7C14 5.5 16.5 6 17 7.5" stroke="#3B7B42" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      );
-  }
-};
 
 interface ArcAction {
   key: string;
@@ -504,7 +385,7 @@ export const PlotArcMenu: React.FC<PlotArcMenuProps> = ({
                         : 'cursor-not-allowed border-[#C9C1B6] bg-[#EAE3D8]/85 opacity-55 grayscale'
                     }`}
                   >
-                    <CropSvgIcon crop={crop.id} />
+                    <FarmItemIcon kind="crop" id={crop.id} className="h-5 w-5" />
                   </button>
                   <div
                     className={`pointer-events-none absolute top-full left-1/2 mt-0.5 -translate-x-1/2 rounded border px-1 py-px text-[9px] leading-none font-extrabold tracking-tight whitespace-nowrap shadow-2xs tabular-nums ${
@@ -544,7 +425,7 @@ export const PlotArcMenu: React.FC<PlotArcMenuProps> = ({
                         : 'cursor-not-allowed border-[#C9C1B6] bg-[#EAE3D8]/85 opacity-55 grayscale'
                     }`}
                   >
-                    <CropSvgIcon crop={crop.id} />
+                    <FarmItemIcon kind="crop" id={crop.id} className="h-5 w-5" />
                   </button>
                   <div
                     className={`pointer-events-none absolute top-full left-1/2 mt-0.5 -translate-x-1/2 rounded border px-1 py-px text-[9px] leading-none font-extrabold tracking-tight whitespace-nowrap shadow-2xs tabular-nums ${
@@ -630,10 +511,7 @@ export const PlotArcMenu: React.FC<PlotArcMenuProps> = ({
           </div>
         ) : activeCrop && (plot.stage === 'growing' || plot.stage === 'ready') ? (
           <div className="anim-pop absolute top-7 left-0 flex -translate-x-1/2 items-center gap-1.5 rounded-xl border border-[#8C6239]/55 bg-[#FFF9EF]/95 px-2.5 py-1 text-[11px] font-bold whitespace-nowrap text-[#4A3525] shadow-md">
-            <span
-              className="h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
-              style={{backgroundColor: activeCrop.color}}
-            />
+            <FarmItemIcon kind="crop" id={activeCrop.id} className="h-4 w-4 shrink-0" />
             <span>{activeCrop.name}</span>
             <span className="text-[#9E8A75]">·</span>
             {plot.stage === 'growing' ? (

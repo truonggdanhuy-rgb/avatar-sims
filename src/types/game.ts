@@ -228,17 +228,20 @@ export type ProcessedId =
 export type RecipeId =
   | 'sugarcane_juice'
   | 'watermelon_juice'
+  | 'watermelon_smoothie'
   | 'honey_lemonade'
   | 'strawberry_tea'
   | 'pumpkin_smoothie'
   | 'corn_milk'
   | 'hot_cacao'
   | 'milk_coffee'
+  | 'vanilla_iced_coffee'
   | 'butter_bread'
   | 'strawberry_cake'
   | 'pumpkin_pie'
   | 'egg_tart'
   | 'duck_egg_flan'
+  | 'vanilla_flan'
   | 'panna_cotta'
   | 'cacao_brownie'
   | 'berry_cheesecake'
@@ -246,6 +249,7 @@ export type RecipeId =
   | 'tomato_pasta'
   | 'glazed_carrot'
   | 'pork_pho'
+  | 'corn_fried_rice'
   | 'cheese_omelet'
   | 'salted_duck_porridge'
   | 'roasted_pork_corn';
@@ -253,6 +257,14 @@ export type RecipeId =
 export type FarmItemKind = 'crop' | 'animal_product' | 'processed' | 'dish';
 
 export type KitchenLevel = 1 | 2 | 3;
+
+export interface MillJob {
+  id: string;
+  processedId: ProcessedId;
+  startedAt: number;
+  readyAt: number;
+  durationMs: number;
+}
 
 export interface CookingJob {
   id: string;
@@ -305,30 +317,65 @@ export interface DailyQuestProgress {
   };
 }
 
-export type FurnitureCategory = 'living' | 'bedroom' | 'kitchen' | 'bath' | 'wall' | 'decor';
+export type FurnitureCategory =
+  | 'living'
+  | 'bedroom'
+  | 'kitchen'
+  | 'bath'
+  | 'wall'
+  | 'decor'
+  | 'paint';
 
 export type FurnitureKind =
   | 'sofa'
   | 'armchair'
   | 'coffee_table'
   | 'tv_stand'
+  | 'table_tv'
   | 'rug_round'
   | 'bed'
   | 'wardrobe'
   | 'nightstand'
   | 'bookshelf'
+  | 'wooden_table'
+  | 'wooden_chair'
   | 'dining_table'
   | 'dining_chair'
   | 'fridge'
   | 'dish_cabinet'
+  | 'kitchen_l_counter'
   | 'floor_lamp'
   | 'potted_plant'
+  | 'plant_fiddle'
+  | 'plant_snake'
+  | 'flower_basket'
   | 'bathtub'
   | 'vanity_sink'
   | 'window_single'
   | 'window_double'
   | 'window_curtain'
-  | 'wall_clock';
+  | 'wall_clock'
+  | 'wall_calendar'
+  | 'succulent_shelf'
+  | 'wall_tv'
+  | 'floor_paint'
+  | 'wall_paint';
+
+export type PaintPattern =
+  | 'wood_plank'
+  | 'checker_tile'
+  | 'terrazzo'
+  | 'matte_wainscot'
+  | 'stripes'
+  | 'polka_dot';
+
+export interface PaintStyleSpec {
+  target: 'floor' | 'wall';
+  pattern: PaintPattern;
+  primary: string;
+  secondary: string;
+  roughness?: number;
+}
 
 export interface FurnitureCatalogItem {
   id: string;
@@ -343,6 +390,8 @@ export interface FurnitureCatalogItem {
   walkable?: boolean;
   wallMount?: boolean;
   mountHeight?: number;
+  surfaceHeight?: number;
+  paintSpec?: PaintStyleSpec;
   interactive?: 'wardrobe' | 'bed' | 'sofa';
 }
 
@@ -351,6 +400,8 @@ export interface PlacedFurniture {
   catalogId: string;
   x: number;
   z: number;
+  y?: number;
   rotY: number;
 }
+
 

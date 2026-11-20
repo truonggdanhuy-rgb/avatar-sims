@@ -199,6 +199,120 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
           <circle cx="32" cy="27" r="2.2" fill="#F4C95D" />
         </svg>
       );
+    case 'kitchen_l_counter':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="10" y="12" width="44" height="14" rx="2.5" fill={c} stroke="#C7B6A0" strokeWidth="1.2" />
+          <rect x="38" y="12" width="16" height="32" rx="2.5" fill={c} stroke="#C7B6A0" strokeWidth="1.2" />
+          <rect x="14" y="14" width="14" height="8" rx="1.5" fill="#9BB0BF" />
+          <rect x="41" y="29" width="10" height="11" rx="1.5" fill="#2B3445" />
+          <circle cx="46" cy="34.5" r="2.5" stroke="#7AD0F5" strokeWidth="1.2" fill="none" />
+        </svg>
+      );
+    case 'wooden_table':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="10" y="18" width="44" height="7" rx="2.5" fill={c} />
+          <rect x="14" y="25" width="36" height="4" fill={a} />
+          <rect x="14" y="29" width="5" height="17" rx="1.5" fill={a} />
+          <rect x="45" y="29" width="5" height="17" rx="1.5" fill={a} />
+        </svg>
+      );
+    case 'wooden_chair':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="21" y="10" width="4" height="22" rx="1.5" fill={c} />
+          <rect x="39" y="10" width="4" height="22" rx="1.5" fill={c} />
+          <rect x="21" y="11" width="22" height="6" rx="2" fill={c} />
+          <rect x="19" y="27" width="26" height="6" rx="2" fill={c} />
+          <rect x="21" y="25" width="22" height="3" rx="1.5" fill={a} />
+          <rect x="21" y="33" width="4" height="13" fill={c} />
+          <rect x="39" y="33" width="4" height="13" fill={c} />
+        </svg>
+      );
+    case 'table_tv':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="12" y="11" width="40" height="24" rx="3" fill={c} />
+          <rect x="15" y="14" width="34" height="18" rx="1.5" fill={a} />
+          <rect x="29" y="35" width="6" height="5" fill="#4B5563" />
+          <rect x="21" y="40" width="22" height="4" rx="2" fill="#4B5563" />
+        </svg>
+      );
+    case 'wall_tv':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="8" y="10" width="48" height="28" rx="3" fill={c} />
+          <rect x="11" y="13" width="42" height="22" rx="1.5" fill={a} />
+          <rect x="18" y="41" width="28" height="4" rx="2" fill="#4B5563" />
+        </svg>
+      );
+    case 'plant_fiddle':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <line x1="32" y1="16" x2="32" y2="33" stroke="#7B5636" strokeWidth="3" />
+          <ellipse cx="32" cy="14" rx="9" ry="5.5" fill={c} />
+          <ellipse cx="22" cy="21" rx="8" ry="5" fill={c} />
+          <ellipse cx="42" cy="21" rx="8" ry="5" fill={c} />
+          <polygon points="23,32 41,32 38,46 26,46" fill={a} stroke="#D5C6B2" strokeWidth="1.2" />
+        </svg>
+      );
+    case 'plant_snake':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M25,33 L22,15 L28,33 Z" fill={c} />
+          <path d="M31,33 L32,10 L36,33 Z" fill="#87C875" />
+          <path d="M37,33 L42,16 L41,33 Z" fill={c} />
+          <polygon points="23,32 41,32 38,46 26,46" fill={a} />
+        </svg>
+      );
+    case 'flower_basket':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M21,28 A11,12 0 0,1 43,28" fill="none" stroke={a} strokeWidth="2.8" />
+          <circle cx="26" cy="24" r="5" fill={c} />
+          <circle cx="32" cy="21" r="5" fill="#FFD166" />
+          <circle cx="38" cy="24" r="5" fill="#FFF6EA" stroke="#E5C5C5" strokeWidth="1" />
+          <polygon points="20,27 44,27 40,44 24,44" fill={a} />
+        </svg>
+      );
+    case 'wall_calendar':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="18" y="8" width="28" height="36" rx="3" fill={c} stroke="#D5C6B2" strokeWidth="1.5" />
+          <rect x="20" y="10" width="24" height="9" rx="1.5" fill={a} />
+          <rect x="22" y="23" width="5" height="4" fill="#EADBC8" />
+          <rect x="29.5" y="23" width="5" height="4" fill="#F4A261" />
+          <rect x="37" y="23" width="5" height="4" fill="#EADBC8" />
+          <rect x="22" y="30" width="5" height="4" fill="#EADBC8" />
+          <rect x="29.5" y="30" width="5" height="4" fill="#EADBC8" />
+          <rect x="37" y="30" width="5" height="4" fill="#EADBC8" />
+        </svg>
+      );
+    case 'succulent_shelf':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <circle cx="19" cy="24" r="5" fill={a} />
+          <rect x="15" y="26" width="8" height="7" rx="1.5" fill="#D98C5F" />
+          <circle cx="32" cy="23" r="5.5" fill="#8FC99E" />
+          <rect x="28" y="26" width="8" height="7" rx="1.5" fill="#EFE4D2" />
+          <circle cx="45" cy="24" r="5" fill="#5EA374" />
+          <rect x="41" y="26" width="8" height="7" rx="1.5" fill="#D98C5F" />
+          <rect x="10" y="33" width="44" height="5" rx="2" fill={c} />
+        </svg>
+      );
+    case 'floor_paint':
+    case 'wall_paint':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M22,23 A10,9 0 0,1 42,23" fill="none" stroke="#9AA5B1" strokeWidth="2.2" />
+          <line x1="35" y1="22" x2="43" y2="10" stroke="#C58F5B" strokeWidth="3" strokeLinecap="round" />
+          <rect x="39" y="8" width="9" height="5" rx="2" fill={c} />
+          <rect x="20" y="22" width="24" height="23" rx="3" fill="#E8EDF2" stroke="#C7D1DC" strokeWidth="1.2" />
+          <rect x="20" y="28" width="24" height="10" fill={c} />
+          <rect x="27" y="30" width="10" height="6" rx="1.5" fill={a} />
+        </svg>
+      );
   }
 };
 

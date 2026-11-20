@@ -1,3 +1,4 @@
+import {PaintPattern} from '../types/game';
 import * as THREE from 'three';
 
 export function createCobblestoneTexture(): THREE.CanvasTexture {
@@ -147,6 +148,88 @@ export function createCheckerFloorTexture(a = '#5B4D84', b = '#453969'): THREE.C
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(3, 3);
+  return tex;
+}
+
+export function createPaintPatternTexture(
+  pattern: PaintPattern,
+  primary: string,
+  secondary: string,
+  repX = 3,
+  repY = 3,
+): THREE.CanvasTexture {
+  if (pattern === 'wood_plank') {
+    const t = createWoodPlankTexture(primary, secondary);
+    t.repeat.set(repX, repY);
+    return t;
+  }
+  if (pattern === 'checker_tile') {
+    const t = createCheckerFloorTexture(primary, secondary);
+    t.repeat.set(repX, repY);
+    return t;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = primary;
+  ctx.fillRect(0, 0, 256, 256);
+
+  if (pattern === 'terrazzo') {
+    const chips = [secondary, '#E5989B', '#7FB3A8', '#E9C46A', '#A89F91'];
+    let s = 0x3a91c25;
+    const rnd = () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+    for (let i = 0; i < 85; i++) {
+      const cx = rnd() * 256;
+      const cy = rnd() * 256;
+      const r = 4 + rnd() * 7;
+      ctx.fillStyle = chips[i % chips.length];
+      ctx.beginPath();
+      ctx.moveTo(cx + r, cy);
+      ctx.lineTo(cx + r * 0.2, cy + r * 0.9);
+      ctx.lineTo(cx - r * 0.85, cy + r * 0.35);
+      ctx.lineTo(cx - r * 0.4, cy - r * 0.8);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (pattern === 'stripes') {
+    ctx.fillStyle = secondary;
+    for (let x = 0; x < 256; x += 32) {
+      ctx.fillRect(x, 0, 14, 256);
+    }
+  } else if (pattern === 'polka_dot') {
+    ctx.fillStyle = secondary;
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 4; col++) {
+        const cx = col * 64 + (row % 2 === 0 ? 16 : 48);
+        const cy = row * 64 + 32;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  } else if (pattern === 'matte_wainscot') {
+    // Subtle plaster variation + lower wainscot paneling band
+    ctx.fillStyle = secondary;
+    ctx.fillRect(0, 184, 256, 72);
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fillRect(0, 182, 256, 6);
+    ctx.strokeStyle = 'rgba(110,85,60,0.14)';
+    ctx.lineWidth = 3;
+    for (let x = 14; x < 256; x += 64) {
+      ctx.strokeRect(x, 196, 36, 44);
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(repX, repY);
   return tex;
 }
 

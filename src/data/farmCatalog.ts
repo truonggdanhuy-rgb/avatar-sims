@@ -418,11 +418,14 @@ export interface FarmIngredientCost {
   qty: number;
 }
 
+export const MILL_SLOTS = 4;
+
 export interface ProcessedDefinition {
   id: ProcessedId;
   name: string;
   machineName: string;
   inputs: FarmIngredientCost[];
+  processSeconds: number; // Thời gian xay/ép nhanh (12s–24s), đứng chờ thoải mái
   sellPrice: number; // Giá thống nhất khi bán lẻ & giao đơn
   color: string;
   description: string;
@@ -434,6 +437,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     name: 'Bột Mì Mịn',
     machineName: 'Cối Xay Bột',
     inputs: [{kind: 'crop', id: 'wheat', qty: 1}],
+    processSeconds: 12,
     sellPrice: 7, // > Lúa Mì (4)
     color: '#F5EAD5',
     description: 'Xay từ Lúa Mì để làm Bánh Mì, Bánh Tart & Mì Ý',
@@ -443,6 +447,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     name: 'Bánh Phở Tươi',
     machineName: 'Cối Xay Bột',
     inputs: [{kind: 'crop', id: 'rice', qty: 2}],
+    processSeconds: 15,
     sellPrice: 15, // > 2 Lúa Gạo (10)
     color: '#FAF6EE',
     description: 'Xay từ Lúa Gạo làm sợi Phở Thịt Lợn dai mềm',
@@ -452,6 +457,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     name: 'Đường Nâu Mía',
     machineName: 'Máy Ép Mía',
     inputs: [{kind: 'crop', id: 'sugarcane', qty: 1}],
+    processSeconds: 14,
     sellPrice: 28, // > Mía (20)
     color: '#B67742',
     description: 'Vị ngọt thanh cho trà, cà phê, bánh & nước mía',
@@ -461,9 +467,10 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     name: 'Siro Mía Vàng',
     machineName: 'Máy Ép Mía',
     inputs: [{kind: 'crop', id: 'sugarcane', qty: 2}],
+    processSeconds: 18,
     sellPrice: 56, // > 2 Mía (40)
     color: '#DF9B35',
-    description: 'Siro cô đặc dùng pha Trà Dâu, Trà Chanh & Cà Rốt Mật',
+    description: 'Siro cô đặc dùng pha Trà Dâu, Bánh Flan & Cà Rốt Mật',
   },
   berry_jam: {
     id: 'berry_jam',
@@ -473,6 +480,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
       {kind: 'crop', id: 'strawberry', qty: 2},
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
+    processSeconds: 22,
     sellPrice: 68, // > 22 + 28 = 50
     color: '#CF465D',
     description: 'Mứt dâu thơm lừng cho Bánh Kem & Cheesecake',
@@ -482,6 +490,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     name: 'Bột Ca Cao Nguyên Chất',
     machineName: 'Cối Xay Ca Cao',
     inputs: [{kind: 'crop', id: 'cacao', qty: 2}],
+    processSeconds: 24,
     sellPrice: 125, // > 2 Ca Cao (92)
     color: '#73442E',
     description: 'Nền cho Ca Cao Sữa Nóng & Bánh Brownie',
@@ -491,6 +500,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     name: 'Cà Phê Rang Xay',
     machineName: 'Cối Xay Rang',
     inputs: [{kind: 'crop', id: 'coffee', qty: 2}],
+    processSeconds: 24,
     sellPrice: 140, // > 2 Cà Phê (104)
     color: '#5C3522',
     description: 'Hương cà phê rang đậm pha Cà Phê Sữa Nông Trại',
@@ -500,6 +510,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     name: 'Phô Mai Tươi',
     machineName: 'Máy Ủ Sữa',
     inputs: [{kind: 'animal_product', id: 'milk', qty: 1}],
+    processSeconds: 18,
     sellPrice: 46, // > Sữa Tươi (32)
     color: '#FAD866',
     description: 'Ủ từ Sữa Tươi để làm Bánh Cheesecake & Trứng Chiên',
@@ -512,6 +523,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
       {kind: 'animal_product', id: 'milk', qty: 1},
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
+    processSeconds: 20,
     sellPrice: 74, // > 32 + 28 = 60
     color: '#FFFDF7',
     description: 'Kem sữa đánh bông mịn để làm Panna Cotta Dâu',
@@ -544,25 +556,25 @@ export const KITCHEN_LEVELS: Record<KitchenLevel, KitchenLevelInfo> = {
     level: 1,
     name: 'Bếp Nông Trại (Lv.1)',
     speedMultiplier: 1.0,
-    slots: 2,
-    upgradeCostToNext: 950,
-    description: 'Tốc độ chuẩn · 2 nồi nấu cùng lúc',
+    slots: 5,
+    upgradeCostToNext: 750,
+    description: 'Tốc độ chuẩn · 5 ô nấu cùng lúc',
   },
   2: {
     level: 2,
     name: 'Bếp Gạch Đỏ (Lv.2)',
     speedMultiplier: 0.85,
-    slots: 3,
-    upgradeCostToNext: 2300,
-    description: 'Giảm 15% thời gian nấu · 3 nồi nấu cùng lúc',
+    slots: 7,
+    upgradeCostToNext: 1950,
+    description: 'Giảm 15% thời gian · 7 ô nấu cùng lúc',
   },
   3: {
     level: 3,
     name: 'Bếp Hoàng Gia (Lv.3)',
     speedMultiplier: 0.7,
-    slots: 4,
+    slots: 10,
     upgradeCostToNext: null,
-    description: 'Giảm 30% thời gian nấu · 4 nồi nấu cùng lúc',
+    description: 'Giảm 30% thời gian · 10 ô nấu (Tối đa)',
   },
 };
 
@@ -915,35 +927,102 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
     color: '#F5C44F',
     description: 'Trứng gà ta ốp phô mai kéo sợi kèm cà chua',
   },
+  watermelon_smoothie: {
+    id: 'watermelon_smoothie',
+    name: 'Sinh Tố Dưa Hấu Sữa',
+    category: 'drink',
+    categoryLabel: 'Nước uống',
+    inputs: [
+      {kind: 'crop', id: 'watermelon', qty: 2},
+      {kind: 'animal_product', id: 'milk', qty: 1},
+      {kind: 'processed', id: 'cane_syrup', qty: 1},
+    ],
+    cookSeconds: 2100, // 35 phút
+    sellPrice: 188, // 52 + 32 + 56 = 140 -> lời +48 Xu
+    color: '#F7798A',
+    description: 'Dưa hấu xay mịn quyện sữa tươi & siro mía ngọt mát',
+  },
+  vanilla_iced_coffee: {
+    id: 'vanilla_iced_coffee',
+    name: 'Cà Phê Sữa Vani',
+    category: 'drink',
+    categoryLabel: 'Nước uống',
+    inputs: [
+      {kind: 'processed', id: 'roasted_coffee', qty: 1},
+      {kind: 'animal_product', id: 'milk', qty: 1},
+      {kind: 'crop', id: 'vanilla', qty: 1},
+      {kind: 'processed', id: 'brown_sugar', qty: 1},
+    ],
+    cookSeconds: 3300, // 55 phút
+    sellPrice: 295, // 140 + 32 + 19 + 28 = 219 -> lời +76 Xu
+    color: '#A16842',
+    description: 'Cà phê sữa béo ngậy thoảng hương vani tươi quyến rũ',
+  },
+  vanilla_flan: {
+    id: 'vanilla_flan',
+    name: 'Bánh Flan Vani Caramel',
+    category: 'bakery',
+    categoryLabel: 'Bánh ngọt',
+    inputs: [
+      {kind: 'animal_product', id: 'chicken_egg', qty: 2},
+      {kind: 'animal_product', id: 'milk', qty: 1},
+      {kind: 'crop', id: 'vanilla', qty: 1},
+      {kind: 'processed', id: 'cane_syrup', qty: 1},
+    ],
+    cookSeconds: 2400, // 40 phút
+    sellPrice: 172, // 20 + 32 + 19 + 56 = 127 -> lời +45 Xu
+    color: '#F6CA65',
+    description: 'Bánh flan trứng sữa mịn màng thơm lừng hương vani',
+  },
+  corn_fried_rice: {
+    id: 'corn_fried_rice',
+    name: 'Cơm Chiên Bắp Hành',
+    category: 'meal',
+    categoryLabel: 'Món ăn',
+    inputs: [
+      {kind: 'crop', id: 'rice', qty: 2},
+      {kind: 'crop', id: 'corn', qty: 2},
+      {kind: 'crop', id: 'scallion', qty: 2},
+      {kind: 'animal_product', id: 'chicken_egg', qty: 1},
+    ],
+    cookSeconds: 1500, // 25 phút
+    sellPrice: 66, // 10 + 16 + 8 + 10 = 44 -> lời +22 Xu
+    color: '#F4CD5C',
+    description: 'Hạt cơm vàng ươm rang cùng bắp ngọt, trứng gà & hành lá',
+  },
 };
 
 export const RECIPE_LIST: RecipeDefinition[] = [
   KITCHEN_RECIPES.sugarcane_juice,
   KITCHEN_RECIPES.watermelon_juice,
+  KITCHEN_RECIPES.watermelon_smoothie,
   KITCHEN_RECIPES.strawberry_tea,
   KITCHEN_RECIPES.honey_lemonade,
   KITCHEN_RECIPES.pumpkin_smoothie,
   KITCHEN_RECIPES.corn_milk,
   KITCHEN_RECIPES.hot_cacao,
   KITCHEN_RECIPES.milk_coffee,
+  KITCHEN_RECIPES.vanilla_iced_coffee,
   KITCHEN_RECIPES.butter_bread,
   KITCHEN_RECIPES.egg_tart,
   KITCHEN_RECIPES.pumpkin_pie,
   KITCHEN_RECIPES.strawberry_cake,
   KITCHEN_RECIPES.duck_egg_flan,
+  KITCHEN_RECIPES.vanilla_flan,
   KITCHEN_RECIPES.panna_cotta,
   KITCHEN_RECIPES.berry_cheesecake,
   KITCHEN_RECIPES.cacao_brownie,
   KITCHEN_RECIPES.carrot_soup,
   KITCHEN_RECIPES.tomato_pasta,
   KITCHEN_RECIPES.pork_pho,
+  KITCHEN_RECIPES.corn_fried_rice,
   KITCHEN_RECIPES.glazed_carrot,
   KITCHEN_RECIPES.salted_duck_porridge,
   KITCHEN_RECIPES.roasted_pork_corn,
   KITCHEN_RECIPES.cheese_omelet,
 ];
 
-export const PLOT_COUNT = 20;
+export const PLOT_COUNT = 36;
 
 export function createInitialPlots(now = Date.now()): GardenPlotState[] {
   return Array.from({length: PLOT_COUNT}, (_, index) => {
@@ -968,6 +1047,21 @@ export function createInitialPlots(now = Date.now()): GardenPlotState[] {
         id,
         level: 1,
         stage: 'ready',
+        crop: 'corn',
+        watered: true,
+        hasPest: false,
+        hasWeed: false,
+        pestRolled: true,
+        plantedAt: now - 720000,
+        readyAt: now,
+        durationMs: 720000,
+      };
+    }
+    if (id === 19) {
+      return {
+        id,
+        level: 1,
+        stage: 'ready',
         crop: 'carrot',
         watered: true,
         hasPest: false,
@@ -978,7 +1072,7 @@ export function createInitialPlots(now = Date.now()): GardenPlotState[] {
         durationMs: 360000,
       };
     }
-    if (id === 11) {
+    if (id === 20) {
       return {
         id,
         level: 1,
@@ -1015,9 +1109,25 @@ export const WELL_WATER_INTERVAL_MS = 3 * 60 * 1000; // 3 phút sinh 1 nước (
 export const INITIAL_WATER_CAN = 10;
 export const INITIAL_WELL_STORED = 8;
 
-export const FARM_STORAGE_BASE_CAPACITY = 80;
+export const FARM_STORAGE_BASE_CAPACITY = 100;
 export const FARM_STORAGE_STEP = 10;
-export const MAX_WAREHOUSE_LEVEL = 13; // 80 -> 200 đơn vị lưu trữ
+export const WAREHOUSE_UPGRADE_COSTS = [
+  200, // 100 -> 110
+  350, // 110 -> 120
+  500, // 120 -> 130
+  700, // 130 -> 140
+  900, // 140 -> 150
+  1100, // 150 -> 160
+  1300, // 160 -> 170
+  1550, // 170 -> 180
+  1850, // 180 -> 190
+  2200, // 190 -> 200
+  2600, // 200 -> 210
+  3050, // 210 -> 220
+  3550, // 220 -> 230
+  4100, // 230 -> 240
+] as const;
+export const MAX_WAREHOUSE_LEVEL = WAREHOUSE_UPGRADE_COSTS.length + 1; // 100 -> 240 đơn vị lưu trữ
 
 export function getFarmStorageCapacity(level: number): number {
   const safeLevel = Math.max(1, Math.min(MAX_WAREHOUSE_LEVEL, Math.floor(level || 1)));
@@ -1027,7 +1137,7 @@ export function getFarmStorageCapacity(level: number): number {
 export function getWarehouseUpgradeCost(level: number): number | null {
   if (level >= MAX_WAREHOUSE_LEVEL) return null;
   const safeLevel = Math.max(1, Math.floor(level || 1));
-  return 120 + (safeLevel - 1) * 70;
+  return WAREHOUSE_UPGRADE_COSTS[safeLevel - 1] ?? null;
 }
 
 export const SUPPLY_META: Record<

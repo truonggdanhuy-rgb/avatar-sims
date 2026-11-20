@@ -1456,202 +1456,476 @@ export function buildTownScene(): TownWorld {
     group.add(shop);
   }
 
-  // ========== DISTRICT 4: TIỆM MINIGAME (Cozy Gabled Arcade Pavilion + Partial Picket Fence) ==========
+  // ========== DISTRICT 4: TIỆM MINIGAME (Large Flat-Roofed Game House + Upright 3D GAME Sign on Roof) ==========
   {
     const arcade = new THREE.Group();
     arcade.position.set(22.6, 0, 5.8);
     arcade.rotation.y = -1.14;
 
-    const stonePlinthMat = getMat('#CFC9DF', 0.76);
-    const wallCreamMat = getMat('#F5EEFC', 0.68);
-    const trimLilacMat = getMat('#66569C', 0.56);
-    const roofSlateMat = getMat('#54448A', 0.58);
-    const coralMat = getMat('#E86B74', 0.5);
+    const stonePlinthMat = getMat('#CFC8E2', 0.76);
+    const stepMat = getMat('#DFDAEC', 0.74);
+    const wallCreamMat = getMat('#F7F1FE', 0.66);
+    const trimIndigoMat = getMat('#4B3D78', 0.56);
+    const trimLilacMat = getMat('#6E5DA8', 0.58);
+    const roofDeckMat = getMat('#3A2F63', 0.64);
+    const roofBorderMat = getMat('#EFE7FA', 0.62);
+    const coralMat = getMat('#F06875', 0.46);
+    const tealNeonMat = new THREE.MeshStandardMaterial({
+      color: '#6CE5DA',
+      emissive: '#35CBBF',
+      emissiveIntensity: 0.34,
+      roughness: 0.28,
+    });
     const goldAccentMat = glossyClayMat('#FFD166', 0.24);
-    const fenceMat = getMat('#FFFDF7', 0.74);
-    const fenceCapMat = getMat('#66569C', 0.62);
+    const glassShowcaseMat = new THREE.MeshStandardMaterial({
+      color: '#A5DDFC',
+      emissive: '#4AA8DC',
+      emissiveIntensity: 0.3,
+      roughness: 0.16,
+      transparent: true,
+      opacity: 0.78,
+    });
+    windowMeshes.push(tealNeonMat);
 
+    // 1. Wide Stepped Terrazzo Podium + Wide Front Entrance Stairs
     const plinth = new THREE.Mesh(
-      new RoundedBoxGeometry(5.1, 0.36, 4.1, 2, 0.08),
+      new RoundedBoxGeometry(6.5, 0.36, 4.9, 2, 0.08),
       stonePlinthMat,
     );
     plinth.position.y = 0.18;
 
+    const stairStep1 = new THREE.Mesh(
+      new RoundedBoxGeometry(2.55, 0.16, 0.72, 2, 0.04),
+      stepMat,
+    );
+    stairStep1.position.set(0, 0.08, 2.52);
+    const stairStep2 = new THREE.Mesh(
+      new RoundedBoxGeometry(2.25, 0.16, 0.42, 2, 0.04),
+      stepMat,
+    );
+    stairStep2.position.set(0, 0.24, 2.34);
+
+    // Pastel stair railings + illuminated globe bollards
+    [-1.24, 1.24].forEach((rx) => {
+      const railPostFront = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.06, 0.56, 8),
+        trimIndigoMat,
+      );
+      railPostFront.position.set(rx, 0.44, 2.74);
+      const bollardGlow = new THREE.Mesh(
+        new THREE.SphereGeometry(0.085, 8, 8),
+        goldAccentMat,
+      );
+      bollardGlow.position.set(rx, 0.76, 2.74);
+      const railBar = new THREE.Mesh(
+        new RoundedBoxGeometry(0.06, 0.06, 0.55, 2, 0.02),
+        coralMat,
+      );
+      railBar.position.set(rx, 0.66, 2.48);
+      railBar.rotation.x = 0.36;
+      arcade.add(railPostFront, bollardGlow, railBar);
+    });
+
+    // 2. Large Architectural Game Building Body + Wainscot + Mid-Tier & Crown Friezes
     const body = new THREE.Mesh(
-      new RoundedBoxGeometry(4.5, 2.55, 3.45, 3, 0.12),
+      new RoundedBoxGeometry(5.95, 3.45, 4.18, 3, 0.12),
       wallCreamMat,
     );
-    body.position.y = 1.62;
+    body.position.y = 2.08;
 
-    // Corner framing pillars + wainscot band
-    [
-      [-2.18, 1.66],
-      [2.18, 1.66],
-      [-2.18, -1.66],
-      [2.18, -1.66],
-    ].forEach(([px, pz]) => {
-      const pil = new THREE.Mesh(new RoundedBoxGeometry(0.24, 2.58, 0.24, 2, 0.04), trimLilacMat);
-      pil.position.set(px, 1.62, pz);
-      arcade.add(pil);
-    });
     const wainscot = new THREE.Mesh(
-      new RoundedBoxGeometry(4.58, 0.64, 3.54, 2, 0.04),
+      new RoundedBoxGeometry(6.05, 0.76, 4.28, 2, 0.05),
+      trimIndigoMat,
+    );
+    wainscot.position.y = 0.74;
+
+    // Illuminated turquoise mid-belt accent strip wrapping the facade
+    const neonBelt = new THREE.Mesh(
+      new RoundedBoxGeometry(6.14, 0.12, 4.36, 2, 0.03),
+      tealNeonMat,
+    );
+    neonBelt.position.y = 1.16;
+
+    // 4 Sculpted Corner Framing Columns + Center Entry Columns
+    [
+      [-2.9, 2.02],
+      [2.9, 2.02],
+      [-2.9, -2.02],
+      [2.9, -2.02],
+      [-1.08, 2.04],
+      [1.08, 2.04],
+    ].forEach(([px, pz]) => {
+      const col = new THREE.Mesh(
+        new RoundedBoxGeometry(0.32, 3.48, 0.32, 2, 0.05),
+        trimIndigoMat,
+      );
+      col.position.set(px, 2.08, pz);
+      const capBand = new THREE.Mesh(
+        new RoundedBoxGeometry(0.38, 0.14, 0.38, 2, 0.03),
+        coralMat,
+      );
+      capBand.position.set(px, 3.66, pz);
+      arcade.add(col, capBand);
+    });
+
+    // Upper horizontal frieze cornice below the flat roof
+    const upperFrieze = new THREE.Mesh(
+      new RoundedBoxGeometry(6.12, 0.34, 4.34, 2, 0.04),
       trimLilacMat,
     );
-    wainscot.position.y = 0.64;
+    upperFrieze.position.y = 3.62;
 
-    // Warm pitched gable roof + coral ridge beam (replaces boxy upper deck!)
-    const mainRoof = createExtrudedRoof(5.35, 1.85, 4.1, roofSlateMat);
-    mainRoof.position.y = 3.74;
-    const ridgeBeam = new THREE.Mesh(
-      new RoundedBoxGeometry(0.22, 0.2, 4.3, 2, 0.05),
+    // 3. Center Double Glass Entry + Illuminated Canopy Marquee + Star Crest
+    const doorRecess = new THREE.Mesh(
+      new RoundedBoxGeometry(1.78, 2.04, 0.24, 2, 0.04),
+      getMat('#271F44', 0.6),
+    );
+    doorRecess.position.set(0, 1.38, 2.02);
+
+    const doorFrameOuter = new THREE.Mesh(
+      new RoundedBoxGeometry(1.94, 2.16, 0.18, 2, 0.05),
       coralMat,
     );
-    ridgeBeam.position.y = 4.72;
+    doorFrameOuter.position.set(0, 1.44, 2.08);
 
-    // Projecting Front Marquee Dormer Gable + Porch Steps & Timber Posts
-    const marqueeGable = createExtrudedRoof(2.25, 0.76, 1.35, coralMat);
-    marqueeGable.position.set(-0.92, 2.66, 2.1);
-    const porchStep = new THREE.Mesh(
-      new RoundedBoxGeometry(1.9, 0.22, 0.92, 2, 0.05),
-      stonePlinthMat,
-    );
-    porchStep.position.set(-0.92, 0.16, 2.15);
-    [-1.7, -0.14].forEach((px) => {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.085, 1.98, 8), trimLilacMat);
-      post.position.set(px, 1.34, 2.46);
-      arcade.add(post);
+    [-0.4, 0.4].forEach((dx) => {
+      const leaf = new THREE.Mesh(
+        new RoundedBoxGeometry(0.74, 1.88, 0.1, 2, 0.03),
+        glassShowcaseMat,
+      );
+      leaf.position.set(dx, 1.36, 2.13);
+      const handle = new THREE.Mesh(
+        new RoundedBoxGeometry(0.06, 0.42, 0.08, 2, 0.02),
+        goldAccentMat,
+      );
+      handle.position.set(dx > 0 ? dx - 0.24 : dx + 0.24, 1.32, 2.19);
+      arcade.add(leaf, handle);
     });
 
-    // Warm porch lantern & star emblem on gable
+    // Jutting Flat Illuminated Entrance Canopy + Pixel Console Crest
+    const entryCanopy = new THREE.Mesh(
+      new RoundedBoxGeometry(2.38, 0.24, 0.92, 2, 0.06),
+      trimIndigoMat,
+    );
+    entryCanopy.position.set(0, 2.66, 2.38);
+    const canopyTrim = new THREE.Mesh(
+      new RoundedBoxGeometry(2.44, 0.09, 0.96, 2, 0.02),
+      tealNeonMat,
+    );
+    canopyTrim.position.set(0, 2.75, 2.39);
+    const crestPlate = new THREE.Mesh(
+      new RoundedBoxGeometry(1.18, 0.42, 0.16, 2, 0.05),
+      coralMat,
+    );
+    crestPlate.position.set(0, 3.06, 2.2);
+    const crestCoin = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.14, 0.08, 12),
+      goldAccentMat,
+    );
+    crestCoin.rotation.x = Math.PI / 2;
+    crestCoin.position.set(0, 3.06, 2.28);
+
     const arcadeLanternMat = new THREE.MeshStandardMaterial({
       color: '#FFF4C2',
       emissive: '#FFCC66',
-      emissiveIntensity: 0.42,
+      emissiveIntensity: 0.48,
       roughness: 0.25,
     });
     lampBulbs.push(arcadeLanternMat);
-    const porchLantern = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), arcadeLanternMat);
-    porchLantern.position.set(-0.36, 2.02, 2.28);
+    [-0.96, 0.96].forEach((lx) => {
+      const sconce = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), arcadeLanternMat);
+      sconce.position.set(lx, 2.24, 2.22);
+      arcade.add(sconce);
+    });
 
-    const starCrest = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), goldAccentMat);
-    starCrest.position.set(0, 3.85, 2.06);
-
-    // Sculpted rooftop Arcade Joystick nestled on the main roof crest
-    const joyBase = new THREE.Mesh(
-      new RoundedBoxGeometry(1.05, 0.2, 0.9, 2, 0.05),
-      getMat('#2C244A', 0.5),
-    );
-    joyBase.position.set(0.65, 4.78, 0);
-    const joyStick = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.09, 0.12, 0.68, 9),
-      getMat('#DCE4EC', 0.32, 0.5),
-    );
-    joyStick.position.set(0.65, 5.14, 0);
-    const joyKnob = new THREE.Mesh(
-      new THREE.SphereGeometry(0.3, 11, 10),
-      glossyClayMat('#F05D68', 0.22),
-    );
-    joyKnob.position.set(0.65, 5.52, 0);
-
-    // Striped Pastel Awning & Cozy Framed Window + Planter Flower Box
-    for (let i = 0; i < 4; i++) {
-      const stripe = new THREE.Mesh(
-        new RoundedBoxGeometry(0.5, 0.16, 0.78, 2, 0.04),
-        getMat(i % 2 === 0 ? '#F06B74' : '#FFFDF9', 0.55),
+    // 4. Left & Right Panoramic Glass Showcase Bays (with miniature arcade cabinets visible inside!)
+    [-1.96, 1.96].forEach((bx, bayIdx) => {
+      const bayFrame = new THREE.Mesh(
+        new RoundedBoxGeometry(1.56, 1.66, 0.22, 2, 0.05),
+        trimLilacMat,
       );
-      stripe.position.set(0.38 + i * 0.5, 2.18, 1.98);
-      stripe.rotation.x = 0.38;
-      arcade.add(stripe);
-    }
+      bayFrame.position.set(bx, 2.08, 2.06);
+      const bayInterior = new THREE.Mesh(
+        new RoundedBoxGeometry(1.36, 1.44, 0.2, 2, 0.03),
+        getMat('#2B224B', 0.65),
+      );
+      bayInterior.position.set(bx, 2.08, 2.0);
+      const bayGlass = new THREE.Mesh(
+        new RoundedBoxGeometry(1.36, 1.44, 0.08, 2, 0.02),
+        glassShowcaseMat,
+      );
+      bayGlass.position.set(bx, 2.08, 2.15);
 
-    const winFrame = new THREE.Mesh(
-      new RoundedBoxGeometry(1.86, 1.28, 0.16, 2, 0.05),
-      trimLilacMat,
+      // Cute Striped Mini Canopy over each side window
+      for (let s = 0; s < 4; s++) {
+        const stripe = new THREE.Mesh(
+          new RoundedBoxGeometry(0.38, 0.11, 0.56, 2, 0.03),
+          getMat(s % 2 === 0 ? '#F06875' : '#FFFDF9', 0.55),
+        );
+        stripe.position.set(bx - 0.57 + s * 0.38, 3.02, 2.26);
+        stripe.rotation.x = 0.3;
+        arcade.add(stripe);
+      }
+
+      // Tiny miniature arcade & claw machines displayed inside the glass bay
+      [-0.32, 0.32].forEach((mx, mIdx) => {
+        const cabCol = bayIdx === 0
+          ? mIdx === 0 ? '#FF6B78' : '#4ECDC4'
+          : mIdx === 0 ? '#FFD166' : '#9B8CFF';
+        const cab = new THREE.Mesh(
+          new RoundedBoxGeometry(0.42, 0.92, 0.2, 2, 0.04),
+          getMat(cabCol, 0.45),
+        );
+        cab.position.set(bx + mx, 1.84, 2.06);
+        const crt = new THREE.Mesh(
+          new RoundedBoxGeometry(0.28, 0.24, 0.05, 2, 0.02),
+          makeWinMat(),
+        );
+        crt.position.set(bx + mx, 2.02, 2.14);
+        arcade.add(cab, crt);
+      });
+
+      // Decorative pastel flower/star planter box beneath each bay
+      const fbox = new THREE.Mesh(
+        new RoundedBoxGeometry(1.48, 0.24, 0.34, 2, 0.04),
+        trimIndigoMat,
+      );
+      fbox.position.set(bx, 0.72, 2.24);
+      [-0.45, 0, 0.45].forEach((fx, fi) => {
+        const orb = new THREE.Mesh(
+          new THREE.SphereGeometry(0.12, 7, 7),
+          fi === 1 ? goldAccentMat : coralMat,
+        );
+        orb.position.set(bx + fx, 0.9, 2.26);
+        arcade.add(orb);
+      });
+
+      arcade.add(bayFrame, bayInterior, bayGlass, fbox);
+    });
+
+    // Side & Back Architectural Windows so all angles look finished
+    [-1, 1].forEach((side) => {
+      [-0.9, 0.9].forEach((wz) => {
+        const sw = buildFramedWindow(0.95, 0.95, trimLilacMat, makeWinMat());
+        sw.rotation.y = (side * Math.PI) / 2;
+        sw.position.set(side * 2.98, 2.15, wz);
+        arcade.add(sw);
+      });
+    });
+    [-1.4, 1.4].forEach((bx) => {
+      const bw = buildFramedWindow(1.05, 0.92, trimLilacMat, makeWinMat());
+      bw.rotation.y = Math.PI;
+      bw.position.set(bx, 2.15, -2.09);
+      arcade.add(bw);
+    });
+
+    // 5. FLAT ROOF DECK (MÁI PHẲNG) + Parapet Walls + Recessed Rooftop Terrace
+    const roofSlab = new THREE.Mesh(
+      new RoundedBoxGeometry(6.34, 0.28, 4.54, 2, 0.06),
+      roofBorderMat,
     );
-    winFrame.position.set(1.05, 1.48, 1.72);
-    const win = new THREE.Mesh(
-      new RoundedBoxGeometry(1.6, 1.04, 0.18, 2, 0.04),
-      new THREE.MeshStandardMaterial({
-        color: '#72C2F0',
-        emissive: '#4EA8DE',
-        emissiveIntensity: 0.36,
-        roughness: 0.2,
-      }),
+    roofSlab.position.y = 3.92;
+
+    const roofTerraceFloor = new THREE.Mesh(
+      new RoundedBoxGeometry(5.86, 0.08, 4.08, 2, 0.02),
+      roofDeckMat,
     );
-    win.position.set(1.05, 1.48, 1.74);
+    roofTerraceFloor.position.y = 4.06;
 
-    // Side windows so back/sides aren't blank
-    const sideWinL = buildFramedWindow(0.84, 0.78, trimLilacMat, makeWinMat());
-    sideWinL.rotation.y = -Math.PI / 2;
-    sideWinL.position.set(-2.26, 1.62, 0);
-    const sideWinR = buildFramedWindow(0.84, 0.78, trimLilacMat, makeWinMat());
-    sideWinR.rotation.y = Math.PI / 2;
-    sideWinR.position.set(2.26, 1.62, 0);
+    // Parapet border walls framing the flat rooftop
+    const parapetFront = new THREE.Mesh(
+      new RoundedBoxGeometry(6.32, 0.26, 0.24, 2, 0.04),
+      roofBorderMat,
+    );
+    parapetFront.position.set(0, 4.14, 2.14);
+    const parapetBack = parapetFront.clone();
+    parapetBack.position.z = -2.14;
+    const parapetLeft = new THREE.Mesh(
+      new RoundedBoxGeometry(0.24, 0.26, 4.52, 2, 0.04),
+      roofBorderMat,
+    );
+    parapetLeft.position.set(-3.04, 4.14, 0);
+    const parapetRight = parapetLeft.clone();
+    parapetRight.position.x = 3.04;
 
-    // Window flower box
-    const fbox = new THREE.Mesh(new RoundedBoxGeometry(1.66, 0.22, 0.3, 2, 0.04), trimLilacMat);
-    fbox.position.set(1.05, 0.76, 1.88);
-    const flA = new THREE.Mesh(new THREE.SphereGeometry(0.14, 7, 7), coralMat);
-    flA.position.set(0.75, 0.94, 1.9);
-    const flB = new THREE.Mesh(new THREE.SphereGeometry(0.14, 7, 7), goldAccentMat);
-    flB.position.set(1.35, 0.94, 1.9);
+    // Rooftop detail props on rear flat roof deck (skylight & exhaust unit)
+    const skyLight = new THREE.Mesh(
+      new RoundedBoxGeometry(2.0, 0.2, 1.15, 2, 0.05),
+      glassShowcaseMat,
+    );
+    skyLight.position.set(-0.6, 4.16, -0.75);
+    const roofUnit = new THREE.Mesh(
+      new RoundedBoxGeometry(0.95, 0.42, 0.72, 2, 0.05),
+      stonePlinthMat,
+    );
+    roofUnit.position.set(1.85, 4.26, -0.95);
 
-    // Double Doors + Outdoor Gachapon Machine
-    const door = new THREE.Mesh(new RoundedBoxGeometry(1.18, 1.68, 0.18, 2, 0.05), coralMat);
-    door.position.set(-0.92, 1.16, 1.72);
+    // 6. LARGE UPRIGHT 3D SCULPTED "G A M E" SIGN STANDING ON THE FLAT ROOF
+    const buildGameLetterGeo = (char: 'G' | 'A' | 'M' | 'E') => {
+      const s = new THREE.Shape();
+      if (char === 'G') {
+        s.moveTo(-0.42, 0.56);
+        s.lineTo(0.42, 0.56);
+        s.lineTo(0.42, 0.34);
+        s.lineTo(-0.18, 0.34);
+        s.lineTo(-0.18, -0.34);
+        s.lineTo(0.18, -0.34);
+        s.lineTo(0.18, -0.08);
+        s.lineTo(-0.04, -0.08);
+        s.lineTo(-0.04, 0.14);
+        s.lineTo(0.42, 0.14);
+        s.lineTo(0.42, -0.56);
+        s.lineTo(-0.42, -0.56);
+        s.closePath();
+      } else if (char === 'A') {
+        s.moveTo(-0.44, -0.56);
+        s.lineTo(-0.14, 0.56);
+        s.lineTo(0.14, 0.56);
+        s.lineTo(0.44, -0.56);
+        s.lineTo(0.2, -0.56);
+        s.lineTo(0.13, -0.26);
+        s.lineTo(-0.13, -0.26);
+        s.lineTo(-0.2, -0.56);
+        s.closePath();
+        const hole = new THREE.Path();
+        hole.moveTo(-0.08, -0.06);
+        hole.lineTo(0.08, -0.06);
+        hole.lineTo(0, 0.32);
+        hole.closePath();
+        s.holes.push(hole);
+      } else if (char === 'M') {
+        s.moveTo(-0.46, -0.56);
+        s.lineTo(-0.46, 0.56);
+        s.lineTo(-0.2, 0.56);
+        s.lineTo(0, 0.12);
+        s.lineTo(0.2, 0.56);
+        s.lineTo(0.46, 0.56);
+        s.lineTo(0.46, -0.56);
+        s.lineTo(0.24, -0.56);
+        s.lineTo(0.24, 0.14);
+        s.lineTo(0.08, -0.22);
+        s.lineTo(-0.08, -0.22);
+        s.lineTo(-0.24, 0.14);
+        s.lineTo(-0.24, -0.56);
+        s.closePath();
+      } else {
+        // 'E'
+        s.moveTo(-0.38, -0.56);
+        s.lineTo(-0.38, 0.56);
+        s.lineTo(0.38, 0.56);
+        s.lineTo(0.38, 0.34);
+        s.lineTo(-0.14, 0.34);
+        s.lineTo(-0.14, 0.11);
+        s.lineTo(0.28, 0.11);
+        s.lineTo(0.28, -0.11);
+        s.lineTo(-0.14, -0.11);
+        s.lineTo(-0.14, -0.34);
+        s.lineTo(0.38, -0.34);
+        s.lineTo(0.38, -0.56);
+        s.closePath();
+      }
+      const geo = new THREE.ExtrudeGeometry(s, {
+        depth: 0.24,
+        bevelEnabled: true,
+        bevelThickness: 0.04,
+        bevelSize: 0.03,
+        bevelSegments: 2,
+      });
+      geo.center();
+      return geo;
+    };
+
+    const signPlinthBeam = new THREE.Mesh(
+      new RoundedBoxGeometry(4.95, 0.2, 0.44, 2, 0.04),
+      trimIndigoMat,
+    );
+    signPlinthBeam.position.set(0, 4.18, 1.38);
+    arcade.add(signPlinthBeam);
+
+    // Steel support struts holding the upright GAME roof sign
+    [-1.95, -0.65, 0.65, 1.95].forEach((sx) => {
+      const strut = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.055, 0.72, 6),
+        trimIndigoMat,
+      );
+      strut.position.set(sx, 4.46, 1.06);
+      strut.rotation.x = 0.68;
+      arcade.add(strut);
+    });
+
+    const gameLetters: {ch: 'G' | 'A' | 'M' | 'E'; x: number; col: string; em: string}[] = [
+      {ch: 'G', x: -1.74, col: '#FF6B78', em: '#E03E52'},
+      {ch: 'A', x: -0.58, col: '#FFD166', em: '#E5A229'},
+      {ch: 'M', x: 0.62, col: '#55DEC8', em: '#26B59F'},
+      {ch: 'E', x: 1.78, col: '#8E9BFF', em: '#5B6BE6'},
+    ];
+    gameLetters.forEach(({ch, x, col, em}) => {
+      const letterMat = new THREE.MeshStandardMaterial({
+        color: col,
+        emissive: em,
+        emissiveIntensity: 0.24,
+        roughness: 0.34,
+      });
+      windowMeshes.push(letterMat);
+      const letterMesh = new THREE.Mesh(buildGameLetterGeo(ch), letterMat);
+      letterMesh.position.set(x, 4.86, 1.38);
+      arcade.add(letterMesh);
+    });
+
+    // 7. Outdoor Gacha Machine + Pixel Token Standee
     const gachaBase = new THREE.Mesh(
-      new RoundedBoxGeometry(0.46, 0.56, 0.46, 2, 0.04),
+      new RoundedBoxGeometry(0.5, 0.62, 0.5, 2, 0.05),
       getMat('#FF758F', 0.45),
     );
-    gachaBase.position.set(-1.95, 0.62, 2.02);
+    gachaBase.position.set(-1.95, 0.66, 2.52);
     const gachaGlobe = new THREE.Mesh(
-      new THREE.SphereGeometry(0.24, 10, 8),
+      new THREE.SphereGeometry(0.26, 10, 8),
       glossyClayMat('#E0F4FF', 0.15),
     );
-    gachaGlobe.position.set(-1.95, 1.06, 2.02);
+    gachaGlobe.position.set(-1.95, 1.14, 2.52);
 
-    // Partial decorative wooden picket fences flanking the arcade side/front yard (never enclosing!)
-    const aFenceRightFront = buildPartialFenceSegment(1.7, 5, fenceMat, fenceCapMat);
-    aFenceRightFront.position.set(1.92, 0, 2.48);
-    const aFenceRightSide = buildPartialFenceSegment(1.65, 5, fenceMat, fenceCapMat);
-    aFenceRightSide.rotation.y = Math.PI / 2;
-    aFenceRightSide.position.set(2.8, 0, 1.68);
-    const aFenceLeftSide = buildPartialFenceSegment(1.65, 5, fenceMat, fenceCapMat);
-    aFenceLeftSide.rotation.y = Math.PI / 2;
-    aFenceLeftSide.position.set(-2.8, 0, 1.68);
+    const tokenPost = new THREE.Mesh(
+      new RoundedBoxGeometry(0.48, 0.68, 0.34, 2, 0.05),
+      getMat('#54C7B8', 0.48),
+    );
+    tokenPost.position.set(1.95, 0.68, 2.52);
+    const tokenStar = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.22, 0),
+      goldAccentMat,
+    );
+    tokenStar.position.set(1.95, 1.18, 2.52);
 
     arcade.add(
       plinth,
+      stairStep1,
+      stairStep2,
       body,
       wainscot,
-      mainRoof,
-      ridgeBeam,
-      marqueeGable,
-      porchStep,
-      porchLantern,
-      starCrest,
-      joyBase,
-      joyStick,
-      joyKnob,
-      winFrame,
-      win,
-      sideWinL,
-      sideWinR,
-      fbox,
-      flA,
-      flB,
-      door,
+      neonBelt,
+      upperFrieze,
+      doorRecess,
+      doorFrameOuter,
+      entryCanopy,
+      canopyTrim,
+      crestPlate,
+      crestCoin,
+      roofSlab,
+      roofTerraceFloor,
+      parapetFront,
+      parapetBack,
+      parapetLeft,
+      parapetRight,
+      skyLight,
+      roofUnit,
       gachaBase,
       gachaGlobe,
-      aFenceRightFront,
-      aFenceRightSide,
-      aFenceLeftSide,
+      tokenPost,
+      tokenStar,
     );
     addInteractionProxy(
       arcade,
-      [5.2, 5.4, 4.6],
-      2.3,
+      [6.8, 5.8, 5.4],
+      2.65,
       {
         kind: 'zone',
         zone: 'arcade' as ZoneId,
@@ -1660,7 +1934,7 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'arcade', x: 22.6, z: 5.8, hw: 2.68, hd: 2.28, rotY: -1.14});
+    colliders.push({type: 'box', id: 'arcade', x: 22.6, z: 5.8, hw: 3.35, hd: 2.55, rotY: -1.14});
     group.add(arcade);
   }
 

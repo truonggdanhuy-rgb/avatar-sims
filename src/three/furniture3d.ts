@@ -569,6 +569,448 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
       g.add(bezel, face, hourHand, minHand, pin);
       break;
     }
+
+    case 'kitchen_l_counter': {
+      const cabBodyMat = clayMat(item.color || '#F4EBDC', 0.72);
+      const cabDoorMat = clayMat(item.accentColor || '#DFCEB4', 0.68);
+      const marbleTopMat = glossyClayMat('#FAF8F5', 0.28);
+      const metalMat = clayMat('#CFD8E0', 0.25, 0.72);
+      const stoveGlassMat = glossyClayMat('#1E2532', 0.14);
+      const handleGoldMat = glossyClayMat('#F4C95D', 0.25);
+
+      // Back wing centered around local (-0.03, -1.69)
+      const backBase = new THREE.Mesh(
+        new RoundedBoxGeometry(3.55, 0.84, 1.0, 2, 0.04),
+        cabBodyMat,
+      );
+      backBase.position.set(-0.03, 0.42, -1.69);
+      const backTop = new THREE.Mesh(
+        new RoundedBoxGeometry(3.62, 0.08, 1.08, 2, 0.03),
+        marbleTopMat,
+      );
+      backTop.position.set(-0.03, 0.88, -1.69);
+
+      // Right wing centered around local (+1.27, +0.95)
+      const rightBase = new THREE.Mesh(
+        new RoundedBoxGeometry(1.0, 0.84, 4.28, 2, 0.04),
+        cabBodyMat,
+      );
+      rightBase.position.set(1.27, 0.42, 0.95);
+      const rightTop = new THREE.Mesh(
+        new RoundedBoxGeometry(1.08, 0.08, 4.36, 2, 0.03),
+        marbleTopMat,
+      );
+      rightTop.position.set(1.27, 0.88, 0.95);
+
+      [-1.35, -0.5, 0.35].forEach((cx) => {
+        const dPanel = new THREE.Mesh(
+          new RoundedBoxGeometry(0.68, 0.66, 0.05, 2, 0.02),
+          cabDoorMat,
+        );
+        dPanel.position.set(cx, 0.42, -1.17);
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), handleGoldMat);
+        knob.position.set(cx + 0.22, 0.52, -1.13);
+        g.add(dPanel, knob);
+      });
+      [-0.5, 0.4, 1.3, 2.2].forEach((cz) => {
+        const dPanel = new THREE.Mesh(
+          new RoundedBoxGeometry(0.05, 0.66, 0.72, 2, 0.02),
+          cabDoorMat,
+        );
+        dPanel.position.set(0.75, 0.42, cz);
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), handleGoldMat);
+        knob.position.set(0.71, 0.52, cz + 0.24);
+        g.add(dPanel, knob);
+      });
+
+      const sinkRim = new THREE.Mesh(
+        new RoundedBoxGeometry(1.02, 0.04, 0.68, 2, 0.02),
+        metalMat,
+      );
+      sinkRim.position.set(-0.9, 0.92, -1.69);
+      const sinkBasin = new THREE.Mesh(
+        new THREE.BoxGeometry(0.84, 0.05, 0.52),
+        clayMat('#8D9AA6', 0.35, 0.5),
+      );
+      sinkBasin.position.set(-0.9, 0.925, -1.69);
+      const faucetBase = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.05, 0.28, 8),
+        metalMat,
+      );
+      faucetBase.position.set(-0.9, 1.06, -2.01);
+      const faucetNeck = new THREE.Mesh(
+        new THREE.TorusGeometry(0.11, 0.025, 6, 10, Math.PI),
+        metalMat,
+      );
+      faucetNeck.rotation.y = Math.PI / 2;
+      faucetNeck.position.set(-0.9, 1.2, -1.9);
+
+      const stoveBase = new THREE.Mesh(
+        new RoundedBoxGeometry(0.76, 0.03, 1.25, 2, 0.02),
+        stoveGlassMat,
+      );
+      stoveBase.position.set(1.27, 0.93, 0.4);
+      [0.07, 0.73].forEach((bz) => {
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(0.15, 0.19, 16),
+          new THREE.MeshBasicMaterial({color: '#6BC5F2'}),
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(1.27, 0.95, bz);
+        g.add(ring);
+      });
+
+      g.add(
+        backBase,
+        backTop,
+        rightBase,
+        rightTop,
+        sinkRim,
+        sinkBasin,
+        faucetBase,
+        faucetNeck,
+        stoveBase,
+      );
+      break;
+    }
+
+    case 'wooden_table': {
+      const top = new THREE.Mesh(
+        new RoundedBoxGeometry(1.52, 0.1, 0.94, 3, 0.04),
+        mainMat,
+      );
+      top.position.y = 0.73;
+      const apron = new THREE.Mesh(
+        new RoundedBoxGeometry(1.36, 0.09, 0.78, 2, 0.02),
+        accentMat,
+      );
+      apron.position.y = 0.65;
+      [
+        [-0.64, -0.35],
+        [0.64, -0.35],
+        [-0.64, 0.35],
+        [0.64, 0.35],
+      ].forEach(([lx, lz]) => {
+        const leg = new THREE.Mesh(
+          new RoundedBoxGeometry(0.09, 0.72, 0.09, 2, 0.02),
+          accentMat,
+        );
+        leg.position.set(lx, 0.36, lz);
+        g.add(leg);
+      });
+      g.add(top, apron);
+      break;
+    }
+
+    case 'wooden_chair': {
+      const seat = new THREE.Mesh(
+        new RoundedBoxGeometry(0.56, 0.08, 0.54, 2, 0.03),
+        mainMat,
+      );
+      seat.position.y = 0.44;
+      const cushion = new THREE.Mesh(
+        new RoundedBoxGeometry(0.46, 0.04, 0.44, 2, 0.02),
+        accentMat,
+      );
+      cushion.position.y = 0.49;
+      [-0.22, 0.22].forEach((bx) => {
+        const post = new THREE.Mesh(
+          new RoundedBoxGeometry(0.06, 0.56, 0.06, 2, 0.02),
+          mainMat,
+        );
+        post.position.set(bx, 0.72, -0.22);
+        g.add(post);
+      });
+      const rail = new THREE.Mesh(
+        new RoundedBoxGeometry(0.54, 0.14, 0.06, 2, 0.02),
+        mainMat,
+      );
+      rail.position.set(0, 0.93, -0.22);
+      const midRail = new THREE.Mesh(
+        new RoundedBoxGeometry(0.48, 0.07, 0.04, 2, 0.01),
+        mainMat,
+      );
+      midRail.position.set(0, 0.69, -0.22);
+      [
+        [-0.21, -0.2],
+        [0.21, -0.2],
+        [-0.21, 0.2],
+        [0.21, 0.2],
+      ].forEach(([lx, lz]) => {
+        const leg = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.032, 0.026, 0.44, 7),
+          mainMat,
+        );
+        leg.position.set(lx, 0.22, lz);
+        g.add(leg);
+      });
+      g.add(seat, cushion, rail, midRail);
+      break;
+    }
+
+    case 'table_tv': {
+      const baseFoot = new THREE.Mesh(
+        new RoundedBoxGeometry(0.56, 0.04, 0.24, 2, 0.02),
+        clayMat('#4B5563', 0.45),
+      );
+      baseFoot.position.y = 0.02;
+      const neck = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.14, 0.06),
+        clayMat('#4B5563', 0.45),
+      );
+      neck.position.set(0, 0.1, -0.02);
+      const bezel = new THREE.Mesh(
+        new RoundedBoxGeometry(1.24, 0.72, 0.07, 2, 0.03),
+        mainMat,
+      );
+      bezel.position.set(0, 0.48, -0.02);
+      const screen = new THREE.Mesh(
+        new THREE.BoxGeometry(1.12, 0.62, 0.08),
+        glossyClayMat(item.accentColor || '#8ED8F8', 0.14),
+      );
+      screen.position.set(0, 0.48, -0.015);
+      g.add(baseFoot, neck, bezel, screen);
+      break;
+    }
+
+    case 'plant_fiddle': {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.19, 0.42, 12), accentMat);
+      pot.position.y = 0.21;
+      const soil = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.21, 0.21, 0.04, 10),
+        clayMat('#6B4429', 0.9),
+      );
+      soil.position.y = 0.41;
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.045, 0.88, 7),
+        clayMat('#7B5636', 0.8),
+      );
+      stem.position.y = 0.78;
+      const leafSpecs: [number, number, number, number, number][] = [
+        [0, 1.24, 0, 0.22, 0.2],
+        [-0.22, 1.05, 0.14, 0.2, 0.65],
+        [0.24, 1.1, -0.1, 0.2, -0.6],
+        [-0.14, 0.84, -0.18, 0.17, 0.8],
+        [0.16, 0.88, 0.2, 0.18, -0.75],
+      ];
+      leafSpecs.forEach(([lx, ly, lz, r, tilt], idx) => {
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(r, 9, 7), mainMat);
+        leaf.scale.set(1.25, 0.32, 0.88);
+        leaf.position.set(lx, ly, lz);
+        leaf.rotation.z = tilt;
+        leaf.rotation.y = idx * 0.9;
+        g.add(leaf);
+      });
+      g.add(pot, soil, stem);
+      break;
+    }
+
+    case 'plant_snake': {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.34, 12), accentMat);
+      pot.position.y = 0.17;
+      const rim = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.215, 0.215, 0.05, 12),
+        clayMat('#FAF5EC', 0.55),
+      );
+      rim.position.y = 0.33;
+      for (let i = 0; i < 6; i++) {
+        const ang = (i / 6) * Math.PI * 2;
+        const h = 0.42 + (i % 3) * 0.14;
+        const blade = new THREE.Mesh(
+          new RoundedBoxGeometry(0.09, h, 0.025, 2, 0.01),
+          i % 2 === 0 ? mainMat : clayMat('#87C875', 0.65),
+        );
+        blade.position.set(Math.cos(ang) * 0.07, 0.34 + h * 0.44, Math.sin(ang) * 0.07);
+        blade.rotation.y = -ang;
+        blade.rotation.z = 0.08;
+        g.add(blade);
+      }
+      g.add(pot, rim);
+      break;
+    }
+
+    case 'flower_basket': {
+      const basket = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.17, 0.22, 12),
+        accentMat,
+      );
+      basket.position.y = 0.11;
+      const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.23, 0.028, 6, 14),
+        clayMat('#A57544', 0.72),
+      );
+      rim.rotation.x = Math.PI / 2;
+      rim.position.y = 0.22;
+      const archHandle = new THREE.Mesh(
+        new THREE.TorusGeometry(0.22, 0.022, 6, 14, Math.PI),
+        clayMat('#A57544', 0.72),
+      );
+      archHandle.position.y = 0.22;
+      const foliage = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 8, 7),
+        clayMat('#66AE5E', 0.78),
+      );
+      foliage.scale.set(1.15, 0.65, 1.0);
+      foliage.position.y = 0.25;
+      const blossomCols = [item.color, '#FFD166', '#FFF8E8', '#F28482', '#C5A3E8'];
+      [
+        [-0.1, 0.34, 0.08],
+        [0.1, 0.34, 0.07],
+        [0, 0.37, -0.05],
+        [-0.08, 0.32, -0.09],
+        [0.09, 0.33, -0.08],
+      ].forEach(([fx, fy, fz], idx) => {
+        const fl = new THREE.Mesh(
+          new THREE.SphereGeometry(0.068, 7, 7),
+          clayMat(blossomCols[idx % blossomCols.length], 0.55),
+        );
+        fl.position.set(fx, fy, fz);
+        g.add(fl);
+      });
+      g.add(basket, rim, archHandle, foliage);
+      break;
+    }
+
+    case 'wall_calendar': {
+      const cy = item.mountHeight ?? 2.05;
+      const board = new THREE.Mesh(
+        new RoundedBoxGeometry(0.56, 0.68, 0.04, 2, 0.02),
+        mainMat,
+      );
+      board.position.set(0, cy, 0.02);
+      const topBanner = new THREE.Mesh(
+        new RoundedBoxGeometry(0.52, 0.16, 0.048, 2, 0.015),
+        accentMat,
+      );
+      topBanner.position.set(0, cy + 0.22, 0.025);
+      const ringBar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.016, 0.016, 0.44, 6),
+        clayMat('#6F4E37', 0.55),
+      );
+      ringBar.rotation.z = Math.PI / 2;
+      ringBar.position.set(0, cy + 0.33, 0.03);
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 4; c++) {
+          const cell = new THREE.Mesh(
+            new THREE.BoxGeometry(0.09, 0.08, 0.015),
+            clayMat(r === 1 && c === 2 ? '#F4A261' : '#EADBC8', 0.72),
+          );
+          cell.position.set(-0.165 + c * 0.11, cy + 0.04 - r * 0.11, 0.042);
+          g.add(cell);
+        }
+      }
+      g.add(board, topBanner, ringBar);
+      break;
+    }
+
+    case 'succulent_shelf': {
+      const cy = item.mountHeight ?? 1.98;
+      const plank = new THREE.Mesh(
+        new RoundedBoxGeometry(1.18, 0.07, 0.34, 2, 0.02),
+        mainMat,
+      );
+      plank.position.set(0, cy, 0.17);
+      [-0.42, 0.42].forEach((bx) => {
+        const bracket = new THREE.Mesh(
+          new RoundedBoxGeometry(0.06, 0.18, 0.24, 2, 0.01),
+          clayMat('#7D5333', 0.65),
+        );
+        bracket.position.set(bx, cy - 0.11, 0.12);
+        g.add(bracket);
+      });
+      const leafCols = [item.accentColor || '#76BA86', '#8FC99E', '#5EA374'];
+      [-0.35, 0, 0.35].forEach((px, idx) => {
+        const pot = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.09, 0.07, 0.13, 9),
+          clayMat(idx === 1 ? '#FFF4E2' : '#D98C5F', 0.7),
+        );
+        pot.position.set(px, cy + 0.1, 0.18);
+        const succ = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(0.095, 0),
+          clayMat(leafCols[idx], 0.62),
+        );
+        succ.scale.set(1.1, 0.85, 1.1);
+        succ.position.set(px, cy + 0.19, 0.18);
+        g.add(pot, succ);
+      });
+      g.add(plank);
+      break;
+    }
+
+    case 'wall_tv': {
+      const cy = item.mountHeight ?? 1.85;
+      const mount = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.28, 0.04),
+        clayMat('#4A5568', 0.5),
+      );
+      mount.position.set(0, cy, 0.02);
+      const bezel = new THREE.Mesh(
+        new RoundedBoxGeometry(1.76, 0.98, 0.06, 2, 0.03),
+        mainMat,
+      );
+      bezel.position.set(0, cy, 0.065);
+      const screen = new THREE.Mesh(
+        new THREE.BoxGeometry(1.62, 0.86, 0.07),
+        glossyClayMat(item.accentColor || '#91D7F7', 0.12),
+      );
+      screen.position.set(0, cy, 0.07);
+      const soundbar = new THREE.Mesh(
+        new RoundedBoxGeometry(1.16, 0.09, 0.09, 2, 0.02),
+        clayMat('#3B4252', 0.45),
+      );
+      soundbar.position.set(0, cy - 0.58, 0.07);
+      g.add(mount, bezel, screen, soundbar);
+      break;
+    }
+
+    case 'floor_paint':
+    case 'wall_paint': {
+      const can = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.22, 0.44, 14),
+        clayMat('#E8EDF2', 0.4, 0.35),
+      );
+      can.position.y = 0.22;
+      const band = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.244, 0.236, 0.18, 14),
+        clayMat(item.color, 0.55),
+      );
+      band.position.y = 0.22;
+      const paintTop = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.21, 0.21, 0.03, 14),
+        glossyClayMat(item.color, 0.2),
+      );
+      paintTop.position.y = 0.43;
+      const swatch = new THREE.Mesh(
+        new RoundedBoxGeometry(0.14, 0.12, 0.04, 2, 0.015),
+        clayMat(item.accentColor || item.color, 0.5),
+      );
+      swatch.position.set(0, 0.22, 0.235);
+      const handle = new THREE.Mesh(
+        new THREE.TorusGeometry(0.25, 0.018, 6, 12, Math.PI),
+        clayMat('#9AA5B1', 0.35, 0.65),
+      );
+      handle.position.y = 0.34;
+      handle.rotation.x = 0.42;
+      // Brush or Roller stick distinguishing wall vs floor paint
+      const stick = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.024, 0.024, 0.36, 7),
+        clayMat('#C58F5B', 0.7),
+      );
+      stick.position.set(0.08, 0.54, -0.02);
+      stick.rotation.z = -0.35;
+      const brushHead = new THREE.Mesh(
+        item.kind === 'wall_paint'
+          ? new THREE.CylinderGeometry(0.05, 0.05, 0.18, 10)
+          : new RoundedBoxGeometry(0.12, 0.08, 0.04, 2, 0.01),
+        clayMat(item.color, 0.6),
+      );
+      if (item.kind === 'wall_paint') {
+        brushHead.rotation.z = Math.PI / 2;
+      }
+      brushHead.position.set(0.14, 0.68, -0.02);
+      g.add(can, band, paintTop, swatch, handle, stick, brushHead);
+      break;
+    }
   }
 
   return g;

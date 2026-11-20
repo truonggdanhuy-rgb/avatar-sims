@@ -8,6 +8,7 @@ import {FurnitureModal} from './components/modals/FurnitureModal';
 import {FurnitureShopModal} from './components/modals/FurnitureShopModal';
 import {LivestockModal} from './components/modals/LivestockModal';
 import {OrderBoardModal} from './components/modals/OrderBoardModal';
+import {PhoneMenuModal} from './components/modals/PhoneMenuModal';
 import {PondModal} from './components/modals/PondModal';
 import {SettingsModal} from './components/modals/SettingsModal';
 import {WardrobeModal} from './components/modals/WardrobeModal';
@@ -38,6 +39,7 @@ import {
   MAX_COOP_ANIMALS,
   MAX_POND_FISH,
   MAX_WAREHOUSE_LEVEL,
+  MILL_SLOTS,
   PLOT_COUNT,
   PLOT_LEVELS,
   POND_FISH_SPECIES,
@@ -49,7 +51,9 @@ import {
   WELL_WATER_MAX,
 } from './data/farmCatalog';
 import {
+  computeStackedY,
   FURNITURE_BY_ID,
+  isPointOnFurnitureSurface,
   STARTER_FURNITURE_INVENTORY,
   STARTER_PLACED_FURNITURE,
 } from './data/furnitureCatalog';
@@ -71,6 +75,7 @@ import {
   GardenPlotState,
   KitchenLevel,
   LivestockAnimalState,
+  MillJob,
   PlacedFurniture,
   PlotLevel,
   PondFishSpecies,
@@ -85,7 +90,7 @@ import {
 import {soundFX} from './utils/sound';
 
 const STORAGE_KEY = 'thi_tran_may_save_v1';
-const HOUSE_LAYOUT_VERSION = 4;
+const HOUSE_LAYOUT_VERSION = 5;
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -96,12 +101,10 @@ const createEmptyDailyQuests = (): DailyQuestProgress => ({
 });
 
 function clampDropIntoHouse(rawX: number, rawZ: number): {x: number; z: number} {
-  let x = Math.max(-12.4, Math.min(9.4, rawX));
-  let z = Math.max(-8.4, Math.min(6.4, rawZ));
-  if (x > 6.45 && z > -0.5 && z < 5.2 && (z < 0.95 || x > 8.95)) {
-    x = 6.2;
-  }
-  return {x, z};
+  return {
+    x: Math.max(-12.6, Math.min(9.6, rawX)),
+    z: Math.max(-8.6, Math.min(6.6, rawZ)),
+  };
 }
 
 function migrateSavedPlots(rawPlots: unknown): GardenPlotState[] {
@@ -260,6 +263,7 @@ export default function App() {
   const [furnitureShopOpen, setFurnitureShopOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dailyQuestsOpen, setDailyQuestsOpen] = useState(false);
+  const [phoneOpen, setPhoneOpen] = useState(false);
   const [furnitureModalOpen, setFurnitureModalOpen] = useState(false);
   const [workshopTab, setWorkshopTab] = useState<'mill' | 'kitchen' | null>(null);
   const [ordersOpen, setOrdersOpen] = useState(false);
@@ -397,6 +401,31 @@ export default function App() {
       // ignore storage errors
     }
     return 1;
+  });
+
+  const [millQueue, setMillQueue] = useState<MillJob[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.millQueue)) {
+          return parsed.millQueue.filter(
+            (j: Partial<MillJob>): j is MillJob =>
+              Boolean(
+                j &&
+                  typeof j.id === 'string' &&
+                  typeof j.processedId === 'string' &&
+                  j.processedId in PROCESSED_ITEMS &&
+                  typeof j.readyAt === 'number' &&
+                  typeof j.durationMs === 'number',
+              ),
+          );
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return [];
   });
 
   const [cookingQueue, setCookingQueue] = useState<CookingJob[]>(() => {
@@ -599,20 +628,23 @@ export default function App() {
           parsed.houseVersion >= 3 &&
           Array.isArray(parsed.placedFurniture)
         ) {
-          const filtered = parsed.placedFurniture.filter(
+          const filtered: PlacedFurniture[] = parsed.placedFurniture.filter(
             (p: PlacedFurniture) => p && typeof p.catalogId === 'string' && FURNITURE_BY_ID[p.catalogId],
           );
-          const hasWardrobePlaced = filtered.some(
-            (p: PlacedFurniture) => FURNITURE_BY_ID[p.catalogId]?.interactive === 'wardrobe',
+          const next = [...filtered];
+          const hasWardrobePlaced = next.some(
+            (p) => FURNITURE_BY_ID[p.catalogId]?.interactive === 'wardrobe',
           );
           const hasWardrobeInInv = (parsed.furnitureInventory?.wardrobe_oak || 0) > 0;
           if (parsed.houseVersion < HOUSE_LAYOUT_VERSION && !hasWardrobePlaced && !hasWardrobeInInv) {
-            return [
-              ...filtered,
-              {instanceId: 'init_wardrobe_1', catalogId: 'wardrobe_oak', x: -6.2, z: -8.55, rotY: 0},
-            ];
+            next.push({instanceId: 'init_wardrobe_1', catalogId: 'wardrobe_oak', x: -6.2, z: -8.55, rotY: 0});
           }
-          return filtered;
+          const hasKitchenLPlaced = next.some((p) => p.catalogId === 'kitchen_l_cream');
+          const hasKitchenLInInv = (parsed.furnitureInventory?.kitchen_l_cream || 0) > 0;
+          if (parsed.houseVersion < 5 && !hasKitchenLPlaced && !hasKitchenLInInv) {
+            next.push({instanceId: 'init_kitchen_l_1', catalogId: 'kitchen_l_cream', x: 8.55, z: 1.85, rotY: 0});
+          }
+          return next;
         }
       }
     } catch {
@@ -873,6 +905,7 @@ export default function App() {
           farmInventory,
           kitchenLevel,
           warehouseLevel,
+          millQueue,
           cookingQueue,
           livestock,
           troughs,
@@ -896,6 +929,7 @@ export default function App() {
     farmInventory,
     kitchenLevel,
     warehouseLevel,
+    millQueue,
     cookingQueue,
     livestock,
     troughs,
@@ -1170,20 +1204,44 @@ export default function App() {
     );
   };
 
-  // === MILL, KITCHEN (UPGRADEABLE + TIMED QUEUE) & ORDERS ===
-  const handleProcessItem = (id: ProcessedId) => {
+  // === MILL (4 FIXED SLOTS, FAST TIMED QUEUE), KITCHEN (5/7/10 SLOTS) & ORDERS ===
+  const handleStartMill = (id: ProcessedId) => {
     const proc = PROCESSED_ITEMS[id];
-    if (!proc) return;
+    if (!proc || millQueue.length >= MILL_SLOTS) return;
     const hasAll = proc.inputs.every(
       (inp) => getFarmItemCount(farmInventory, inp.kind, inp.id) >= inp.qty,
     );
     if (!hasAll) return;
 
-    const deltas = [
-      ...proc.inputs.map((inp) => ({kind: inp.kind, id: inp.id, delta: -inp.qty})),
-      {kind: 'processed' as const, id: proc.id, delta: 1},
-    ];
+    const deltas = proc.inputs.map((inp) => ({
+      kind: inp.kind,
+      id: inp.id,
+      delta: -inp.qty,
+    }));
+    const now = Date.now();
+    const durationMs = Math.max(5000, proc.processSeconds * 1000);
     setFarmInventory((prev) => adjustFarmInventory(prev, deltas));
+    setMillQueue((prev) => [
+      ...prev,
+      {
+        id: `mill_${now.toString(36)}_${Math.random().toString(36).slice(2, 5)}`,
+        processedId: id,
+        startedAt: now,
+        readyAt: now + durationMs,
+        durationMs,
+      },
+    ]);
+    setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 1)}));
+  };
+
+  const handleCollectProcessed = (jobId: string) => {
+    const job = millQueue.find((j) => j.id === jobId);
+    if (!job || Date.now() < job.readyAt) return;
+    if (getFarmStorageUsed(farmInventory) >= getFarmStorageCapacity(warehouseLevel)) return;
+    setMillQueue((prev) => prev.filter((j) => j.id !== jobId));
+    setFarmInventory((prev) =>
+      adjustFarmInventory(prev, [{kind: 'processed', id: job.processedId, delta: 1}]),
+    );
     setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 2)}));
   };
 
@@ -1203,7 +1261,7 @@ export default function App() {
     }));
     const now = Date.now();
     const durationMs = Math.max(
-      120000,
+      30000,
       Math.round(rec.cookSeconds * 1000 * kInfo.speedMultiplier),
     );
     setFarmInventory((prev) => adjustFarmInventory(prev, deltas));
@@ -1609,6 +1667,10 @@ export default function App() {
         spawnX = Math.max(-3.6, Math.min(3.3, homeSpotRef.current.x));
         spawnZ = -0.35;
       }
+    } else if (cat.kind === 'floor_paint' || cat.kind === 'wall_paint') {
+      const spot = clampDropIntoHouse(homeSpotRef.current.x, homeSpotRef.current.z);
+      spawnX = spot.x;
+      spawnZ = spot.z;
     } else {
       const spot = clampDropIntoHouse(
         homeSpotRef.current.x + (Math.random() - 0.5) * 0.6,
@@ -1618,46 +1680,93 @@ export default function App() {
       spawnZ = spot.z;
     }
 
+    const sx = Number(spawnX.toFixed(2));
+    const sz = Number(spawnZ.toFixed(2));
     const instanceId = `furn_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-    const newItem: PlacedFurniture = {
-      instanceId,
-      catalogId,
-      x: Number(spawnX.toFixed(2)),
-      z: Number(spawnZ.toFixed(2)),
-      rotY: spawnRotY,
-    };
 
     setFurnitureInventory((prev) => ({
       ...prev,
       [catalogId]: Math.max(0, (prev[catalogId] || 0) - 1),
     }));
-    setPlacedFurniture((prev) => [...prev, newItem]);
+    setPlacedFurniture((prev) => {
+      const sy = computeStackedY(sx, sz, catalogId, prev);
+      const newItem: PlacedFurniture = {
+        instanceId,
+        catalogId,
+        x: sx,
+        z: sz,
+        y: sy > 0 ? sy : undefined,
+        rotY: spawnRotY,
+      };
+      return [...prev, newItem];
+    });
     setFurnitureModalOpen(false);
     setEditFurnitureMode(true);
     setSelectedFurnitureId(instanceId);
   };
 
   const handleMoveFurniture = (instanceId: string, x: number, z: number, rotY?: number) => {
-    setPlacedFurniture((prev) =>
-      prev.map((item) => {
-        if (item.instanceId !== instanceId) return item;
-        const cat = FURNITURE_BY_ID[item.catalogId];
-        if (cat?.wallMount && rotY !== undefined) {
+    setPlacedFurniture((prev) => {
+      const target = prev.find((item) => item.instanceId === instanceId);
+      if (!target) return prev;
+      const cat = FURNITURE_BY_ID[target.catalogId];
+      if (cat?.wallMount && rotY !== undefined) {
+        return prev.map((item) =>
+          item.instanceId === instanceId
+            ? {...item, x: Number(x.toFixed(2)), z: Number(z.toFixed(2)), rotY, y: undefined}
+            : item,
+        );
+      }
+
+      const safe = clampDropIntoHouse(x, z);
+      const nextX = Number(safe.x.toFixed(2));
+      const nextZ = Number(safe.z.toFixed(2));
+      const dx = nextX - target.x;
+      const dz = nextZ - target.z;
+      const oldBaseY = target.y ?? 0;
+      const nextY = computeStackedY(nextX, nextZ, target.catalogId, prev, instanceId);
+      const dy = nextY - oldBaseY;
+
+      const carriedIds = new Set<string>();
+      if (cat?.surfaceHeight && !cat.wallMount) {
+        const expectedTop = oldBaseY + cat.surfaceHeight;
+        for (const cand of prev) {
+          if (cand.instanceId === instanceId) continue;
+          const candCat = FURNITURE_BY_ID[cand.catalogId];
+          if (!candCat || candCat.wallMount || candCat.kind === 'floor_paint' || candCat.kind === 'wall_paint') {
+            continue;
+          }
+          if (
+            Math.abs((cand.y ?? 0) - expectedTop) <= 0.06 &&
+            isPointOnFurnitureSurface(cand.x, cand.z, target, cat)
+          ) {
+            carriedIds.add(cand.instanceId);
+          }
+        }
+      }
+
+      return prev.map((item) => {
+        if (item.instanceId === instanceId) {
           return {
             ...item,
-            x: Number(x.toFixed(2)),
-            z: Number(z.toFixed(2)),
-            rotY,
+            x: nextX,
+            z: nextZ,
+            y: nextY > 0 ? nextY : undefined,
           };
         }
-        const safe = clampDropIntoHouse(x, z);
-        return {
-          ...item,
-          x: Number(safe.x.toFixed(2)),
-          z: Number(safe.z.toFixed(2)),
-        };
-      }),
-    );
+        if (carriedIds.has(item.instanceId)) {
+          const movedChild = clampDropIntoHouse(item.x + dx, item.z + dz);
+          const childY = Number(Math.max(0, (item.y ?? 0) + dy).toFixed(2));
+          return {
+            ...item,
+            x: Number(movedChild.x.toFixed(2)),
+            z: Number(movedChild.z.toFixed(2)),
+            y: childY > 0 ? childY : undefined,
+          };
+        }
+        return item;
+      });
+    });
   };
 
   const handleRotateFurniture = (instanceId: string) => {
@@ -1677,7 +1786,17 @@ export default function App() {
   const handleStowFurniture = (instanceId: string) => {
     const target = placedFurniture.find((item) => item.instanceId === instanceId);
     if (!target) return;
-    setPlacedFurniture((prev) => prev.filter((item) => item.instanceId !== instanceId));
+    setPlacedFurniture((prev) => {
+      const remaining = prev.filter((item) => item.instanceId !== instanceId);
+      return remaining.map((item) => {
+        if (!item.y || item.y <= 0) return item;
+        const recomputed = computeStackedY(item.x, item.z, item.catalogId, remaining, item.instanceId);
+        return {
+          ...item,
+          y: recomputed > 0 ? recomputed : undefined,
+        };
+      });
+    });
     setFurnitureInventory((prev) => ({
       ...prev,
       [target.catalogId]: (prev[target.catalogId] || 0) + 1,
@@ -1720,6 +1839,7 @@ export default function App() {
         onOpenFurnitureShop={() => setFurnitureShopOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenDailyQuests={() => setDailyQuestsOpen(true)}
+        onOpenPhone={() => setPhoneOpen(true)}
         onOpenFurniture={() => {
           setEditFurnitureMode(false);
           setSelectedFurnitureId(null);
@@ -1777,10 +1897,14 @@ export default function App() {
           station={workshopTab}
           coins={stats.coins}
           kitchenLevel={kitchenLevel}
+          millQueue={millQueue}
           cookingQueue={cookingQueue}
           inventory={farmInventory}
+          storageUsed={storageUsed}
+          storageCapacity={storageCapacity}
           storageFull={storageFull}
-          onProcessItem={handleProcessItem}
+          onStartMill={handleStartMill}
+          onCollectProcessed={handleCollectProcessed}
           onStartCook={handleStartCook}
           onCollectDish={handleCollectDish}
           onUpgradeKitchen={handleUpgradeKitchen}
@@ -1886,6 +2010,54 @@ export default function App() {
           quests={dailyQuests}
           onClaimQuest={handleClaimQuest}
           onClose={() => setDailyQuestsOpen(false)}
+        />
+      )}
+
+      {phoneOpen && (
+        <PhoneMenuModal
+          zone={zone}
+          avatar={avatar}
+          stats={stats}
+          timeOfDay={timeOfDay}
+          soundEnabled={soundEnabled}
+          dailyQuests={dailyQuests}
+          storageUsed={storageUsed}
+          storageCapacity={storageCapacity}
+          onChangeZone={(next) => {
+            handleZoneChange(next);
+            setPhoneOpen(false);
+          }}
+          onOpenWardrobe={() => {
+            setPhoneOpen(false);
+            setWardrobeOpen(true);
+          }}
+          onOpenDailyQuests={() => {
+            setPhoneOpen(false);
+            setDailyQuestsOpen(true);
+          }}
+          onOpenSettings={() => {
+            setPhoneOpen(false);
+            setSettingsOpen(true);
+          }}
+          onOpenFurniture={() => {
+            setPhoneOpen(false);
+            if (zone !== 'home') {
+              handleZoneChange('home');
+            }
+            setEditFurnitureMode(false);
+            setSelectedFurnitureId(null);
+            setFurnitureModalOpen(true);
+          }}
+          onOpenStorage={() => {
+            setPhoneOpen(false);
+            if (zone !== 'garden') {
+              handleZoneChange('garden');
+            }
+            setStorageOpen(true);
+          }}
+          onChangeTimeOfDay={setTimeOfDay}
+          onToggleSound={handleToggleSound}
+          onClose={() => setPhoneOpen(false)}
         />
       )}
 

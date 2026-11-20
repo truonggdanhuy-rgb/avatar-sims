@@ -24,6 +24,14 @@
   font-family: var(--font-display);
 }
 
+.phone-ui {
+  font-family: var(--font-body);
+  font-feature-settings: "kern" 1, "liga" 1;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }

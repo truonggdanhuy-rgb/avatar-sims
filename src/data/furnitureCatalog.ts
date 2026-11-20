@@ -8,6 +8,7 @@ export const FURNITURE_CATEGORIES: {key: 'all' | FurnitureCategory; label: strin
   {key: 'bath', label: 'Nhà tắm'},
   {key: 'wall', label: 'Cửa sổ & Tường'},
   {key: 'decor', label: 'Trang trí'},
+  {key: 'paint', label: 'Sơn tường & sàn'},
 ];
 
 export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
@@ -21,6 +22,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#669977',
     halfW: 1.05,
     halfD: 0.56,
+    surfaceHeight: 0.5,
     interactive: 'sofa',
   },
   {
@@ -33,6 +35,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#D9A77A',
     halfW: 0.56,
     halfD: 0.55,
+    surfaceHeight: 0.49,
     interactive: 'sofa',
   },
   {
@@ -45,6 +48,32 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#9E6E40',
     halfW: 0.72,
     halfD: 0.48,
+    surfaceHeight: 0.52,
+  },
+  {
+    id: 'wooden_table_study',
+    kind: 'wooden_table',
+    category: 'living',
+    name: 'Bàn Gỗ Tự Nhiên',
+    price: 220,
+    color: '#C58E58',
+    accentColor: '#9A673B',
+    halfW: 0.78,
+    halfD: 0.48,
+    surfaceHeight: 0.78,
+  },
+  {
+    id: 'wooden_chair_classic',
+    kind: 'wooden_chair',
+    category: 'living',
+    name: 'Ghế Gỗ Tựa Nan',
+    price: 95,
+    color: '#B87E4A',
+    accentColor: '#F3DFC1',
+    halfW: 0.34,
+    halfD: 0.34,
+    surfaceHeight: 0.48,
+    interactive: 'sofa',
   },
   {
     id: 'tv_stand_cream',
@@ -56,6 +85,18 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#364152',
     halfW: 1.0,
     halfD: 0.4,
+    surfaceHeight: 0.63,
+  },
+  {
+    id: 'table_tv_slim',
+    kind: 'table_tv',
+    category: 'living',
+    name: 'Tivi Để Bàn Hiện Đại',
+    price: 360,
+    color: '#2D3748',
+    accentColor: '#8ED8F8',
+    halfW: 0.64,
+    halfD: 0.2,
   },
   {
     id: 'bookshelf_oak',
@@ -67,6 +108,19 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#E69B8B',
     halfW: 0.75,
     halfD: 0.36,
+    surfaceHeight: 2.06,
+  },
+  {
+    id: 'bookshelf_pine',
+    kind: 'bookshelf',
+    category: 'living',
+    name: 'Giá Sách Gỗ Thông Sáng',
+    price: 265,
+    color: '#DEC196',
+    accentColor: '#7BAE8B',
+    halfW: 0.75,
+    halfD: 0.36,
+    surfaceHeight: 2.06,
   },
   {
     id: 'rug_coral',
@@ -78,6 +132,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#F7E2CE',
     halfW: 1.65,
     halfD: 1.35,
+    surfaceHeight: 0.04,
     walkable: true,
   },
   {
@@ -90,6 +145,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#EEF8F4',
     halfW: 1.65,
     halfD: 1.35,
+    surfaceHeight: 0.04,
     walkable: true,
   },
   {
@@ -102,6 +158,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#9A6942',
     halfW: 1.08,
     halfD: 1.25,
+    surfaceHeight: 0.68,
     interactive: 'bed',
   },
   {
@@ -114,6 +171,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#DDF3FC',
     halfW: 0.98,
     halfD: 0.58,
+    surfaceHeight: 2.79,
     interactive: 'wardrobe',
   },
   {
@@ -126,6 +184,19 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#FFF3D6',
     halfW: 0.42,
     halfD: 0.4,
+    surfaceHeight: 0.7,
+  },
+  {
+    id: 'kitchen_l_cream',
+    kind: 'kitchen_l_counter',
+    category: 'kitchen',
+    name: 'Tủ Bếp Chữ L Đá Trắng',
+    price: 680,
+    color: '#F4EBDC',
+    accentColor: '#DFCEB4',
+    halfW: 1.82,
+    halfD: 2.22,
+    surfaceHeight: 0.92,
   },
   {
     id: 'dining_table_oak',
@@ -137,6 +208,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#FFF8EB',
     halfW: 1.05,
     halfD: 0.72,
+    surfaceHeight: 0.9,
   },
   {
     id: 'dining_chair_oak',
@@ -148,6 +220,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#E6B89C',
     halfW: 0.36,
     halfD: 0.36,
+    surfaceHeight: 0.53,
     interactive: 'sofa',
   },
   {
@@ -160,6 +233,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#B8C4CF',
     halfW: 0.56,
     halfD: 0.52,
+    surfaceHeight: 2.28,
   },
   {
     id: 'dish_cabinet_oak',
@@ -171,6 +245,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#D8F1FA',
     halfW: 0.78,
     halfD: 0.42,
+    surfaceHeight: 2.16,
   },
   {
     id: 'bathtub_white',
@@ -193,6 +268,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     accentColor: '#BCE7F9',
     halfW: 0.65,
     halfD: 0.42,
+    surfaceHeight: 0.84,
   },
   {
     id: 'window_single_oak',
@@ -251,6 +327,48 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     mountHeight: 2.15,
   },
   {
+    id: 'wall_calendar_pastel',
+    kind: 'wall_calendar',
+    category: 'wall',
+    name: 'Lịch Treo Tường Thị Trấn',
+    price: 95,
+    color: '#FFF9EF',
+    accentColor: '#E57A6B',
+    halfW: 0.36,
+    halfD: 0.1,
+    walkable: true,
+    wallMount: true,
+    mountHeight: 2.05,
+  },
+  {
+    id: 'succulent_shelf_oak',
+    kind: 'succulent_shelf',
+    category: 'wall',
+    name: 'Kệ Treo Sen Đá Đôi',
+    price: 155,
+    color: '#C28B56',
+    accentColor: '#76BA86',
+    halfW: 0.62,
+    halfD: 0.24,
+    walkable: true,
+    wallMount: true,
+    mountHeight: 1.98,
+  },
+  {
+    id: 'wall_tv_slim',
+    kind: 'wall_tv',
+    category: 'wall',
+    name: 'Tivi Gắn Tường Siêu Mỏng',
+    price: 420,
+    color: '#2A3342',
+    accentColor: '#91D7F7',
+    halfW: 0.92,
+    halfD: 0.14,
+    walkable: true,
+    wallMount: true,
+    mountHeight: 1.85,
+  },
+  {
     id: 'floor_lamp_gold',
     kind: 'floor_lamp',
     category: 'decor',
@@ -269,8 +387,8 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     price: 95,
     color: '#55B362',
     accentColor: '#D98C5F',
-    halfW: 0.38,
-    halfD: 0.38,
+    halfW: 0.36,
+    halfD: 0.36,
   },
   {
     id: 'plant_lavender',
@@ -280,8 +398,232 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
     price: 75,
     color: '#B589D6',
     accentColor: '#EADBC8',
-    halfW: 0.35,
-    halfD: 0.35,
+    halfW: 0.34,
+    halfD: 0.34,
+  },
+  {
+    id: 'plant_fiddle',
+    kind: 'plant_fiddle',
+    category: 'decor',
+    name: 'Cây Bàng Singapore',
+    price: 115,
+    color: '#4F9E5A',
+    accentColor: '#F3EAD8',
+    halfW: 0.36,
+    halfD: 0.36,
+  },
+  {
+    id: 'plant_snake',
+    kind: 'plant_snake',
+    category: 'decor',
+    name: 'Chậu Lưỡi Hổ Gốm Sứ',
+    price: 90,
+    color: '#6BB86B',
+    accentColor: '#E5B27B',
+    halfW: 0.28,
+    halfD: 0.28,
+  },
+  {
+    id: 'flower_basket_daisy',
+    kind: 'flower_basket',
+    category: 'decor',
+    name: 'Giỏ Hoa Cúc Mây',
+    price: 85,
+    color: '#F79BB4',
+    accentColor: '#C99660',
+    halfW: 0.28,
+    halfD: 0.28,
+  },
+  // === THÙNG SƠN SÀN & SƠN TƯỜNG (Chỉ hiện trong chế độ Di chuyển) ===
+  {
+    id: 'paint_floor_walnut',
+    kind: 'floor_paint',
+    category: 'paint',
+    name: 'Thùng Sơn Sàn Gỗ Óc Chó',
+    price: 160,
+    color: '#8C5B38',
+    accentColor: '#5D3920',
+    halfW: 0.28,
+    halfD: 0.28,
+    walkable: true,
+    paintSpec: {
+      target: 'floor',
+      pattern: 'wood_plank',
+      primary: '#8C5B38',
+      secondary: '#5D3920',
+      roughness: 0.68,
+    },
+  },
+  {
+    id: 'paint_floor_birch',
+    kind: 'floor_paint',
+    category: 'paint',
+    name: 'Thùng Sơn Sàn Gỗ Sáng',
+    price: 150,
+    color: '#E9D5B5',
+    accentColor: '#C9AE86',
+    halfW: 0.28,
+    halfD: 0.28,
+    walkable: true,
+    paintSpec: {
+      target: 'floor',
+      pattern: 'wood_plank',
+      primary: '#E9D5B5',
+      secondary: '#C9AE86',
+      roughness: 0.72,
+    },
+  },
+  {
+    id: 'paint_floor_checker_mint',
+    kind: 'floor_paint',
+    category: 'paint',
+    name: 'Thùng Sơn Sàn Caro Mint',
+    price: 180,
+    color: '#B8E3D4',
+    accentColor: '#F6FBF8',
+    halfW: 0.28,
+    halfD: 0.28,
+    walkable: true,
+    paintSpec: {
+      target: 'floor',
+      pattern: 'checker_tile',
+      primary: '#B8E3D4',
+      secondary: '#F6FBF8',
+      roughness: 0.52,
+    },
+  },
+  {
+    id: 'paint_floor_checker_peach',
+    kind: 'floor_paint',
+    category: 'paint',
+    name: 'Thùng Sơn Sàn Caro Đào Ấm',
+    price: 180,
+    color: '#F3C7B8',
+    accentColor: '#FFF7F1',
+    halfW: 0.28,
+    halfD: 0.28,
+    walkable: true,
+    paintSpec: {
+      target: 'floor',
+      pattern: 'checker_tile',
+      primary: '#F3C7B8',
+      secondary: '#FFF7F1',
+      roughness: 0.54,
+    },
+  },
+  {
+    id: 'paint_floor_terrazzo',
+    kind: 'floor_paint',
+    category: 'paint',
+    name: 'Thùng Sơn Sàn Đá Terrazzo',
+    price: 210,
+    color: '#F2ECE2',
+    accentColor: '#D6B99E',
+    halfW: 0.28,
+    halfD: 0.28,
+    walkable: true,
+    paintSpec: {
+      target: 'floor',
+      pattern: 'terrazzo',
+      primary: '#F2ECE2',
+      secondary: '#D6B99E',
+      roughness: 0.48,
+    },
+  },
+  {
+    id: 'paint_wall_mint',
+    kind: 'wall_paint',
+    category: 'paint',
+    name: 'Thùng Sơn Tường Xanh Mint',
+    price: 140,
+    color: '#CDE8DA',
+    accentColor: '#F3FAF6',
+    halfW: 0.28,
+    halfD: 0.28,
+    walkable: true,
+    paintSpec: {
+      target: 'wall',
+      pattern: 'matte_wainscot',
+      primary: '#CDE8DA',
+      secondary: '#F3FAF6',
+      roughness: 0.78,
+    },
+  },
+  {
+    id: 'paint_wall_peach',
+    kind: 'wall_paint',
+    category: 'paint',
+    name: 'Thùng Sơn Tường Hồng Đào',
+    price: 140,
+    color: '#F7D8CE',
+    accentColor: '#FFF4F0',
+    halfW: 0.28,
+    halfD: 0.28,
+    walkable: true,
+    paintSpec: {
+      target: 'wall',
+      pattern: 'matte_wainscot',
+      primary: '#F7D8CE',
+      secondary: '#FFF4F0',
+      roughness: 0.78,
+    },
+  },
+  {
+    id: 'paint_wall_stripe_sky',
+    kind: 'wall_paint',
+    category: 'paint',
+    name: 'Thùng Sơn Tường Sọc Xanh Mây',
+    price: 175,
+    color: '#CBE4F5',
+    accentColor: '#F5FAFD',
+    halfW: 0.28,
+    halfD: 0.28,
+    walkable: true,
+    paintSpec: {
+      target: 'wall',
+      pattern: 'stripes',
+      primary: '#CBE4F5',
+      secondary: '#F5FAFD',
+      roughness: 0.76,
+    },
+  },
+  {
+    id: 'paint_wall_polka_butter',
+    kind: 'wall_paint',
+    category: 'paint',
+    name: 'Thùng Sơn Tường Chấm Bi Bơ',
+    price: 175,
+    color: '#FBEBC2',
+    accentColor: '#FFFBF0',
+    halfW: 0.28,
+    halfD: 0.28,
+    walkable: true,
+    paintSpec: {
+      target: 'wall',
+      pattern: 'polka_dot',
+      primary: '#FBEBC2',
+      secondary: '#FFFBF0',
+      roughness: 0.76,
+    },
+  },
+  {
+    id: 'paint_wall_lavender',
+    kind: 'wall_paint',
+    category: 'paint',
+    name: 'Thùng Sơn Tường Oải Hương',
+    price: 165,
+    color: '#DFD2F2',
+    accentColor: '#F7F3FC',
+    halfW: 0.28,
+    halfD: 0.28,
+    walkable: true,
+    paintSpec: {
+      target: 'wall',
+      pattern: 'matte_wainscot',
+      primary: '#DFD2F2',
+      secondary: '#F7F3FC',
+      roughness: 0.78,
+    },
   },
 ];
 
@@ -290,10 +632,81 @@ export const FURNITURE_BY_ID: Record<string, FurnitureCatalogItem> = Object.from
 );
 
 export const STARTER_PLACED_FURNITURE: PlacedFurniture[] = [
-  // Người chơi mới có sẵn 1 Giường + 1 Tủ đồ + 1 Cửa sổ rèm
+  // Người chơi mới có sẵn 1 Giường + 1 Tủ đồ + 1 Cửa sổ rèm + 1 Tủ bếp chữ L (di chuyển được)
   {instanceId: 'init_bed_1', catalogId: 'bed_peach', x: -11.4, z: -7.2, rotY: 0},
   {instanceId: 'init_wardrobe_1', catalogId: 'wardrobe_oak', x: -6.2, z: -8.55, rotY: 0},
   {instanceId: 'init_win_1', catalogId: 'window_curtain_sage', x: -9.1, z: -9.32, rotY: 0},
+  {instanceId: 'init_kitchen_l_1', catalogId: 'kitchen_l_cream', x: 8.55, z: 1.85, rotY: 0},
 ];
 
 export const STARTER_FURNITURE_INVENTORY: Record<string, number> = {};
+
+export type HouseRoomId = 'living' | 'bedroom' | 'backroom' | 'kitchen' | 'bath';
+
+export function getHouseRoomAt(x: number, z: number): HouseRoomId {
+  if (x >= 4.0) return z < -0.5 ? 'bath' : 'kitchen';
+  if (z < -0.5) return x < -4.75 ? 'bedroom' : 'backroom';
+  return 'living';
+}
+
+export function isPointOnFurnitureSurface(
+  wx: number,
+  wz: number,
+  sup: PlacedFurniture,
+  supCat: FurnitureCatalogItem,
+): boolean {
+  const cos = Math.cos(sup.rotY);
+  const sin = Math.sin(sup.rotY);
+  const dx = wx - sup.x;
+  const dz = wz - sup.z;
+  const lx = dx * cos - dz * sin;
+  const lz = dx * sin + dz * cos;
+
+  if (supCat.kind === 'kitchen_l_counter') {
+    const inBack = Math.abs(lx + 0.03) <= 1.76 && Math.abs(lz + 1.69) <= 0.5;
+    const inRight = Math.abs(lx - 1.27) <= 0.5 && Math.abs(lz - 0.95) <= 2.12;
+    return inBack || inRight;
+  }
+
+  return Math.abs(lx) <= supCat.halfW && Math.abs(lz) <= supCat.halfD;
+}
+
+export function computeStackedY(
+  x: number,
+  z: number,
+  itemCatalogId: string,
+  placedList: PlacedFurniture[],
+  excludeInstanceId?: string,
+): number {
+  const itemCat = FURNITURE_BY_ID[itemCatalogId];
+  if (
+    !itemCat ||
+    itemCat.wallMount ||
+    itemCat.kind === 'floor_paint' ||
+    itemCat.kind === 'wall_paint' ||
+    itemCat.kind === 'rug_round' ||
+    itemCat.kind === 'kitchen_l_counter'
+  ) {
+    return 0;
+  }
+
+  let bestY = 0;
+  for (const sup of placedList) {
+    if (excludeInstanceId && sup.instanceId === excludeInstanceId) continue;
+    const supCat = FURNITURE_BY_ID[sup.catalogId];
+    if (!supCat || !supCat.surfaceHeight || supCat.wallMount) continue;
+    if (
+      supCat.kind !== 'rug_round' &&
+      Math.min(itemCat.halfW, itemCat.halfD) > Math.max(supCat.halfW, supCat.halfD) + 0.15
+    ) {
+      continue;
+    }
+    if (!isPointOnFurnitureSurface(x, z, sup, supCat)) continue;
+    const topY = Number(((sup.y ?? 0) + supCat.surfaceHeight).toFixed(2));
+    if (topY > bestY) {
+      bestY = topY;
+    }
+  }
+  return bestY;
+}
+

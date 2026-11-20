@@ -1,15 +1,13 @@
 import React, {useState} from 'react';
 import {
   Coins,
-  Fish,
-  HeartPulse,
   PawPrint,
   ShoppingBag,
   Sprout,
   Store,
-  Utensils,
   X,
 } from 'lucide-react';
+import {FarmItemIcon} from '../FarmItemIcon';
 import {
   ANIMAL_LIST,
   CROP_LIST,
@@ -84,16 +82,7 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
       desc: 'Xịt 1 cây bị sâu giữ +2 sản lượng.',
       bulkQty: 5,
       btnClass: 'bg-[#D95970]',
-      icon: (
-        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none">
-          <circle cx="6.5" cy="14.5" r="2.6" fill="#63B848" />
-          <circle cx="10.2" cy="12.8" r="2.7" fill="#76CA57" />
-          <circle cx="13.8" cy="13.6" r="2.7" fill="#63B848" />
-          <circle cx="17.5" cy="12" r="3" fill="#7FD460" />
-          <circle cx="18.6" cy="11.2" r="0.65" fill="#23331D" />
-          <path d="M18 9.2L19.5 7.2M16.5 9.4L16 7.2" stroke="#4D8E38" strokeWidth="1.4" strokeLinecap="round" />
-        </svg>
-      ),
+      icon: <FarmItemIcon kind="supply" id="bugSpray" className="h-6 w-6 shrink-0" />,
     },
     {
       key: 'animalFeed',
@@ -103,7 +92,7 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
       desc: 'Đổ máng chuồng (1 túi/con).',
       bulkQty: 5,
       btnClass: 'bg-[#E09B3D]',
-      icon: <Utensils className="h-3.5 w-3.5 text-[#E09B3D]" />,
+      icon: <FarmItemIcon kind="supply" id="animalFeed" className="h-6 w-6 shrink-0" />,
     },
     {
       key: 'animalMedicine',
@@ -113,7 +102,7 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
       desc: 'Chữa bệnh gia cầm & gia súc.',
       bulkQty: 3,
       btnClass: 'bg-[#C95168]',
-      icon: <HeartPulse className="h-3.5 w-3.5 text-[#C95168]" />,
+      icon: <FarmItemIcon kind="supply" id="animalMedicine" className="h-6 w-6 shrink-0" />,
     },
     {
       key: 'fishFeed',
@@ -123,7 +112,7 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
       desc: 'Rải gần hồ (1 túi/3-4 con).',
       bulkQty: 5,
       btnClass: 'bg-[#2F789B]',
-      icon: <Fish className="h-3.5 w-3.5 text-[#2F789B]" />,
+      icon: <FarmItemIcon kind="supply" id="fishFeed" className="h-6 w-6 shrink-0" />,
     },
     {
       key: 'fishMedicine',
@@ -133,7 +122,7 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
       desc: 'Trị bệnh Cá, Vịt & Rùa.',
       bulkQty: 3,
       btnClass: 'bg-[#4B8A5B]',
-      icon: <HeartPulse className="h-3.5 w-3.5 text-[#4B8A5B]" />,
+      icon: <FarmItemIcon kind="supply" id="fishMedicine" className="h-6 w-6 shrink-0" />,
     },
   ];
 
@@ -245,10 +234,7 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
                   >
                     <div className="flex items-center justify-between gap-1">
                       <div className="flex min-w-0 items-center gap-1.5">
-                        <span
-                          className="h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
-                          style={{backgroundColor: crop.color}}
-                        />
+                        <FarmItemIcon kind="seed" id={crop.id} className="h-6 w-6 shrink-0" />
                         <span className="truncate text-xs font-bold text-[#3D3025]">
                           {crop.name}
                         </span>

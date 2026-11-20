@@ -1591,59 +1591,63 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   });
 
   // Delicate Expressive Nendoroid Mouths ('smile' | 'grin' | 'cat' | 'calm' | 'smirk' | 'bashful')
-  const mouthLineMat = clayMat('#643731', 0.48);
+  const mouthLineMat = clayMat('#5E342D', 0.5);
   const mouthY = 0.15;
-  const mouthZ = 0.24;
+  const mouthZ = 0.241;
 
   if (config.expression === 'grin') {
+    // Cute chibi anime ':D' open smile — thin top smile line + smooth flat rose cavity + soft coral tongue (zero creepy teeth/lipstick!)
+    const mouthCavityShape = new THREE.Shape();
+    mouthCavityShape.moveTo(-0.022, 0.0035);
+    mouthCavityShape.quadraticCurveTo(0, 0.0005, 0.022, 0.0035);
+    mouthCavityShape.quadraticCurveTo(0.019, -0.0155, 0, -0.0155);
+    mouthCavityShape.quadraticCurveTo(-0.019, -0.0155, -0.022, 0.0035);
+    const mouthCavity = new THREE.Mesh(
+      new THREE.ShapeGeometry(mouthCavityShape, 12),
+      clayMat('#B4565E', 0.62),
+    );
+    mouthCavity.position.set(0, mouthY + 0.001, mouthZ - 0.0012);
+
+    const tongueShape = new THREE.Shape();
+    tongueShape.moveTo(-0.012, -0.0085);
+    tongueShape.quadraticCurveTo(0, -0.0028, 0.012, -0.0085);
+    tongueShape.quadraticCurveTo(0.009, -0.014, 0, -0.014);
+    tongueShape.quadraticCurveTo(-0.009, -0.014, -0.012, -0.0085);
+    const tongue = new THREE.Mesh(
+      new THREE.ShapeGeometry(tongueShape, 10),
+      clayMat('#EC959C', 0.54),
+    );
+    tongue.position.set(0, mouthY + 0.001, mouthZ - 0.0003);
+
     const upperLip = new THREE.Mesh(
       createTaperedTubeGeometry(
         [
-          [-0.032, mouthY + 0.007, mouthZ - 0.004],
-          [0, mouthY + 0.005, mouthZ + 0.002],
-          [0.032, mouthY + 0.007, mouthZ - 0.004],
+          [-0.0235, mouthY + 0.0045, mouthZ - 0.0028],
+          [0, mouthY + 0.0018, mouthZ + 0.0006],
+          [0.0235, mouthY + 0.0045, mouthZ - 0.0028],
         ],
-        0.0036,
-        12,
+        0.0025,
+        14,
         6,
-        0.24,
+        0.22,
       ),
       mouthLineMat,
     );
-    const mouthCavity = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.03, 0.022, 0.012, 14, 1, false, 0, Math.PI),
-      clayMat('#9C3E49', 0.54),
-    );
-    mouthCavity.rotation.x = Math.PI / 2;
-    mouthCavity.rotation.y = Math.PI / 2;
-    mouthCavity.scale.set(0.95, 1, 0.9);
-    mouthCavity.position.set(0, mouthY + 0.004, mouthZ - 0.004);
-    const teeth = new THREE.Mesh(
-      new RoundedBoxGeometry(0.044, 0.008, 0.01, 2, 0.003),
-      clayMat('#FFF9F4', 0.35),
-    );
-    teeth.position.set(0, mouthY + 0.001, mouthZ - 0.001);
-    const tongue = new THREE.Mesh(
-      new THREE.SphereGeometry(0.015, 10, 8),
-      clayMat('#F28691', 0.48),
-    );
-    tongue.scale.set(1.15, 0.5, 0.5);
-    tongue.position.set(0, mouthY - 0.009, mouthZ);
-    headPivot.add(mouthCavity, teeth, tongue, upperLip);
+    headPivot.add(mouthCavity, tongue, upperLip);
   } else if (config.expression === 'cat') {
     const catMouth = new THREE.Mesh(
       createTaperedTubeGeometry(
         [
-          [-0.032, mouthY + 0.005, mouthZ - 0.004],
-          [-0.016, mouthY - 0.004, mouthZ],
-          [0, mouthY + 0.003, mouthZ + 0.002],
-          [0.016, mouthY - 0.004, mouthZ],
-          [0.032, mouthY + 0.005, mouthZ - 0.004],
+          [-0.028, mouthY + 0.0045, mouthZ - 0.003],
+          [-0.014, mouthY - 0.0035, mouthZ],
+          [0, mouthY + 0.0025, mouthZ + 0.0018],
+          [0.014, mouthY - 0.0035, mouthZ],
+          [0.028, mouthY + 0.0045, mouthZ - 0.003],
         ],
-        0.0034,
+        0.0029,
         18,
         6,
-        0.26,
+        0.24,
       ),
       mouthLineMat,
     );
@@ -1652,11 +1656,11 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     const calmMouth = new THREE.Mesh(
       createTaperedTubeGeometry(
         [
-          [-0.02, mouthY + 0.001, mouthZ - 0.001],
-          [0, mouthY - 0.001, mouthZ + 0.001],
-          [0.02, mouthY + 0.001, mouthZ - 0.001],
+          [-0.019, mouthY + 0.001, mouthZ - 0.001],
+          [0, mouthY - 0.0008, mouthZ + 0.001],
+          [0.019, mouthY + 0.001, mouthZ - 0.001],
         ],
-        0.0034,
+        0.0028,
         10,
         6,
         0.25,
@@ -1668,11 +1672,11 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     const smirkMouth = new THREE.Mesh(
       createTaperedTubeGeometry(
         [
-          [-0.024, mouthY - 0.002, mouthZ - 0.001],
-          [0.002, mouthY - 0.001, mouthZ + 0.002],
-          [0.028, mouthY + 0.009, mouthZ - 0.004],
+          [-0.021, mouthY - 0.0015, mouthZ - 0.001],
+          [0.002, mouthY - 0.001, mouthZ + 0.0015],
+          [0.024, mouthY + 0.007, mouthZ - 0.0032],
         ],
-        0.0036,
+        0.0029,
         12,
         6,
         0.22,
@@ -1684,12 +1688,12 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     const bashfulMouth = new THREE.Mesh(
       createTaperedTubeGeometry(
         [
-          [-0.018, mouthY + 0.001, mouthZ - 0.001],
-          [-0.006, mouthY - 0.003, mouthZ + 0.001],
-          [0.006, mouthY + 0.002, mouthZ + 0.001],
-          [0.018, mouthY - 0.002, mouthZ - 0.001],
+          [-0.017, mouthY + 0.001, mouthZ - 0.001],
+          [-0.0055, mouthY - 0.0025, mouthZ + 0.001],
+          [0.0055, mouthY + 0.0018, mouthZ + 0.001],
+          [0.017, mouthY - 0.0015, mouthZ - 0.001],
         ],
-        0.0032,
+        0.0027,
         12,
         6,
         0.25,
@@ -1702,13 +1706,13 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     const smileMesh = new THREE.Mesh(
       createTaperedTubeGeometry(
         [
-          [-0.026, mouthY + 0.005, mouthZ - 0.003],
-          [-0.013, mouthY - 0.003, mouthZ + 0.001],
-          [0, mouthY - 0.005, mouthZ + 0.002],
-          [0.013, mouthY - 0.003, mouthZ + 0.001],
-          [0.026, mouthY + 0.005, mouthZ - 0.003],
+          [-0.024, mouthY + 0.0045, mouthZ - 0.0025],
+          [-0.012, mouthY - 0.0028, mouthZ + 0.0008],
+          [0, mouthY - 0.0045, mouthZ + 0.0016],
+          [0.012, mouthY - 0.0028, mouthZ + 0.0008],
+          [0.024, mouthY + 0.0045, mouthZ - 0.0025],
         ],
-        0.0036,
+        0.003,
         14,
         6,
         0.24,

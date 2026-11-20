@@ -2,6 +2,8 @@ import React, {useEffect, useRef, useState} from 'react';
 import {
   Armchair,
   Check,
+  ChevronLeft,
+  ChevronRight,
   DoorClosed,
   DoorOpen,
   Move,
@@ -13,7 +15,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {WELL_WATER_MAX} from '../data/farmCatalog';
-import {FURNITURE_BY_ID} from '../data/furnitureCatalog';
+import {FURNITURE_BY_ID, isPointOnFurnitureSurface} from '../data/furnitureCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
 import {
   buildSubzoneScene,
@@ -72,6 +74,7 @@ interface WorldCanvasProps {
   onOpenFurnitureShop: () => void;
   onOpenSettings: () => void;
   onOpenDailyQuests: () => void;
+  onOpenPhone: () => void;
   onOpenFurniture: () => void;
   onToggleEditFurniture: () => void;
   onSelectFurniture: (id: string | null) => void;
@@ -392,6 +395,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onScatterPondFeed,
   onPondProximityChange,
   onAddCoins,
+  onOpenPhone,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const labelLayerRef = useRef<HTMLDivElement | null>(null);
@@ -408,6 +412,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   );
   const [nearPond, setNearPond] = useState(false);
   const [confirmPondFeed, setConfirmPondFeed] = useState(false);
+  const [homeToolsOpen, setHomeToolsOpen] = useState(false);
   const [webglError, setWebglError] = useState(false);
 
   const stateRef = useRef({
@@ -508,6 +513,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const activeDoorsRef = useRef<HouseDoorHandle[]>([]);
   const nearbyDoorKeyRef = useRef<string>('');
   const nearPondRef = useRef<boolean>(false);
+  const homeExitTriggeredRef = useRef<boolean>(false);
   const selectedPlotRef = useRef<{plotId: number; worldPos: THREE.Vector3} | null>(null);
 
   const showBubble = (text: string, x: number, y: number, z: number) => {
@@ -520,11 +526,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   };
 
   useEffect(() => {
+    homeExitTriggeredRef.current = false;
     if (zone !== 'home') {
       openDoorsRef.current = {};
       activeDoorsRef.current = [];
       nearbyDoorKeyRef.current = '';
       setNearbyDoor(null);
+      setHomeToolsOpen(false);
     }
     if (zone !== 'garden') {
       selectedPlotRef.current = null;
@@ -563,7 +571,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
   useEffect(() => {
     rebuildSceneTriggerRef.current?.();
-  }, [zone, plotVisualKey, livestockVisualKey, troughsVisualKey, pondFishVisualKey, fishingState, placedFurniture]);
+  }, [
+    zone,
+    plotVisualKey,
+    livestockVisualKey,
+    troughsVisualKey,
+    pondFishVisualKey,
+    fishingState,
+    placedFurniture,
+    editFurnitureMode,
+  ]);
 
   useEffect(() => {
     rebuildAvatarTriggerRef.current?.(avatar);
@@ -762,6 +779,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           plots: pl,
           fishingState: fs,
           placedFurniture: z === 'home' ? pf : undefined,
+          editFurnitureMode: z === 'home' ? stateRef.current.editFurnitureMode : undefined,
           openDoors: z === 'home' ? openDoorsRef.current : undefined,
           livestock: z === 'garden' ? stateRef.current.livestock : undefined,
           troughs: z === 'garden' ? stateRef.current.troughs : undefined,
@@ -844,9 +862,23 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       raycaster.setFromCamera(pointer, camera);
 
-      // 0. House Edit Mode: select furniture or move selected furniture (with wall snap for wall-mounted items)
+      // 0. House Edit Mode: select furniture, stack on furniture surfaces, or snap to wall/floor
       if (stateRef.current.zone === 'home' && stateRef.current.editFurnitureMode) {
         const hits = raycaster.intersectObjects(currentClickTargets, true);
+        const selId = stateRef.current.selectedFurnitureId;
+        const selPlaced = selId
+          ? stateRef.current.placedFurniture.find((p) => p.instanceId === selId)
+          : null;
+        const selCat = selPlaced ? FURNITURE_BY_ID[selPlaced.catalogId] : null;
+        const isSelStackable = Boolean(
+          selCat &&
+            !selCat.wallMount &&
+            selCat.kind !== 'floor_paint' &&
+            selCat.kind !== 'wall_paint' &&
+            selCat.kind !== 'rug_round' &&
+            selCat.kind !== 'kitchen_l_counter',
+        );
+
         let firstWallHitPoint: THREE.Vector3 | null = null;
         for (const h of hits) {
           let obj: THREE.Object3D | null = h.object;
@@ -854,8 +886,26 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             obj = obj.parent;
           }
           if (obj && obj.userData.furnitureId) {
+            const hitFid = obj.userData.furnitureId as string;
+            if (selId && isSelStackable && hitFid !== selId) {
+              const hitPlaced = stateRef.current.placedFurniture.find(
+                (p) => p.instanceId === hitFid,
+              );
+              const hitCat = hitPlaced ? FURNITURE_BY_ID[hitPlaced.catalogId] : null;
+              if (
+                hitPlaced &&
+                hitCat &&
+                !hitCat.wallMount &&
+                hitCat.surfaceHeight &&
+                isPointOnFurnitureSurface(h.point.x, h.point.z, hitPlaced, hitCat)
+              ) {
+                soundFX.tap();
+                callbacksRef.current.onMoveFurniture(selId, h.point.x, h.point.z);
+                return;
+              }
+            }
             soundFX.tap();
-            callbacksRef.current.onSelectFurniture(obj.userData.furnitureId as string);
+            callbacksRef.current.onSelectFurniture(hitFid);
             return;
           }
           if (!firstWallHitPoint && obj && obj.userData.kind === 'house_wall') {
@@ -863,10 +913,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
         }
 
-        const selId = stateRef.current.selectedFurnitureId;
         if (selId) {
-          const selPlaced = stateRef.current.placedFurniture.find((p) => p.instanceId === selId);
-          const selCat = selPlaced ? FURNITURE_BY_ID[selPlaced.catalogId] : null;
           if (selCat?.wallMount) {
             let refPt = firstWallHitPoint;
             if (!refPt && currentGrounds.length > 0) {
@@ -1669,6 +1716,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (z === 'home') {
         homeSpotRef.current.x = playerPos.x;
         homeSpotRef.current.z = playerPos.z;
+        if (
+          !stateRef.current.editFurnitureMode &&
+          !homeExitTriggeredRef.current &&
+          Math.abs(playerPos.x + 1.8) < 1.05 &&
+          playerPos.z >= 6.84
+        ) {
+          homeExitTriggeredRef.current = true;
+          activeTarget = null;
+          soundFX.enterDoor();
+          callbacksRef.current.onChangeZone('town');
+        }
       }
 
       if (z === 'home' && stateRef.current.editFurnitureMode && stateRef.current.selectedFurnitureId) {
@@ -1678,7 +1736,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const cat = sel ? FURNITURE_BY_ID[sel.catalogId] : null;
         if (sel && cat) {
           selectionRing.visible = true;
-          selectionRing.position.set(sel.x, 0.03, sel.z);
+          selectionRing.position.set(sel.x, (sel.y ?? 0) + 0.03, sel.z);
           const ringRadius =
             Math.max(cat.halfW, cat.halfD) * 1.28 + Math.sin(elapsed * 5) * 0.035;
           selectionRing.scale.set(ringRadius, ringRadius, 1);
@@ -1924,35 +1982,86 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           );
         })()}
 
-      {/* Top-corner 2 small buttons inside House: Tủ nội thất & Di chuyển */}
-      {zone === 'home' && (
-        <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              soundFX.tap();
-              onOpenFurniture();
-            }}
-            className="flex min-h-[38px] items-center gap-1.5 rounded-xl border-2 border-[#8C6239] bg-[#FFF8EB] px-3 py-1.5 text-xs font-bold text-[#4A3525] shadow-md transition-transform active:scale-95"
+      {/* Top-Left Compact Smartphone Menu Button */}
+      {!miniActive && !(zone === 'home' && editFurnitureMode) && (
+        <button
+          type="button"
+          onClick={() => {
+            soundFX.tap();
+            onOpenPhone();
+          }}
+          aria-label="Mở điện thoại"
+          className="phone-ui absolute top-2.5 left-2.5 z-30 flex min-h-[38px] items-center gap-2 rounded-2xl border-2 border-[#3C3128] bg-[#FFF9EF]/95 px-2.5 py-1.5 text-[#3B2B1E] shadow-lg transition-transform hover:scale-[1.02] active:scale-95"
+        >
+          <span
+            aria-hidden="true"
+            className="relative flex h-7 w-5 shrink-0 flex-col items-center justify-between rounded-[6px] border-[1.75px] border-[#2C2421] bg-gradient-to-b from-[#6CC4DE] to-[#56A888] p-[2px] shadow-xs"
           >
-            <Armchair className="h-4 w-4 text-[#9A5B25]" />
-            <span>Tủ nội thất</span>
-          </button>
+            <span className="h-[2px] w-2 rounded-full bg-[#2C2421]/75" />
+            <span className="grid grid-cols-2 gap-[2px]">
+              <span className="h-1 w-1 rounded-[1px] bg-white/95" />
+              <span className="h-1 w-1 rounded-[1px] bg-[#FFE596]" />
+              <span className="h-1 w-1 rounded-[1px] bg-[#FFD3DB]" />
+              <span className="h-1 w-1 rounded-[1px] bg-white/95" />
+            </span>
+            <span className="h-[2px] w-2.5 rounded-full bg-white/80" />
+          </span>
+          <span className="text-xs font-extrabold tracking-tight text-[#3B2B1E]">
+            Menu
+          </span>
+        </button>
+      )}
+
+      {/* Compact collapsible top-right arrow toolbar inside House */}
+      {zone === 'home' && (
+        <div className="absolute top-2.5 right-2.5 z-30 flex items-center gap-1.5">
+          {(homeToolsOpen || editFurnitureMode) && (
+            <div className="anim-pop flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  onOpenFurniture();
+                }}
+                className="flex min-h-[30px] items-center gap-1 rounded-xl border-2 border-[#8C6239] bg-[#FFF8EB] px-2 py-1 text-[11px] font-bold text-[#4A3525] shadow-md transition-transform active:scale-95"
+              >
+                <Armchair className="h-3.5 w-3.5 text-[#9A5B25]" />
+                <span>Tủ nội thất</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  if (editFurnitureMode) setHomeToolsOpen(false);
+                  onToggleEditFurniture();
+                }}
+                className={`flex min-h-[30px] items-center gap-1 rounded-xl border-2 px-2 py-1 text-[11px] font-bold shadow-md transition-transform active:scale-95 ${
+                  editFurnitureMode
+                    ? 'border-[#B95D3B] bg-[#DF7B57] text-white'
+                    : 'border-[#8C6239] bg-[#FFF8EB] text-[#4A3525]'
+                }`}
+              >
+                <Move className="h-3.5 w-3.5" />
+                <span>{editFurnitureMode ? 'Xong' : 'Di chuyển'}</span>
+              </button>
+            </div>
+          )}
 
           <button
             type="button"
             onClick={() => {
               soundFX.tap();
-              onToggleEditFurniture();
+              setHomeToolsOpen((prev) => !prev);
             }}
-            className={`flex min-h-[38px] items-center gap-1.5 rounded-xl border-2 px-3 py-1.5 text-xs font-bold shadow-md transition-transform active:scale-95 ${
-              editFurnitureMode
-                ? 'border-[#B95D3B] bg-[#DF7B57] text-white'
-                : 'border-[#8C6239] bg-[#FFF8EB] text-[#4A3525]'
-            }`}
+            aria-label="Mở công cụ nhà"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border-2 border-[#8C6239] bg-[#FFF8EB] text-[#4A3525] shadow-md transition-transform active:scale-95"
           >
-            <Move className="h-4 w-4" />
-            <span>{editFurnitureMode ? 'Xong' : 'Di chuyển'}</span>
+            {homeToolsOpen || editFurnitureMode ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
           </button>
         </div>
       )}
@@ -2030,24 +2139,26 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       {/* Bottom Action Bar in Furniture Move Mode */}
       {zone === 'home' && editFurnitureMode && (
-        <div className="absolute bottom-4 left-1/2 z-30 flex w-[min(94vw,440px)] -translate-x-1/2 flex-col items-center gap-1.5">
+        <div className="absolute bottom-4 left-1/2 z-30 flex w-[min(95vw,470px)] -translate-x-1/2 flex-col items-center gap-1.5">
           {selectedCatalogItem && selectedPlacedItem ? (
             <>
-              <span className="rounded-lg bg-[#4A3525]/85 px-2.5 py-0.5 text-[11px] font-semibold text-amber-50 shadow-xs">
-                {selectedCatalogItem.wallMount
-                  ? `Chạm tường để đặt "${selectedCatalogItem.name}" · Chạm đồ khác để chọn`
-                  : `Chạm sàn để đặt "${selectedCatalogItem.name}" · Chạm đồ khác để chọn`}
+              <span className="rounded-lg bg-[#4A3525]/85 px-2.5 py-0.5 text-center text-[11px] font-semibold text-amber-50 shadow-xs">
+                {selectedCatalogItem.kind === 'floor_paint' || selectedCatalogItem.kind === 'wall_paint'
+                  ? `Chạm sàn phòng muốn sơn để đặt "${selectedCatalogItem.name}" · Cất để về mặc định`
+                  : selectedCatalogItem.wallMount
+                    ? `Chạm tường để gắn "${selectedCatalogItem.name}"`
+                    : `Chạm sàn hoặc mặt bàn/tủ/giường để đặt "${selectedCatalogItem.name}"`}
               </span>
-              <div className="flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-[#8C6239] bg-[#FFF8EB] p-2 shadow-xl">
+              <div className="flex w-full items-center justify-between gap-1.5 rounded-2xl border-2 border-[#8C6239] bg-[#FFF8EB] p-2 shadow-xl">
                 <button
                   type="button"
                   onClick={() => {
                     soundFX.tap();
                     onRotateFurniture(selectedPlacedItem.instanceId);
                   }}
-                  className="flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#6F4E37] px-3 text-xs font-bold text-amber-50 transition-transform active:scale-95"
+                  className="flex min-h-[36px] flex-1 items-center justify-center gap-1 rounded-xl bg-[#6F4E37] px-2.5 text-xs font-bold text-amber-50 transition-transform active:scale-95"
                 >
-                  <RotateCw className="h-4 w-4" />
+                  <RotateCw className="h-3.5 w-3.5" />
                   <span>Xoay</span>
                 </button>
                 <button
@@ -2056,31 +2167,43 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                     soundFX.tap();
                     onStowFurniture(selectedPlacedItem.instanceId);
                   }}
-                  className="flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#E7D4BA] px-3 text-xs font-bold text-[#4A3525] transition-transform active:scale-95"
+                  className="flex min-h-[36px] flex-1 items-center justify-center gap-1 rounded-xl bg-[#E7D4BA] px-2.5 text-xs font-bold text-[#4A3525] transition-transform active:scale-95"
                 >
-                  <PackageMinus className="h-4 w-4" />
-                  <span>Cất vào tủ</span>
+                  <PackageMinus className="h-3.5 w-3.5" />
+                  <span>Cất</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     soundFX.tap();
+                    onSelectFurniture(null);
+                  }}
+                  className="flex min-h-[36px] items-center justify-center rounded-xl bg-[#F3E6D3] px-2.5 text-xs font-bold text-[#6F4E37] transition-transform active:scale-95"
+                >
+                  Đổi món
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setHomeToolsOpen(false);
                     onToggleEditFurniture();
                   }}
-                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-[#6BA383] px-3.5 text-xs font-bold text-white transition-transform active:scale-95"
+                  className="flex min-h-[36px] items-center justify-center gap-1 rounded-xl bg-[#6BA383] px-3 text-xs font-bold text-white transition-transform active:scale-95"
                 >
-                  <Check className="h-4 w-4" />
+                  <Check className="h-3.5 w-3.5" />
                   <span>Xong</span>
                 </button>
               </div>
             </>
           ) : (
             <div className="flex items-center gap-3 rounded-2xl border-2 border-[#8C6239] bg-[#FFF8EB] px-4 py-2 text-xs font-bold text-[#4A3525] shadow-xl">
-              <span>Chạm vào một món nội thất để di chuyển hoặc xoay</span>
+              <span>Chạm vào món đồ hoặc thùng sơn để di chuyển / cất</span>
               <button
                 type="button"
                 onClick={() => {
                   soundFX.tap();
+                  setHomeToolsOpen(false);
                   onToggleEditFurniture();
                 }}
                 className="rounded-xl bg-[#6BA383] px-3 py-1.5 text-white transition-transform active:scale-95"

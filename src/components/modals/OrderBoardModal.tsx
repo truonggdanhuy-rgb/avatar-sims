@@ -1,12 +1,12 @@
 import React from 'react';
 import {ClipboardList, Coins, PackageCheck, RefreshCw, X} from 'lucide-react';
 import {
-  getFarmItemColor,
   getFarmItemCount,
   getFarmItemName,
 } from '../../data/farmCatalog';
 import {FarmInventory, FarmOrder} from '../../types/game';
 import {soundFX} from '../../utils/sound';
+import {FarmItemIcon} from '../FarmItemIcon';
 
 interface OrderBoardModalProps {
   coins: number;
@@ -85,16 +85,13 @@ export const OrderBoardModal: React.FC<OrderBoardModalProps> = ({
                       return (
                         <span
                           key={`${order.id}_${req.id}`}
-                          className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-semibold tabular-nums ${
+                          className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-semibold tabular-nums ${
                             ok
                               ? 'bg-[#EEF7F0] text-[#3F7B4E]'
                               : 'bg-[#FDF0F2] text-[#C2515E]'
                           }`}
                         >
-                          <span
-                            className="h-2 w-2 shrink-0 rounded-full"
-                            style={{backgroundColor: getFarmItemColor(req.kind, req.id)}}
-                          />
+                          <FarmItemIcon kind={req.kind} id={req.id} className="h-4 w-4 shrink-0" />
                           <span>
                             {getFarmItemName(req.kind, req.id)} {have}/{req.qty}
                           </span>
