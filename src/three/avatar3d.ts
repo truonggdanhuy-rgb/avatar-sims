@@ -14,9 +14,9 @@ const HEAD_PIVOT_Y = 0.968;
 
 const HAND_POSES: Record<HoldPose, {armX: number; armZ: number; elbowX: number; elbowZ: number}> = {
   none: {armX: 0, armZ: 0.36, elbowX: -0.12, elbowZ: -0.05},
-  carry_umbrella: {armX: -0.42, armZ: 0.34, elbowX: -1.06, elbowZ: -0.06},
-  carry_front: {armX: -0.34, armZ: 0.3, elbowX: -0.92, elbowZ: -0.12},
-  carry_bag: {armX: -0.04, armZ: 0.36, elbowX: -0.18, elbowZ: -0.04},
+  carry_umbrella: {armX: -0.46, armZ: 0.62, elbowX: -0.94, elbowZ: 0.18},
+  carry_front: {armX: -0.42, armZ: 0.44, elbowX: -0.98, elbowZ: 0.08},
+  carry_bag: {armX: -0.06, armZ: 0.48, elbowX: -0.14, elbowZ: 0.06},
 };
 
 export interface AvatarRig {
@@ -42,6 +42,251 @@ function shadeHex(hex: string, factor: number): THREE.Color {
   const nextL = Math.min(0.92, Math.max(0.12, hsl.l + factor));
   c.setHSL(hsl.h, hsl.s, nextL);
   return c;
+}
+
+const _eyeTexCache = new Map<string, THREE.CanvasTexture>();
+
+function createNendoroidEyeTexture(
+  eyeColor: string,
+  style: AvatarConfig['eyeStyle'],
+): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
+  const key = `${eyeColor}_${style}`;
+  const cached = _eyeTexCache.get(key);
+  if (cached) return cached;
+
+  const size = 192;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const cx = size * 0.5;
+  const cy = size * 0.5;
+  const baseCol = new THREE.Color(eyeColor);
+  const darkHex = `#${shadeHex(eyeColor, -0.26).getHexString()}`;
+  const midHex = `#${baseCol.getHexString()}`;
+  const lightHex = `#${shadeHex(eyeColor, 0.2).getHexString()}`;
+  const rimHex = `#${shadeHex(eyeColor, -0.34).getHexString()}`;
+
+  // Clean warm sclera with soft upper eyelid shadow
+  ctx.fillStyle = '#FFFDF9';
+  ctx.fillRect(0, 0, size, size);
+  const scleraShade = ctx.createLinearGradient(0, 0, 0, size * 0.44);
+  scleraShade.addColorStop(0, 'rgba(182, 168, 178, 0.42)');
+  scleraShade.addColorStop(1, 'rgba(255, 253, 249, 0)');
+  ctx.fillStyle = scleraShade;
+  ctx.fillRect(0, 0, size, size * 0.44);
+
+  const isAlmond = style === 'almond' || style === 'squint';
+  const irisRx = isAlmond ? size * 0.255 : size * 0.245;
+  const irisRy = isAlmond ? size * 0.3 : size * 0.31;
+  const irisCy = style === 'squint' ? cy + size * 0.025 : cy;
+
+  // Iris body vertical Nendoroid gradient (deep upper shadow -> luminous jewel crescent)
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, irisCy, irisRx, irisRy, 0, 0, Math.PI * 2);
+  ctx.clip();
+
+  const irisGrad = ctx.createLinearGradient(0, irisCy - irisRy, 0, irisCy + irisRy);
+  irisGrad.addColorStop(0.0, darkHex);
+  irisGrad.addColorStop(0.45, midHex);
+  irisGrad.addColorStop(0.84, lightHex);
+  irisGrad.addColorStop(1.0, midHex);
+  ctx.fillStyle = irisGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Subtle lower glowing crescent inside iris
+  const glowGrad = ctx.createRadialGradient(
+    cx,
+    irisCy + irisRy * 0.42,
+    irisRx * 0.08,
+    cx,
+    irisCy + irisRy * 0.35,
+    irisRx * 0.78,
+  );
+  glowGrad.addColorStop(0, 'rgba(255, 255, 255, 0.48)');
+  glowGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = glowGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Crisp pupil blended under upper shadow
+  ctx.beginPath();
+  ctx.ellipse(cx, irisCy - irisRy * 0.06, irisRx * 0.46, irisRy * 0.44, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#1E161A';
+  ctx.fill();
+
+  // Top dark limbal shadow arc
+  ctx.fillStyle = 'rgba(24, 16, 20, 0.36)';
+  ctx.fillRect(0, irisCy - irisRy, size, irisRy * 0.42);
+  ctx.restore();
+
+  // Soft crisp outer iris ring
+  ctx.beginPath();
+  ctx.ellipse(cx, irisCy, irisRx, irisRy, 0, 0, Math.PI * 2);
+  ctx.lineWidth = 4.2;
+  ctx.strokeStyle = rimHex;
+  ctx.stroke();
+
+  // Crisp Nendoroid specular catchlights
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.ellipse(
+    cx - irisRx * 0.36,
+    irisCy - irisRy * 0.32,
+    irisRx * 0.25,
+    irisRy * 0.2,
+    -0.32,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+
+  if (style === 'starry' || style === 'cheerful' || style === 'wink') {
+    ctx.beginPath();
+    ctx.arc(cx + irisRx * 0.38, irisCy + irisRy * 0.36, irisRx * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (style === 'starry') {
+    ctx.beginPath();
+    ctx.arc(cx + irisRx * 0.28, irisCy - irisRy * 0.44, irisRx * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  _eyeTexCache.set(key, tex);
+  return tex;
+}
+
+/**
+ * Curved spherical eye disc with exact front-facing UVs (0..1) so procedural eye textures
+ * map cleanly onto the face without bug-eye bulge.
+ */
+function createCurvedEyePatchGeometry(
+  rx: number,
+  ry: number,
+  bulge: number,
+  radialSegs = 24,
+  ringSegs = 6,
+): THREE.BufferGeometry {
+  const positions: number[] = [0, 0, bulge];
+  const uvs: number[] = [0.5, 0.5];
+  const indices: number[] = [];
+
+  for (let ir = 1; ir <= ringSegs; ir++) {
+    const r = ir / ringSegs;
+    const z = bulge * Math.sqrt(Math.max(0, 1 - r * r * 0.92));
+    for (let j = 0; j < radialSegs; j++) {
+      const th = (j / radialSegs) * Math.PI * 2;
+      const nx = r * Math.cos(th);
+      const ny = r * Math.sin(th);
+      positions.push(nx * rx, ny * ry, z);
+      uvs.push(0.5 + 0.5 * nx, 0.5 + 0.5 * ny);
+    }
+  }
+
+  for (let j = 0; j < radialSegs; j++) {
+    const nextJ = (j + 1) % radialSegs;
+    indices.push(0, 1 + j, 1 + nextJ);
+  }
+  for (let ir = 1; ir < ringSegs; ir++) {
+    const rowA = 1 + (ir - 1) * radialSegs;
+    const rowB = 1 + ir * radialSegs;
+    for (let j = 0; j < radialSegs; j++) {
+      const nextJ = (j + 1) % radialSegs;
+      const a = rowA + j;
+      const b = rowB + j;
+      const c = rowB + nextJ;
+      const d = rowA + nextJ;
+      indices.push(a, b, d);
+      indices.push(b, c, d);
+    }
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+/**
+ * Smooth tapered 3D clay stroke (for delicate anime brows, winged lashes, squint lids, and mouths).
+ */
+function createTaperedTubeGeometry(
+  pts: [number, number, number][],
+  baseRadius: number,
+  tubularSegs = 14,
+  radialSegs = 8,
+  tipScale = 0.22,
+): THREE.BufferGeometry {
+  const vecs = pts.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+  const curve = new THREE.CatmullRomCurve3(vecs, false, 'centripetal', 0.5);
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const upRef = new THREE.Vector3(0, 0, 1);
+
+  for (let i = 0; i <= tubularSegs; i++) {
+    const t = i / tubularSegs;
+    const c = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t).normalize();
+    const normal = upRef.clone().addScaledVector(tan, -upRef.dot(tan));
+    if (normal.lengthSq() < 1e-4) normal.set(0, 1, 0);
+    normal.normalize();
+    const binorm = tan.clone().cross(normal).normalize();
+
+    const arch = Math.sin(t * Math.PI);
+    const r = baseRadius * (tipScale + (1 - tipScale) * Math.pow(arch, 0.55));
+    for (let j = 0; j < radialSegs; j++) {
+      const th = (j / radialSegs) * Math.PI * 2;
+      const cos = Math.cos(th);
+      const sin = Math.sin(th);
+      positions.push(
+        c.x + (normal.x * cos + binorm.x * sin) * r,
+        c.y + (normal.y * cos + binorm.y * sin) * r,
+        c.z + (normal.z * cos + binorm.z * sin) * r,
+      );
+    }
+  }
+
+  for (let i = 0; i < tubularSegs; i++) {
+    const rowA = i * radialSegs;
+    const rowB = (i + 1) * radialSegs;
+    for (let j = 0; j < radialSegs; j++) {
+      const nextJ = (j + 1) % radialSegs;
+      const a = rowA + j;
+      const b = rowB + j;
+      const c = rowB + nextJ;
+      const d = rowA + nextJ;
+      indices.push(a, b, d);
+      indices.push(b, c, d);
+    }
+  }
+
+  const startIdx = positions.length / 3;
+  const p0 = curve.getPointAt(0);
+  positions.push(p0.x, p0.y, p0.z);
+  for (let j = 0; j < radialSegs; j++) {
+    indices.push(startIdx, j, (j + 1) % radialSegs);
+  }
+  const endIdx = positions.length / 3;
+  const p1 = curve.getPointAt(1);
+  positions.push(p1.x, p1.y, p1.z);
+  const lastRow = tubularSegs * radialSegs;
+  for (let j = 0; j < radialSegs; j++) {
+    indices.push(endIdx, lastRow + ((j + 1) % radialSegs), lastRow + j);
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
 }
 
 /**
@@ -169,10 +414,14 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   const bottomMat = clayMat(config.bottomColor, 0.72, 0.02);
   const bottomDarkMat = clayMat(shadeHex(config.bottomColor, -0.09).getHex(), 0.74, 0.02);
   const bottomLightMat = clayMat(shadeHex(config.bottomColor, 0.07).getHex(), 0.68, 0.02);
-  const eyeWhiteMat = glossyClayMat('#FFFFFF', 0.16);
-  const irisMat = glossyClayMat(config.eyeColor, 0.14);
-  const pupilMat = glossyClayMat('#241B19', 0.12);
-  const cheekMat = clayMat('#F28B92', 0.65, 0);
+  const cheekMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color('#F28A95'),
+    roughness: 0.72,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.56,
+    depthWrite: false,
+  });
 
   // Soft contact shadow disc right under the planted shoes
   const shadowDisc = new THREE.Mesh(
@@ -814,14 +1063,15 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   if (handheld) {
     const hColor = config.handheldColor || '#E8B84B';
     const poseCfg = HAND_POSES[holdPose];
+    const hoodieClearZ = isHoodie ? 0.06 : 0;
     rightArm.rotation.x = poseCfg.armX;
-    rightArm.rotation.z = poseCfg.armZ;
+    rightArm.rotation.z = poseCfg.armZ + hoodieClearZ;
     rightElbow.rotation.x = poseCfg.elbowX;
     rightElbow.rotation.z = poseCfg.elbowZ;
 
     // Attach handAnchor directly at the closed-fist grip pocket, oriented upright in world space
     const handAnchor = new THREE.Group();
-    handAnchor.position.set(0, -0.005, 0.024);
+    handAnchor.position.set(0, -0.005, 0.026);
     rightArmRig.handGroup.add(handAnchor);
 
     bodyPivot.updateMatrixWorld(true);
@@ -829,9 +1079,9 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     rightArmRig.handGroup.getWorldQuaternion(handWorldQuat);
     const desiredWorldQuat = new THREE.Quaternion().setFromEuler(
       holdPose === 'carry_umbrella'
-        ? new THREE.Euler(-0.07, 0, 0.11) // subtle natural shelter lean over the character's head
+        ? new THREE.Euler(-0.04, 0, -0.04) // angled gently outward away from face/hat; safe for balloons too
         : holdPose === 'carry_front'
-          ? new THREE.Euler(0.08, 0, 0)
+          ? new THREE.Euler(0.1, 0, -0.04)
           : new THREE.Euler(0, 0, 0),
     );
     handAnchor.quaternion.copy(handWorldQuat).invert().multiply(desiredWorldQuat);
@@ -841,28 +1091,28 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
         new THREE.CylinderGeometry(0.074, 0.052, 0.185, 16),
         clayMat(hColor, 0.35),
       );
-      cup.position.set(0, 0.022, 0);
+      cup.position.set(0.006, 0.024, 0.012);
       const sleeve = new THREE.Mesh(
         new THREE.CylinderGeometry(0.064, 0.058, 0.064, 16),
         clayMat('#E8D3B9', 0.8),
       );
-      sleeve.position.set(0, 0.008, 0);
+      sleeve.position.set(0.006, 0.01, 0.012);
       const lid = new THREE.Mesh(
         new THREE.SphereGeometry(0.074, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.5),
         glossyClayMat('#FFF8F0', 0.2),
       );
-      lid.position.set(0, 0.114, 0);
+      lid.position.set(0.006, 0.116, 0.012);
       const straw = new THREE.Mesh(
         new THREE.CylinderGeometry(0.011, 0.011, 0.135, 8),
         clayMat('#E86F82', 0.4),
       );
-      straw.position.set(0.016, 0.182, 0);
+      straw.position.set(0.022, 0.184, 0.012);
       straw.rotation.z = -0.15;
       handAnchor.add(cup, sleeve, lid, straw);
     } else if (handheld === 'plush_bear') {
       const bearGrp = new THREE.Group();
-      bearGrp.position.set(-0.02, 0.01, 0.025);
-      bearGrp.rotation.y = -0.22;
+      bearGrp.position.set(0.032, 0.016, 0.048);
+      bearGrp.rotation.y = -0.34;
 
       const bearMat = clayMat(hColor, 0.85);
       const creamMat = clayMat('#F7E6D0', 0.78);
@@ -983,25 +1233,25 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
           strapMat,
         );
         strap.rotation.y = Math.PI / 2;
-        strap.position.set(0.038 + sx, -0.082, 0);
+        strap.position.set(0.056 + sx, -0.082, 0);
         handAnchor.add(strap);
       });
       const bag = new THREE.Mesh(
         new RoundedBoxGeometry(0.115, 0.25, 0.215, 3, 0.025),
         clayMat(hColor, 0.78),
       );
-      bag.position.set(0.038, -0.208, 0);
+      bag.position.set(0.056, -0.208, 0);
       const pocket = new THREE.Mesh(
         new RoundedBoxGeometry(0.018, 0.12, 0.125, 2, 0.012),
         clayMat(shadeHex(hColor, -0.08).getHex(), 0.78),
       );
-      pocket.position.set(0.095, -0.218, 0);
+      pocket.position.set(0.113, -0.218, 0);
       const badge = new THREE.Mesh(
         new THREE.CylinderGeometry(0.022, 0.022, 0.01, 12),
         clayMat('#E86F82', 0.5),
       );
       badge.rotation.z = Math.PI / 2;
-      badge.position.set(0.105, -0.178, 0.038);
+      badge.position.set(0.123, -0.178, 0.038);
       handAnchor.add(bag, pocket, badge);
     } else if (handheld === 'mini_umbrella') {
       // Tall, wide protective umbrella clearing head & hats cleanly (~1.92m rim, 2.16m dome)
@@ -1079,21 +1329,21 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   bodyPivot.add(headPivot);
 
   const neck = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.064, 0.076, 0.07, 16),
+    new THREE.CylinderGeometry(0.062, 0.076, 0.092, 16),
     skinMat,
   );
-  neck.position.y = -0.015;
+  neck.position.y = -0.004;
   headPivot.add(neck);
 
   // Sculpted head mesh (already centered at HEAD_CY = 0.30)
   const headMesh = new THREE.Mesh(createSculptedHeadGeometry(), skinMat);
   headPivot.add(headMesh);
 
-  // Detailed Ears with soft inner ear hollows
+  // Detailed Ears nested cleanly beside Nendoroid cheek/jaw contour
   const innerEarMat = clayMat(shadeHex(config.skinTone, -0.11).getHex(), 0.72);
   [-1, 1].forEach((side) => {
     const earGrp = new THREE.Group();
-    earGrp.position.set(side * 0.305, 0.27, -0.012);
+    earGrp.position.set(side * 0.298, 0.252, -0.01);
     earGrp.rotation.y = -side * 0.22;
 
     const earOuter = new THREE.Mesh(new THREE.SphereGeometry(0.056, 12, 12), skinMat);
@@ -1105,153 +1355,366 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     headPivot.add(earGrp);
   });
 
-  // Soft Rosy Cheeks
-  const cheekGeo = new THREE.SphereGeometry(0.044, 12, 10);
-  const cheekL = new THREE.Mesh(cheekGeo, cheekMat);
-  cheekL.scale.set(1.26, 0.68, 0.35);
-  cheekL.position.set(-0.172, 0.195, 0.214);
-  cheekL.rotation.y = -0.32;
-  const cheekR = cheekL.clone();
-  cheekR.position.x = 0.172;
-  cheekR.rotation.y = 0.32;
-  headPivot.add(cheekL, cheekR);
+  // Optional Soft Rosy Cheeks (ONLY rendered when config.blush === true!)
+  if (config.blush) {
+    const blushPatchGeo = new THREE.SphereGeometry(0.042, 14, 10);
+    const blushStrokeMat = clayMat('#EB7482', 0.6);
+    [-1, 1].forEach((side) => {
+      const cheek = new THREE.Mesh(blushPatchGeo, cheekMat);
+      cheek.scale.set(1.2, 0.6, 0.09);
+      cheek.position.set(side * 0.168, 0.194, 0.2155);
+      cheek.rotation.y = side * 0.42;
+      headPivot.add(cheek);
 
-  // Expressive Eyes + Sleek Curved Upper Lash Liners + Eyelids
+      // Two delicate anime blush hatch lines flush on the patch
+      [-0.013, 0.01].forEach((dx) => {
+        const hatch = new THREE.Mesh(
+          createTaperedTubeGeometry(
+            [
+              [-0.006, -0.008, 0],
+              [0.006, 0.009, 0.001],
+            ],
+            0.0021,
+            4,
+            6,
+            0.25,
+          ),
+          blushStrokeMat,
+        );
+        hatch.position.set(side * 0.168 + dx, 0.194, 0.2195);
+        hatch.rotation.y = side * 0.42;
+        headPivot.add(hatch);
+      });
+    });
+  }
+
+  // Expressive Detailed Nendoroid Eyes ('starry' | 'almond' | 'cheerful' | 'cozy' | 'squint' | 'wink')
+  const lashMat = clayMat('#241A19', 0.42);
+  const eyeTex = createNendoroidEyeTexture(config.eyeColor, config.eyeStyle);
+  const eyePatchMat = new THREE.MeshStandardMaterial({
+    color: '#FFFFFF',
+    map: eyeTex,
+    roughness: 0.2,
+    metalness: 0.0,
+  });
   const eyelids: THREE.Mesh[] = [];
+
   const makeEye = (side: -1 | 1) => {
     const eyeGroup = new THREE.Group();
-    eyeGroup.position.set(side * 0.112, 0.258, 0.246);
-    eyeGroup.rotation.y = side * 0.18;
+    eyeGroup.position.set(side * 0.11, 0.252, 0.252);
+    eyeGroup.rotation.y = side * 0.2;
 
-    if (config.eyeStyle === 'cozy') {
+    const isClosedCozy =
+      config.eyeStyle === 'cozy' || (config.eyeStyle === 'wink' && side === 1);
+
+    if (isClosedCozy) {
+      const isWinkSide = config.eyeStyle === 'wink';
+      const arcPts: [number, number, number][] = isWinkSide
+        ? [
+            [side * -0.044, 0.016, 0.01],
+            [side * -0.004, -0.002, 0.019],
+            [side * 0.044, -0.018, 0.01],
+          ]
+        : [
+            [-0.044, -0.012, 0.01],
+            [-0.022, 0.01, 0.017],
+            [0, 0.018, 0.02],
+            [0.022, 0.01, 0.017],
+            [0.044, -0.012, 0.01],
+          ];
       const arc = new THREE.Mesh(
-        new THREE.TorusGeometry(0.042, 0.01, 8, 14, Math.PI * 0.85),
-        pupilMat,
+        createTaperedTubeGeometry(arcPts, 0.0056, 14, 8, 0.22),
+        lashMat,
       );
-      arc.rotation.z = 0.24;
-      arc.position.set(0, -0.01, 0.018);
-      eyeGroup.add(arc);
-    } else {
-      const isAlmond = config.eyeStyle === 'almond';
-      const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.056, 14, 14), eyeWhiteMat);
-      sclera.scale.set(isAlmond ? 1.04 : 0.96, isAlmond ? 0.92 : 1.08, 0.42);
-      eyeGroup.add(sclera);
-
-      const iris = new THREE.Mesh(new THREE.SphereGeometry(0.041, 14, 14), irisMat);
-      iris.scale.set(0.96, isAlmond ? 0.92 : 1.05, 0.42);
-      iris.position.z = 0.015;
-      eyeGroup.add(iris);
-
-      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.023, 12, 12), pupilMat);
-      pupil.scale.set(1, 1, 0.42);
-      pupil.position.z = 0.025;
-      eyeGroup.add(pupil);
-
-      const glint = new THREE.Mesh(
-        new THREE.SphereGeometry(0.013, 8, 8),
-        new THREE.MeshBasicMaterial({color: '#FFFFFF'}),
-      );
-      glint.position.set(-0.013, 0.017, 0.034);
-      eyeGroup.add(glint);
-
-      if (config.eyeStyle === 'starry') {
-        const subGlint = new THREE.Mesh(
-          new THREE.SphereGeometry(0.008, 8, 8),
-          new THREE.MeshBasicMaterial({color: '#FFFFFF'}),
+      if (isWinkSide) {
+        const lowerWing = new THREE.Mesh(
+          createTaperedTubeGeometry(
+            [
+              [side * -0.04, -0.018, 0.01],
+              [side * 0.002, -0.004, 0.018],
+              [side * 0.044, -0.018, 0.01],
+            ],
+            0.0044,
+            10,
+            8,
+            0.2,
+          ),
+          lashMat,
         );
-        subGlint.position.set(0.014, -0.014, 0.033);
-        eyeGroup.add(subGlint);
+        eyeGroup.add(lowerWing);
+      } else {
+        const wing = new THREE.Mesh(
+          createTaperedTubeGeometry(
+            [
+              [side * 0.038, -0.008, 0.011],
+              [side * 0.052, -0.002, 0.008],
+            ],
+            0.0036,
+            6,
+            6,
+            0.15,
+          ),
+          lashMat,
+        );
+        eyeGroup.add(wing);
       }
+      eyeGroup.add(arc);
+      return eyeGroup;
+    }
 
-      const lash = new THREE.Mesh(
-        new THREE.TorusGeometry(0.056, 0.0105, 8, 16, Math.PI * 0.86),
-        pupilMat,
-      );
-      lash.rotation.z = 0.22 + (isAlmond ? -side * 0.14 : 0);
-      lash.position.set(0, 0.012, 0.017);
-      eyeGroup.add(lash);
+    const isAlmond = config.eyeStyle === 'almond';
+    const isSquint = config.eyeStyle === 'squint';
+    const rx = isAlmond || isSquint ? 0.054 : 0.05;
+    const ry = isAlmond ? 0.048 : isSquint ? 0.046 : 0.056;
 
-      const lid = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), skinMat);
-      lid.scale.set(1.04, 0.08, 0.52);
-      lid.position.set(0, 0.044, 0.008);
-      eyeGroup.add(lid);
-      eyelids.push(lid);
+    const eyeDisc = new THREE.Mesh(
+      createCurvedEyePatchGeometry(rx, ry, 0.015),
+      eyePatchMat,
+    );
+    eyeGroup.add(eyeDisc);
+
+    // Sculpted tapered Upper Eyelash sits cleanly IN FRONT of both iris & drooping squint lid
+    const upperLashPts: [number, number, number][] = isSquint
+      ? [
+          [side * -0.052, 0.016, 0.02],
+          [0, 0.012, 0.025],
+          [side * 0.054, 0.01, 0.018],
+        ]
+      : [
+          [side * -0.048, 0.014, 0.014],
+          [side * -0.024, ry * 0.88, 0.02],
+          [0, ry * 0.98, 0.022],
+          [side * 0.032, ry * (isAlmond ? 0.84 : 0.8), 0.019],
+          [side * 0.058, isAlmond ? 0.012 : 0.006, 0.012],
+        ];
+    const upperLash = new THREE.Mesh(
+      createTaperedTubeGeometry(upperLashPts, isSquint ? 0.0064 : 0.0058, 16, 8, 0.24),
+      lashMat,
+    );
+    eyeGroup.add(upperLash);
+
+    // Subtle lower-outer lash accent for refined Nendoroid finish
+    const lowerAccent = new THREE.Mesh(
+      createTaperedTubeGeometry(
+        [
+          [side * -0.03, -ry * 0.86, 0.014],
+          [0, -ry * 0.94, 0.018],
+          [side * 0.038, -ry * 0.78, 0.013],
+        ],
+        isSquint ? 0.0038 : 0.0024,
+        10,
+        6,
+        0.18,
+      ),
+      isSquint ? lashMat : clayMat(shadeHex(config.skinTone, -0.22).getHex(), 0.6),
+    );
+    eyeGroup.add(lowerAccent);
+
+    // Moving Skin Eyelid (stays tucked strictly behind upperLash z <= 0.019 while cleanly masking upper iris)
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.056, 14, 12), skinMat);
+    const baseLidScaleY = isSquint ? 0.54 : 0.06;
+    const baseLidY = isSquint ? 0.031 : 0.046;
+    lid.scale.set(1.03, baseLidScaleY, 0.28);
+    lid.position.set(0, baseLidY, 0.003);
+    lid.userData.baseScaleY = baseLidScaleY;
+    lid.userData.baseY = baseLidY;
+    eyeGroup.add(lid);
+    eyelids.push(lid);
+
+    // Soft cheek lower-lid rise when squinting (nheo mắt)
+    if (isSquint) {
+      const lowerLid = new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 10), skinMat);
+      lowerLid.scale.set(1.02, 0.24, 0.26);
+      lowerLid.position.set(0, -0.042, 0.002);
+      eyeGroup.add(lowerLid);
     }
 
     return eyeGroup;
   };
   headPivot.add(makeEye(-1), makeEye(1));
 
-  // Fine Curved Sculpted Eyebrows (cleanly seated on sculpted forehead above eyes & glasses)
-  const eyebrowMat = clayMat(shadeHex(config.hairColor, -0.05).getHex(), 0.52);
+  // Fine Sculpted Tapered Eyebrows matching each expression & hair color
+  const browBaseCol = new THREE.Color(config.hairColor);
+  const browLum = {h: 0, s: 0, l: 0};
+  browBaseCol.getHSL(browLum);
+  if (browLum.l > 0.58) browBaseCol.setHSL(browLum.h, browLum.s * 0.85, 0.44);
+  else browBaseCol.lerp(new THREE.Color('#1E1512'), 0.22);
+  const eyebrowMat = clayMat(browBaseCol.getHex(), 0.56);
+
   [-1, 1].forEach((side) => {
+    const expr = config.expression;
+    const isSquint = config.eyeStyle === 'squint';
+    const baseY =
+      expr === 'grin'
+        ? 0.312
+        : isSquint
+          ? 0.296
+          : expr === 'calm'
+            ? 0.302
+            : 0.306;
+    const innerDY =
+      expr === 'bashful'
+        ? 0.007
+        : expr === 'smirk' && side === 1
+          ? 0.011
+          : expr === 'cat'
+            ? -0.004
+            : isSquint
+              ? -0.005
+              : 0;
+    const outerDY =
+      expr === 'bashful'
+        ? -0.005
+        : expr === 'smirk' && side === 1
+          ? 0.009
+          : expr === 'grin'
+            ? 0.004
+            : -0.002;
+
     const brow = new THREE.Mesh(
-      new THREE.TorusGeometry(0.045, 0.0072, 6, 12, Math.PI * 0.42),
+      createTaperedTubeGeometry(
+        [
+          [side * -0.036, innerDY, 0.003],
+          [0, 0.006, 0.007],
+          [side * 0.038, outerDY, -0.002],
+        ],
+        0.0038,
+        10,
+        6,
+        0.24,
+      ),
       eyebrowMat,
     );
-    const browY =
-      config.expression === 'grin'
-        ? 0.314
-        : config.expression === 'calm'
-          ? 0.304
-          : 0.308;
-    const tilt =
-      config.expression === 'grin'
-        ? side * 0.06
-        : config.expression === 'cat'
-          ? -side * 0.12
-          : config.expression === 'calm'
-            ? side * 0.04
-            : -side * 0.04;
-    brow.position.set(side * 0.112, browY, 0.256);
-    brow.rotation.y = side * 0.18;
-    brow.rotation.z = Math.PI * 0.29 + tilt;
+    brow.position.set(side * 0.11, baseY, 0.258);
+    brow.rotation.y = side * 0.2;
     headPivot.add(brow);
   });
 
-  // Mouth Expressions ('smile' | 'grin' | 'cat' | 'calm') seated cleanly on sculpted chin plane
-  const mouthLineMat = clayMat('#5B342E', 0.48);
+  // Delicate Expressive Nendoroid Mouths ('smile' | 'grin' | 'cat' | 'calm' | 'smirk' | 'bashful')
+  const mouthLineMat = clayMat('#643731', 0.48);
+  const mouthY = 0.15;
+  const mouthZ = 0.24;
+
   if (config.expression === 'grin') {
+    const upperLip = new THREE.Mesh(
+      createTaperedTubeGeometry(
+        [
+          [-0.032, mouthY + 0.007, mouthZ - 0.004],
+          [0, mouthY + 0.005, mouthZ + 0.002],
+          [0.032, mouthY + 0.007, mouthZ - 0.004],
+        ],
+        0.0036,
+        12,
+        6,
+        0.24,
+      ),
+      mouthLineMat,
+    );
     const mouthCavity = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.036, 0.027, 0.018, 12, 1, false, 0, Math.PI),
-      clayMat('#9C3D46', 0.5),
+      new THREE.CylinderGeometry(0.03, 0.022, 0.012, 14, 1, false, 0, Math.PI),
+      clayMat('#9C3E49', 0.54),
     );
     mouthCavity.rotation.x = Math.PI / 2;
     mouthCavity.rotation.y = Math.PI / 2;
-    mouthCavity.scale.set(0.95, 1, 0.85);
-    mouthCavity.position.set(0, 0.155, 0.236);
-    const tongue = new THREE.Mesh(
-      new THREE.SphereGeometry(0.019, 10, 8),
-      clayMat('#F07F89', 0.45),
+    mouthCavity.scale.set(0.95, 1, 0.9);
+    mouthCavity.position.set(0, mouthY + 0.004, mouthZ - 0.004);
+    const teeth = new THREE.Mesh(
+      new RoundedBoxGeometry(0.044, 0.008, 0.01, 2, 0.003),
+      clayMat('#FFF9F4', 0.35),
     );
-    tongue.scale.set(1.1, 0.55, 0.6);
-    tongue.position.set(0, 0.141, 0.24);
-    headPivot.add(mouthCavity, tongue);
+    teeth.position.set(0, mouthY + 0.001, mouthZ - 0.001);
+    const tongue = new THREE.Mesh(
+      new THREE.SphereGeometry(0.015, 10, 8),
+      clayMat('#F28691', 0.48),
+    );
+    tongue.scale.set(1.15, 0.5, 0.5);
+    tongue.position.set(0, mouthY - 0.009, mouthZ);
+    headPivot.add(mouthCavity, teeth, tongue, upperLip);
   } else if (config.expression === 'cat') {
-    [-1, 1].forEach((s) => {
-      const catArc = new THREE.Mesh(
-        new THREE.TorusGeometry(0.018, 0.0068, 6, 12, Math.PI),
-        mouthLineMat,
-      );
-      catArc.rotation.z = Math.PI;
-      catArc.position.set(s * 0.018, 0.155, 0.238);
-      headPivot.add(catArc);
-    });
+    const catMouth = new THREE.Mesh(
+      createTaperedTubeGeometry(
+        [
+          [-0.032, mouthY + 0.005, mouthZ - 0.004],
+          [-0.016, mouthY - 0.004, mouthZ],
+          [0, mouthY + 0.003, mouthZ + 0.002],
+          [0.016, mouthY - 0.004, mouthZ],
+          [0.032, mouthY + 0.005, mouthZ - 0.004],
+        ],
+        0.0034,
+        18,
+        6,
+        0.26,
+      ),
+      mouthLineMat,
+    );
+    headPivot.add(catMouth);
   } else if (config.expression === 'calm') {
     const calmMouth = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.0068, 0.028, 6, 8),
+      createTaperedTubeGeometry(
+        [
+          [-0.02, mouthY + 0.001, mouthZ - 0.001],
+          [0, mouthY - 0.001, mouthZ + 0.001],
+          [0.02, mouthY + 0.001, mouthZ - 0.001],
+        ],
+        0.0034,
+        10,
+        6,
+        0.25,
+      ),
       mouthLineMat,
     );
-    calmMouth.rotation.z = Math.PI / 2;
-    calmMouth.position.set(0, 0.153, 0.239);
     headPivot.add(calmMouth);
-  } else {
-    const smileMesh = new THREE.Mesh(
-      new THREE.TorusGeometry(0.028, 0.0082, 8, 14, Math.PI),
+  } else if (config.expression === 'smirk') {
+    const smirkMouth = new THREE.Mesh(
+      createTaperedTubeGeometry(
+        [
+          [-0.024, mouthY - 0.002, mouthZ - 0.001],
+          [0.002, mouthY - 0.001, mouthZ + 0.002],
+          [0.028, mouthY + 0.009, mouthZ - 0.004],
+        ],
+        0.0036,
+        12,
+        6,
+        0.22,
+      ),
       mouthLineMat,
     );
-    smileMesh.rotation.z = Math.PI;
-    smileMesh.position.set(0, 0.156, 0.238);
+    headPivot.add(smirkMouth);
+  } else if (config.expression === 'bashful') {
+    const bashfulMouth = new THREE.Mesh(
+      createTaperedTubeGeometry(
+        [
+          [-0.018, mouthY + 0.001, mouthZ - 0.001],
+          [-0.006, mouthY - 0.003, mouthZ + 0.001],
+          [0.006, mouthY + 0.002, mouthZ + 0.001],
+          [0.018, mouthY - 0.002, mouthZ - 0.001],
+        ],
+        0.0032,
+        12,
+        6,
+        0.25,
+      ),
+      mouthLineMat,
+    );
+    headPivot.add(bashfulMouth);
+  } else {
+    // 'smile': delicate soft Nendoroid U-smile
+    const smileMesh = new THREE.Mesh(
+      createTaperedTubeGeometry(
+        [
+          [-0.026, mouthY + 0.005, mouthZ - 0.003],
+          [-0.013, mouthY - 0.003, mouthZ + 0.001],
+          [0, mouthY - 0.005, mouthZ + 0.002],
+          [0.013, mouthY - 0.003, mouthZ + 0.001],
+          [0.026, mouthY + 0.005, mouthZ - 0.003],
+        ],
+        0.0036,
+        14,
+        6,
+        0.24,
+      ),
+      mouthLineMat,
+    );
     headPivot.add(smileMesh);
   }
 
@@ -1268,17 +1731,18 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   if (config.headItem === 'beret') {
     const beretMat = clayMat(headItemCol, 0.66);
     const rimMat = clayMat(shadeHex(headItemCol, -0.14).getHex(), 0.72);
+    // Ordered bottom-up for crisp outward-facing Three.js LatheGeometry normals
     const pts = [
-      new THREE.Vector2(0.0, 0.115),
-      new THREE.Vector2(0.09, 0.122),
-      new THREE.Vector2(0.24, 0.114),
-      new THREE.Vector2(0.325, 0.072),
-      new THREE.Vector2(0.315, 0.022),
+      new THREE.Vector2(0.245, -0.008),
       new THREE.Vector2(0.268, 0.0),
-      new THREE.Vector2(0.25, 0.0),
+      new THREE.Vector2(0.32, 0.024),
+      new THREE.Vector2(0.332, 0.072),
+      new THREE.Vector2(0.248, 0.114),
+      new THREE.Vector2(0.1, 0.124),
+      new THREE.Vector2(0.0, 0.118),
     ];
     const beretGeo = new THREE.LatheGeometry(pts, 28);
-    beretGeo.scale(1.06, 0.94, 1.0);
+    beretGeo.scale(1.06, 0.96, 1.0);
     const beretBody = new THREE.Mesh(beretGeo, beretMat);
     beretBody.position.set(
       crownTilted.position.x,
@@ -1310,16 +1774,17 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   } else if (config.headItem === 'sunhat') {
     const hatMat = clayMat(headItemCol || '#EBD08E', 0.74);
     const ribbonMat = clayMat('#E57A6B', 0.65);
+    // Ordered inner-underbrim -> outer-brim -> top-crown for outward normals
     const pts = [
-      new THREE.Vector2(0.0, 0.145),
-      new THREE.Vector2(0.16, 0.14),
-      new THREE.Vector2(0.245, 0.118),
-      new THREE.Vector2(0.278, 0.018),
-      new THREE.Vector2(0.43, -0.008),
-      new THREE.Vector2(0.515, -0.028),
-      new THREE.Vector2(0.516, -0.042),
-      new THREE.Vector2(0.42, -0.022),
       new THREE.Vector2(0.262, 0.006),
+      new THREE.Vector2(0.42, -0.022),
+      new THREE.Vector2(0.518, -0.042),
+      new THREE.Vector2(0.516, -0.028),
+      new THREE.Vector2(0.43, -0.008),
+      new THREE.Vector2(0.278, 0.018),
+      new THREE.Vector2(0.245, 0.118),
+      new THREE.Vector2(0.16, 0.14),
+      new THREE.Vector2(0.0, 0.146),
     ];
     const hatGeo = new THREE.LatheGeometry(pts, 32);
     hatGeo.scale(1.06, 1.0, 0.98);
@@ -1346,27 +1811,33 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     accGroup.add(sunhat, ribbon);
   } else if (config.headItem === 'cap') {
     const capCol = headItemCol || '#4B86B4';
-    const capMat = clayMat(capCol, 0.62);
-    const trimMat = clayMat('#F4EFE6', 0.65);
+    const capMat = clayMat(capCol, 0.6);
+    const darkCapMat = clayMat(shadeHex(capCol, -0.14).getHex(), 0.64);
+    const trimMat = clayMat('#F7F3EA', 0.62);
 
     const capGrp = new THREE.Group();
-    capGrp.position.set(crownTop.position.x, crownTop.position.y - 0.145, crownTop.position.z);
-    capGrp.rotation.set(-0.1, 0, 0);
+    // Deeper seating covering the crown cleanly down toward brow & temples
+    capGrp.position.set(crownTop.position.x, crownTop.position.y - 0.162, crownTop.position.z - 0.004);
+    capGrp.rotation.set(-0.08, 0, 0);
 
-    const domeGeo = new THREE.SphereGeometry(1, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.54);
-    domeGeo.scale(0.34, 0.19, 0.322);
+    // Fuller sculpted 6-panel athletic dome
+    const domeGeo = new THREE.SphereGeometry(1, 32, 18, 0, Math.PI * 2, 0, Math.PI * 0.56);
+    domeGeo.scale(0.358, 0.245, 0.346);
     const dome = new THREE.Mesh(domeGeo, capMat);
 
-    const cuffGeo = new THREE.TorusGeometry(1, 0.045, 10, 28);
-    cuffGeo.rotateX(Math.PI / 2);
-    cuffGeo.scale(0.335, 1, 0.316);
-    const cuff = new THREE.Mesh(cuffGeo, capMat);
+    // Subtle matching piping trim along cap base (no clunky white donut)
+    const rimGeo = new THREE.TorusGeometry(1, 0.018, 10, 32);
+    rimGeo.rotateX(Math.PI / 2);
+    rimGeo.scale(0.352, 1, 0.34);
+    const rim = new THREE.Mesh(rimGeo, darkCapMat);
+    rim.position.y = -0.004;
 
+    // Longer, sleeker, wider curved baseball visor
     const visorShape = new THREE.Shape();
-    visorShape.moveTo(-0.24, 0);
-    visorShape.quadraticCurveTo(-0.23, 0.18, 0, 0.22);
-    visorShape.quadraticCurveTo(0.23, 0.18, 0.24, 0);
-    visorShape.quadraticCurveTo(0, 0.06, -0.24, 0);
+    visorShape.moveTo(-0.245, 0);
+    visorShape.bezierCurveTo(-0.24, 0.22, -0.13, 0.325, 0, 0.335);
+    visorShape.bezierCurveTo(0.13, 0.325, 0.24, 0.22, 0.245, 0);
+    visorShape.quadraticCurveTo(0, 0.075, -0.245, 0);
 
     const visorGeo = new THREE.ExtrudeGeometry(visorShape, {
       depth: 0.018,
@@ -1374,23 +1845,32 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
       bevelThickness: 0.008,
       bevelSize: 0.008,
       bevelSegments: 2,
-      curveSegments: 14,
+      curveSegments: 16,
     });
-    visorGeo.rotateX(Math.PI / 2 + 0.14);
+    visorGeo.rotateX(Math.PI / 2 + 0.1);
     const vPos = visorGeo.attributes.position;
     for (let i = 0; i < vPos.count; i++) {
       const vx = vPos.getX(i);
-      vPos.setY(i, vPos.getY(i) - vx * vx * 0.56);
+      const vz = vPos.getZ(i);
+      vPos.setY(i, vPos.getY(i) - vx * vx * 0.62 - vz * 0.04);
     }
     visorGeo.computeVertexNormals();
-    const visor = new THREE.Mesh(visorGeo, trimMat);
-    visor.position.set(0, 0.01, 0.245);
+    const visor = new THREE.Mesh(visorGeo, capMat);
+    visor.position.set(0, 0.014, 0.255);
 
-    const btn = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), trimMat);
-    btn.scale.set(1, 0.55, 1);
-    btn.position.set(0, 0.19, 0);
+    // Subtle crisp front visor edge trim + front crown emblem
+    const emblem = new THREE.Mesh(
+      new RoundedBoxGeometry(0.088, 0.048, 0.018, 2, 0.008),
+      trimMat,
+    );
+    emblem.position.set(0, 0.088, 0.332);
+    emblem.rotation.x = -0.34;
 
-    capGrp.add(dome, cuff, visor, btn);
+    const btn = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), darkCapMat);
+    btn.scale.set(1, 0.52, 1);
+    btn.position.set(0, 0.245, 0);
+
+    capGrp.add(dome, rim, visor, emblem, btn);
     accGroup.add(capGrp);
   } else if (config.headItem === 'beanie') {
     const knitCol = headItemCol || '#D89A48';
@@ -1399,48 +1879,51 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     const pomMat = clayMat('#F8F4EC', 0.82);
 
     const beanieGrp = new THREE.Group();
-    beanieGrp.position.set(crownTop.position.x, crownTop.position.y - 0.088, crownTop.position.z);
+    beanieGrp.position.set(crownTop.position.x, crownTop.position.y - 0.105, crownTop.position.z - 0.006);
     beanieGrp.rotation.set(-0.1, 0, 0);
 
+    // Ordered bottom-up so LatheGeometry normals point cleanly OUTWARD, oversized to cover hair
     const pts = [
-      new THREE.Vector2(0.0, 0.15),
-      new THREE.Vector2(0.12, 0.144),
-      new THREE.Vector2(0.24, 0.102),
-      new THREE.Vector2(0.312, 0.015),
-      new THREE.Vector2(0.322, -0.068),
-      new THREE.Vector2(0.295, -0.068),
+      new THREE.Vector2(0.328, -0.076),
+      new THREE.Vector2(0.368, -0.068),
+      new THREE.Vector2(0.365, 0.018),
+      new THREE.Vector2(0.312, 0.108),
+      new THREE.Vector2(0.185, 0.162),
+      new THREE.Vector2(0.0, 0.172),
     ];
-    const domeGeo = new THREE.LatheGeometry(pts, 28);
-    domeGeo.scale(1.06, 1.0, 0.98);
+    const domeGeo = new THREE.LatheGeometry(pts, 32);
+    domeGeo.scale(1.06, 1.0, 1.0);
     const dome = new THREE.Mesh(domeGeo, knitMat);
 
-    const cuffGeo = new THREE.TorusGeometry(0.305, 0.038, 12, 28);
+    // Plush folded ribbed knit cuff covering the hair rim smoothly
+    const cuffGeo = new THREE.TorusGeometry(0.348, 0.046, 12, 32);
     cuffGeo.rotateX(Math.PI / 2);
-    cuffGeo.scale(1.06, 1.0, 0.98);
+    cuffGeo.scale(1.06, 1.0, 1.0);
     const cuff = new THREE.Mesh(cuffGeo, cuffMat);
-    cuff.position.y = -0.056;
+    cuff.position.y = -0.064;
 
-    const pom = new THREE.Mesh(new THREE.SphereGeometry(0.058, 14, 12), pomMat);
-    pom.position.set(0, 0.165, -0.01);
+    const pom = new THREE.Mesh(new THREE.SphereGeometry(0.064, 16, 12), pomMat);
+    pom.position.set(0, 0.194, -0.01);
 
     beanieGrp.add(dome, cuff, pom);
     accGroup.add(beanieGrp);
   } else if (config.headItem === 'cat_ears') {
     const bandR = headbandArc.radius;
     const band = new THREE.Mesh(
-      new THREE.TorusGeometry(bandR, 0.02, 10, 26, Math.PI),
+      new THREE.TorusGeometry(bandR, 0.019, 10, 28, Math.PI),
       clayMat('#3A2B28', 0.65),
     );
+    band.scale.set(1.01, 0.99, 1.0);
     band.position.copy(headbandArc.center);
     band.rotation.x = headbandArc.tiltX;
     accGroup.add(band);
 
-    const earTopY = headbandArc.center.y + bandR * Math.cos(headbandArc.tiltX) - 0.01;
-    const earZ = headbandArc.center.z - bandR * Math.sin(headbandArc.tiltX) * 0.5 + 0.02;
+    const earTopY = headbandArc.center.y + bandR * 0.99 * Math.cos(headbandArc.tiltX) - 0.012;
+    const earZ = headbandArc.center.z - bandR * Math.sin(headbandArc.tiltX) * 0.52 + 0.022;
     [-1, 1].forEach((side) => {
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.084, 0.145, 14), clayMat('#FFF8F2'));
       ear.scale.set(1.0, 1.0, 0.62);
-      ear.position.set(side * 0.205, earTopY, earZ);
+      ear.position.set(side * 0.21, earTopY, earZ);
       ear.rotation.z = -side * 0.3;
       ear.rotation.x = headbandArc.tiltX;
       const inner = new THREE.Mesh(
@@ -1448,7 +1931,7 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
         clayMat(headItemCol || '#F497AC'),
       );
       inner.scale.set(1.0, 1.0, 0.52);
-      inner.position.set(side * 0.205, earTopY - 0.012, earZ + 0.022);
+      inner.position.set(side * 0.21, earTopY - 0.012, earZ + 0.022);
       inner.rotation.z = -side * 0.3;
       inner.rotation.x = headbandArc.tiltX;
       accGroup.add(ear, inner);
@@ -1456,45 +1939,89 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   } else if (config.headItem === 'flower_crown') {
     const bandR = headbandArc.radius;
     const band = new THREE.Mesh(
-      new THREE.TorusGeometry(bandR, 0.018, 10, 26, Math.PI),
+      new THREE.TorusGeometry(bandR, 0.017, 10, 28, Math.PI),
       clayMat('#5E9E69', 0.72),
     );
+    band.scale.set(1.01, 0.99, 1.0);
     band.position.copy(headbandArc.center);
     band.rotation.x = headbandArc.tiltX;
     accGroup.add(band);
 
+    const petalGeo = new THREE.SphereGeometry(0.019, 10, 8);
+    petalGeo.scale(0.85, 1.15, 0.45);
+    const coreMat = clayMat('#F7C844', 0.58);
+
     for (let i = 0; i < 5; i++) {
-      const ang = -1.1 + i * 0.55;
-      const fx = Math.sin(ang) * (bandR + 0.015);
-      const fy = headbandArc.center.y + Math.cos(ang) * (bandR + 0.015) * Math.cos(headbandArc.tiltX);
-      const fz = headbandArc.center.z - Math.cos(ang) * (bandR + 0.015) * Math.sin(headbandArc.tiltX);
-      const fl = new THREE.Mesh(
-        new THREE.SphereGeometry(0.038, 12, 10),
-        clayMat(i % 2 === 0 ? headItemCol || '#F7A8B8' : '#FFE082'),
-      );
-      fl.position.set(fx, fy, fz);
-      accGroup.add(fl);
+      const ang = -1.06 + i * 0.53;
+      const fx = Math.sin(ang) * (bandR * 1.01 + 0.014);
+      const fy = headbandArc.center.y + Math.cos(ang) * (bandR * 0.99 + 0.014) * Math.cos(headbandArc.tiltX);
+      const fz = headbandArc.center.z - Math.cos(ang) * (bandR + 0.014) * Math.sin(headbandArc.tiltX);
+
+      const flowerGrp = new THREE.Group();
+      flowerGrp.position.set(fx, fy, fz);
+      const radialN = new THREE.Vector3(
+        Math.sin(ang),
+        Math.cos(ang) * Math.cos(headbandArc.tiltX),
+        -Math.cos(ang) * Math.sin(headbandArc.tiltX) + 0.22,
+      ).normalize();
+      flowerGrp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), radialN);
+
+      const pMat = clayMat(i % 2 === 0 ? headItemCol || '#F7A8B8' : '#FFF3B8', 0.62);
+      for (let p = 0; p < 5; p++) {
+        const pa = (p / 5) * Math.PI * 2;
+        const petal = new THREE.Mesh(petalGeo, pMat);
+        petal.position.set(Math.cos(pa) * 0.022, Math.sin(pa) * 0.022, 0);
+        petal.rotation.z = pa - Math.PI / 2;
+        flowerGrp.add(petal);
+      }
+      const bud = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), coreMat);
+      bud.scale.set(1, 1, 0.65);
+      bud.position.z = 0.006;
+      flowerGrp.add(bud);
+      accGroup.add(flowerGrp);
     }
   } else if (config.headItem === 'ribbon_bow') {
     const bowMat = clayMat(headItemCol || '#6BAEE6', 0.56);
+    const knotMat = clayMat(shadeHex(headItemCol || '#6BAEE6', -0.1).getHex(), 0.58);
     const bandR = headbandArc.radius;
+
+    // Band sits flush on outer hair envelope
     const band = new THREE.Mesh(
-      new THREE.TorusGeometry(bandR, 0.02, 10, 26, Math.PI),
+      new THREE.TorusGeometry(bandR, 0.02, 10, 28, Math.PI),
       bowMat,
     );
+    band.scale.set(1.01, 0.99, 1.0);
     band.position.copy(headbandArc.center);
     band.rotation.x = headbandArc.tiltX;
-    const bowY = headbandArc.center.y + bandR * 0.9;
-    const wingL = new THREE.Mesh(new THREE.SphereGeometry(0.072, 12, 10), bowMat);
-    wingL.scale.set(1.2, 0.72, 0.52);
-    wingL.position.set(0.145, bowY + 0.015, 0.072);
-    wingL.rotation.z = -0.25;
-    const wingR = wingL.clone();
-    wingR.position.set(0.245, bowY - 0.025, 0.072);
-    wingR.rotation.z = 0.25;
-    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.034, 10, 10), bowMat);
-    knot.position.set(0.195, bowY - 0.005, 0.095);
-    accGroup.add(band, wingL, wingR, knot);
+    accGroup.add(band);
+
+    // Sculpted bow mounted cleanly ON TOP of the headband arch so hair never hides it
+    const bowAng = 0.56;
+    const archR = bandR + 0.022;
+    const bowGrp = new THREE.Group();
+    bowGrp.position.set(
+      Math.sin(bowAng) * archR * 1.01,
+      headbandArc.center.y + Math.cos(bowAng) * archR * 0.99 * Math.cos(headbandArc.tiltX),
+      headbandArc.center.z - Math.cos(bowAng) * archR * Math.sin(headbandArc.tiltX) + 0.012,
+    );
+    bowGrp.rotation.set(headbandArc.tiltX, -0.16, -bowAng * 0.72);
+
+    [-1, 1].forEach((side) => {
+      const wing = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 12), bowMat);
+      wing.scale.set(1.25, 0.76, 0.54);
+      wing.position.set(side * 0.064, 0.008, 0);
+      wing.rotation.z = side * 0.24;
+
+      const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.016, 0.056, 6, 8), bowMat);
+      tail.position.set(side * 0.036, -0.048, -0.006);
+      tail.rotation.z = side * 0.42;
+      bowGrp.add(wing, tail);
+    });
+    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 10), knotMat);
+    knot.scale.set(1.05, 0.92, 0.85);
+    knot.position.set(0, 0.004, 0.016);
+    bowGrp.add(knot);
+    accGroup.add(bowGrp);
   } else if (config.headItem === 'hair_clip') {
     const clipMat1 = clayMat(headItemCol || '#F4A261', 0.45);
     const clipMat2 = clayMat('#FDF2D6', 0.48);
@@ -1624,11 +2151,11 @@ export function updateAvatarRigAnimation(
 ): void {
   if (rig.eyelids.length > 0) {
     const eyesClosed = pose === 'sleep' || isCozyEyes;
-    const targetLidY = eyesClosed ? 1.15 : 0.08;
-    const lidY = eyesClosed ? 0 : 0.044;
     rig.eyelids.forEach((lid) => {
-      lid.scale.y = targetLidY;
-      lid.position.y = lidY;
+      const baseScaleY = (lid.userData.baseScaleY as number) ?? 0.06;
+      const baseY = (lid.userData.baseY as number) ?? 0.046;
+      lid.scale.y = eyesClosed ? 1.15 : baseScaleY;
+      lid.position.y = eyesClosed ? 0 : baseY;
     });
   }
 
@@ -1676,6 +2203,9 @@ export function updateAvatarRigAnimation(
     } else if (hold === 'carry_front') {
       rig.rightArm.rotation.x = HAND_POSES.carry_front.armX;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX;
+    } else if (hold === 'carry_bag') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
     } else {
       rig.rightArm.rotation.x = -0.42;
       if (rig.rightElbow) rig.rightElbow.rotation.x = -0.52;

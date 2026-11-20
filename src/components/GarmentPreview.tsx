@@ -178,26 +178,28 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
                 <circle cx="57" cy="20" r="9" fill={col} stroke={outline} strokeWidth="2" />
               </g>
             )}
-            {/* Sculpted Hairline Base Cap + Chibi Face */}
-            <circle cx="40" cy="36" r="19" fill={col} stroke={outline} strokeWidth="2.1" />
+            {/* Sculpted Fluffy Hairline Base Cap + Chibi Face */}
+            <ellipse cx="40" cy="34" rx="20.5" ry="20" fill={col} stroke={outline} strokeWidth="2.1" />
             <path d="M25 38 C25 27, 32 24, 40 24 C48 24, 55 27, 55 38 C55 49, 47 55, 40 55 C33 55, 25 49, 25 38 Z" fill="#FDE2CC" stroke={outline} strokeWidth="1.7" />
             {/* Bangs */}
             {back === 'boy_1' ? (
-              <path d="M22 39 C22 20, 31 15, 41 15 C51 15, 58 21, 57 39 C54 34, 50 30, 46 25 C41 33, 33 38, 22 39 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
+              <path d="M21 39 C21 19, 31 13, 41 13 C51 13, 59 20, 58 39 C54 34, 50 30, 46 25 C41 33, 33 38, 21 39 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
             ) : back === 'boy_2' ? (
-              <path d="M22 39 C22 21, 30 15, 40 16 C50 15, 58 21, 58 39 C52 38, 48 33, 44 26 C42 29, 41 31, 40 25 C37 33, 31 38, 22 39 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
+              <path d="M21 39 C21 19, 30 13, 40 14 C50 13, 59 19, 59 39 C52 38, 48 33, 44 26 C42 29, 41 31, 40 25 C37 33, 31 38, 21 39 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
             ) : back === 'boy_3' ? (
-              <path d="M40 11 L43 16 C52 17, 58 23, 58 38 L53 34 L49 39 L45 31 L40 39 L35 31 L31 39 L27 34 L22 38 C22 23, 28 17, 37 16 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
+              <path d="M40 9 L43 14 C52 15, 59 22, 59 38 L53 34 L49 39 L45 31 L40 39 L35 31 L31 39 L27 34 L21 38 C21 22, 28 15, 37 14 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
+            ) : back === 'boy_4' ? (
+              <path d="M42 10 L44 14 C53 15, 60 22, 59 39 L54 33 L50 38 L46 31 L42 38 L38 30 L34 38 L30 31 L25 38 L21 33 L15 32 L20 27 C20 18, 29 14, 39 14 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
             ) : back === 'short_crop' ? (
-              <path d="M23 36 C23 20, 31 16, 40 16 C49 16, 57 20, 57 36 C53 33, 49 34, 46 31 C42 35, 38 35, 34 31 C31 34, 27 33, 23 36 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
+              <path d="M22 36 C22 18, 31 14, 40 14 C49 14, 58 18, 58 36 C53 33, 49 34, 46 31 C42 35, 38 35, 34 31 C31 34, 27 33, 22 36 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
             ) : front === 'curtain' ? (
-              <path d="M23 38 C24 22, 32 18, 40 18 C48 18, 56 22, 57 38 C50 35, 45 31, 40 26 C35 31, 30 35, 23 38 Z" fill={col} stroke={outline} strokeWidth="1.8" />
+              <path d="M22 38 C23 20, 32 15, 40 15 C48 15, 57 20, 58 38 C50 35, 45 31, 40 26 C35 31, 30 35, 22 38 Z" fill={col} stroke={outline} strokeWidth="1.8" />
             ) : front === 'side_sweep' ? (
-              <path d="M23 37 C23 22, 32 18, 40 18 C49 18, 56 23, 57 35 C48 33, 38 30, 23 37 Z" fill={col} stroke={outline} strokeWidth="1.8" />
+              <path d="M22 37 C22 20, 32 15, 40 15 C49 15, 57 21, 58 35 C48 33, 38 30, 22 37 Z" fill={col} stroke={outline} strokeWidth="1.8" />
             ) : (
-              <path d="M23 35 C24 21, 32 18, 40 18 C48 18, 56 21, 57 35 C51 31, 46 31, 44 35 C41 30, 38 30, 36 35 C33 31, 29 31, 23 35 Z" fill={col} stroke={outline} strokeWidth="1.8" />
+              <path d="M22 35 C23 19, 32 15, 40 15 C48 15, 57 19, 58 35 C51 31, 46 31, 44 35 C41 30, 38 30, 36 35 C33 31, 29 31, 22 35 Z" fill={col} stroke={outline} strokeWidth="1.8" />
             )}
-            <path d="M31 22 Q40 19 49 22" stroke={light} strokeWidth="2.2" strokeLinecap="round" opacity="0.7" />
+            <path d="M30 20 Q40 17 50 20" stroke={light} strokeWidth="2.2" strokeLinecap="round" opacity="0.7" />
           </g>
         );
       })()}
@@ -207,6 +209,7 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
         const eyeCol = patch.eyeColor || '#4B7F52';
         const eyeStyle = patch.eyeStyle || 'starry';
         const expr = patch.expression || 'smile';
+        const hasBlush = Boolean(patch.blush);
 
         return (
           <g>
@@ -221,64 +224,115 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             />
             {/* Sculpted Eyebrows */}
             <path
-              d={expr === 'grin' ? 'M25 32 Q30 29 35 32' : expr === 'cat' ? 'M25 33 Q30 30 35 34' : 'M25 32 Q30 30.5 35 32.5'}
+              d={
+                expr === 'grin'
+                  ? 'M25 32 Q30 29 35 32'
+                  : expr === 'bashful'
+                    ? 'M25 33 Q30 31.5 35 30'
+                    : eyeStyle === 'squint'
+                      ? 'M25 33.5 Q30 32.5 35 34'
+                      : expr === 'cat'
+                        ? 'M25 33 Q30 30 35 34'
+                        : 'M25 32 Q30 30.5 35 32.5'
+              }
               stroke={outline}
-              strokeWidth="2"
+              strokeWidth="1.9"
               strokeLinecap="round"
               fill="none"
             />
             <path
-              d={expr === 'grin' ? 'M45 32 Q50 29 55 32' : expr === 'cat' ? 'M45 34 Q50 30 55 33' : 'M45 32.5 Q50 30.5 55 32'}
+              d={
+                expr === 'grin'
+                  ? 'M45 32 Q50 29 55 32'
+                  : expr === 'bashful'
+                    ? 'M45 30 Q50 31.5 55 33'
+                    : expr === 'smirk'
+                      ? 'M45 31 Q50 28.5 55 31'
+                      : eyeStyle === 'squint'
+                        ? 'M45 34 Q50 32.5 55 33.5'
+                        : expr === 'cat'
+                          ? 'M45 34 Q50 30 55 33'
+                          : 'M45 32.5 Q50 30.5 55 32'
+              }
               stroke={outline}
-              strokeWidth="2"
+              strokeWidth="1.9"
               strokeLinecap="round"
               fill="none"
             />
-            {/* Rosy cheeks & tiny nose hint */}
-            <ellipse cx="26" cy="48" rx="4.4" ry="2.4" fill="#F28B92" opacity="0.62" />
-            <ellipse cx="54" cy="48" rx="4.4" ry="2.4" fill="#F28B92" opacity="0.62" />
-            <circle cx="40" cy="45.5" r="1.1" fill="#D9A88C" />
+            {/* Optional Rosy Cheeks & subtle nose dot */}
+            {hasBlush && (
+              <g opacity="0.62">
+                <ellipse cx="26" cy="48" rx="4.4" ry="2.3" fill="#F28B92" />
+                <ellipse cx="54" cy="48" rx="4.4" ry="2.3" fill="#F28B92" />
+              </g>
+            )}
+            <circle cx="40" cy="45.5" r="0.9" fill="#D9A88C" />
 
-            {/* Lower-half Stylized Eyes */}
+            {/* Detailed Nendoroid Eyes */}
             {eyeStyle === 'cozy' ? (
               <g>
-                <path d="M25 41 Q30 36 35 41" stroke={outline} strokeWidth="2.6" strokeLinecap="round" fill="none" />
-                <path d="M45 41 Q50 36 55 41" stroke={outline} strokeWidth="2.6" strokeLinecap="round" fill="none" />
+                <path d="M25 41 Q30 36 35 41" stroke={outline} strokeWidth="2.5" strokeLinecap="round" fill="none" />
+                <path d="M45 41 Q50 36 55 41" stroke={outline} strokeWidth="2.5" strokeLinecap="round" fill="none" />
+              </g>
+            ) : eyeStyle === 'squint' ? (
+              <g>
+                {[30, 50].map((ex) => (
+                  <g key={ex}>
+                    <rect x={ex - 4.8} y="38.5" width="9.6" height="4.8" rx="2.2" fill="#FFFFFF" stroke={outline} strokeWidth="1.2" />
+                    <ellipse cx={ex} cy="41.2" rx="2.9" ry="2.1" fill={eyeCol} />
+                    <circle cx={ex} cy="41.3" r="1.3" fill="#241B19" />
+                    <circle cx={ex - 1.1} cy="40.3" r="0.8" fill="#FFFFFF" />
+                    <rect x={ex - 5.2} y="35.8" width="10.4" height="3.2" rx="1" fill="#FDE2CC" />
+                    <path d={`M${ex - 5.2} 38.8 L${ex + 5.2} 39.1`} stroke={outline} strokeWidth="2.2" strokeLinecap="round" />
+                    <path d={`M${ex - 3.6} 43.4 Q${ex} 44.3 ${ex + 3.6} 43.4`} stroke="#B8836B" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+                  </g>
+                ))}
               </g>
             ) : (
               <g>
-                {[30, 50].map((ex, idx) => (
-                  <g key={ex}>
-                    <ellipse
-                      cx={ex}
-                      cy="41"
-                      rx={eyeStyle === 'almond' ? 4.8 : 4.5}
-                      ry={eyeStyle === 'almond' ? 4.3 : 5.2}
-                      fill="#FFFFFF"
-                      stroke={outline}
-                      strokeWidth="1.4"
-                    />
-                    <circle cx={ex} cy="41.5" r="3.1" fill={eyeCol} />
-                    <circle cx={ex} cy="41.7" r="1.7" fill="#241B19" />
-                    <circle cx={ex - 1.3} cy="39.5" r="1.2" fill="#FFFFFF" />
-                    {eyeStyle === 'starry' && (
-                      <circle cx={ex + 1.4} cy="43.3" r="0.8" fill="#FFFFFF" />
-                    )}
+                {[30, 50].map((ex, idx) =>
+                  eyeStyle === 'wink' && idx === 1 ? (
                     <path
-                      d={
-                        eyeStyle === 'almond'
-                          ? idx === 0
-                            ? `M${ex - 5} 38 Q${ex} 35 ${ex + 4} 37`
-                            : `M${ex - 4} 37 Q${ex} 35 ${ex + 5} 38`
-                          : `M${ex - 4.8} 37.5 Q${ex} 34.5 ${ex + 4.8} 37.5`
-                      }
+                      key={ex}
+                      d="M45 38.5 Q50 41 55 43.2"
                       stroke={outline}
-                      strokeWidth="2.1"
+                      strokeWidth="2.5"
                       strokeLinecap="round"
                       fill="none"
                     />
-                  </g>
-                ))}
+                  ) : (
+                    <g key={ex}>
+                      <ellipse
+                        cx={ex}
+                        cy="41"
+                        rx={eyeStyle === 'almond' ? 4.8 : 4.5}
+                        ry={eyeStyle === 'almond' ? 4.3 : 5.2}
+                        fill="#FFFFFF"
+                        stroke={outline}
+                        strokeWidth="1.4"
+                      />
+                      <circle cx={ex} cy="41.5" r="3.1" fill={eyeCol} />
+                      <circle cx={ex} cy="41.7" r="1.7" fill="#241B19" />
+                      <circle cx={ex - 1.3} cy="39.5" r="1.2" fill="#FFFFFF" />
+                      {(eyeStyle === 'starry' || eyeStyle === 'wink') && (
+                        <circle cx={ex + 1.4} cy="43.3" r="0.8" fill="#FFFFFF" />
+                      )}
+                      <path
+                        d={
+                          eyeStyle === 'almond'
+                            ? idx === 0
+                              ? `M${ex - 5} 38 Q${ex} 35 ${ex + 4} 37`
+                              : `M${ex - 4} 37 Q${ex} 35 ${ex + 5} 38`
+                            : `M${ex - 4.8} 37.5 Q${ex} 34.5 ${ex + 4.8} 37.5`
+                        }
+                        stroke={outline}
+                        strokeWidth="2.1"
+                        strokeLinecap="round"
+                        fill="none"
+                      />
+                    </g>
+                  ),
+                )}
               </g>
             )}
 
@@ -303,7 +357,25 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <path
                 d="M37 53 Q40 54 43 53"
                 stroke={outline}
-                strokeWidth="2"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                fill="none"
+              />
+            )}
+            {expr === 'smirk' && (
+              <path
+                d="M36 53.5 Q41 53.5 44.5 50.8"
+                stroke={outline}
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                fill="none"
+              />
+            )}
+            {expr === 'bashful' && (
+              <path
+                d="M36.5 53 Q38.5 54 40 52.5 Q41.5 54 43.5 53"
+                stroke={outline}
+                strokeWidth="1.8"
                 strokeLinecap="round"
                 fill="none"
               />
@@ -312,7 +384,7 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <path
                 d="M36 52 Q40 56 44 52"
                 stroke={outline}
-                strokeWidth="2"
+                strokeWidth="1.9"
                 strokeLinecap="round"
                 fill="none"
               />

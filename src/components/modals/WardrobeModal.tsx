@@ -43,18 +43,18 @@ export const WardrobeModal: React.FC<WardrobeModalProps> = ({
 
   return (
     <div
-      className="absolute inset-0 z-50 flex items-center justify-center bg-stone-950/65 p-2.5 sm:p-5"
+      className="absolute inset-0 z-50 flex items-center justify-center bg-stone-950/65 p-1.5 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="anim-pop flex h-full max-h-[94dvh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border-4 border-[#9C734B] bg-[#FAF3E8] shadow-2xl md:h-[min(86dvh,660px)]"
+        className="anim-pop flex h-full max-h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border-4 border-[#9C734B] bg-[#FAF3E8] shadow-2xl md:h-[min(86dvh,660px)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mirror Frame Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#E5D5BE] bg-[#F2E5D2] px-4 py-2.5">
+        <div className="flex shrink-0 items-center justify-between border-b border-[#E5D5BE] bg-[#F2E5D2] px-3.5 py-2 sm:px-4 sm:py-2.5">
           <div className="flex items-center gap-2">
             <Shirt className="h-4 w-4 text-amber-800" />
-            <h2 className="font-display text-base font-bold text-[#4A3525]">
+            <h2 className="font-display text-sm font-bold text-[#4A3525] sm:text-base">
               Tủ Đồ Của {avatar.name}
             </h2>
           </div>
@@ -65,24 +65,24 @@ export const WardrobeModal: React.FC<WardrobeModalProps> = ({
               onClose();
             }}
             aria-label="Đóng tủ đồ"
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E3CEB2] text-[#4A3525] transition-transform active:scale-95"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E3CEB2] text-[#4A3525] transition-transform active:scale-95 sm:h-10 sm:w-10"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden min-[500px]:flex-row">
           {/* Live 3D Mirror Character Preview */}
-          <div className="relative flex h-48 shrink-0 flex-col items-center justify-center border-b border-[#E5D5BE] bg-gradient-to-b from-[#FFFDF9] to-[#F4E7D3] sm:h-52 md:h-full md:w-[300px] md:border-r md:border-b-0">
+          <div className="relative flex h-40 shrink-0 flex-col items-center justify-center border-b border-[#E5D5BE] bg-gradient-to-b from-[#FFFDF9] to-[#F4E7D3] min-[500px]:h-full min-[500px]:w-[225px] min-[500px]:border-r min-[500px]:border-b-0 sm:w-[250px] md:w-[300px]">
             <AvatarPreview3D avatar={avatar} className="h-full w-full" />
-            <span className="pointer-events-none absolute bottom-2 text-[11px] font-semibold text-[#6F4E37]">
+            <span className="pointer-events-none absolute bottom-1.5 text-[10px] font-semibold text-[#6F4E37] sm:bottom-2 sm:text-[11px]">
               Kéo nhân vật để xoay 360°
             </span>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {/* 8 Category Tabs (Matches Shop Exactly) */}
-            <div className="custom-scroll flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-[#E5D5BE] bg-[#F6ECDC] px-3 py-2">
+            <div className="custom-scroll flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-[#E5D5BE] bg-[#F6ECDC] px-2.5 py-1.5 sm:px-3 sm:py-2">
               {FASHION_CATEGORIES.map((t) => (
                 <button
                   key={t.key}
@@ -91,7 +91,7 @@ export const WardrobeModal: React.FC<WardrobeModalProps> = ({
                     soundFX.tap();
                     setTab(t.key);
                   }}
-                  className={`min-h-[40px] shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+                  className={`min-h-[34px] shrink-0 rounded-xl px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors sm:min-h-[40px] sm:px-3.5 sm:py-1.5 ${
                     tab === t.key
                       ? 'bg-[#6F4E37] text-amber-50 shadow-xs'
                       : 'bg-[#EADBC6] text-[#5B422E] hover:bg-[#DFCCB0]'
@@ -104,6 +104,28 @@ export const WardrobeModal: React.FC<WardrobeModalProps> = ({
 
             {/* Scrollable Owned Items Grid */}
             <div className="custom-scroll flex-1 overflow-y-auto p-3 text-[#4A3525]">
+              {tab === 'face' && (
+                <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#E5D5BE] bg-[#FBF4EA] px-3 py-2">
+                  <span className="text-xs font-bold text-[#5B422E]">
+                    Má hồng trên gương mặt
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFX.tap();
+                      onChange({...avatar, blush: !avatar.blush});
+                    }}
+                    className={`min-h-[32px] rounded-xl px-3 text-xs font-bold transition-colors active:scale-95 ${
+                      avatar.blush
+                        ? 'bg-[#E57A8D] text-white shadow-xs'
+                        : 'bg-[#EADBC6] text-[#5B422E]'
+                    }`}
+                  >
+                    {avatar.blush ? 'Đang bật' : 'Đang tắt'}
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-2.5 pb-2 sm:grid-cols-3">
                 {unequipPatch && (
                   <button

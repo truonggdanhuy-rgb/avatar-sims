@@ -61,18 +61,18 @@ export const BoutiqueModal: React.FC<BoutiqueModalProps> = ({
 
   return (
     <div
-      className="absolute inset-0 z-50 flex items-center justify-center bg-stone-950/65 p-2.5 sm:p-5"
+      className="absolute inset-0 z-50 flex items-center justify-center bg-stone-950/65 p-1.5 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="anim-pop flex h-full max-h-[94dvh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border-4 border-[#9C734B] bg-[#FAF3E8] shadow-2xl md:h-[min(86dvh,660px)]"
+        className="anim-pop flex h-full max-h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border-4 border-[#9C734B] bg-[#FAF3E8] shadow-2xl md:h-[min(86dvh,660px)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Shop Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#E5D5BE] bg-[#F2E5D2] px-4 py-2.5">
+        <div className="flex shrink-0 items-center justify-between border-b border-[#E5D5BE] bg-[#F2E5D2] px-3.5 py-2 sm:px-4 sm:py-2.5">
           <div className="flex items-center gap-2">
             <ShoppingBag className="h-4 w-4 text-[#B85769]" />
-            <h2 className="font-display text-base font-bold text-[#4A3525]">
+            <h2 className="font-display text-sm font-bold text-[#4A3525] sm:text-base">
               Cửa Hàng của Tina
             </h2>
           </div>
@@ -89,23 +89,23 @@ export const BoutiqueModal: React.FC<BoutiqueModalProps> = ({
                 onClose();
               }}
               aria-label="Đóng cửa hàng"
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E3CEB2] text-[#4A3525] transition-transform active:scale-95"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E3CEB2] text-[#4A3525] transition-transform active:scale-95 sm:h-10 sm:w-10"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden min-[500px]:flex-row">
           {/* Live 3D Fitting Preview */}
-          <div className="relative flex h-48 shrink-0 flex-col items-center justify-center border-b border-[#E5D5BE] bg-gradient-to-b from-[#FFFDF9] to-[#F7E5DF] sm:h-52 md:h-full md:w-[300px] md:border-r md:border-b-0">
+          <div className="relative flex h-40 shrink-0 flex-col items-center justify-center border-b border-[#E5D5BE] bg-gradient-to-b from-[#FFFDF9] to-[#F7E5DF] min-[500px]:h-full min-[500px]:w-[225px] min-[500px]:border-r min-[500px]:border-b-0 sm:w-[250px] md:w-[300px]">
             <AvatarPreview3D avatar={previewAvatar} className="h-full w-full" />
             <div
-              className={`pointer-events-none absolute inset-x-2.5 bottom-2 flex items-center gap-2 ${
+              className={`pointer-events-none absolute inset-x-2 bottom-1.5 flex items-center gap-2 sm:bottom-2 ${
                 isPreviewDirty ? 'justify-between' : 'justify-center'
               }`}
             >
-              <span className="text-[11px] font-semibold text-[#6F4E37]">
+              <span className="text-[10px] font-semibold text-[#6F4E37] sm:text-[11px]">
                 Kéo nhân vật để xoay 360°
               </span>
               {isPreviewDirty && (
@@ -115,9 +115,9 @@ export const BoutiqueModal: React.FC<BoutiqueModalProps> = ({
                     soundFX.tap();
                     setPreviewAvatar(avatar);
                   }}
-                  className="pointer-events-auto flex min-h-[32px] items-center gap-1 rounded-xl border border-[#DFC7A5] bg-[#FFF8EB]/95 px-2.5 text-[11px] font-bold text-[#6F4E37] shadow-xs transition-transform active:scale-95"
+                  className="pointer-events-auto flex min-h-[30px] items-center gap-1 rounded-xl border border-[#DFC7A5] bg-[#FFF8EB]/95 px-2 text-[10px] font-bold text-[#6F4E37] shadow-xs transition-transform active:scale-95 sm:min-h-[32px] sm:px-2.5 sm:text-[11px]"
                 >
-                  <RotateCcw className="h-3.5 w-3.5" />
+                  <RotateCcw className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   <span>Hoàn tác</span>
                 </button>
               )}
@@ -126,7 +126,7 @@ export const BoutiqueModal: React.FC<BoutiqueModalProps> = ({
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {/* 8 Fashion Category Tabs */}
-            <div className="custom-scroll flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-[#E5D5BE] bg-[#F6ECDC] px-3 py-2">
+            <div className="custom-scroll flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-[#E5D5BE] bg-[#F6ECDC] px-2.5 py-1.5 sm:px-3 sm:py-2">
               {FASHION_CATEGORIES.map((t) => (
                 <button
                   key={t.key}
@@ -135,7 +135,7 @@ export const BoutiqueModal: React.FC<BoutiqueModalProps> = ({
                     soundFX.tap();
                     setTab(t.key);
                   }}
-                  className={`min-h-[40px] shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+                  className={`min-h-[34px] shrink-0 rounded-xl px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors sm:min-h-[40px] sm:px-3.5 sm:py-1.5 ${
                     tab === t.key
                       ? 'bg-[#B85769] text-white shadow-xs'
                       : 'bg-[#EADBC6] text-[#5B422E] hover:bg-[#DFCCB0]'
@@ -148,6 +148,31 @@ export const BoutiqueModal: React.FC<BoutiqueModalProps> = ({
 
             {/* Scrollable Responsive Visual Garment Grid */}
             <div className="custom-scroll flex-1 overflow-y-auto p-3 text-[#4A3525]">
+              {tab === 'face' && (
+                <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#E5D5BE] bg-[#FBF4EA] px-3 py-2">
+                  <span className="text-xs font-bold text-[#5B422E]">
+                    Má hồng trên gương mặt
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFX.tap();
+                      const nextBlush = !previewAvatar.blush;
+                      const next = {...avatar, blush: nextBlush};
+                      onEquipAvatar(next);
+                      setPreviewAvatar({...previewAvatar, blush: nextBlush});
+                    }}
+                    className={`min-h-[32px] rounded-xl px-3 text-xs font-bold transition-colors active:scale-95 ${
+                      previewAvatar.blush
+                        ? 'bg-[#E57A8D] text-white shadow-xs'
+                        : 'bg-[#EADBC6] text-[#5B422E]'
+                    }`}
+                  >
+                    {previewAvatar.blush ? 'Đang bật' : 'Đang tắt'}
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-2.5 pb-2 sm:grid-cols-3">
                 {items.map((item) => {
                   const owned = ownedIds.includes(item.id) || item.price === 0;

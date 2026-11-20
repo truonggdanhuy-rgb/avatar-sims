@@ -265,14 +265,14 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
         className="h-full w-full cursor-grab active:cursor-grabbing"
       />
       {showInspectorControls && (
-        <div className="pointer-events-auto absolute inset-x-2 top-2 flex flex-wrap items-center justify-between gap-1">
-          <div className="flex items-center gap-1 rounded-xl border border-[#DFC7A5] bg-[#FFF8EB]/95 p-0.5 shadow-xs">
+        <div className="pointer-events-auto absolute inset-x-1.5 top-1.5 flex flex-wrap items-center justify-between gap-1 sm:inset-x-2 sm:top-2">
+          <div className="flex items-center gap-0.5 rounded-xl border border-[#DFC7A5] bg-[#FFF8EB]/95 p-0.5 shadow-xs sm:gap-1">
             {(Object.keys(ANGLE_VALUES) as AngleKey[]).map((key) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => handleSelectAngle(key)}
-                className={`rounded-lg px-2 py-1 text-[10px] font-bold whitespace-nowrap transition-colors ${
+                className={`rounded-lg px-1.5 py-0.5 text-[9.5px] font-bold whitespace-nowrap transition-colors sm:px-2 sm:py-1 sm:text-[10px] ${
                   activeAngle === key
                     ? 'bg-[#6F4E37] text-amber-50'
                     : 'text-[#6F4E37] hover:bg-[#EFE0C9]'
@@ -285,7 +285,7 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
           <button
             type="button"
             onClick={handleToggleZoom}
-            className={`rounded-xl border px-2 py-1 text-[10px] font-bold whitespace-nowrap shadow-xs transition-colors ${
+            className={`rounded-xl border px-1.5 py-0.5 text-[9.5px] font-bold whitespace-nowrap shadow-xs transition-colors sm:px-2 sm:py-1 sm:text-[10px] ${
               headZoom
                 ? 'border-[#6F4E37] bg-[#6F4E37] text-amber-50'
                 : 'border-[#DFC7A5] bg-[#FFF8EB]/95 text-[#6F4E37] hover:bg-[#EFE0C9]'

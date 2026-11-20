@@ -17,13 +17,14 @@ export type HairBackStyle =
   | 'twin_buns'
   | 'boy_1'
   | 'boy_2'
-  | 'boy_3';
+  | 'boy_3'
+  | 'boy_4';
 
 export type HairFrontStyle = 'air_bangs' | 'side_sweep' | 'curtain' | 'neat_fringe';
 
-export type EyeStyle = 'starry' | 'almond' | 'cheerful' | 'cozy';
+export type EyeStyle = 'starry' | 'almond' | 'cheerful' | 'cozy' | 'squint' | 'wink';
 
-export type ExpressionStyle = 'smile' | 'grin' | 'cat' | 'calm';
+export type ExpressionStyle = 'smile' | 'grin' | 'cat' | 'calm' | 'smirk' | 'bashful';
 
 export type TopStyle =
   | 'sailor_blouse'
@@ -78,6 +79,7 @@ export interface AvatarConfig {
   eyeStyle: EyeStyle;
   eyeColor: string;
   expression: ExpressionStyle;
+  blush?: boolean;
   top: TopStyle;
   topColor: string;
   bottom: BottomStyle;

@@ -247,6 +247,13 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 150,
     patch: {hairBack: 'boy_3', hairFront: 'air_bangs', hairColor: '#262A36'},
   },
+  {
+    id: 'hair_boy_4',
+    category: 'hair',
+    name: 'Tóc Nam 4',
+    price: 0,
+    patch: {hairBack: 'boy_4', hairFront: 'neat_fringe', hairColor: '#3D2A20'},
+  },
 
   // ========== 4. MẶT ==========
   {
@@ -255,6 +262,27 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Mặt Cười Dịu Dàng',
     price: 0,
     patch: {eyeStyle: 'starry', eyeColor: '#4B7F52', expression: 'smile'},
+  },
+  {
+    id: 'face_squint_cool',
+    category: 'face',
+    name: 'Mắt Nheo Cool',
+    price: 0,
+    patch: {eyeStyle: 'squint', eyeColor: '#3B5E8C', expression: 'smirk'},
+  },
+  {
+    id: 'face_squint_playful',
+    category: 'face',
+    name: 'Mắt Nheo Tinh Nghịch',
+    price: 0,
+    patch: {eyeStyle: 'squint', eyeColor: '#5B3A29', expression: 'cat'},
+  },
+  {
+    id: 'face_wink_sparkle',
+    category: 'face',
+    name: 'Mặt Nháy Mắt Tươi Tắn',
+    price: 90,
+    patch: {eyeStyle: 'wink', eyeColor: '#D4627E', expression: 'smile'},
   },
   {
     id: 'face_grin_violet',
@@ -290,6 +318,13 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Mặt Trầm Lặng Dễ Thương',
     price: 110,
     patch: {eyeStyle: 'almond', eyeColor: '#B57B3C', expression: 'calm'},
+  },
+  {
+    id: 'face_bashful_blush',
+    category: 'face',
+    name: 'Mặt Ngại Ngùng Má Hồng',
+    price: 120,
+    patch: {eyeStyle: 'almond', eyeColor: '#C96A7B', expression: 'bashful', blush: true},
   },
 
   // ========== 5. ĐẦU ==========
