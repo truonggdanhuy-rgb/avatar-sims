@@ -44,7 +44,7 @@ export function createFishingSpotVisuals(options: {
   toolId?: ToolId;
 }): FishingSpotVisuals {
   const {waterY, defaultPos, toolId = 'wooden_rod'} = options;
-  const spec = ROD_BOBBER_SPECS[toolId] ?? ROD_BOBBER_SPECS.wooden_rod;
+  const spec = toolId === 'wooden_rod' ? ROD_BOBBER_SPECS.wooden_rod : ROD_BOBBER_SPECS.wooden_rod;
 
   const group = new THREE.Group();
 

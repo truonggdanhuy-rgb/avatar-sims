@@ -1109,25 +1109,25 @@ export const WELL_WATER_INTERVAL_MS = 3 * 60 * 1000; // 3 phút sinh 1 nước (
 export const INITIAL_WATER_CAN = 10;
 export const INITIAL_WELL_STORED = 8;
 
-export const FARM_STORAGE_BASE_CAPACITY = 100;
-export const FARM_STORAGE_STEP = 10;
+export const FARM_STORAGE_BASE_CAPACITY = 250;
+export const FARM_STORAGE_STEP = 25;
 export const WAREHOUSE_UPGRADE_COSTS = [
-  200, // 100 -> 110
-  350, // 110 -> 120
-  500, // 120 -> 130
-  700, // 130 -> 140
-  900, // 140 -> 150
-  1100, // 150 -> 160
-  1300, // 160 -> 170
-  1550, // 170 -> 180
-  1850, // 180 -> 190
-  2200, // 190 -> 200
-  2600, // 200 -> 210
-  3050, // 210 -> 220
-  3550, // 220 -> 230
-  4100, // 230 -> 240
+  200, // 250 -> 275
+  350, // 275 -> 300
+  500, // 300 -> 325
+  700, // 325 -> 350
+  900, // 350 -> 375
+  1100, // 375 -> 400
+  1300, // 400 -> 425
+  1550, // 425 -> 450
+  1850, // 450 -> 475
+  2200, // 475 -> 500
+  2600, // 500 -> 525
+  3050, // 525 -> 550
+  3550, // 550 -> 575
+  4100, // 575 -> 600
 ] as const;
-export const MAX_WAREHOUSE_LEVEL = WAREHOUSE_UPGRADE_COSTS.length + 1; // 100 -> 240 đơn vị lưu trữ
+export const MAX_WAREHOUSE_LEVEL = WAREHOUSE_UPGRADE_COSTS.length + 1; // 250 -> 600 đơn vị lưu trữ
 
 export function getFarmStorageCapacity(level: number): number {
   const safeLevel = Math.max(1, Math.min(MAX_WAREHOUSE_LEVEL, Math.floor(level || 1)));

@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   Armchair,
+  Bug,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -25,7 +26,9 @@ import {
   getRodRepairCost,
   rollRandomRiverFish,
 } from '../data/fishingCatalog';
+import {getNetRepairCost} from '../data/insectCatalog';
 import {FishIllustration} from './FishingIcons';
+import {InsectIllustration} from './InsectIcons';
 import {FURNITURE_BY_ID, isPointOnFurnitureSurface} from '../data/furnitureCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
 import {FishingVisualFrame} from '../three/fishingVisuals3d';
@@ -48,6 +51,7 @@ import {
 import {
   AvatarConfig,
   AvatarPose,
+  BugNetState,
   CoopKind,
   CoopTroughs,
   CropType,
@@ -56,6 +60,8 @@ import {
   FishRarity,
   GameStats,
   GardenPlotState,
+  InsectRarity,
+  InsectSpeciesId,
   LivestockAnimalState,
   PlacedFurniture,
   PondFishState,
@@ -81,6 +87,7 @@ interface WorldCanvasProps {
   pondFeedPulse: number;
   farmPondFishPulse: number;
   fishingRod: FishingRodState;
+  bugNet: BugNetState;
   seeds: Partial<Record<CropType, number>>;
   bugSprayCount: number;
   waterCount: number;
@@ -128,6 +135,28 @@ interface WorldCanvasProps {
     durabilityLost: number;
   };
   onRepairFishingRod: () => boolean;
+  onCatchInsect: (caught: {
+    speciesId: InsectSpeciesId;
+    lengthMm: number;
+    sellPrice: number;
+  }) => {
+    speciesId: InsectSpeciesId;
+    name: string;
+    rarity: InsectRarity;
+    lengthMm: number;
+    sellPrice: number;
+    isNewRecord: boolean;
+    isFirstDiscovery: boolean;
+    durabilityLeft: number;
+    maxDurability: number;
+    durabilityLost: number;
+  } | null;
+  onLoseNetDurability: () => {
+    durabilityLeft: number;
+    maxDurability: number;
+    durabilityLost: number;
+  };
+  onRepairBugNet: () => boolean;
   onRestoreEnergy: () => void;
   onBoostMood: () => void;
   onCollectWellWater: () => {
@@ -171,6 +200,32 @@ interface SeatTarget {
   isBed?: boolean;
   isSwing?: boolean;
 }
+
+type CatchCelebrationData =
+  | {
+      kind: 'fish';
+      speciesId: RiverFishSpeciesId;
+      name: string;
+      rarity: FishRarity;
+      weightKg: number;
+      sellPrice: number;
+      isNewRecord: boolean;
+      isFirstDiscovery: boolean;
+      durabilityLeft: number;
+      maxDurability: number;
+    }
+  | {
+      kind: 'insect';
+      speciesId: InsectSpeciesId;
+      name: string;
+      rarity: InsectRarity;
+      lengthMm: number;
+      sellPrice: number;
+      isNewRecord: boolean;
+      isFirstDiscovery: boolean;
+      durabilityLeft: number;
+      maxDurability: number;
+    };
 
 interface NavPoint {
   x: number;
@@ -738,6 +793,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   pondFeedPulse,
   farmPondFishPulse,
   fishingRod,
+  bugNet,
   seeds,
   bugSprayCount,
   waterCount,
@@ -765,6 +821,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onCatchRiverFish,
   onLoseFishingDurability,
   onRepairFishingRod,
+  onCatchInsect,
+  onLoseNetDurability,
+  onRepairBugNet,
   onRestoreEnergy,
   onBoostMood,
   onCollectWellWater,
@@ -801,6 +860,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     pointerId: null,
   });
   const jumpActionRef = useRef<(() => void) | null>(null);
+  const catchActionRef = useRef<(() => void) | null>(null);
   const teleportPlazaActionRef = useRef<(() => void) | null>(null);
   const pendingPlazaSpawnRef = useRef<boolean>(false);
 
@@ -813,17 +873,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     repairCost: number;
     maxDurability: number;
   } | null>(null);
-  const [catchCelebration, setCatchCelebration] = useState<{
-    speciesId: RiverFishSpeciesId;
-    name: string;
-    rarity: FishRarity;
-    weightKg: number;
-    sellPrice: number;
-    isNewRecord: boolean;
-    isFirstDiscovery: boolean;
-    durabilityLeft: number;
+  const [brokenNetPrompt, setBrokenNetPrompt] = useState<{
+    repairCost: number;
     maxDurability: number;
   } | null>(null);
+  const [catchCelebration, setCatchCelebration] = useState<CatchCelebrationData | null>(null);
   const [miniActive, setMiniActive] = useState(false);
   const [miniScore, setMiniScore] = useState(0);
   const [starPos, setStarPos] = useState({x: 50, y: 50});
@@ -847,6 +901,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     wellWater,
     fishingState,
     fishingRod,
+    bugNet,
+    showJoystick,
     placedFurniture,
     editFurnitureMode,
     selectedFurnitureId,
@@ -863,6 +919,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     wellWater,
     fishingState,
     fishingRod,
+    bugNet,
+    showJoystick,
     placedFurniture,
     editFurnitureMode,
     selectedFurnitureId,
@@ -884,6 +942,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onStowFurniture,
     onCatchRiverFish,
     onLoseFishingDurability,
+    onCatchInsect,
+    onLoseNetDurability,
     onRestoreEnergy,
     onBoostMood,
     onCollectWellWater,
@@ -919,6 +979,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onStowFurniture,
     onCatchRiverFish,
     onLoseFishingDurability,
+    onCatchInsect,
+    onLoseNetDurability,
     onRestoreEnergy,
     onBoostMood,
     onCollectWellWater,
@@ -963,17 +1025,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     }, 2600);
   };
 
-  const triggerCatchCelebration = (res: {
-    speciesId: RiverFishSpeciesId;
-    name: string;
-    rarity: FishRarity;
-    weightKg: number;
-    sellPrice: number;
-    isNewRecord: boolean;
-    isFirstDiscovery: boolean;
-    durabilityLeft: number;
-    maxDurability: number;
-  }) => {
+  const triggerCatchCelebration = (res: CatchCelebrationData) => {
     if (catchTimerRef.current) clearTimeout(catchTimerRef.current);
     setCatchCelebration(res);
     catchTimerRef.current = window.setTimeout(() => {
@@ -1081,11 +1133,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   }, [zone, fishingState]);
 
   useEffect(() => {
-    rebuildAvatarTriggerRef.current?.(
-      avatar,
-      fishingRod.equipped ? 'wooden_rod' : null,
-    );
-  }, [avatar, fishingRod.equipped]);
+    const equippedTool: ToolId | null = fishingRod.equipped
+      ? 'wooden_rod'
+      : bugNet.equipped
+        ? 'wooden_net'
+        : null;
+    rebuildAvatarTriggerRef.current?.(avatar, equippedTool);
+  }, [avatar, fishingRod.equipped, bugNet.equipped]);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -1203,8 +1257,20 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let stallTimer = 0;
     let prevDistToTarget = Infinity;
 
+    const netSwingCtrl = {
+      active: false,
+      elapsed: 0,
+      catchEvaluated: false,
+      duration: 0.38,
+    };
+    let insectAlertCooldown = 0;
+
     let playerRig: AvatarRig = buildAvatarRig(stateRef.current.avatar, {
-      equippedTool: stateRef.current.fishingRod.equipped ? 'wooden_rod' : null,
+      equippedTool: stateRef.current.fishingRod.equipped
+        ? 'wooden_rod'
+        : stateRef.current.bugNet.equipped
+          ? 'wooden_net'
+          : null,
     });
     playerRig.root.position.set(playerPos.x, 0.14, playerPos.z);
     scene.add(playerRig.root);
@@ -1597,7 +1663,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         if (res) {
           soundFX.sparkle();
           setSpeechBubble(null);
-          triggerCatchCelebration(res);
+          triggerCatchCelebration({kind: 'fish', ...res});
         }
       } else if (fishCtrl.phase === 'waiting' || fishCtrl.phase === 'nibbling') {
         resetFishing(true);
@@ -1646,12 +1712,41 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
 
     jumpActionRef.current = () => {
-      if (jumpY > 0.02 || jumpVel > 0.02) return;
+      if (jumpY > 0.02 || jumpVel > 0.02 || netSwingCtrl.active) return;
       if (fishCtrl.phase !== 'idle') {
         resetFishing(true);
       }
       releaseSeatIfNeeded();
       jumpVel = JUMP_VELOCITY;
+      soundFX.tap();
+    };
+
+    catchActionRef.current = () => {
+      if (stateRef.current.zone !== 'town') return;
+      const net = stateRef.current.bugNet;
+      if (!net.owned || !net.equipped) return;
+      if (!stateRef.current.showJoystick) {
+        soundFX.tap();
+        showBubble('Vào Menu Điện Thoại (góc trên trái) → Bật Joystick để bắt côn trùng!');
+        return;
+      }
+      if (net.durability <= 0) {
+        soundFX.tap();
+        setBrokenNetPrompt({
+          repairCost: getNetRepairCost(net.durability, net.maxDurability),
+          maxDurability: net.maxDurability,
+        });
+        return;
+      }
+      if (netSwingCtrl.active || jumpY > 0.05) return;
+      if (fishCtrl.phase !== 'idle') {
+        resetFishing(true);
+      }
+      activeTarget = null;
+      releaseSeatIfNeeded();
+      netSwingCtrl.active = true;
+      netSwingCtrl.elapsed = 0;
+      netSwingCtrl.catchEvaluated = false;
       soundFX.tap();
     };
 
@@ -2554,7 +2649,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       // Dynamic Virtual Joystick steering OR Smart Waypoint Walk Kinematics
       const joy = joystickInputRef.current;
       const joyMag = joy.active ? Math.hypot(joy.x, joy.y) : 0;
-      if (joyMag > 0.08) {
+      let moveHorizSpeed = 0;
+      let isCreepingNow = false;
+
+      if (netSwingCtrl.active) {
+        activeTarget = null;
+      } else if (joyMag > 0.08) {
         if (activeTarget) activeTarget = null;
         releaseSeatIfNeeded();
         if (fishCtrl.phase !== 'idle') {
@@ -2580,7 +2680,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const moveDirX = rightX * joy.x + fwdX * -joy.y;
         const moveDirZ = rightZ * joy.x + fwdZ * -joy.y;
         const moveLen = Math.hypot(moveDirX, moveDirZ) || 1;
-        const speed = (z === 'town' ? 5.6 : 3.6) * Math.min(1, joyMag);
+        isCreepingNow = z === 'town' && stateRef.current.bugNet.equipped && joyMag <= 0.54 && !isAirborne;
+        const speed = isCreepingNow
+          ? 1.55
+          : (z === 'town' ? 5.6 : 3.6) * Math.min(1, joyMag);
         const stepLen = speed * delta;
         const rawX = playerPos.x + (moveDirX / moveLen) * stepLen;
         const rawZ = playerPos.z + (moveDirZ / moveLen) * stepLen;
@@ -2598,6 +2701,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const dmz = nextZ - playerPos.z;
         playerPos.x = nextX;
         playerPos.z = nextZ;
+        moveHorizSpeed = Math.hypot(dmx, dmz) / Math.max(0.001, delta);
 
         const targetRot =
           Math.hypot(dmx, dmz) > 0.002
@@ -2606,10 +2710,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         let diff = targetRot - playerPos.rotY;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
-        playerPos.rotY += diff * Math.min(1, delta * 14);
-        playerPos.pose = isAirborne ? 'jump' : 'walk';
+        playerPos.rotY += diff * Math.min(1, delta * (isCreepingNow ? 10 : 14));
+        playerPos.pose = isAirborne ? 'jump' : isCreepingNow ? 'creep' : 'walk';
       } else {
-        if (!activeTarget && playerPos.pose === 'walk') {
+        if (!activeTarget && (playerPos.pose === 'walk' || playerPos.pose === 'creep')) {
           playerPos.pose = isAirborne ? 'jump' : 'idle';
         }
         // Smart waypoint walk kinematics with collision sliding & exact seat alignment
@@ -2695,6 +2799,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const moveZ = nextZ - playerPos.z;
             playerPos.x = nextX;
             playerPos.z = nextZ;
+            moveHorizSpeed = Math.hypot(moveX, moveZ) / Math.max(0.001, delta);
 
             if (Math.hypot(moveX, moveZ) > 0.002) {
               const targetRot = Math.atan2(moveX, moveZ);
@@ -2722,6 +2827,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       if (isAirborne) {
         playerPos.pose = 'jump';
+        moveHorizSpeed = Math.max(moveHorizSpeed, 2.5);
       }
 
       if (z === 'town') {
@@ -3060,6 +3166,70 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const shScale = Math.max(0.42, 1 - jumpY * 0.28);
         playerRig.shadowDisc.scale.setScalar(shScale);
       }
+
+      if (insectAlertCooldown > 0) {
+        insectAlertCooldown = Math.max(0, insectAlertCooldown - delta);
+      }
+
+      if (netSwingCtrl.active) {
+        netSwingCtrl.elapsed += delta;
+        playerPos.pose = 'net_swing';
+        avatarPoseProgress = Math.min(1, netSwingCtrl.elapsed / netSwingCtrl.duration);
+
+        if (netSwingCtrl.elapsed >= 0.16 && !netSwingCtrl.catchEvaluated) {
+          netSwingCtrl.catchEvaluated = true;
+          const evalRes = activeTown?.tryCatchInsect?.(
+            playerPos.x,
+            groundOffset + jumpY,
+            playerPos.z,
+            playerPos.rotY,
+          );
+          if (evalRes?.caught) {
+            const catchRes = callbacksRef.current.onCatchInsect(evalRes.caught);
+            if (catchRes) {
+              soundFX.sparkle();
+              setSpeechBubble(null);
+              triggerCatchCelebration({
+                kind: 'insect',
+                speciesId: catchRes.speciesId,
+                name: catchRes.name,
+                rarity: catchRes.rarity,
+                lengthMm: catchRes.lengthMm,
+                sellPrice: catchRes.sellPrice,
+                isNewRecord: catchRes.isNewRecord,
+                isFirstDiscovery: catchRes.isFirstDiscovery,
+                durabilityLeft: catchRes.durabilityLeft,
+                maxDurability: catchRes.maxDurability,
+              });
+            }
+          } else {
+            const durRes = callbacksRef.current.onLoseNetDurability();
+            const durInfo =
+              durRes.durabilityLeft === 0
+                ? ' Vợt gỗ đã hỏng! Chạm nút Bắt để sửa.'
+                : durRes.durabilityLost > 0
+                  ? ` (Độ bền ${durRes.durabilityLeft}/${durRes.maxDurability})`
+                  : '';
+            if (evalRes && evalRes.escapedCount > 0) {
+              showBubble(`Vung hụt! Côn trùng hoảng sợ bay mất rồi.${durInfo}`);
+            } else if (evalRes && evalRes.startledCount > 0) {
+              showBubble(
+                `Chệch góc rồi! Xoay mặt thẳng vào côn trùng trước khi Bắt.${durInfo}`,
+              );
+            } else {
+              showBubble(`Chưa trúng côn trùng nào ngay trước mặt!${durInfo}`);
+            }
+          }
+        }
+
+        if (netSwingCtrl.elapsed >= netSwingCtrl.duration) {
+          netSwingCtrl.active = false;
+          netSwingCtrl.elapsed = 0;
+          playerPos.pose = 'idle';
+          avatarPoseProgress = 0;
+        }
+      }
+
       updateAvatarRigAnimation(
         playerRig,
         playerPos.pose,
@@ -3070,6 +3240,30 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       if (z === 'town') {
         activeTown?.updateFishingVisuals?.(fishVisualFrame, elapsed);
+        const insectEvents = activeTown?.updateInsects?.(
+          playerPos.x,
+          groundOffset + jumpY,
+          playerPos.z,
+          moveHorizSpeed,
+          isCreepingNow,
+          elapsed,
+          delta,
+          _frustum,
+        );
+        if (
+          insectEvents &&
+          (insectEvents.escapedByRun > 0 || insectEvents.startledByRun > 0) &&
+          stateRef.current.bugNet.equipped &&
+          !netSwingCtrl.active &&
+          insectAlertCooldown <= 0
+        ) {
+          insectAlertCooldown = 3.2;
+          showBubble(
+            insectEvents.escapedByRun > 0
+              ? 'Đi quá mạnh làm côn trùng bay mất! Kéo nhẹ Joystick để đi rón rén.'
+              : 'Côn trùng giật mình bay sang chỗ khác! Kéo nhẹ Joystick để đi chậm.',
+          );
+        }
         activeTown?.update(elapsed, tod, _frustum);
       } else {
         if (z === 'garden' || z === 'fishing') {
@@ -3620,19 +3814,28 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             />
 
             <div className="flex items-center gap-3.5">
-              {/* Animated Jumping Fish Illustration */}
+              {/* Animated Catch Illustration */}
               <div
                 className={`relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border-2 ${
                   catchCelebration.rarity === 'rare'
                     ? 'border-[#FFD166]/60 bg-[#FFFFFF]/15 shadow-[0_0_24px_rgba(255,209,102,0.4)]'
-                    : 'border-[#9AD7E8] bg-white shadow-inner'
+                    : catchCelebration.kind === 'insect'
+                      ? 'border-[#89D8B0] bg-white shadow-inner'
+                      : 'border-[#9AD7E8] bg-white shadow-inner'
                 }`}
               >
                 <div className="anim-fish-jump">
-                  <FishIllustration
-                    speciesId={catchCelebration.speciesId}
-                    className="h-16 w-16"
-                  />
+                  {catchCelebration.kind === 'insect' ? (
+                    <InsectIllustration
+                      speciesId={catchCelebration.speciesId}
+                      className="h-16 w-16"
+                    />
+                  ) : (
+                    <FishIllustration
+                      speciesId={catchCelebration.speciesId}
+                      className="h-16 w-16"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -3642,10 +3845,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                     className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
                       catchCelebration.rarity === 'rare'
                         ? 'bg-[#FFD166] text-[#3B2108]'
-                        : 'bg-[#3C95AD] text-white'
+                        : catchCelebration.kind === 'insect'
+                          ? 'bg-[#42A48D] text-white'
+                          : 'bg-[#3C95AD] text-white'
                     }`}
                   >
-                    {catchCelebration.rarity === 'rare' ? '★ Hiếm!' : 'Câu Thành Công'}
+                    {catchCelebration.rarity === 'rare'
+                      ? '★ Hiếm!'
+                      : catchCelebration.kind === 'insect'
+                        ? 'Bắt Thành Công'
+                        : 'Câu Thành Công'}
                   </span>
                   {catchCelebration.isFirstDiscovery && (
                     <span className="rounded-full bg-[#44B67B] px-2 py-0.5 text-[10px] font-black text-white">
@@ -3669,7 +3878,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                     catchCelebration.rarity === 'rare' ? 'text-[#E8DDF7]' : 'text-[#5B4530]'
                   }`}
                 >
-                  <span>{catchCelebration.weightKg.toFixed(2)} kg</span>
+                  <span>
+                    {catchCelebration.kind === 'insect'
+                      ? `${catchCelebration.lengthMm} mm`
+                      : `${catchCelebration.weightKg.toFixed(2)} kg`}
+                  </span>
                   <span>·</span>
                   <span
                     className={
@@ -3689,7 +3902,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                         : 'text-[#6E7A85]'
                   }`}
                 >
-                  Độ bền cần: {catchCelebration.durabilityLeft}/{catchCelebration.maxDurability}
+                  {catchCelebration.kind === 'insect' ? 'Độ bền vợt: ' : 'Độ bền cần: '}
+                  {catchCelebration.durabilityLeft}/{catchCelebration.maxDurability}
                   {catchCelebration.durabilityLeft === 0 ? ' (Hỏng)' : ''}
                 </div>
               </div>
@@ -3767,6 +3981,81 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               >
                 <Wrench className="h-3.5 w-3.5" />
                 Sửa ({brokenRodPrompt.repairCost} Xu)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Broken Bug Net Repair Confirmation Modal */}
+      {brokenNetPrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          onClick={() => setBrokenNetPrompt(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="anim-pop w-full max-w-sm rounded-3xl border-4 border-[#DFCA9F] bg-[#FFF8EB] p-5 text-[#3B2A1A] shadow-2xl"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#F5C2C2] bg-[#FDECEC] text-[#D64545]">
+                <Wrench className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black">Vợt gỗ đang hỏng</h3>
+                <p className="text-xs font-bold text-[#7A6048]">
+                  Độ bền: 0/{brokenNetPrompt.maxDurability}
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-3 rounded-2xl border border-[#EADBC2] bg-white px-3.5 py-3 text-xs font-bold leading-relaxed text-[#523D28]">
+              Vợt bắt côn trùng đang hỏng! Bạn muốn sửa vợt với giá{' '}
+              <span className="font-black text-[#C47C1A]">
+                {brokenNetPrompt.repairCost} Xu
+              </span>{' '}
+              để bắt tiếp không?
+            </p>
+
+            <div className="mt-2 flex items-center justify-between px-1 text-[11px] font-bold text-[#7A6048]">
+              <span>Số dư hiện có:</span>
+              <span className="inline-flex items-center gap-1 font-black text-[#9E6014]">
+                <Coins className="h-3.5 w-3.5 text-amber-500" />
+                {stats.coins} Xu
+              </span>
+            </div>
+
+            {stats.coins < brokenNetPrompt.repairCost && (
+              <div className="mt-2 rounded-xl bg-[#FDECEC] px-3 py-1.5 text-[11px] font-bold text-[#B63535]">
+                Bạn chưa đủ {brokenNetPrompt.repairCost} Xu để sửa vợt.
+              </div>
+            )}
+
+            <div className="mt-4 grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  setBrokenNetPrompt(null);
+                }}
+                className="rounded-xl bg-[#EADCCB] py-2.5 text-xs font-black text-[#5C442C] transition active:scale-95"
+              >
+                Để sau
+              </button>
+              <button
+                type="button"
+                disabled={stats.coins < brokenNetPrompt.repairCost}
+                onClick={() => {
+                  const ok = onRepairBugNet();
+                  if (ok) {
+                    setBrokenNetPrompt(null);
+                    showBubble('Đã sửa vợt gỗ xong! Tiếp tục rình bắt côn trùng nào.');
+                  }
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#48A674] py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-[#3A9162] disabled:opacity-45 active:scale-95"
+              >
+                <Wrench className="h-3.5 w-3.5" />
+                Sửa ({brokenNetPrompt.repairCost} Xu)
               </button>
             </div>
           </div>
@@ -3891,7 +4180,63 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {/* Right-Side FPS-Style Jump Button */}
+      {/* Mandatory Joystick Guide when holding Bug Net with Joystick turned off */}
+      {zone === 'town' && bugNet.equipped && !showJoystick && !miniActive && (
+        <div className="phone-ui pointer-events-auto absolute bottom-6 left-1/2 z-30 flex max-w-[92vw] -translate-x-1/2 items-center gap-2.5 rounded-2xl border-2 border-[#7CC79D] bg-[#F5FFF9]/95 px-4 py-2.5 text-xs font-bold text-[#21593A] shadow-lg">
+          <Bug className="h-4 w-4 shrink-0 text-[#2E8F5B]" />
+          <span>
+            Cầm vợt bắt côn trùng cần bật Joystick! Vào{' '}
+            <button
+              type="button"
+              onClick={() => {
+                soundFX.tap();
+                onOpenPhone();
+              }}
+              className="font-black underline decoration-2 underline-offset-2 text-[#1B6E43]"
+            >
+              Menu Điện Thoại
+            </button>{' '}
+            → bật <b>Joystick</b> để đi rón rén và bắt bọ.
+          </span>
+        </div>
+      )}
+
+      {/* FPS-Style Catch Bug Button (Right Beside Jump Button when holding Bug Net) */}
+      {zone === 'town' && bugNet.equipped && showJoystick && !miniActive && (
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            catchActionRef.current?.();
+          }}
+          aria-label="Bắt côn trùng"
+          className="phone-ui absolute right-[114px] bottom-10 z-30 flex h-[64px] w-[64px] flex-col items-center justify-center gap-0.5 rounded-full border-[2.5px] border-[#5BB883]/75 bg-[#F2FFF6]/75 text-[#226B43]/90 shadow-md transition-transform active:scale-90 sm:right-[128px] sm:bottom-12"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.1"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 19L12.5 11.5" />
+            <ellipse
+              cx="16"
+              cy="8"
+              rx="4.6"
+              ry="3.6"
+              transform="rotate(-45 16 8)"
+            />
+            <path d="M12.8 5.8C13.8 8.8 15.2 10.2 18.2 11.2" strokeOpacity="0.5" />
+          </svg>
+          <span className="text-[11px] font-black leading-none">Bắt</span>
+        </button>
+      )}
+
+      {/* Right-Side FPS-Style Jump Button (Moved inward, higher up, softer colors) */}
       {showJumpButton && !miniActive && !(zone === 'home' && editFurnitureMode) && (
         <button
           type="button"
@@ -3900,11 +4245,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             jumpActionRef.current?.();
           }}
           aria-label="Nhảy lên"
-          className="phone-ui absolute right-5 bottom-6 z-30 flex h-[68px] w-[68px] items-center justify-center rounded-full border-[3px] border-[#3C95AD] bg-[#FFFDF8]/95 text-[#1F5E72] shadow-xl transition-transform active:scale-90"
+          className="phone-ui absolute right-9 bottom-12 z-30 flex h-[64px] w-[64px] items-center justify-center rounded-full border-[2.5px] border-[#6BB2C7]/65 bg-[#FFFDF8]/68 text-[#2C7489]/80 shadow-md transition-transform active:scale-90 sm:right-12 sm:bottom-14"
         >
           <svg
             viewBox="0 0 24 24"
-            className="h-9 w-9"
+            className="h-8 w-8"
             fill="none"
             stroke="currentColor"
             strokeWidth="2.15"

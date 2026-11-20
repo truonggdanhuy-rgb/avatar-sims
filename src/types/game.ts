@@ -72,12 +72,14 @@ export type HandheldStyle =
 export type AvatarPose =
   | 'idle'
   | 'walk'
+  | 'creep'
   | 'jump'
   | 'sit'
   | 'sleep'
   | 'fish_cast'
   | 'fish_wait'
-  | 'fish_pull';
+  | 'fish_pull'
+  | 'net_swing';
 
 export interface AvatarConfig {
   name: string;
@@ -413,9 +415,16 @@ export interface PlacedFurniture {
   rotY: number;
 }
 
-export type ToolId = 'wooden_rod';
+export type ToolId = 'wooden_rod' | 'wooden_net';
 
 export interface FishingRodState {
+  owned: boolean;
+  equipped: boolean;
+  durability: number;
+  maxDurability: number;
+}
+
+export interface BugNetState {
   owned: boolean;
   equipped: boolean;
   durability: number;
@@ -464,6 +473,74 @@ export interface CaughtFishItem {
 export interface FishDexRecord {
   caughtCount: number;
   maxWeightKg: number;
+}
+
+export type InsectRarity = 'common' | 'rare';
+
+export type InsectHabitat = 'flower' | 'bush' | 'tree' | 'rock' | 'water_edge';
+
+export type InsectShapeKind =
+  | 'butterfly'
+  | 'moth'
+  | 'beetle'
+  | 'horned_beetle'
+  | 'ladybug'
+  | 'bee'
+  | 'dragonfly'
+  | 'cicada'
+  | 'grasshopper'
+  | 'mantis'
+  | 'firefly'
+  | 'stinkbug';
+
+export type InsectSpeciesId =
+  | 'buom_trang'
+  | 'buom_phuong_xanh'
+  | 'buom_duoi_nhan'
+  | 'bo_rua_do'
+  | 'ong_mat_vang'
+  | 'chuon_chuon_ot'
+  | 'chuon_chuon_tre'
+  | 've_sau'
+  | 'bo_xit_xanh'
+  | 'chau_chau_dong'
+  | 'bo_ngua_xanh'
+  | 'dom_dom_dem'
+  | 'canh_cam_ngoc'
+  | 'bo_te_giac'
+  | 'bo_kep_kim'
+  | 'ngai_mat_trang'
+  | 'buom_hoang_de';
+
+export interface InsectSpeciesDefinition {
+  id: InsectSpeciesId;
+  name: string;
+  rarity: InsectRarity;
+  habitat: InsectHabitat;
+  shapeKind: InsectShapeKind;
+  minMm: number;
+  maxMm: number;
+  basePrice: number;
+  pricePerMm: number;
+  dropWeight: number;
+  primaryColor: string;
+  accentColor: string;
+  wingColor: string;
+  description: string;
+}
+
+export interface CaughtInsectItem {
+  id: string;
+  speciesId: InsectSpeciesId;
+  lengthMm: number;
+  sellPrice: number;
+  locked: boolean;
+  caughtAt: number;
+}
+
+export interface InsectDexRecord {
+  caughtCount: number;
+  maxLengthMm: number;
 }
 
 

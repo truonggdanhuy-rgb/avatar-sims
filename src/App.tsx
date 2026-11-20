@@ -27,6 +27,16 @@ import {
   WOODEN_ROD_PRICE,
 } from './data/fishingCatalog';
 import {
+  computeInsectSellPrice,
+  createInitialBugNet,
+  createInitialInsectDex,
+  getNetRepairCost,
+  INSECT_CATALOG,
+  rollNetDurabilityLoss,
+  WOODEN_NET_MAX_DURABILITY,
+  WOODEN_NET_PRICE,
+} from './data/insectCatalog';
+import {
   ANIMALS,
   createAnimalInstance,
   createInitialFarmInventory,
@@ -73,7 +83,9 @@ import {
   AnimalProduceId,
   AnimalType,
   AvatarConfig,
+  BugNetState,
   CaughtFishItem,
+  CaughtInsectItem,
   CookingJob,
   CoopKind,
   CoopTroughs,
@@ -88,6 +100,8 @@ import {
   FurnitureCatalogItem,
   GameStats,
   GardenPlotState,
+  InsectDexRecord,
+  InsectSpeciesId,
   KitchenLevel,
   LivestockAnimalState,
   MillJob,
@@ -789,6 +803,100 @@ export default function App() {
     return `MAY-${randCode}-${randNum}`;
   });
 
+  const [accountCreatedAt] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.accountCreatedAt === 'number' && parsed.accountCreatedAt > 0) {
+          return parsed.accountCreatedAt;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return Date.now();
+  });
+
+  const [bugNet, setBugNet] = useState<BugNetState>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.bugNet && typeof parsed.bugNet === 'object') {
+          const n = parsed.bugNet;
+          const maxDur =
+            typeof n.maxDurability === 'number' && n.maxDurability > 0
+              ? n.maxDurability
+              : WOODEN_NET_MAX_DURABILITY;
+          return {
+            owned: Boolean(n.owned),
+            equipped: Boolean(n.owned && n.equipped),
+            durability:
+              typeof n.durability === 'number'
+                ? Math.max(0, Math.min(maxDur, Math.floor(n.durability)))
+                : maxDur,
+            maxDurability: maxDur,
+          };
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return createInitialBugNet();
+  });
+  const bugNetRef = useRef(bugNet);
+  bugNetRef.current = bugNet;
+
+  const [insectBasket, setInsectBasket] = useState<CaughtInsectItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.insectBasket)) {
+          return parsed.insectBasket.filter(
+            (b: Partial<CaughtInsectItem>): b is CaughtInsectItem =>
+              Boolean(
+                b &&
+                  typeof b.id === 'string' &&
+                  typeof b.speciesId === 'string' &&
+                  b.speciesId in INSECT_CATALOG &&
+                  typeof b.lengthMm === 'number' &&
+                  b.lengthMm > 0,
+              ),
+          );
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return [];
+  });
+
+  const [insectDex, setInsectDex] = useState<Partial<Record<InsectSpeciesId, InsectDexRecord>>>(() => {
+    const base = createInitialInsectDex();
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.insectDex && typeof parsed.insectDex === 'object') {
+          for (const key of Object.keys(INSECT_CATALOG) as InsectSpeciesId[]) {
+            const rec = parsed.insectDex[key];
+            if (rec && typeof rec === 'object') {
+              base[key] = {
+                caughtCount: Math.max(0, Number(rec.caughtCount ?? rec.totalCaught) || 0),
+                maxLengthMm: Math.max(0, Number(rec.maxLengthMm) || 0),
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return base;
+  });
+
   const [showJoystick, setShowJoystick] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -1100,6 +1208,10 @@ export default function App() {
           fishingRod,
           fishBasket,
           fishDex,
+          bugNet,
+          insectBasket,
+          insectDex,
+          accountCreatedAt,
           accountId,
           showJoystick,
           showJumpButton,
@@ -1131,6 +1243,10 @@ export default function App() {
     fishingRod,
     fishBasket,
     fishDex,
+    bugNet,
+    insectBasket,
+    insectDex,
+    accountCreatedAt,
     accountId,
     showJoystick,
     showJumpButton,
@@ -1875,8 +1991,9 @@ export default function App() {
     if (!fishingRod.owned) return;
     const nextEquipped = !fishingRod.equipped;
     setFishingRod((prev) => ({...prev, equipped: nextEquipped}));
-    // Stowing handheld item back to wardrobe when equipping fishing rod / net
+    // Stowing bug net & handheld item back when equipping fishing rod
     if (nextEquipped) {
+      setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
       setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
     }
   };
@@ -2017,11 +2134,183 @@ export default function App() {
     }));
   };
 
+  // === BUG NET & INSECT CATCHING SYSTEM ===
+  const handleBuyBugNet = () => {
+    if (bugNet.owned || stats.coins < WOODEN_NET_PRICE) return;
+    soundFX.sparkle();
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - WOODEN_NET_PRICE,
+      mood: Math.min(100, prev.mood + 5),
+    }));
+    setBugNet({
+      owned: true,
+      equipped: false,
+      durability: WOODEN_NET_MAX_DURABILITY,
+      maxDurability: WOODEN_NET_MAX_DURABILITY,
+    });
+  };
+
+  const handleRepairBugNet = () => {
+    if (!bugNet.owned || bugNet.durability >= bugNet.maxDurability) return false;
+    const cost = getNetRepairCost(bugNet.durability, bugNet.maxDurability);
+    if (stats.coins < cost) return false;
+    soundFX.sparkle();
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - cost,
+    }));
+    setBugNet((prev) => ({
+      ...prev,
+      durability: prev.maxDurability,
+    }));
+    return true;
+  };
+
+  const handleToggleEquipNet = () => {
+    if (!bugNet.owned) return;
+    const nextEquipped = !bugNet.equipped;
+    setBugNet((prev) => ({...prev, equipped: nextEquipped}));
+    if (nextEquipped) {
+      setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
+    }
+  };
+
+  const handleCatchInsect = (caught: {
+    speciesId: InsectSpeciesId;
+    lengthMm: number;
+    sellPrice: number;
+  }) => {
+    const net = bugNetRef.current;
+    if (!net.owned || !net.equipped || net.durability <= 0) return null;
+
+    const spec = INSECT_CATALOG[caught.speciesId];
+    if (!spec) return null;
+
+    const durLost = rollNetDurabilityLoss('catch', spec.rarity);
+    const nextDur = Math.max(0, net.durability - durLost);
+
+    const existingDex = insectDex[spec.id];
+    const isFirstDiscovery = !existingDex || existingDex.caughtCount === 0;
+    const isNewRecord =
+      Boolean(existingDex && existingDex.caughtCount > 0) &&
+      caught.lengthMm > (existingDex?.maxLengthMm ?? 0);
+
+    const newItem: CaughtInsectItem = {
+      id: `bug_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      speciesId: spec.id,
+      lengthMm: caught.lengthMm,
+      sellPrice: caught.sellPrice,
+      caughtAt: Date.now(),
+      locked: false,
+    };
+
+    if (durLost > 0) {
+      setBugNet((prev) => ({
+        ...prev,
+        durability: Math.max(0, prev.durability - durLost),
+      }));
+    }
+    setInsectBasket((prev) => [newItem, ...prev]);
+    setInsectDex((prev) => {
+      const existing = prev[spec.id] ?? {
+        caughtCount: 0,
+        maxLengthMm: 0,
+      };
+      return {
+        ...prev,
+        [spec.id]: {
+          caughtCount: existing.caughtCount + 1,
+          maxLengthMm: Math.max(existing.maxLengthMm, caught.lengthMm),
+        },
+      };
+    });
+    setStats((prev) => ({
+      ...prev,
+      energy: Math.max(5, prev.energy - 2),
+      mood: Math.min(100, prev.mood + 2),
+    }));
+
+    return {
+      speciesId: spec.id,
+      name: spec.name,
+      rarity: spec.rarity,
+      lengthMm: caught.lengthMm,
+      sellPrice: caught.sellPrice,
+      isNewRecord,
+      isFirstDiscovery,
+      durabilityLeft: nextDur,
+      maxDurability: net.maxDurability,
+      durabilityLost: durLost,
+    };
+  };
+
+  const handleLoseNetDurability = () => {
+    const net = bugNetRef.current;
+    if (!net.owned) {
+      return {durabilityLeft: 0, maxDurability: WOODEN_NET_MAX_DURABILITY, durabilityLost: 0};
+    }
+    const durLost = rollNetDurabilityLoss('miss');
+    const nextDur = Math.max(0, net.durability - durLost);
+    if (durLost > 0) {
+      setBugNet((prev) => ({
+        ...prev,
+        durability: Math.max(0, prev.durability - durLost),
+      }));
+    }
+    setStats((prev) => ({
+      ...prev,
+      energy: Math.max(5, prev.energy - 1),
+    }));
+    return {
+      durabilityLeft: nextDur,
+      maxDurability: net.maxDurability,
+      durabilityLost: durLost,
+    };
+  };
+
+  const handleToggleInsectLock = (insectId: string) => {
+    setInsectBasket((prev) =>
+      prev.map((b) => (b.id === insectId ? {...b, locked: !b.locked} : b)),
+    );
+  };
+
+  const handleSellInsect = (insectId: string) => {
+    const target = insectBasket.find((b) => b.id === insectId);
+    if (!target || target.locked) return;
+    const gain = computeInsectSellPrice(target.speciesId, target.lengthMm);
+    soundFX.sparkle();
+    setInsectBasket((prev) => prev.filter((b) => b.id !== insectId));
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins + gain,
+      mood: Math.min(100, prev.mood + 1),
+    }));
+  };
+
+  const handleSellAllUnlockedInsects = () => {
+    const unlocked = insectBasket.filter((b) => !b.locked);
+    if (unlocked.length === 0) return;
+    const totalGain = unlocked.reduce(
+      (sum, b) => sum + computeInsectSellPrice(b.speciesId, b.lengthMm),
+      0,
+    );
+    soundFX.sparkle();
+    setInsectBasket((prev) => prev.filter((b) => b.locked));
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins + totalGain,
+      mood: Math.min(100, prev.mood + Math.min(8, unlocked.length)),
+    }));
+  };
+
   // === AVATAR, SHOPS & HOUSE FURNITURE ===
   const handleEquipAvatar = (next: AvatarConfig) => {
     setAvatar(next);
     if (next.handheld !== 'none') {
       setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
     }
     markQuestDone('dressup');
   };
@@ -2037,6 +2326,7 @@ export default function App() {
     setAvatar((prev) => ({...prev, ...item.patch}));
     if (item.patch.handheld && item.patch.handheld !== 'none') {
       setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
     }
     markQuestDone('dressup');
   };
@@ -2239,6 +2529,7 @@ export default function App() {
         pondFeedPulse={pondFeedPulse}
         farmPondFishPulse={farmPondFishPulse}
         fishingRod={fishingRod}
+        bugNet={bugNet}
         seeds={farmInventory.seeds}
         bugSprayCount={farmInventory.supplies.bugSpray}
         waterCount={waterCan}
@@ -2275,6 +2566,9 @@ export default function App() {
         onCatchRiverFish={handleCatchRiverFish}
         onLoseFishingDurability={handleLoseFishingDurability}
         onRepairFishingRod={handleRepairFishingRod}
+        onCatchInsect={handleCatchInsect}
+        onLoseNetDurability={handleLoseNetDurability}
+        onRepairBugNet={handleRepairBugNet}
         onRestoreEnergy={() => setStats((prev) => ({...prev, energy: 100}))}
         onBoostMood={() =>
           setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 10)}))
@@ -2364,7 +2658,7 @@ export default function App() {
         />
       )}
 
-      {zone === 'garden' && storageOpen && (
+      {storageOpen && (
         <FarmStorageModal
           coins={stats.coins}
           warehouseLevel={warehouseLevel}
@@ -2413,11 +2707,17 @@ export default function App() {
         <KoiShopModal
           coins={stats.coins}
           fishingRod={fishingRod}
+          bugNet={bugNet}
           fishBasket={fishBasket}
+          insectBasket={insectBasket}
           onBuyRod={handleBuyFishingRod}
+          onBuyNet={handleBuyBugNet}
           onToggleFishLock={handleToggleFishLock}
           onSellFish={handleSellFish}
           onSellAllUnlocked={handleSellAllUnlockedFish}
+          onToggleInsectLock={handleToggleInsectLock}
+          onSellInsect={handleSellInsect}
+          onSellAllUnlockedInsects={handleSellAllUnlockedInsects}
           onOpenBagTools={() => {
             setKoiShopOpen(false);
             setPhoneInitialTab('bag');
@@ -2468,7 +2768,10 @@ export default function App() {
           storageUsed={storageUsed}
           storageCapacity={storageCapacity}
           fishingRod={fishingRod}
+          bugNet={bugNet}
           fishDex={fishDex}
+          insectDex={insectDex}
+          accountCreatedAt={accountCreatedAt}
           accountId={accountId}
           showJoystick={showJoystick}
           showJumpButton={showJumpButton}
@@ -2476,6 +2779,7 @@ export default function App() {
           initialTab={phoneInitialTab}
           initialBagSubTab={phoneBagSubTab}
           onToggleEquipRod={handleToggleEquipRod}
+          onToggleEquipNet={handleToggleEquipNet}
           onToggleJoystick={() => setShowJoystick((prev) => !prev)}
           onToggleJumpButton={() => setShowJumpButton((prev) => !prev)}
           onTeleportToPlaza={handleTeleportToPlaza}
@@ -2493,9 +2797,6 @@ export default function App() {
           }}
           onOpenStorage={() => {
             setPhoneOpen(false);
-            if (zone !== 'garden') {
-              handleZoneChange('garden');
-            }
             setStorageOpen(true);
           }}
           onChangeTimeOfDay={setTimeOfDay}

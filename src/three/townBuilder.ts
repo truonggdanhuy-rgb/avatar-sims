@@ -10,6 +10,11 @@ import {
   FishingVisualFrame,
 } from './fishingVisuals3d';
 import {
+  InsectAnchor,
+  InsectCatchEvaluation,
+  TownInsectManager,
+} from './insects3d';
+import {
   createGrassTexture,
   createStoneWalkwayTexture,
   glossyClayMat,
@@ -105,6 +110,22 @@ export interface TownWorld {
   updateFishingVisuals?: (frame: FishingVisualFrame, elapsed: number) => void;
   setOutdoorSwingSeated?: (seated: boolean) => void;
   getOutdoorSwingSeatPose?: () => {x: number; y: number; z: number; pitch: number} | null;
+  updateInsects?: (
+    playerX: number,
+    playerY: number,
+    playerZ: number,
+    playerSpeed: number,
+    isCreeping: boolean,
+    elapsed: number,
+    dt: number,
+    frustum?: THREE.Frustum,
+  ) => {escapedByRun: number; startledByRun: number};
+  tryCatchInsect?: (
+    playerX: number,
+    playerY: number,
+    playerZ: number,
+    playerRotY: number,
+  ) => InsectCatchEvaluation;
   update: (elapsed: number, timeOfDay: TimeOfDay, frustum?: THREE.Frustum) => void;
   dispose: () => void;
 }
@@ -3436,39 +3457,45 @@ export function buildTownScene(): TownWorld {
     const pIronMat = getMat('#363940', 0.45, 0.45);
     const pGoldMat = glossyClayMat('#F4C95D', 0.24);
 
-    // Base plinth & step
+    // Base plinth & step (slightly wider so corner posts and wainscot sit squarely)
     const plinth = new THREE.Mesh(
-      new RoundedBoxGeometry(3.9, 0.3, 3.2, 2, 0.06),
+      new RoundedBoxGeometry(3.98, 0.32, 3.28, 2, 0.06),
       pPlinthMat,
     );
-    plinth.position.y = 0.15;
+    plinth.position.y = 0.14;
     const frontStep = new THREE.Mesh(
       new RoundedBoxGeometry(1.45, 0.16, 0.52, 2, 0.04),
       pPlinthMat,
     );
-    frontStep.position.set(0.74, 0.08, 1.72);
+    frontStep.position.set(0.74, 0.08, 1.78);
 
-    // Main store body + wainscot + wooden corner posts
+    // Main store body + wainscot + trim ledge + proud corner posts (zero coplanar Z-fighting)
     const body = new THREE.Mesh(
-      new RoundedBoxGeometry(3.55, 2.25, 2.8, 3, 0.1),
+      new RoundedBoxGeometry(3.52, 2.28, 2.78, 3, 0.09),
       pWallMat,
     );
-    body.position.y = 1.42;
+    body.position.y = 1.43;
 
     const wainscot = new THREE.Mesh(
-      new RoundedBoxGeometry(3.64, 0.54, 2.9, 2, 0.05),
+      new RoundedBoxGeometry(3.62, 0.56, 2.88, 2, 0.04),
       pTealMat,
     );
-    wainscot.position.y = 0.57;
+    wainscot.position.y = 0.56;
+
+    const wainscotCap = new THREE.Mesh(
+      new RoundedBoxGeometry(3.68, 0.08, 2.94, 2, 0.025),
+      pCreamMat,
+    );
+    wainscotCap.position.y = 0.85;
 
     [
-      [-1.72, 1.35],
-      [1.72, 1.35],
-      [-1.72, -1.35],
-      [1.72, -1.35],
+      [-1.73, 1.36],
+      [1.73, 1.36],
+      [-1.73, -1.36],
+      [1.73, -1.36],
     ].forEach(([cx, cz]) => {
       const post = new THREE.Mesh(
-        new RoundedBoxGeometry(0.2, 2.28, 0.2, 2, 0.04),
+        new RoundedBoxGeometry(0.24, 2.3, 0.24, 2, 0.04),
         pTrimMat,
       );
       post.position.set(cx, 1.42, cz);
@@ -3476,23 +3503,23 @@ export function buildTownScene(): TownWorld {
     });
 
     // Pitched cozy roof + dormer platform pedestal for the big puppy sculpture
-    const roof = createExtrudedRoof(4.3, 1.55, 3.38, pRoofMat);
+    const roof = createExtrudedRoof(4.32, 1.56, 3.4, pRoofMat);
     roof.position.y = 3.25;
     const ridgeBeam = new THREE.Mesh(
-      new RoundedBoxGeometry(0.2, 0.18, 3.52, 2, 0.04),
+      new RoundedBoxGeometry(0.22, 0.18, 3.54, 2, 0.04),
       pRoofEdgeMat,
     );
-    ridgeBeam.position.y = 4.02;
+    ridgeBeam.position.y = 4.08;
 
     const puppyDeck = new THREE.Mesh(
-      new RoundedBoxGeometry(1.85, 0.26, 1.75, 2, 0.05),
+      new RoundedBoxGeometry(1.88, 0.26, 1.78, 2, 0.05),
       pCreamMat,
     );
-    puppyDeck.position.set(0, 3.85, 0.15);
+    puppyDeck.position.set(0, 3.92, 0.15);
 
     // ===== CHÚ CÚN CON TO TRÊN MÁI NHÀ (Large Sculpted Puppy on the Roof) =====
     const pupGroup = new THREE.Group();
-    pupGroup.position.set(0, 4.0, 0.15);
+    pupGroup.position.set(0, 4.06, 0.15);
     const pupFurMat = glossyClayMat('#F4C37A', 0.42);
     const pupBellyMat = glossyClayMat('#FFF6E3', 0.48);
     const pupEarMat = glossyClayMat('#A66135', 0.48);
@@ -3587,7 +3614,7 @@ export function buildTownScene(): TownWorld {
 
     // ===== BIỂN HIỆU TREO BÊN HÔNG CỬA HÀNG ("Pets") =====
     const sideSignGroup = new THREE.Group();
-    sideSignGroup.position.set(-1.78, 2.02, 0.18);
+    sideSignGroup.position.set(-1.85, 2.02, 0.18);
 
     const wallPlate = new THREE.Mesh(
       new RoundedBoxGeometry(0.12, 0.42, 0.24, 2, 0.03),
@@ -3687,16 +3714,17 @@ export function buildTownScene(): TownWorld {
     // Side & Back framed windows
     const sideWinR = buildFramedWindow(0.86, 0.76, pTrimMat, makeWinMat());
     sideWinR.rotation.y = Math.PI / 2;
-    sideWinR.position.set(1.79, 1.42, 0);
+    sideWinR.position.set(1.78, 1.42, 0);
     const backWin = buildFramedWindow(1.12, 0.76, pTrimMat, makeWinMat());
     backWin.rotation.y = Math.PI;
-    backWin.position.set(0, 1.42, -1.41);
+    backWin.position.set(0, 1.42, -1.4);
 
     petShop.add(
       plinth,
       frontStep,
       body,
       wainscot,
+      wainscotCap,
       roof,
       ridgeBeam,
       dispFrame,
@@ -5485,6 +5513,99 @@ export function buildTownScene(): TownWorld {
   heroMossIM.computeBoundingSphere();
   group.add(heroBoulderIM, heroMossIM);
 
+  // Large Meadow Flower Clusters (Cụm hoa to làm điểm đậu & thu hút côn trùng)
+  const BIG_FLOWER_MAX = 46;
+  const bigFlowerCoords: [number, number][] = [];
+  const bfBaseLeaf = new THREE.SphereGeometry(0.46, 8, 6);
+  bfBaseLeaf.scale(1.22, 0.42, 1.18);
+  bfBaseLeaf.translate(0, 0.14, 0);
+  const bfLeaf2 = new THREE.SphereGeometry(0.32, 7, 5);
+  bfLeaf2.scale(1.15, 0.46, 1.1);
+  bfLeaf2.translate(0.28, 0.12, -0.18);
+  const bfMoundGeo = mergeParts([bfBaseLeaf, bfLeaf2]);
+  const bfMoundMat = getMat('#4EA85B', 0.76);
+  const bfMoundIM = new THREE.InstancedMesh(bfMoundGeo, bfMoundMat, BIG_FLOWER_MAX);
+
+  const bBloomParts: THREE.BufferGeometry[] = [];
+  const bloomOffsets: [number, number, number, number][] = [
+    [0, 0.38, 0, 0.16],
+    [-0.24, 0.31, 0.18, 0.13],
+    [0.24, 0.32, -0.14, 0.135],
+    [-0.1, 0.28, -0.24, 0.115],
+  ];
+  bloomOffsets.forEach(([ox, oy, oz, rad]) => {
+    const fl = new THREE.SphereGeometry(rad, 7, 6);
+    fl.scale(1.18, 0.62, 1.18);
+    fl.translate(ox, oy, oz);
+    bBloomParts.push(fl);
+  });
+  const bfBloomGeo = mergeParts(bBloomParts);
+  const bfBloomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.5});
+  const bfBloomIM = new THREE.InstancedMesh(bfBloomGeo, bfBloomMat, BIG_FLOWER_MAX);
+  const bfPalette = ['#FF9BB0', '#FFD166', '#98D8FF', '#D5AEFF', '#FFAD85'];
+
+  let placedBigFlowers = 0;
+  for (let i = 0; i < 240 && placedBigFlowers < BIG_FLOWER_MAX; i++) {
+    const angle = i * 2.39996 + 0.55;
+    const rad = 10.6 + ((i * 2.41) % 52.0);
+    const fx = Math.cos(angle) * rad;
+    const fz = Math.sin(angle) * rad;
+    if (isOnRoadOrPlaza(fx, fz)) continue;
+    const fy = getTownGroundHeight(fx, fz) - 0.02;
+    const sc = 0.92 + (placedBigFlowers % 3) * 0.14;
+    _instDummy.position.set(fx, fy, fz);
+    _instDummy.rotation.set(0, angle * 1.1, 0);
+    _instDummy.scale.setScalar(sc);
+    _instDummy.updateMatrix();
+    bfMoundIM.setMatrixAt(placedBigFlowers, _instDummy.matrix);
+    bfBloomIM.setMatrixAt(placedBigFlowers, _instDummy.matrix);
+    _instColor.set(bfPalette[placedBigFlowers % bfPalette.length]);
+    bfBloomIM.setColorAt(placedBigFlowers, _instColor);
+    bigFlowerCoords.push([fx, fz]);
+    colliders.push({type: 'circle', x: fx, z: fz, r: 0.45 * sc});
+    placedBigFlowers++;
+  }
+  bfMoundIM.count = placedBigFlowers;
+  bfBloomIM.count = placedBigFlowers;
+  bfMoundIM.instanceMatrix.needsUpdate = true;
+  bfBloomIM.instanceMatrix.needsUpdate = true;
+  if (bfBloomIM.instanceColor) bfBloomIM.instanceColor.needsUpdate = true;
+  bfMoundIM.computeBoundingSphere();
+  bfBloomIM.computeBoundingSphere();
+  group.add(bfMoundIM, bfBloomIM);
+
+  // Town Insect Habitats & Live 3D Bug Manager (Côn trùng khắp thị trấn)
+  const insectAnchors: InsectAnchor[] = [];
+  bigFlowerCoords.forEach(([fx, fz]) => {
+    insectAnchors.push({x: fx, y: getTownGroundHeight(fx, fz) + 0.32, z: fz, habitat: 'flower'});
+  });
+  bushCoords.forEach(([bx, bz]) => {
+    insectAnchors.push({x: bx, y: getTownGroundHeight(bx, bz) + 0.42, z: bz, habitat: 'bush'});
+  });
+  bigBushCoords.forEach(([bx, bz]) => {
+    insectAnchors.push({x: bx, y: getTownGroundHeight(bx, bz) + 0.56, z: bz, habitat: 'bush'});
+  });
+  oakTrees.forEach(([tx, tz]) => {
+    insectAnchors.push({x: tx + 0.42, y: getTownGroundHeight(tx, tz) + 0.86, z: tz + 0.25, habitat: 'tree'});
+  });
+  branchedTrees.forEach(([tx, tz]) => {
+    insectAnchors.push({x: tx - 0.35, y: getTownGroundHeight(tx, tz) + 0.82, z: tz + 0.3, habitat: 'tree'});
+  });
+  smallRockCoords.forEach(([rx, rz]) => {
+    insectAnchors.push({x: rx, y: getTownGroundHeight(rx, rz) + 0.35, z: rz, habitat: 'rock'});
+  });
+  largeRockCoords.forEach(([rx, rz]) => {
+    insectAnchors.push({x: rx, y: getTownGroundHeight(rx, rz) + 0.92, z: rz, habitat: 'rock'});
+  });
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const sr = getLakeShoreRadius(a) + 0.85;
+    const wx = LAKE_CENTER.x + Math.cos(a) * sr;
+    const wz = LAKE_CENTER.z + Math.sin(a) * sr;
+    insectAnchors.push({x: wx, y: 0.25, z: wz, habitat: 'water_edge'});
+  }
+  const insectManager = new TownInsectManager(group, insectAnchors);
+
   // Track last applied timeOfDay so emissive updates only run when changed
   let lastAppliedTod: TimeOfDay | null = null;
   let currentTod: TimeOfDay = 'morning';
@@ -5771,6 +5892,7 @@ export function buildTownScene(): TownWorld {
     petShopSignTex.dispose();
     warmGlowTex.dispose();
     lakeFishingVisuals?.dispose();
+    insectManager.dispose();
     group.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh || (obj as THREE.Points).isPoints) {
         const m = obj as THREE.Mesh;
@@ -5782,6 +5904,34 @@ export function buildTownScene(): TownWorld {
       }
     });
   };
+
+  const updateInsects = (
+    playerX: number,
+    playerY: number,
+    playerZ: number,
+    playerSpeed: number,
+    isCreeping: boolean,
+    elapsed: number,
+    dt: number,
+    frustum?: THREE.Frustum,
+  ) =>
+    insectManager.update(
+      elapsed,
+      dt,
+      playerX,
+      playerY,
+      playerZ,
+      playerSpeed,
+      isCreeping,
+      frustum,
+    );
+
+  const tryCatchInsect = (
+    playerX: number,
+    playerY: number,
+    playerZ: number,
+    playerRotY: number,
+  ) => insectManager.tryCatch(playerX, playerY, playerZ, playerRotY);
 
   return {
     group,
@@ -5795,6 +5945,8 @@ export function buildTownScene(): TownWorld {
     updateFishingVisuals,
     setOutdoorSwingSeated,
     getOutdoorSwingSeatPose,
+    updateInsects,
+    tryCatchInsect,
     update,
     dispose,
   };

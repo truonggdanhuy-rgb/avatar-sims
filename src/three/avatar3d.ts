@@ -8,7 +8,7 @@ import {
 } from './hairSystem';
 import {clayMat, glossyClayMat, makeShadowed} from './materials';
 
-export type HoldPose = 'none' | 'carry_front' | 'carry_bag' | 'carry_umbrella';
+export type HoldPose = 'none' | 'carry_front' | 'carry_bag' | 'carry_umbrella' | 'carry_net';
 
 const HEAD_PIVOT_Y = 0.968;
 
@@ -17,6 +17,7 @@ const HAND_POSES: Record<HoldPose, {armX: number; armZ: number; elbowX: number; 
   carry_umbrella: {armX: -0.46, armZ: 0.62, elbowX: -0.94, elbowZ: 0.18},
   carry_front: {armX: -0.42, armZ: 0.44, elbowX: -0.98, elbowZ: 0.08},
   carry_bag: {armX: -0.06, armZ: 0.48, elbowX: -0.14, elbowZ: 0.06},
+  carry_net: {armX: -1.16, armZ: 0.24, elbowX: -1.24, elbowZ: -0.18},
 };
 
 export interface SkirtDeformPair {
@@ -43,6 +44,7 @@ export interface AvatarRig {
   eyelids: THREE.Mesh[];
   shadowDisc?: THREE.Mesh;
   holdPose?: HoldPose;
+  toolType?: ToolId | null;
   rodBobber?: THREE.Object3D;
   rodLine?: THREE.Object3D;
 }
@@ -1065,7 +1067,9 @@ export function buildAvatarRig(
       ? config.handheld
       : null;
   const holdPose: HoldPose = equippedTool
-    ? 'carry_front'
+    ? equippedTool === 'wooden_net'
+      ? 'carry_net'
+      : 'carry_front'
     : !handheld
       ? 'none'
       : handheld === 'tote_bag'
@@ -1331,6 +1335,68 @@ export function buildAvatarRig(
         miniBobberGroup,
       );
       handAnchor.add(rodGroup);
+    } else if (equippedTool === 'wooden_net') {
+      const netGroup = new THREE.Group();
+      // Rest pole comfortably backward & slightly outward over right shoulder
+      netGroup.rotation.x = -0.82;
+      netGroup.rotation.z = -0.22;
+
+      const darkWoodMat = clayMat('#7D4F2D', 0.68);
+      const handleWoodMat = clayMat('#B87F4D', 0.64);
+      const shaftWoodMat = clayMat('#9D6639', 0.62);
+      const netSackMat = new THREE.MeshStandardMaterial({
+        color: '#ECF7FC',
+        roughness: 0.78,
+        metalness: 0.02,
+        side: THREE.DoubleSide,
+      });
+
+      const buttCap = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), darkWoodMat);
+      buttCap.position.set(0, -0.15, 0);
+
+      const handleGrip = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.021, 0.022, 0.28, 12),
+        handleWoodMat,
+      );
+      handleGrip.position.set(0, -0.01, 0);
+
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.016, 0.019, 0.64, 10),
+        shaftWoodMat,
+      );
+      pole.position.set(0, 0.42, 0);
+
+      const socket = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.028, 0.02, 0.075, 10),
+        darkWoodMat,
+      );
+      socket.position.set(0, 0.74, 0);
+
+      const hoopGroup = new THREE.Group();
+      hoopGroup.position.set(0, 0.96, 0);
+      hoopGroup.rotation.x = 0.06;
+
+      const hoop = new THREE.Mesh(
+        new THREE.TorusGeometry(0.215, 0.02, 10, 26),
+        darkWoodMat,
+      );
+
+      // Deep tapered white mesh sack hanging backward behind the shoulder
+      const sackPts = [
+        new THREE.Vector2(0.0, -0.49),
+        new THREE.Vector2(0.055, -0.45),
+        new THREE.Vector2(0.115, -0.32),
+        new THREE.Vector2(0.175, -0.14),
+        new THREE.Vector2(0.208, 0.0),
+      ];
+      const sackGeo = new THREE.LatheGeometry(sackPts, 20);
+      const sack = new THREE.Mesh(sackGeo, netSackMat);
+      sack.rotation.x = Math.PI / 2;
+      sack.position.set(0, 0, 0.0);
+
+      hoopGroup.add(hoop, sack);
+      netGroup.add(buttCap, handleGrip, pole, socket, hoopGroup);
+      handAnchor.add(netGroup);
     } else if (handheld === 'milk_tea') {
       const cup = new THREE.Mesh(
         new THREE.CylinderGeometry(0.074, 0.052, 0.185, 16),
@@ -2388,6 +2454,7 @@ export function buildAvatarRig(
     eyelids,
     shadowDisc,
     holdPose,
+    toolType: equippedTool,
     rodBobber: rodBobberObj,
     rodLine: rodLineObj,
   };
@@ -2454,6 +2521,9 @@ export function updateAvatarRigAnimation(
     } else if (hold === 'carry_bag') {
       rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX + swing * 0.22;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
+    } else if (hold === 'carry_net') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_net.armX + swing * 0.05;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX;
     } else {
       rig.rightArm.rotation.x = swing * 0.45;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.none.elbowX - 0.08 + Math.max(0, swing) * 0.15;
@@ -2465,6 +2535,70 @@ export function updateAvatarRigAnimation(
     rig.bodyPivot.rotation.x = 0.06;
     rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = Math.sin(elapsed * 6) * 0.03;
+  } else if (pose === 'creep') {
+    // Khum nhẹ người, bước chậm rón rén khi kéo nhẹ joystick lúc cầm vợt
+    const swing = Math.sin(elapsed * 5.2);
+    rig.leftLeg.rotation.x = swing * 0.28 - 0.12;
+    rig.rightLeg.rotation.x = -swing * 0.28 - 0.12;
+    rig.leftLeg.rotation.z = -0.04;
+    rig.rightLeg.rotation.z = 0.04;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.34 + Math.max(0, -swing) * 0.24;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.34 + Math.max(0, swing) * 0.24;
+
+    rig.leftArm.rotation.x = -0.26 - swing * 0.14;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.52;
+
+    if (hold === 'carry_net') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_net.armX + 0.12;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX + 0.14;
+    } else {
+      rig.rightArm.rotation.x = -0.26 + swing * 0.14;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = -0.52;
+    }
+
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.bodyPivot.position.y = -0.075 + Math.abs(Math.cos(elapsed * 5.2)) * 0.022;
+    rig.bodyPivot.rotation.x = 0.24;
+    rig.headPivot.rotation.x = -0.18;
+    rig.headPivot.rotation.z = 0;
+  } else if (pose === 'net_swing') {
+    const u = THREE.MathUtils.clamp(poseProgress, 0, 1);
+    let armX: number;
+    let elbowX: number;
+    let torsoLean: number;
+    if (u < 0.28) {
+      const t = u / 0.28;
+      armX = THREE.MathUtils.lerp(HAND_POSES.carry_net.armX, -1.68, t);
+      elbowX = THREE.MathUtils.lerp(HAND_POSES.carry_net.elbowX, -0.55, t);
+      torsoLean = THREE.MathUtils.lerp(0.05, -0.12, t);
+    } else if (u < 0.66) {
+      const t = Math.sin(((u - 0.28) / 0.38) * (Math.PI * 0.5));
+      armX = THREE.MathUtils.lerp(-1.68, 0.24, t);
+      elbowX = THREE.MathUtils.lerp(-0.55, -0.16, t);
+      torsoLean = THREE.MathUtils.lerp(-0.12, 0.24, t);
+    } else {
+      const t = (u - 0.66) / 0.34;
+      armX = THREE.MathUtils.lerp(0.24, HAND_POSES.carry_net.armX, t);
+      elbowX = THREE.MathUtils.lerp(-0.16, HAND_POSES.carry_net.elbowX, t);
+      torsoLean = THREE.MathUtils.lerp(0.24, 0.04, t);
+    }
+    rig.leftLeg.rotation.x = -0.12;
+    rig.rightLeg.rotation.x = 0.14;
+    rig.leftLeg.rotation.z = 0;
+    rig.rightLeg.rotation.z = 0;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.16;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.12;
+    rig.leftArm.rotation.x = -0.22;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.34;
+    rig.rightArm.rotation.x = armX;
+    if (rig.rightElbow) rig.rightElbow.rotation.x = elbowX;
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.bodyPivot.position.y = -0.02;
+    rig.bodyPivot.rotation.x = torsoLean;
+    rig.headPivot.rotation.x = -torsoLean * 0.45;
+    rig.headPivot.rotation.z = 0;
   } else if (pose === 'jump') {
     rig.leftLeg.rotation.x = -0.34;
     rig.rightLeg.rotation.x = 0.24;
@@ -2484,6 +2618,9 @@ export function updateAvatarRigAnimation(
     } else if (hold === 'carry_bag') {
       rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX - 0.15;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
+    } else if (hold === 'carry_net') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_net.armX - 0.06;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX;
     } else {
       rig.rightArm.rotation.x = -0.58;
       if (rig.rightElbow) rig.rightElbow.rotation.x = -0.42;
@@ -2607,6 +2744,9 @@ export function updateAvatarRigAnimation(
     } else if (hold === 'carry_bag') {
       rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX + sitBreath * 0.012;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
+    } else if (hold === 'carry_net') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_net.armX + sitBreath * 0.01;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX;
     } else {
       rig.rightArm.rotation.x = -0.44 + sitBreath * 0.015;
       if (rig.rightElbow) rig.rightElbow.rotation.x = -0.62;
@@ -2667,6 +2807,9 @@ export function updateAvatarRigAnimation(
     } else if (hold === 'carry_bag') {
       rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX + breath * 0.014;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
+    } else if (hold === 'carry_net') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_net.armX + breath * 0.012;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX;
     } else {
       rig.rightArm.rotation.x = -Math.sin(breathPhase - 0.3) * 0.024;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.none.elbowX - breath01 * 0.03;

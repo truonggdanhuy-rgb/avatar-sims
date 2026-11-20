@@ -41,7 +41,7 @@ export const FISH_RARITY_CONFIG: Record<FishRarity, FishRarityBehavior> = {
 };
 
 export const ROD_BOBBER_SPECS: Record<
-  ToolId,
+  'wooden_rod',
   {shape: 'round'; primaryColor: string; bandColor: string; metalColor: string}
 > = {
   wooden_rod: {
