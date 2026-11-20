@@ -136,6 +136,34 @@ function createExitDoorway(
   return doorGroup;
 }
 
+const _livestockEmojiMatCache = new Map<string, THREE.SpriteMaterial>();
+function getLivestockEmojiSpriteMaterial(emoji: string): THREE.SpriteMaterial {
+  const cached = _livestockEmojiMatCache.get(emoji);
+  if (cached) return cached;
+  const w = emoji.length > 2 ? 144 : 96;
+  const h = 96;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = '64px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, w / 2, h / 2 + 4);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true,
+    depthWrite: false,
+  });
+  _livestockEmojiMatCache.set(emoji, mat);
+  return mat;
+}
+
 export function buildSubzoneScene(
   zone: Exclude<ZoneId, 'town'>,
   options: {
@@ -2694,14 +2722,15 @@ export function buildSubzoneScene(
       // Baby scale (0.66x) vs Adult/Retired (1.0x)
       aBody.scale.setScalar(ani.stage === 'baby' ? 0.66 : 1.0);
 
-      if (ani.sick || ani.hasProduce) {
-        const badgeY = ani.type === 'cow' ? 1.38 : ani.type === 'pig' ? 1.02 : 0.82;
-        const badge = new THREE.Mesh(
-          new THREE.SphereGeometry(0.11, 8, 8),
-          glossyClayMat(ani.sick ? '#3EB35E' : '#FFD166', 0.22),
-        );
-        badge.position.set(0, badgeY, 0);
-        aBody.add(badge);
+      const isHungry = ani.hunger < 45;
+      if (ani.sick || isHungry) {
+        const badgeY = ani.type === 'cow' ? 1.46 : ani.type === 'pig' ? 1.08 : 0.88;
+        const emojiText = ani.sick && isHungry ? '🤢 🍽️' : ani.sick ? '🤢' : '🍽️';
+        const emojiSprite = new THREE.Sprite(getLivestockEmojiSpriteMaterial(emojiText));
+        emojiSprite.scale.set(emojiText.length > 2 ? 0.82 : 0.56, 0.56, 1);
+        emojiSprite.position.set(0, badgeY, 0);
+        emojiSprite.renderOrder = 6;
+        aBody.add(emojiSprite);
       }
 
       aRoot.add(aBody);

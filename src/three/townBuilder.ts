@@ -2639,27 +2639,6 @@ export function buildTownScene(): TownWorld {
     lakePierNightLight.position.set(PIER_X + 1.32, 2.0, 44.3);
     lake.add(lanternPost, lanternArm, lanternCord, lanternCap, pierLamp, lakePierNightLight);
 
-    // Wooden tackle barrel + leaning fishing rod on bridge corner
-    const barrel = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.24, 0.22, 0.48, 10),
-      getMat('#9E6A3E', 0.76),
-    );
-    barrel.position.set(PIER_X - 0.62, 0.49, 43.45);
-    const barrelRim = new THREE.Mesh(
-      new THREE.TorusGeometry(0.23, 0.025, 6, 12),
-      getMat('#4B525A', 0.5, 0.4),
-    );
-    barrelRim.rotation.x = Math.PI / 2;
-    barrelRim.position.set(PIER_X - 0.62, 0.66, 43.45);
-    const rodPole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.018, 0.036, 2.1, 7),
-      getMat('#B58952', 0.62),
-    );
-    rodPole.position.set(PIER_X - 0.68, 1.15, 43.82);
-    rodPole.rotation.x = 0.42;
-    rodPole.rotation.z = -0.18;
-    lake.add(barrel, barrelRim, rodPole);
-
     // Interactive Fishing Spot Box at Pier Tip & Center Lake
     addInteractionProxy(
       lake,

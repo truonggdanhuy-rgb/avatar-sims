@@ -4,19 +4,28 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Coins,
   DoorClosed,
   DoorOpen,
   Fish,
   Move,
   PackageMinus,
   RotateCw,
+  Sparkles,
+  Trophy,
   Utensils,
+  Wrench,
 } from 'lucide-react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {WELL_WATER_MAX} from '../data/farmCatalog';
-import {FISH_RARITY_CONFIG, rollRandomRiverFish} from '../data/fishingCatalog';
+import {
+  FISH_RARITY_CONFIG,
+  getRodRepairCost,
+  rollRandomRiverFish,
+} from '../data/fishingCatalog';
+import {FishIllustration} from './FishingIcons';
 import {FURNITURE_BY_ID, isPointOnFurnitureSurface} from '../data/furnitureCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
 import {FishingVisualFrame} from '../three/fishingVisuals3d';
@@ -98,16 +107,23 @@ interface WorldCanvasProps {
     weightKg: number;
     sellPrice: number;
   }) => {
+    speciesId: RiverFishSpeciesId;
     name: string;
     rarity: FishRarity;
     weightKg: number;
+    sellPrice: number;
+    isNewRecord: boolean;
+    isFirstDiscovery: boolean;
     durabilityLeft: number;
     maxDurability: number;
+    durabilityLost: number;
   } | null;
   onLoseFishingDurability: () => {
     durabilityLeft: number;
     maxDurability: number;
+    durabilityLost: number;
   };
+  onRepairFishingRod: () => boolean;
   onRestoreEnergy: () => void;
   onBoostMood: () => void;
   onCollectWellWater: () => {
@@ -397,6 +413,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onStowFurniture,
   onCatchRiverFish,
   onLoseFishingDurability,
+  onRepairFishingRod,
   onRestoreEnergy,
   onBoostMood,
   onCollectWellWater,
@@ -426,6 +443,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [arcMenuPos, setArcMenuPos] = useState<{plotId: number; x: number; y: number} | null>(null);
   const [fishingState, setFishingState] = useState<FishingPhase>('idle');
   const [biteAlertPos, setBiteAlertPos] = useState<{x: number; y: number} | null>(null);
+  const [brokenRodPrompt, setBrokenRodPrompt] = useState<{
+    repairCost: number;
+    maxDurability: number;
+  } | null>(null);
+  const [catchCelebration, setCatchCelebration] = useState<{
+    speciesId: RiverFishSpeciesId;
+    name: string;
+    rarity: FishRarity;
+    weightKg: number;
+    sellPrice: number;
+    isNewRecord: boolean;
+    isFirstDiscovery: boolean;
+    durabilityLeft: number;
+    maxDurability: number;
+  } | null>(null);
   const [miniActive, setMiniActive] = useState(false);
   const [miniScore, setMiniScore] = useState(0);
   const [starPos, setStarPos] = useState({x: 50, y: 50});
@@ -548,6 +580,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const activeTownRef = useRef<TownWorld | null>(null);
   const activeSubzoneRef = useRef<SubzoneWorld | null>(null);
   const bubbleTimerRef = useRef<number | null>(null);
+  const catchTimerRef = useRef<number | null>(null);
   const fishTimerRef = useRef<number | null>(null);
   const openDoorsRef = useRef<Record<string, boolean>>({});
   const activeDoorsRef = useRef<HouseDoorHandle[]>([]);
@@ -562,6 +595,24 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     bubbleTimerRef.current = window.setTimeout(() => {
       setSpeechBubble(null);
     }, 2600);
+  };
+
+  const triggerCatchCelebration = (res: {
+    speciesId: RiverFishSpeciesId;
+    name: string;
+    rarity: FishRarity;
+    weightKg: number;
+    sellPrice: number;
+    isNewRecord: boolean;
+    isFirstDiscovery: boolean;
+    durabilityLeft: number;
+    maxDurability: number;
+  }) => {
+    if (catchTimerRef.current) clearTimeout(catchTimerRef.current);
+    setCatchCelebration(res);
+    catchTimerRef.current = window.setTimeout(() => {
+      setCatchCelebration(null);
+    }, 3400);
   };
 
   useEffect(() => {
@@ -613,7 +664,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     .join('|');
 
   const livestockVisualKey = livestock
-    .map((a) => `${a.id}:${a.type}:${a.stage}:${a.sick ? 1 : 0}:${a.hasProduce ? 1 : 0}`)
+    .map(
+      (a) =>
+        `${a.id}:${a.type}:${a.stage}:${a.sick ? 1 : 0}:${a.hunger < 45 ? 1 : 0}:${a.hasProduce ? 1 : 0}`,
+    )
     .join('|');
 
   const troughsVisualKey = `${troughs.poultry}:${troughs.cattle}`;
@@ -1053,12 +1107,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
       if (rod.durability <= 0) {
         soundFX.tap();
-        showBubble(
-          `Cần câu đã hỏng (0/${rod.maxDurability})! Ghé sạp anh Koi để sửa cần.`,
-          spotX,
-          2.25,
-          spotZ,
-        );
+        setBrokenRodPrompt({
+          repairCost: getRodRepairCost(rod.durability, rod.maxDurability),
+          maxDurability: rod.maxDurability,
+        });
         return;
       }
 
@@ -1126,7 +1178,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         playerPos.pose = 'fish_cast';
         setFishingState('casting');
         soundFX.tap();
-        showBubble('Quăng phao gỗ tròn xuống nước...', spotX, 2.25, spotZ);
+        showBubble('Quăng phao xuống nước...', spotX, 2.25, spotZ);
       } else if (fishCtrl.phase === 'bite') {
         const preRolled = fishCtrl.rolledCatch
           ? {
@@ -1141,14 +1193,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const res = callbacksRef.current.onCatchRiverFish(preRolled);
         if (res) {
           soundFX.sparkle();
-          const rareTag = res.rarity === 'rare' ? ' ★ Hiếm!' : '';
-          const brokeTag = res.durabilityLeft === 0 ? ' (Hỏng · Cần sửa)' : '';
-          showBubble(
-            `Câu được ${res.name} (${res.weightKg.toFixed(2)} kg)${rareTag}! Độ bền ${res.durabilityLeft}/${res.maxDurability}${brokeTag}`,
-            spotX,
-            2.38,
-            spotZ,
-          );
+          setSpeechBubble(null);
+          triggerCatchCelebration(res);
         }
       } else if (fishCtrl.phase === 'waiting' || fishCtrl.phase === 'nibbling') {
         resetFishing(true);
@@ -2465,16 +2511,20 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           fishVisualFrame.shadowOpacity = 0.54;
           fishVisualFrame.shadowTailSpeed = 28;
 
-          // Reaction timeout: fish escapes and still reduces rod durability!
+          // Reaction timeout: fish escapes and may reduce rod durability
           if (fishCtrl.phaseElapsed >= fishCtrl.biteWindowSec) {
             const sx = fishCtrl.spotX;
             const sz = fishCtrl.spotZ;
             resetFishing(true);
             soundFX.splash();
             const durRes = callbacksRef.current.onLoseFishingDurability();
-            const brokeTag = durRes.durabilityLeft === 0 ? ' (Hỏng · Cần sửa)' : '';
+            const brokeTag = durRes.durabilityLeft === 0 ? ' · Cần câu đã hỏng!' : '';
+            const durInfo =
+              durRes.durabilityLost > 0
+                ? ` Độ bền ${durRes.durabilityLeft}/${durRes.maxDurability}${brokeTag}`
+                : '';
             showBubble(
-              `Cá kéo mạnh quá, chạy mất rồi! Độ bền ${durRes.durabilityLeft}/${durRes.maxDurability}${brokeTag}`,
+              `Cá kéo mạnh quá, chạy mất rồi!${durInfo}`,
               sx,
               2.35,
               sz,
@@ -3037,6 +3087,186 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Catch Celebration Card Overlay */}
+      {catchCelebration && (
+        <div
+          onClick={() => setCatchCelebration(null)}
+          className="pointer-events-auto fixed inset-x-0 bottom-6 z-40 flex justify-center px-4"
+        >
+          <div
+            className={`anim-catch-card relative w-full max-w-[336px] cursor-pointer overflow-hidden rounded-3xl border-4 p-4 shadow-2xl ${
+              catchCelebration.rarity === 'rare'
+                ? 'border-[#F4C44E] bg-gradient-to-br from-[#2B174D] via-[#4C247D] to-[#23395B] text-white'
+                : 'border-[#5AB7D0] bg-gradient-to-br from-[#FFFDF7] to-[#E6F6FB] text-[#2F2114]'
+            }`}
+          >
+            {/* Decorative Twinkling Sparkles */}
+            <Sparkles
+              className={`anim-sparkle pointer-events-none absolute top-3 right-3 h-5 w-5 ${
+                catchCelebration.rarity === 'rare' ? 'text-[#FFD166]' : 'text-[#42A8C4]'
+              }`}
+            />
+            <Sparkles
+              style={{animationDelay: '0.35s'}}
+              className={`anim-sparkle pointer-events-none absolute bottom-3 left-3 h-4 w-4 ${
+                catchCelebration.rarity === 'rare' ? 'text-[#C792EA]' : 'text-[#5DC49B]'
+              }`}
+            />
+
+            <div className="flex items-center gap-3.5">
+              {/* Animated Jumping Fish Illustration */}
+              <div
+                className={`relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border-2 ${
+                  catchCelebration.rarity === 'rare'
+                    ? 'border-[#FFD166]/60 bg-[#FFFFFF]/15 shadow-[0_0_24px_rgba(255,209,102,0.4)]'
+                    : 'border-[#9AD7E8] bg-white shadow-inner'
+                }`}
+              >
+                <div className="anim-fish-jump">
+                  <FishIllustration
+                    speciesId={catchCelebration.speciesId}
+                    className="h-16 w-16"
+                  />
+                </div>
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
+                      catchCelebration.rarity === 'rare'
+                        ? 'bg-[#FFD166] text-[#3B2108]'
+                        : 'bg-[#3C95AD] text-white'
+                    }`}
+                  >
+                    {catchCelebration.rarity === 'rare' ? '★ Hiếm!' : 'Câu Thành Công'}
+                  </span>
+                  {catchCelebration.isFirstDiscovery && (
+                    <span className="rounded-full bg-[#44B67B] px-2 py-0.5 text-[10px] font-black text-white">
+                      Loài Mới!
+                    </span>
+                  )}
+                  {!catchCelebration.isFirstDiscovery && catchCelebration.isNewRecord && (
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-[#EE6C4D] px-2 py-0.5 text-[10px] font-black text-white">
+                      <Trophy className="h-2.5 w-2.5" />
+                      Kỷ Lục!
+                    </span>
+                  )}
+                </div>
+
+                <div className="truncate text-base font-black leading-tight">
+                  {catchCelebration.name}
+                </div>
+
+                <div
+                  className={`flex items-center gap-2 text-xs font-extrabold tabular-nums ${
+                    catchCelebration.rarity === 'rare' ? 'text-[#E8DDF7]' : 'text-[#5B4530]'
+                  }`}
+                >
+                  <span>{catchCelebration.weightKg.toFixed(2)} kg</span>
+                  <span>·</span>
+                  <span
+                    className={
+                      catchCelebration.rarity === 'rare' ? 'text-[#FFD166]' : 'text-[#C67B14]'
+                    }
+                  >
+                    Giá ~{catchCelebration.sellPrice} Xu
+                  </span>
+                </div>
+
+                <div
+                  className={`text-[10px] font-bold tabular-nums ${
+                    catchCelebration.durabilityLeft === 0
+                      ? 'text-[#FF6B6B]'
+                      : catchCelebration.rarity === 'rare'
+                        ? 'text-white/75'
+                        : 'text-[#6E7A85]'
+                  }`}
+                >
+                  Độ bền cần: {catchCelebration.durabilityLeft}/{catchCelebration.maxDurability}
+                  {catchCelebration.durabilityLeft === 0 ? ' (Hỏng)' : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Broken Rod Repair Confirmation Modal */}
+      {brokenRodPrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          onClick={() => setBrokenRodPrompt(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="anim-pop w-full max-w-sm rounded-3xl border-4 border-[#DFCA9F] bg-[#FFF8EB] p-5 text-[#3B2A1A] shadow-2xl"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FDECEC] text-[#D64545] border border-[#F5C2C2]">
+                <Wrench className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black">Cần câu đang hỏng</h3>
+                <p className="text-xs font-bold text-[#7A6048]">
+                  Độ bền: 0/{brokenRodPrompt.maxDurability}
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-3 rounded-2xl border border-[#EADBC2] bg-white px-3.5 py-3 text-xs font-bold leading-relaxed text-[#523D28]">
+              Cần câu đang hỏng! Bạn muốn sửa cần với giá{' '}
+              <span className="font-black text-[#C47C1A]">
+                {brokenRodPrompt.repairCost} Xu
+              </span>{' '}
+              để câu tiếp không?
+            </p>
+
+            <div className="mt-2 flex items-center justify-between text-[11px] font-bold text-[#7A6048] px-1">
+              <span>Số dư hiện có:</span>
+              <span className="inline-flex items-center gap-1 font-black text-[#9E6014]">
+                <Coins className="h-3.5 w-3.5 text-amber-500" />
+                {stats.coins} Xu
+              </span>
+            </div>
+
+            {stats.coins < brokenRodPrompt.repairCost && (
+              <div className="mt-2 rounded-xl bg-[#FDECEC] px-3 py-1.5 text-[11px] font-bold text-[#B63535]">
+                Bạn chưa đủ {brokenRodPrompt.repairCost} Xu để sửa cần.
+              </div>
+            )}
+
+            <div className="mt-4 grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  setBrokenRodPrompt(null);
+                }}
+                className="rounded-xl bg-[#EADCCB] py-2.5 text-xs font-black text-[#5C442C] transition active:scale-95"
+              >
+                Để sau
+              </button>
+              <button
+                type="button"
+                disabled={stats.coins < brokenRodPrompt.repairCost}
+                onClick={() => {
+                  const ok = onRepairFishingRod();
+                  if (ok) {
+                    setBrokenRodPrompt(null);
+                    showBubble('Đã sửa cần câu xong! Thả phao câu tiếp thôi.');
+                  }
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#E89B35] py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-[#D68924] disabled:opacity-45 active:scale-95"
+              >
+                <Wrench className="h-3.5 w-3.5" />
+                Sửa ({brokenRodPrompt.repairCost} Xu)
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

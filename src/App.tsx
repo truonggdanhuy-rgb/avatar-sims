@@ -22,6 +22,7 @@ import {
   getRodRepairCost,
   RIVER_FISH_CATALOG,
   rollRandomRiverFish,
+  rollRodDurabilityLoss,
   WOODEN_ROD_MAX_DURABILITY,
   WOODEN_ROD_PRICE,
 } from './data/fishingCatalog';
@@ -1733,9 +1734,9 @@ export default function App() {
   };
 
   const handleRepairFishingRod = () => {
-    if (!fishingRod.owned || fishingRod.durability >= fishingRod.maxDurability) return;
+    if (!fishingRod.owned || fishingRod.durability >= fishingRod.maxDurability) return false;
     const cost = getRodRepairCost(fishingRod.durability, fishingRod.maxDurability);
-    if (stats.coins < cost) return;
+    if (stats.coins < cost) return false;
     soundFX.sparkle();
     setStats((prev) => ({
       ...prev,
@@ -1745,6 +1746,7 @@ export default function App() {
       ...prev,
       durability: prev.maxDurability,
     }));
+    return true;
   };
 
   const handleToggleEquipRod = () => {
@@ -1765,7 +1767,6 @@ export default function App() {
     const rod = fishingRodRef.current;
     if (!rod.owned || !rod.equipped || rod.durability <= 0) return null;
 
-    const nextDur = Math.max(0, rod.durability - 1);
     const caught = preRolled
       ? {
           species: RIVER_FISH_CATALOG[preRolled.speciesId],
@@ -1774,6 +1775,15 @@ export default function App() {
         }
       : rollRandomRiverFish();
     const spec = caught.species;
+
+    const durLost = rollRodDurabilityLoss('catch', spec.rarity);
+    const nextDur = Math.max(0, rod.durability - durLost);
+
+    const existingDex = fishDex[spec.id];
+    const isFirstDiscovery = !existingDex || existingDex.caughtCount === 0;
+    const isNewRecord =
+      Boolean(existingDex && existingDex.caughtCount > 0) &&
+      caught.weightKg > (existingDex?.maxWeightKg ?? 0);
 
     const newItem: CaughtFishItem = {
       id: `fish_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -1785,10 +1795,12 @@ export default function App() {
       locked: false,
     };
 
-    setFishingRod((prev) => ({
-      ...prev,
-      durability: Math.max(0, prev.durability - 1),
-    }));
+    if (durLost > 0) {
+      setFishingRod((prev) => ({
+        ...prev,
+        durability: Math.max(0, prev.durability - durLost),
+      }));
+    }
     setFishBasket((prev) => [newItem, ...prev]);
     setFishDex((prev) => {
       const existing = prev[spec.id] ?? {
@@ -1811,24 +1823,32 @@ export default function App() {
     markQuestDone('fishing');
 
     return {
+      speciesId: spec.id,
       name: spec.name,
       rarity: spec.rarity,
       weightKg: caught.weightKg,
+      sellPrice: caught.sellPrice,
+      isNewRecord,
+      isFirstDiscovery,
       durabilityLeft: nextDur,
       maxDurability: rod.maxDurability,
+      durabilityLost: durLost,
     };
   };
 
   const handleLoseFishingDurability = () => {
     const rod = fishingRodRef.current;
     if (!rod.owned) {
-      return {durabilityLeft: 0, maxDurability: WOODEN_ROD_MAX_DURABILITY};
+      return {durabilityLeft: 0, maxDurability: WOODEN_ROD_MAX_DURABILITY, durabilityLost: 0};
     }
-    const nextDur = Math.max(0, rod.durability - 1);
-    setFishingRod((prev) => ({
-      ...prev,
-      durability: Math.max(0, prev.durability - 1),
-    }));
+    const durLost = rollRodDurabilityLoss('escape');
+    const nextDur = Math.max(0, rod.durability - durLost);
+    if (durLost > 0) {
+      setFishingRod((prev) => ({
+        ...prev,
+        durability: Math.max(0, prev.durability - durLost),
+      }));
+    }
     setStats((prev) => ({
       ...prev,
       energy: Math.max(5, prev.energy - 1),
@@ -1836,6 +1856,7 @@ export default function App() {
     return {
       durabilityLeft: nextDur,
       maxDurability: rod.maxDurability,
+      durabilityLost: durLost,
     };
   };
 
@@ -2128,6 +2149,7 @@ export default function App() {
         onStowFurniture={handleStowFurniture}
         onCatchRiverFish={handleCatchRiverFish}
         onLoseFishingDurability={handleLoseFishingDurability}
+        onRepairFishingRod={handleRepairFishingRod}
         onRestoreEnergy={() => setStats((prev) => ({...prev, energy: 100}))}
         onBoostMood={() =>
           setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 10)}))
@@ -2268,7 +2290,6 @@ export default function App() {
           fishingRod={fishingRod}
           fishBasket={fishBasket}
           onBuyRod={handleBuyFishingRod}
-          onRepairRod={handleRepairFishingRod}
           onToggleFishLock={handleToggleFishLock}
           onSellFish={handleSellFish}
           onSellAllUnlocked={handleSellAllUnlockedFish}
@@ -2322,14 +2343,10 @@ export default function App() {
           storageUsed={storageUsed}
           storageCapacity={storageCapacity}
           fishingRod={fishingRod}
-          fishBasket={fishBasket}
           fishDex={fishDex}
           initialTab={phoneInitialTab}
           initialBagSubTab={phoneBagSubTab}
           onToggleEquipRod={handleToggleEquipRod}
-          onToggleFishLock={handleToggleFishLock}
-          onSellFish={handleSellFish}
-          onSellAllUnlocked={handleSellAllUnlockedFish}
           onOpenWardrobe={() => {
             setPhoneOpen(false);
             setWardrobeOpen(true);

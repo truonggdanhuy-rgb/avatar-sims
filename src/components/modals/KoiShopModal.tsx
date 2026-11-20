@@ -1,9 +1,8 @@
 import React, {useState} from 'react';
-import {Coins, Wrench, X, CheckCircle2, Backpack, Fish} from 'lucide-react';
+import {Coins, ShoppingBag, X, CheckCircle2, Backpack, Fish} from 'lucide-react';
 import {
   WOODEN_ROD_MAX_DURABILITY,
   WOODEN_ROD_PRICE,
-  getRodRepairCost,
 } from '../../data/fishingCatalog';
 import {CaughtFishItem, FishingRodState} from '../../types/game';
 import {FishBasketPanel} from '../FishBasketPanel';
@@ -14,7 +13,6 @@ interface KoiShopModalProps {
   fishingRod: FishingRodState;
   fishBasket: CaughtFishItem[];
   onBuyRod: () => void;
-  onRepairRod: () => void;
   onToggleFishLock: (fishId: string) => void;
   onSellFish: (fishId: string) => void;
   onSellAllUnlocked: () => void;
@@ -27,7 +25,6 @@ export function KoiShopModal({
   fishingRod,
   fishBasket,
   onBuyRod,
-  onRepairRod,
   onToggleFishLock,
   onSellFish,
   onSellAllUnlocked,
@@ -35,8 +32,6 @@ export function KoiShopModal({
   onClose,
 }: KoiShopModalProps) {
   const [tab, setTab] = useState<'shop' | 'sell'>('shop');
-  const repairCost = getRodRepairCost(fishingRod.durability, fishingRod.maxDurability);
-  const needsRepair = fishingRod.owned && fishingRod.durability < fishingRod.maxDurability;
   const isBroken = fishingRod.owned && fishingRod.durability <= 0;
   const durPct = Math.round(
     (fishingRod.durability / Math.max(1, fishingRod.maxDurability)) * 100,
@@ -47,12 +42,7 @@ export function KoiShopModal({
       <div className="w-full max-w-lg bg-[#FFF8EB] rounded-3xl border-4 border-[#DFCA9F] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="px-5 py-3.5 bg-gradient-to-r from-[#3D95AC] to-[#57B3C5] text-white flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-black tracking-tight">Sạp Câu Cá của Koi</h2>
-            <p className="text-[11px] font-bold text-white/90">
-              Cần câu gỗ · Sửa cần · Thu mua cá sông tươi
-            </p>
-          </div>
+          <h2 className="text-lg font-black tracking-tight">Sạp Câu Cá của Koi</h2>
           <div className="flex items-center gap-2">
             <div className="inline-flex items-center gap-1 bg-white/20 px-3 py-1 rounded-full text-xs font-black">
               <Coins className="w-3.5 h-3.5 text-[#FFE57F]" />
@@ -66,12 +56,6 @@ export function KoiShopModal({
           </div>
         </div>
 
-        {/* Koi Greeting */}
-        <div className="px-5 py-2.5 bg-[#EAF6F9] border-b border-[#CBE4EB] text-xs font-bold text-[#2D5D6E]">
-          Koi: "Chào bạn! Cần câu tốt giúp giữ nhịp hồ câu êm ả. Mua xong nhớ mở{' '}
-          <span className="font-black text-[#1E4757]">Túi Đồ &gt; Cần &amp; Vợt</span> để trang bị nhé!"
-        </div>
-
         {/* Tabs */}
         <div className="px-4 pt-3 flex gap-2">
           <button
@@ -81,8 +65,8 @@ export function KoiShopModal({
                 ? 'bg-[#3D95AC] text-white shadow-sm'
                 : 'bg-[#EFE3CA] text-[#6D5337] hover:bg-[#E4D3B2]'
             }`}>
-            <Wrench className="w-3.5 h-3.5" />
-            Cửa Hàng &amp; Sửa Cần
+            <ShoppingBag className="w-3.5 h-3.5" />
+            Cửa Hàng
           </button>
           <button
             onClick={() => setTab('sell')}
@@ -110,7 +94,7 @@ export function KoiShopModal({
                     <div>
                       <div className="text-base font-black text-[#3B2A1A]">Cần Câu Gỗ</div>
                       <div className="text-xs font-semibold text-[#6F583E]">
-                        Độ bền tối đa: {WOODEN_ROD_MAX_DURABILITY} lần câu cá
+                        Độ bền tối đa: {WOODEN_ROD_MAX_DURABILITY}
                       </div>
                       <div className="text-[11px] font-bold text-[#3C95AD] mt-0.5">
                         Dùng được ở Hồ Câu Thị Trấn &amp; Hồ Cá Nông Trại
@@ -141,7 +125,7 @@ export function KoiShopModal({
                         className={
                           isBroken
                             ? 'text-[#D64545] font-black'
-                            : needsRepair
+                            : durPct <= 30
                               ? 'text-[#C8741D] font-black'
                               : 'text-[#3B7C59]'
                         }>
@@ -162,28 +146,12 @@ export function KoiShopModal({
                       />
                     </div>
 
-                    {isBroken && (
-                      <div className="text-xs font-bold text-[#B93838] bg-[#FDECEC] border border-[#F5C2C2] rounded-xl px-3 py-2">
-                        Cần câu đã về 0 độ bền và bị hỏng! Bạn cần sửa cần giá{' '}
-                        <span className="font-black">{repairCost} Xu</span> mới câu tiếp được.
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={onRepairRod}
-                        disabled={!needsRepair || coins < repairCost}
-                        className="py-2.5 px-3 rounded-xl bg-[#E89B35] hover:bg-[#D68924] disabled:opacity-40 text-white text-xs font-black transition flex items-center justify-center gap-1.5">
-                        <Wrench className="w-3.5 h-3.5" />
-                        {needsRepair ? `Sửa cần (${repairCost} Xu)` : 'Độ bền tối đa'}
-                      </button>
-                      <button
-                        onClick={onOpenBagTools}
-                        className="py-2.5 px-3 rounded-xl bg-[#EFE4CF] hover:bg-[#E3D3B4] text-[#4E3922] text-xs font-black transition flex items-center justify-center gap-1.5">
-                        <Backpack className="w-3.5 h-3.5" />
-                        Mở Túi &gt; Cần &amp; Vợt
-                      </button>
-                    </div>
+                    <button
+                      onClick={onOpenBagTools}
+                      className="w-full py-2.5 px-3 rounded-xl bg-[#EFE4CF] hover:bg-[#E3D3B4] text-[#4E3922] text-xs font-black transition flex items-center justify-center gap-1.5">
+                      <Backpack className="w-3.5 h-3.5" />
+                      Mở Túi &gt; Cần &amp; Vợt
+                    </button>
                   </div>
                 )}
               </div>

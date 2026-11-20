@@ -107,7 +107,7 @@ export function FishBasketPanel({
           {/* Fish List */}
           {riverFish.length === 0 ? (
             <div className="bg-[#F9F2E4] border border-[#E5D6BC] rounded-2xl p-6 text-center text-xs font-bold text-[#8B7254]">
-              Giỏ cá sông đang trống. Hãy trang bị cần câu trong Túi Đồ và thả cần ở Hồ Câu hoặc Hồ Cá Nông Trại!
+              Bạn chưa có cá sông nào để bán. Hãy trang bị cần câu trong Túi Đồ và thả cần ở Hồ Câu hoặc Hồ Cá Nông Trại!
             </div>
           ) : (
             <div

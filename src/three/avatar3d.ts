@@ -30,6 +30,8 @@ export interface AvatarRig {
   rightElbow?: THREE.Group;
   leftLeg: THREE.Group;
   rightLeg: THREE.Group;
+  leftKnee?: THREE.Group;
+  rightKnee?: THREE.Group;
   eyelids: THREE.Mesh[];
   shadowDisc?: THREE.Mesh;
   holdPose?: HoldPose;
@@ -442,38 +444,42 @@ export function buildAvatarRig(
   shadowDisc.position.y = 0.004;
   root.add(shadowDisc);
 
-  // ========== LEGS, SOCKS & GROUNDED SHOES ==========
+  // ========== ARTICULATED LEGS (HIP -> THIGH -> KNEE -> SHIN -> GROUNDED SHOES) ==========
+  const KNEE_Y = -0.215;
   const sockMat = clayMat('#FFF8EE', 0.72, 0.01);
   const makeLeg = (xOffset: number) => {
     const legPivot = new THREE.Group();
     legPivot.position.set(xOffset, 0.52, 0);
 
-    // Continuous tapered leg extending deep inside the shoe so there is never an empty ankle gap
     const legMat = config.bottom === 'wide_trousers' ? bottomMat : skinMat;
     const hipCap = new THREE.Mesh(new THREE.SphereGeometry(0.078, 14, 12), legMat);
     legPivot.add(hipCap);
 
-    const legMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.078, 0.056, 0.44, 18),
+    // Upper thigh (hip y=0 down to knee y=-0.215)
+    const thighMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.078, 0.068, 0.225, 18),
       legMat,
     );
-    legMesh.position.y = -0.22;
-    legPivot.add(legMesh);
+    thighMesh.position.y = -0.11;
+    legPivot.add(thighMesh);
+
+    const kneeCap = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 12), legMat);
+    kneeCap.position.y = KNEE_Y;
+    legPivot.add(kneeCap);
 
     if (config.bottom === 'wide_trousers') {
-      const pantCyl = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.094, 0.114, 0.395, 18),
+      const thighPant = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.094, 0.105, 0.22, 18),
         bottomMat,
       );
-      pantCyl.position.y = -0.202;
-      legPivot.add(pantCyl);
-
-      const cuff = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.118, 0.12, 0.044, 18),
-        bottomDarkMat,
+      thighPant.position.y = -0.108;
+      const kneeTrouserCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.103, 14, 12),
+        bottomMat,
       );
-      cuff.position.y = -0.395;
-      legPivot.add(cuff);
+      kneeTrouserCap.scale.set(1, 0.92, 1);
+      kneeTrouserCap.position.y = KNEE_Y;
+      legPivot.add(thighPant, kneeTrouserCap);
     } else if (config.bottom === 'denim_shorts') {
       const shortMesh = new THREE.Mesh(
         new THREE.CylinderGeometry(0.106, 0.102, 0.165, 16),
@@ -490,36 +496,64 @@ export function buildAvatarRig(
       legPivot.add(hem);
     }
 
+    // Lower leg (shin + socks + shoes) pivoted at KNEE_Y so knees bend naturally when sitting/walking
+    const kneePivot = new THREE.Group();
+    kneePivot.position.set(0, KNEE_Y, 0);
+    legPivot.add(kneePivot);
+
+    const shinMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.068, 0.056, 0.23, 18),
+      legMat,
+    );
+    shinMesh.position.y = -0.115;
+    kneePivot.add(shinMesh);
+
+    if (config.bottom === 'wide_trousers') {
+      const shinPant = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.105, 0.114, 0.195, 18),
+        bottomMat,
+      );
+      shinPant.position.y = -0.095;
+      kneePivot.add(shinPant);
+
+      const cuff = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.118, 0.12, 0.044, 18),
+        bottomDarkMat,
+      );
+      cuff.position.y = -0.18;
+      kneePivot.add(cuff);
+    }
+
     // Knit ankle sock + rolled cuff bridging the lower shin smoothly into shoes
     if (config.bottom !== 'wide_trousers' && config.shoes !== 'boots') {
       const sockTube = new THREE.Mesh(
         new THREE.CylinderGeometry(0.062, 0.059, 0.105, 18),
         sockMat,
       );
-      sockTube.position.y = -0.39;
+      sockTube.position.y = -0.175;
       const sockCuff = new THREE.Mesh(
         new THREE.TorusGeometry(0.06, 0.011, 8, 18),
         sockMat,
       );
       sockCuff.rotation.x = Math.PI / 2;
-      sockCuff.position.y = -0.338;
-      legPivot.add(sockTube, sockCuff);
+      sockCuff.position.y = -0.123;
+      kneePivot.add(sockTube, sockCuff);
     }
 
-    // Shoe planted flush on ground (0.52 - 0.512 = 0.008 right above shadowDisc)
+    // Shoe planted flush on ground when standing (0.52 - 0.215 - 0.297 = 0.008 right above shadowDisc)
     const shoeMat = glossyClayMat(config.shoeColor || '#3A2B2B', 0.34);
     const isSneaker = config.shoes === 'sneakers';
     const shoeBase = new THREE.Mesh(
       new RoundedBoxGeometry(0.154, isSneaker ? 0.092 : 0.102, 0.23, 4, isSneaker ? 0.04 : 0.044),
       shoeMat,
     );
-    shoeBase.position.set(0, isSneaker ? -0.454 : -0.46, 0.036);
-    legPivot.add(shoeBase);
+    shoeBase.position.set(0, isSneaker ? -0.239 : -0.245, 0.036);
+    kneePivot.add(shoeBase);
 
     const toeCap = new THREE.Mesh(new THREE.SphereGeometry(0.074, 14, 10), shoeMat);
     toeCap.scale.set(1.0, isSneaker ? 0.6 : 0.68, 1.05);
-    toeCap.position.set(0, isSneaker ? -0.46 : -0.466, 0.114);
-    legPivot.add(toeCap);
+    toeCap.position.set(0, isSneaker ? -0.245 : -0.251, 0.114);
+    kneePivot.add(toeCap);
 
     if (isSneaker) {
       const outsole = new THREE.Mesh(
@@ -527,63 +561,67 @@ export function buildAvatarRig(
         clayMat('#EBE5DB', 0.48),
       );
       outsole.scale.set(1.04, 1, 1.56);
-      outsole.position.set(0, -0.499, 0.056);
-      legPivot.add(outsole);
+      outsole.position.set(0, -0.284, 0.056);
+      kneePivot.add(outsole);
 
       for (let i = 0; i < 2; i++) {
         const lace = new THREE.Mesh(
           new RoundedBoxGeometry(0.064, 0.014, 0.02, 2, 0.005),
           clayMat('#FFFFFF', 0.4),
         );
-        lace.position.set(0, -0.408, 0.042 + i * 0.04);
-        legPivot.add(lace);
+        lace.position.set(0, -0.193, 0.042 + i * 0.04);
+        kneePivot.add(lace);
       }
     } else if (config.shoes === 'boots') {
       const bootShaft = new THREE.Mesh(
         new THREE.CylinderGeometry(0.084, 0.088, 0.165, 16),
         shoeMat,
       );
-      bootShaft.position.set(0, -0.37, 0);
+      bootShaft.position.set(0, -0.155, 0);
       const collar = new THREE.Mesh(
         new THREE.TorusGeometry(0.084, 0.015, 8, 16),
         clayMat(shadeHex(config.shoeColor || '#3A2B2B', -0.08).getHex(), 0.45),
       );
       collar.rotation.x = Math.PI / 2;
-      collar.position.set(0, -0.288, 0);
-      legPivot.add(bootShaft, collar);
+      collar.position.set(0, -0.073, 0);
+      kneePivot.add(bootShaft, collar);
     } else if (config.shoes === 'mary_janes') {
       const collarRim = new THREE.Mesh(
         new THREE.TorusGeometry(0.064, 0.012, 8, 18),
         shoeMat,
       );
       collarRim.rotation.x = Math.PI / 2;
-      collarRim.position.set(0, -0.41, 0.005);
+      collarRim.position.set(0, -0.195, 0.005);
       const strap = new THREE.Mesh(
         new RoundedBoxGeometry(0.148, 0.02, 0.03, 2, 0.008),
         clayMat(shadeHex(config.shoeColor || '#3A2B2B', 0.08).getHex(), 0.35),
       );
-      strap.position.set(0, -0.415, 0.032);
-      legPivot.add(collarRim, strap);
+      strap.position.set(0, -0.2, 0.032);
+      kneePivot.add(collarRim, strap);
     } else if (config.shoes === 'loafers') {
       const collarRim = new THREE.Mesh(
         new THREE.TorusGeometry(0.064, 0.012, 8, 18),
         shoeMat,
       );
       collarRim.rotation.x = Math.PI / 2;
-      collarRim.position.set(0, -0.41, 0.005);
+      collarRim.position.set(0, -0.195, 0.005);
       const saddle = new THREE.Mesh(
         new RoundedBoxGeometry(0.14, 0.02, 0.052, 2, 0.008),
         clayMat(shadeHex(config.shoeColor || '#D8B894', -0.14).getHex(), 0.4),
       );
-      saddle.position.set(0, -0.412, 0.054);
-      legPivot.add(collarRim, saddle);
+      saddle.position.set(0, -0.197, 0.054);
+      kneePivot.add(collarRim, saddle);
     }
 
-    return legPivot;
+    return {legPivot, kneePivot};
   };
 
-  const leftLeg = makeLeg(-0.125);
-  const rightLeg = makeLeg(0.125);
+  const leftLegRig = makeLeg(-0.125);
+  const rightLegRig = makeLeg(0.125);
+  const leftLeg = leftLegRig.legPivot;
+  const rightLeg = rightLegRig.legPivot;
+  const leftKnee = leftLegRig.kneePivot;
+  const rightKnee = rightLegRig.kneePivot;
   bodyPivot.add(leftLeg, rightLeg);
 
   // ========== TORSO & SCULPTED CLOTHING ==========
@@ -2237,6 +2275,8 @@ export function buildAvatarRig(
     rightElbow,
     leftLeg,
     rightLeg,
+    leftKnee,
+    rightKnee,
     eyelids,
     shadowDisc,
     holdPose,
@@ -2272,6 +2312,10 @@ export function updateAvatarRigAnimation(
     const swing = Math.sin(elapsed * 12);
     rig.leftLeg.rotation.x = swing * 0.55;
     rig.rightLeg.rotation.x = -swing * 0.55;
+    rig.leftLeg.rotation.z = 0;
+    rig.rightLeg.rotation.z = 0;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = Math.max(0, -swing) * 0.5 + 0.06;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = Math.max(0, swing) * 0.5 + 0.06;
     rig.leftArm.rotation.x = -swing * 0.45;
     if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.none.elbowX - 0.08 + Math.max(0, -swing) * 0.15;
 
@@ -2314,6 +2358,10 @@ export function updateAvatarRigAnimation(
     }
     rig.leftLeg.rotation.x = -0.08;
     rig.rightLeg.rotation.x = 0.08;
+    rig.leftLeg.rotation.z = 0;
+    rig.rightLeg.rotation.z = 0;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.08;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.05;
     rig.leftArm.rotation.x = -0.12;
     if (rig.leftElbow) rig.leftElbow.rotation.x = -0.25;
     rig.rightArm.rotation.x = armX;
@@ -2328,6 +2376,10 @@ export function updateAvatarRigAnimation(
     const breathe = Math.sin(elapsed * 2.2) * 0.018;
     rig.leftLeg.rotation.x = 0;
     rig.rightLeg.rotation.x = 0;
+    rig.leftLeg.rotation.z = 0;
+    rig.rightLeg.rotation.z = 0;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0;
     rig.leftArm.rotation.x = 0.04;
     if (rig.leftElbow) rig.leftElbow.rotation.x = -0.18;
     rig.rightArm.rotation.x = HAND_POSES.carry_front.armX - 0.06 + breathe;
@@ -2343,6 +2395,10 @@ export function updateAvatarRigAnimation(
     const snap = Math.sin(Math.min(1, u * 1.45) * Math.PI);
     rig.leftLeg.rotation.x = 0.12 * snap;
     rig.rightLeg.rotation.x = -0.14 * snap;
+    rig.leftLeg.rotation.z = 0;
+    rig.rightLeg.rotation.z = 0;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.12 * snap;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.18 * snap;
     rig.leftArm.rotation.x = -0.35 * snap;
     if (rig.leftElbow) rig.leftElbow.rotation.x = -0.45 * snap;
     rig.rightArm.rotation.x = THREE.MathUtils.lerp(-0.48, -1.32, snap);
@@ -2354,34 +2410,47 @@ export function updateAvatarRigAnimation(
     rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = 0;
   } else if (pose === 'sit') {
-    rig.leftLeg.rotation.x = -1.36;
-    rig.rightLeg.rotation.x = -1.36;
-    rig.leftArm.rotation.x = -0.42;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.52;
+    const sitBreath = Math.sin(elapsed * 1.9);
+    const breath01 = 0.5 + 0.5 * sitBreath;
+
+    // Natural bent-knee sitting posture: thighs rest along seat, knees bend down so shins & shoes hang naturally
+    rig.leftLeg.rotation.x = -1.42;
+    rig.rightLeg.rotation.x = -1.42;
+    rig.leftLeg.rotation.z = -0.04;
+    rig.rightLeg.rotation.z = 0.04;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 1.38;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 1.38;
+
+    rig.leftArm.rotation.x = -0.52 + sitBreath * 0.015;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.68;
 
     if (hold === 'carry_umbrella') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX;
+      rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + sitBreath * 0.012;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
     } else if (hold === 'carry_front') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_front.armX;
+      rig.rightArm.rotation.x = HAND_POSES.carry_front.armX + sitBreath * 0.012;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX;
     } else if (hold === 'carry_bag') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX;
+      rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX + sitBreath * 0.012;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
     } else {
-      rig.rightArm.rotation.x = -0.42;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = -0.52;
+      rig.rightArm.rotation.x = -0.52 + sitBreath * 0.015;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = -0.68;
     }
 
-    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
-    rig.headPivot.position.y = HEAD_PIVOT_Y;
-    rig.bodyPivot.position.y = -0.18;
-    rig.bodyPivot.rotation.x = 0;
-    rig.headPivot.rotation.x = 0;
-    rig.headPivot.rotation.z = 0;
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77 + breath01 * 0.008;
+    rig.headPivot.position.y = HEAD_PIVOT_Y + breath01 * 0.01;
+    rig.bodyPivot.position.y = -0.19;
+    rig.bodyPivot.rotation.x = 0.03 + sitBreath * 0.008;
+    rig.headPivot.rotation.x = Math.sin(elapsed * 1.9 - 0.5) * 0.015;
+    rig.headPivot.rotation.z = Math.sin(elapsed * 0.85) * 0.01;
   } else if (pose === 'sleep') {
     rig.leftLeg.rotation.x = 0;
     rig.rightLeg.rotation.x = 0;
+    rig.leftLeg.rotation.z = 0;
+    rig.rightLeg.rotation.z = 0;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0;
     rig.leftArm.rotation.x = 0;
     rig.rightArm.rotation.x = 0;
     if (rig.leftElbow) rig.leftElbow.rotation.x = -0.08;
@@ -2400,6 +2469,10 @@ export function updateAvatarRigAnimation(
 
     rig.leftLeg.rotation.x = 0;
     rig.rightLeg.rotation.x = 0;
+    rig.leftLeg.rotation.z = 0;
+    rig.rightLeg.rotation.z = 0;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0;
     rig.bodyPivot.position.y = breath01 * 0.016;
     rig.bodyPivot.rotation.x = breath * 0.012;
 

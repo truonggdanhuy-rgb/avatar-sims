@@ -71,6 +71,19 @@ export function getRodRepairCost(durability: number, maxDurability: number): num
 }
 
 /**
+ * Probabilistic durability loss so rods don't break every exact 25 casts/catches.
+ * Catching common fish ~38% chance, rare fish ~55% chance, fish escaping ~62% chance.
+ */
+export function rollRodDurabilityLoss(
+  outcome: 'catch' | 'escape',
+  rarity: FishRarity = 'common',
+): number {
+  const loseChance =
+    outcome === 'escape' ? 0.62 : rarity === 'rare' ? 0.55 : 0.38;
+  return Math.random() < loseChance ? 1 : 0;
+}
+
+/**
  * Cá sông:
  * - Cá thường: Tôm càng xanh, Cá lóc, Cá chép, Cá cơm, Cá chình (~84% tổng tỷ lệ)
  * - Cá hiếm: Cá la hán, Cá lia thia 3 đuôi, Cá heo nước ngọt (~16% tổng tỷ lệ)
