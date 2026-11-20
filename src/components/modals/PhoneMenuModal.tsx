@@ -18,7 +18,6 @@ import {
   Settings,
   Shirt,
   Sun,
-  Sunset,
   UserCircle2,
   Volume2,
   VolumeX,
@@ -187,13 +186,11 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
     (k) => dailyQuests.claimed[k],
   ).length;
 
-  const TimeIcon =
-    timeOfDay === 'morning' ? Sun : timeOfDay === 'sunset' ? Sunset : Moon;
-  const nextTime: TimeOfDay =
-    timeOfDay === 'morning' ? 'sunset' : timeOfDay === 'sunset' ? 'night' : 'morning';
+  const TimeIcon = timeOfDay === 'morning' ? Sun : Moon;
+  const nextTime: TimeOfDay = timeOfDay === 'morning' ? 'night' : 'morning';
 
   // Placeholder temperature (future weather system hook)
-  const displayTemp = timeOfDay === 'night' ? '22°C' : timeOfDay === 'sunset' ? '25°C' : '27°C';
+  const displayTemp = timeOfDay === 'night' ? '22°C' : '27°C';
 
   return (
     <div
@@ -487,7 +484,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                     className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-[#E0CEB6] bg-white px-2 py-1.5 text-[11px] font-bold text-[#4A3525] transition-transform active:scale-95"
                   >
                     <TimeIcon className="h-3.5 w-3.5 text-[#B9771E]" />
-                    <span>Đổi Buổi</span>
+                    <span>{timeOfDay === 'morning' ? 'Sáng -> Tối' : 'Tối -> Sáng'}</span>
                   </button>
 
                   <button

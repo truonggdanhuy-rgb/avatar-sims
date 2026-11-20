@@ -23,11 +23,13 @@ import {
 } from './fishingVisuals3d';
 import {buildFurnitureMesh} from './furniture3d';
 import {
+  applyAtlasRegionToGeometry,
   clayMat,
   createCheckerFloorTexture,
   createGrassTexture,
   createPaintPatternTexture,
   createWoodPlankTexture,
+  getSharedSignAtlasMaterial,
   glossyClayMat,
   mergeStaticGroupByMaterial,
 } from './materials';
@@ -223,8 +225,7 @@ export function buildSubzoneScene(
   let updateFn: (elapsed: number, timeOfDay: TimeOfDay, context?: SubzoneUpdateContext) => void =
     () => {};
 
-  const woodTex = createWoodPlankTexture();
-  disposables.push(woodTex);
+  const woodTex = createWoodPlankTexture('#CC965E', '#9E6C3B', zone === 'home' ? 9 : 3, zone === 'home' ? 7 : 3);
 
   let groundMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(8.2, 11),
@@ -255,7 +256,6 @@ export function buildSubzoneScene(
       }
     }
 
-    woodTex.repeat.set(9, 7);
     groundMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(24.0, 17.0),
       new THREE.MeshStandardMaterial({map: woodTex, roughness: 0.76}),
@@ -841,16 +841,37 @@ export function buildSubzoneScene(
       minPivot: THREE.Object3D;
       secPivot?: THREE.Object3D;
     }[] = [];
+    const MAX_HOUSE_LIGHTS = 3;
+    const houseLightPool = Array.from({length: MAX_HOUSE_LIGHTS}, () => {
+      const pl = new THREE.PointLight('#FFD896', 0, 18, 1.15);
+      group.add(pl);
+      return pl;
+    });
     const lampControllers: {
       id: string;
       name: string;
       x: number;
       z: number;
+      lx: number;
+      ly: number;
+      lz: number;
       isOn: boolean;
-      pointLight: THREE.PointLight;
       shadeMat?: THREE.MeshStandardMaterial;
       baseColor: string;
     }[] = [];
+    const syncHousePointLights = () => {
+      let slot = 0;
+      for (const lamp of lampControllers) {
+        if (lamp.isOn && slot < houseLightPool.length) {
+          const pl = houseLightPool[slot++];
+          pl.position.set(lamp.lx, lamp.ly, lamp.lz);
+          pl.intensity = 18;
+        }
+      }
+      while (slot < houseLightPool.length) {
+        houseLightPool[slot++].intensity = 0;
+      }
+    };
     const bathtubControllers: {
       id: string;
       waterMesh: THREE.Mesh;
@@ -977,9 +998,6 @@ export function buildSubzoneScene(
           0,
         ];
         const lPos = toWorld(localLight[0], localLight[2]);
-        const pointLight = new THREE.PointLight('#FFD896', isOn ? 18 : 0, 18, 1.15);
-        pointLight.position.set(lPos.wx, posY + localLight[1], lPos.wz);
-        group.add(pointLight);
 
         const shadeMat = meshGroup.userData.lampShadeMat as THREE.MeshStandardMaterial | undefined;
         if (shadeMat) {
@@ -991,8 +1009,10 @@ export function buildSubzoneScene(
           name: cat.name,
           x: pf.x,
           z: pf.z,
+          lx: lPos.wx,
+          ly: posY + localLight[1],
+          lz: lPos.wz,
           isOn,
-          pointLight,
           shadeMat,
           baseColor: cat.color,
         });
@@ -1122,15 +1142,16 @@ export function buildSubzoneScene(
       }
     });
 
+    syncHousePointLights();
     setLampOnFn = (instanceId: string, on: boolean) => {
       const lamp = lampControllers.find((l) => l.id === instanceId);
       if (!lamp) return;
       lamp.isOn = on;
-      lamp.pointLight.intensity = on ? 18 : 0;
       if (lamp.shadeMat) {
         lamp.shadeMat.emissiveIntensity = on ? 0.78 : 0.04;
         lamp.shadeMat.color.set(on ? lamp.baseColor : '#B8ADA0');
       }
+      syncHousePointLights();
     };
     getHouseLampsFn = () =>
       lampControllers.map((l) => ({
@@ -1301,9 +1322,7 @@ export function buildSubzoneScene(
     };
   } else if (zone === 'garden') {
     // Spacious Open Farm Estate (54m x 40m) — lush grass, tall trees, 2 wide coops with low fences, big fish pond + bridge, back workshop row + mini warehouse & 20 crop beds
-    const farmGrassTex = createGrassTexture();
-    farmGrassTex.repeat.set(13, 10);
-    disposables.push(farmGrassTex);
+    const farmGrassTex = createGrassTexture(13, 10);
 
     const grassFloor = new THREE.Mesh(
       new THREE.PlaneGeometry(54.0, 40.0),
@@ -1313,6 +1332,8 @@ export function buildSubzoneScene(
     grassFloor.userData = {kind: 'ground'};
     groundMesh = grassFloor;
     group.add(grassFloor);
+
+    const staticGardenGroup = new THREE.Group();
 
     // Sparse Town-Style Natural Stepping Stones directly on the grass (1 lightweight InstancedMesh draw call)
     const stepStoneSpots: [number, number, number, number][] = [];
@@ -1436,7 +1457,7 @@ export function buildSubzoneScene(
       const midX = (xStart + xEnd) / 2;
       const rail = new THREE.Mesh(new RoundedBoxGeometry(len, 0.08, 0.08, 2, 0.02), railWoodMat);
       rail.position.set(midX, 0.34, zPos);
-      group.add(rail);
+      staticGardenGroup.add(rail);
       const count = Math.max(2, Math.round(len / 0.75) + 1);
       for (let i = 0; i < count; i++) {
         const px = xStart + (i / (count - 1)) * (xEnd - xStart);
@@ -1445,7 +1466,7 @@ export function buildSubzoneScene(
           picketWoodMat,
         );
         picket.position.set(px, 0.28, zPos);
-        group.add(picket);
+        staticGardenGroup.add(picket);
       }
       colliders.push({type: 'box', x: midX, z: zPos, hw: len / 2 + 0.08, hd: 0.16});
     };
@@ -1456,13 +1477,13 @@ export function buildSubzoneScene(
       const midX = (xStart + xEnd) / 2;
       const railLow = new THREE.Mesh(new RoundedBoxGeometry(len, 0.07, 0.07, 2, 0.02), ranchRailMat);
       railLow.position.set(midX, 0.25, zPos);
-      group.add(railLow);
+      staticGardenGroup.add(railLow);
       const count = Math.max(2, Math.round(len / 1.75) + 1);
       for (let i = 0; i < count; i++) {
         const px = xStart + (i / (count - 1)) * (xEnd - xStart);
         const post = new THREE.Mesh(new RoundedBoxGeometry(0.13, 0.42, 0.13, 2, 0.03), ranchPostMat);
         post.position.set(px, 0.21, zPos);
-        group.add(post);
+        staticGardenGroup.add(post);
       }
       colliders.push({type: 'box', x: midX, z: zPos, hw: len / 2 + 0.06, hd: 0.14});
     };
@@ -1472,51 +1493,15 @@ export function buildSubzoneScene(
       const midZ = (zStart + zEnd) / 2;
       const railLow = new THREE.Mesh(new RoundedBoxGeometry(0.07, 0.07, len, 2, 0.02), ranchRailMat);
       railLow.position.set(xPos, 0.25, midZ);
-      group.add(railLow);
+      staticGardenGroup.add(railLow);
       const count = Math.max(2, Math.round(len / 1.75) + 1);
       for (let i = 0; i < count; i++) {
         const pz = zStart + (i / (count - 1)) * (zEnd - zStart);
         const post = new THREE.Mesh(new RoundedBoxGeometry(0.13, 0.42, 0.13, 2, 0.03), ranchPostMat);
         post.position.set(xPos, 0.21, pz);
-        group.add(post);
+        staticGardenGroup.add(post);
       }
       colliders.push({type: 'box', x: xPos, z: midZ, hw: 0.14, hd: len / 2 + 0.06});
-    };
-
-    // Sculpting helpers for rich Cozy Farm architecture
-    const makeFarmSignTex = (
-      title: string,
-      subtitle: string,
-      bg: string,
-      border: string,
-      textColor: string,
-    ) => {
-      const c = document.createElement('canvas');
-      c.width = 512;
-      c.height = 160;
-      const ctx = c.getContext('2d')!;
-      ctx.fillStyle = bg;
-      ctx.beginPath();
-      ctx.roundRect(6, 6, 500, 148, 22);
-      ctx.fill();
-      ctx.strokeStyle = border;
-      ctx.lineWidth = 9;
-      ctx.stroke();
-      ctx.fillStyle = textColor;
-      ctx.font = 'bold 48px "Plus Jakarta Sans", system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(title, 256, subtitle ? 64 : 82);
-      if (subtitle) {
-        ctx.font = '600 24px "Plus Jakarta Sans", system-ui, sans-serif';
-        ctx.globalAlpha = 0.82;
-        ctx.fillText(subtitle, 256, 114);
-        ctx.globalAlpha = 1;
-      }
-      const tex = new THREE.CanvasTexture(c);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      disposables.push(tex);
-      return tex;
     };
 
     const buildShingleGableRoof = (
@@ -1689,16 +1674,19 @@ export function buildSubzoneScene(
     const kRoof = buildShingleGableRoof(5.6, 1.62, 4.25, '#D46B53', '#FFF5E0', '#A84B39', 4);
     kRoof.position.set(0, 3.36, 0);
 
-    // Gable louver medallion + crisp wooden signboard `"BẾP NÔNG TRẠI"`
-    const kSignTex = makeFarmSignTex('BẾP NÔNG TRẠI', 'Nấu ăn & làm bánh', '#FFF3DA', '#8A5632', '#4F321D');
-    const kSignBoard = new THREE.Mesh(
+    // Gable louver medallion + crisp wooden signboard `"BẾP NÔNG TRẠI"` via shared Sign Atlas
+    const kSignGeo = applyAtlasRegionToGeometry(
       new RoundedBoxGeometry(2.05, 0.56, 0.1, 2, 0.03),
+      'farm_kitchen',
+    );
+    const kSignBoard = new THREE.Mesh(
+      kSignGeo,
       [
         timberMat,
         timberMat,
         timberMat,
         timberMat,
-        new THREE.MeshStandardMaterial({map: kSignTex, roughness: 0.6}),
+        getSharedSignAtlasMaterial(),
         timberMat,
       ],
     );
@@ -1818,7 +1806,7 @@ export function buildSubzoneScene(
       clickTargets,
     );
     colliders.push({type: 'box', x: 0, z: -8.8, hw: 2.58, hd: 1.92});
-    group.add(kitchenCottage);
+    staticGardenGroup.add(kitchenCottage);
 
     // === 2. XƯỞNG ÉP & XAY CỐI ĐÁ (Back Left: X = -6.6, Z = -8.6) ===
     const millShed = new THREE.Group();
@@ -1954,7 +1942,7 @@ export function buildSubzoneScene(
       clickTargets,
     );
     colliders.push({type: 'box', x: -6.6, z: -8.6, hw: 1.72, hd: 1.35});
-    group.add(millShed);
+    staticGardenGroup.add(millShed);
 
     // === 3. GIẾNG NƯỚC ĐÁ XẾP MÁI NGÓI CỔ TÍCH (Back Far Left: X = -12.6, Z = -8.2) ===
     const well = new THREE.Group();
@@ -2094,7 +2082,7 @@ export function buildSubzoneScene(
     );
     addBoxProxy(well, [2.2, 3.0, 2.2], [0, 1.4, 0], {kind: 'well', tx: -11.0, tz: -5.6}, clickTargets);
     colliders.push({type: 'circle', x: -12.6, z: -8.2, r: 1.08});
-    group.add(well);
+    staticGardenGroup.add(well);
 
     // === 4A. BẢNG ĐƠN HÀNG MÁI NGÓI (Back Right: X = 5.2, Z = -8.4) ===
     const board = new THREE.Group();
@@ -2168,7 +2156,7 @@ export function buildSubzoneScene(
       clickTargets,
     );
     colliders.push({type: 'box', x: 5.2, z: -8.4, hw: 1.32, hd: 0.78});
-    group.add(board);
+    staticGardenGroup.add(board);
 
     // === 4B. NHÀ KHO NÔNG TRẠI CÓ TỜI GÁC MÁI (Back Right: X = 9.0, Z = -8.5) ===
     const storageShed = new THREE.Group();
@@ -2277,7 +2265,7 @@ export function buildSubzoneScene(
       clickTargets,
     );
     colliders.push({type: 'box', x: 9.0, z: -8.5, hw: 1.32, hd: 1.12});
-    group.add(storageShed);
+    staticGardenGroup.add(storageShed);
 
     // === 4C. XE BUS SHOP NÔNG TRẠI RETRO (Back Far Right: X = 14.8, Z = -8.4) ===
     const shopBus = new THREE.Group();
@@ -2415,15 +2403,18 @@ export function buildSubzoneScene(
     );
     busCrate.position.set(-0.35, 2.6, -0.15);
 
-    const busSignTex = makeFarmSignTex('FARM SHOP', 'Hạt giống · Vật tư', '#FFE79B', '#7C512D', '#4A2F19');
-    const roofSignBoard = new THREE.Mesh(
+    const busSignGeo = applyAtlasRegionToGeometry(
       new RoundedBoxGeometry(2.15, 0.56, 0.14, 2, 0.04),
+      'farm_shop',
+    );
+    const roofSignBoard = new THREE.Mesh(
+      busSignGeo,
       [
         timberMat,
         timberMat,
         timberMat,
         timberMat,
-        new THREE.MeshStandardMaterial({map: busSignTex, roughness: 0.55}),
+        getSharedSignAtlasMaterial(),
         timberMat,
       ],
     );
@@ -2462,7 +2453,7 @@ export function buildSubzoneScene(
       clickTargets,
     );
     colliders.push({type: 'box', x: 14.8, z: -8.4, hw: 2.5, hd: 1.2});
-    group.add(shopBus);
+    staticGardenGroup.add(shopBus);
 
     // === 5. HAI CHUỒNG NUÔI THÚ RỘNG RÃI VỚI ĐẤT CHUỒNG PHỦ ĐẦY & CÔNG TRÌNH TỈ MỈ ===
     // 5A. CHUỒNG GIA CẦM (GÀ & VỊT: X -21.2..-10.4, Z -4.0..+2.2, cổng tại Z -1.75..+0.35)
@@ -2477,7 +2468,7 @@ export function buildSubzoneScene(
       clayMat('#C8B482', 0.9),
     );
     poultryEarth.position.set(-15.8, 0.012, -0.9);
-    group.add(poultryEarth);
+    staticGardenGroup.add(poultryEarth);
 
     const coopHouse = new THREE.Group();
     coopHouse.position.set(-19.25, 0, -2.55);
@@ -2540,7 +2531,7 @@ export function buildSubzoneScene(
     cVent.position.set(0, 1.72, 0.92);
 
     coopHouse.add(cPlatform, cBody, cRoof, cNestBay, cNestLid, cDoor, cRamp, cVent);
-    group.add(coopHouse);
+    staticGardenGroup.add(coopHouse);
     colliders.push({type: 'box', x: -19.25, z: -2.55, hw: 1.32, hd: 1.02});
 
     // Compartmentalized Laying Nest Boxes
@@ -2566,7 +2557,7 @@ export function buildSubzoneScene(
       nestRack.add(strawPad, ...(nx < 0.4 ? [divider] : []));
     });
     nestRack.add(nestBox);
-    group.add(nestRack);
+    staticGardenGroup.add(nestRack);
     colliders.push({type: 'box', x: -15.2, z: -3.15, hw: 0.88, hd: 0.45});
 
     const poultryTroughCount = options.troughs?.poultry ?? 0;
@@ -2592,7 +2583,7 @@ export function buildSubzoneScene(
       grain.position.y = 0.35;
       poultryTrough.add(grain);
     }
-    group.add(poultryTrough);
+    staticGardenGroup.add(poultryTrough);
     colliders.push({type: 'box', x: -12.3, z: 1.18, hw: 0.78, hd: 0.38});
 
     addBoxProxy(
@@ -2615,7 +2606,7 @@ export function buildSubzoneScene(
       clayMat('#C4AD79', 0.9),
     );
     cattleEarth.position.set(-15.8, 0.012, 6.7);
-    group.add(cattleEarth);
+    staticGardenGroup.add(cattleEarth);
 
     // Classic Gambrel-Roof Country Red Barn Shelter with Cream X-Bracing & Loft Shutter
     const barn = new THREE.Group();
@@ -2681,7 +2672,7 @@ export function buildSubzoneScene(
       barnLoftDoor,
       barnLantern,
     );
-    group.add(barn);
+    staticGardenGroup.add(barn);
     colliders.push({type: 'box', x: -19.2, z: 4.7, hw: 1.45, hd: 1.1});
 
     // Sculpted Twine-Tied Hay Bales
@@ -2707,7 +2698,7 @@ export function buildSubzoneScene(
         twine.position.x = tx;
         bale.add(twine);
       });
-      group.add(bale);
+      staticGardenGroup.add(bale);
     });
     colliders.push({type: 'box', x: -12.5, z: 4.2, hw: 1.05, hd: 0.6});
 
@@ -2731,7 +2722,7 @@ export function buildSubzoneScene(
     );
     tubWater.position.y = 0.41;
     waterTub.add(tubWall, tubHoopTop, tubWater);
-    group.add(waterTub);
+    staticGardenGroup.add(waterTub);
     colliders.push({type: 'circle', x: -19.1, z: 9.05, r: 0.64});
 
     const cattleTroughCount = options.troughs?.cattle ?? 0;
@@ -2757,7 +2748,7 @@ export function buildSubzoneScene(
       grain.position.y = 0.41;
       cattleTrough.add(grain);
     }
-    group.add(cattleTrough);
+    staticGardenGroup.add(cattleTrough);
     colliders.push({type: 'box', x: -12.3, z: 9.05, hw: 0.84, hd: 0.42});
 
     addBoxProxy(
@@ -2782,6 +2773,7 @@ export function buildSubzoneScene(
       pauseTimer: number;
       speed: number;
       phase: number;
+      animAccum: number;
     }
     const roamingAnimals: RoamingAnimalCtrl[] = [];
     const pickCoopSpot = (coop: CoopKind, idx: number, seedOffset = 0): [number, number] => {
@@ -2970,7 +2962,7 @@ export function buildSubzoneScene(
         const emojiSprite = new THREE.Sprite(getLivestockEmojiSpriteMaterial(emojiText));
         emojiSprite.scale.set(emojiText.length > 2 ? 0.82 : 0.56, 0.56, 1);
         emojiSprite.position.set(0, badgeY, 0);
-        emojiSprite.renderOrder = 6;
+        emojiSprite.renderOrder = 12;
         aBody.add(emojiSprite);
       }
 
@@ -2998,6 +2990,7 @@ export function buildSubzoneScene(
         pauseTimer: (idx % 3) * 0.8,
         speed: ani.coop === 'poultry' ? 0.82 : ani.type === 'pig' ? 0.65 : 0.5,
         phase: idx * 1.9,
+        animAccum: (idx % 4) * 0.017,
       });
     });
 
@@ -3035,11 +3028,24 @@ export function buildSubzoneScene(
     pondBedGeo.rotateX(-Math.PI / 2);
     const pondBed = new THREE.Mesh(pondBedGeo, clayMat('#1A4E61', 0.94));
     pondBed.position.set(pondCX, 0.015, pondCZ);
+    pondBed.renderOrder = 0;
 
     const pondWaterGeo = new THREE.ShapeGeometry(waterShape);
     pondWaterGeo.rotateX(-Math.PI / 2);
-    const pondWater = new THREE.Mesh(pondWaterGeo, glossyClayMat('#3AB7E2', 0.12));
+    const pondWater = new THREE.Mesh(
+      pondWaterGeo,
+      new THREE.MeshStandardMaterial({
+        color: '#3AB7E2',
+        roughness: 0.1,
+        metalness: 0.08,
+        envMapIntensity: 0.9,
+        transparent: true,
+        opacity: 0.78,
+        depthWrite: false,
+      }),
+    );
     pondWater.position.set(pondCX, 0.055, pondCZ);
+    pondWater.renderOrder = 3;
 
     // HOLLOW inner sandy-earth shelf (outer = 1.07, hole = 0.94 -> never covers the water!)
     const innerShoreShape = new THREE.Shape(makeContourPts(1.07));
@@ -3069,7 +3075,8 @@ export function buildSubzoneScene(
     const outerBerm = new THREE.Mesh(outerBermGeo, clayMat('#7AA154', 0.88));
     outerBerm.position.set(pondCX, 0.02, pondCZ);
 
-    group.add(pondBed, pondWater, innerShore, outerBerm);
+    group.add(pondBed, pondWater);
+    staticGardenGroup.add(innerShore, outerBerm);
 
     // Instanced river boulders & pebbles lining the lagoon banks (skip bridge approach X < 11.8 & |Z - 3.0| < 1.35)
     const pondRockList: [number, number, number, number, number][] = [];
@@ -3220,12 +3227,14 @@ export function buildSubzoneScene(
     ].forEach(([lx, lz, hasBloom]) => {
       const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.03, 12), lilyMat);
       pad.position.set(lx as number, 0.062, lz as number);
-      group.add(pad);
+      pad.renderOrder = 4;
+      staticGardenGroup.add(pad);
       if (hasBloom) {
         const lotus = new THREE.Mesh(new THREE.SphereGeometry(0.11, 7, 6), lotusMat);
         lotus.scale.set(1.2, 0.72, 1.2);
         lotus.position.set((lx as number) + 0.06, 0.1, lz as number);
-        group.add(lotus);
+        lotus.renderOrder = 4;
+        staticGardenGroup.add(lotus);
       }
     });
 
@@ -3245,7 +3254,7 @@ export function buildSubzoneScene(
     curbN.position.set(12.65, 0.38, 2.13);
     const curbS = curbN.clone();
     curbS.position.z = 3.87;
-    group.add(pierDeck, pierStep, curbN, curbS);
+    staticGardenGroup.add(pierDeck, pierStep, curbN, curbS);
     [
       [10.6, 2.18],
       [10.6, 3.82],
@@ -3256,7 +3265,7 @@ export function buildSubzoneScene(
     ].forEach(([px, pz]) => {
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.095, 0.78, 8), timberMat);
       post.position.set(px, 0.36, pz);
-      group.add(post);
+      staticGardenGroup.add(post);
     });
 
     // Water colliders leave the bridge corridor (X: 9.4..15.6, Z: 2.15..3.85) completely walkable!
@@ -3279,6 +3288,7 @@ export function buildSubzoneScene(
       phase: number;
       isSurface: boolean;
       sick: boolean;
+      animAccum: number;
     }
     const swimmingFish: SwimmingFishCtrl[] = [];
     const fishListToSpawn = options.pondFish ?? [];
@@ -3371,7 +3381,13 @@ export function buildSubzoneScene(
       const inNorthHalf = idx % 2 === 0;
       const cx = 15.5 + ((idx % 3) - 1) * 0.9;
       const cz = inNorthHalf ? -0.25 : 6.25;
-      fGroup.position.set(cx, isSurface ? 0.082 : 0.052, cz);
+      fGroup.position.set(cx, isSurface ? 0.082 : 0.045, cz);
+      const fishOrder = isSurface ? 4 : 2;
+      fGroup.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh) {
+          obj.renderOrder = fishOrder;
+        }
+      });
       group.add(fGroup);
 
       swimmingFish.push({
@@ -3388,6 +3404,7 @@ export function buildSubzoneScene(
         phase: idx * 1.7,
         isSurface,
         sick: fish.sick,
+        animAccum: (idx % 4) * 0.017,
       });
     });
 
@@ -3407,6 +3424,7 @@ export function buildSubzoneScene(
     const pondPellets: PondPelletCtrl[] = Array.from({length: 16}, () => {
       const mesh = new THREE.Mesh(pelletGeo, pelletMat);
       mesh.visible = false;
+      mesh.renderOrder = 4;
       group.add(mesh);
       return {
         mesh,
@@ -3516,24 +3534,46 @@ export function buildSubzoneScene(
       group.add(plotGroup);
     });
 
+    mergeStaticGroupByMaterial(
+      staticGardenGroup,
+      animatedMillWheel ? new Set([animatedMillWheel]) : undefined,
+    );
+    group.add(staticGardenGroup);
     group.add(createExitDoorway('Cổng Thị Trấn', [0, 0, 12.6], '#6EA85C', clickTargets, labelAnchors));
 
     let prevFarmElapsed = 0;
     let wanderSeed = 11;
-    updateFn = (elapsed) => {
+    let millAnimAccum = 0;
+    updateFn = (elapsed, _tod, context) => {
       const dt = prevFarmElapsed > 0 ? Math.min(0.08, elapsed - prevFarmElapsed) : 0.016;
       prevFarmElapsed = elapsed;
+      const camX = context?.cameraPos?.x ?? 0;
+      const camZ = context?.cameraPos?.z ?? 6;
 
       if (animatedMillWheel) {
-        animatedMillWheel.rotation.z = -elapsed * 0.9;
+        const millDistSq = (camX + 6.6) * (camX + 6.6) + (camZ + 8.6) * (camZ + 8.6);
+        millAnimAccum += dt;
+        const stepInterval = millDistSq > 400 ? 0.08 : 0;
+        if (millAnimAccum >= stepInterval) {
+          millAnimAccum = 0;
+          animatedMillWheel.rotation.z = -elapsed * 0.9;
+        }
       }
 
-      // Animate free-roaming chickens, ducks, pigs & cows inside their respective coops
+      // Animate free-roaming chickens, ducks, pigs & cows with distance-throttled visual updates
       for (const a of roamingAnimals) {
+        const dxCam = a.x - camX;
+        const dzCam = a.z - camZ;
+        const distSqCam = dxCam * dxCam + dzCam * dzCam;
+        const animInterval = distSqCam > 441 ? 0.075 : 0;
         if (a.pauseTimer > 0) {
           a.pauseTimer -= dt;
-          a.body.position.y = Math.sin(elapsed * 3.2 + a.phase) * 0.012;
-          for (const leg of a.legs) leg.rotation.x = 0;
+          a.animAccum += dt;
+          if (a.animAccum >= animInterval) {
+            a.animAccum = 0;
+            a.body.position.y = Math.sin(elapsed * 3.2 + a.phase) * 0.012;
+            for (const leg of a.legs) leg.rotation.x = 0;
+          }
         } else {
           const dx = a.targetX - a.x;
           const dz = a.targetZ - a.z;
@@ -3553,12 +3593,16 @@ export function buildSubzoneScene(
             while (diff > Math.PI) diff -= Math.PI * 2;
             while (diff < -Math.PI) diff += Math.PI * 2;
             a.rotY += diff * Math.min(1, dt * 6);
-            a.root.position.set(a.x, 0, a.z);
-            a.root.rotation.y = a.rotY;
-            a.body.position.y = Math.abs(Math.sin(elapsed * 8.5 + a.phase)) * 0.04;
-            a.legs.forEach((leg, li) => {
-              leg.rotation.x = Math.sin(elapsed * 9.5 + a.phase + li * Math.PI) * 0.42;
-            });
+            a.animAccum += dt;
+            if (a.animAccum >= animInterval) {
+              a.animAccum = 0;
+              a.root.position.set(a.x, 0, a.z);
+              a.root.rotation.y = a.rotY;
+              a.body.position.y = Math.abs(Math.sin(elapsed * 8.5 + a.phase)) * 0.04;
+              for (let li = 0; li < a.legs.length; li++) {
+                a.legs[li].rotation.x = Math.sin(elapsed * 9.5 + a.phase + li * Math.PI) * 0.42;
+              }
+            }
           }
         }
       }
@@ -3588,8 +3632,10 @@ export function buildSubzoneScene(
       }
 
       for (const f of swimmingFish) {
-        const baseY = f.isSurface ? 0.082 : 0.052;
-        // Look for nearest landed, uneaten pellet if feeding is active
+        const baseY = f.isSurface ? 0.082 : 0.045;
+        const dxCam = f.x - camX;
+        const dzCam = f.z - camZ;
+        const fishInterval = dxCam * dxCam + dzCam * dzCam > 441 ? 0.075 : 0;
         let nearestPellet: PondPelletCtrl | null = null;
         let bestDist = Infinity;
         if (pondFeedTimer > 0 && !f.sick) {
@@ -3631,9 +3677,13 @@ export function buildSubzoneScene(
           f.x += vx * Math.min(1, dt * 4);
           f.z += vz * Math.min(1, dt * 4);
           f.rotY = Math.atan2(-Math.sin(t) * f.rx * f.speed, Math.cos(t) * f.rz * f.speed);
-          f.group.position.set(f.x, baseY + Math.sin(elapsed * 3 + f.phase) * 0.015, f.z);
-          f.group.rotation.y = f.rotY;
-          f.tail.rotation.y = Math.sin(elapsed * 10 + f.phase) * 0.35;
+          f.animAccum += dt;
+          if (f.animAccum >= fishInterval) {
+            f.animAccum = 0;
+            f.group.position.set(f.x, baseY + Math.sin(elapsed * 3 + f.phase) * 0.015, f.z);
+            f.group.rotation.y = f.rotY;
+            f.tail.rotation.y = Math.sin(elapsed * 10 + f.phase) * 0.35;
+          }
         }
       }
 
@@ -3653,9 +3703,18 @@ export function buildSubzoneScene(
 
     const water = new THREE.Mesh(
       new RoundedBoxGeometry(10.5, 0.3, 6.8, 2, 0.05),
-      glossyClayMat('#4AB3DA', 0.12),
+      new THREE.MeshStandardMaterial({
+        color: '#4AB3DA',
+        roughness: 0.1,
+        metalness: 0.08,
+        envMapIntensity: 0.9,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+      }),
     );
     water.position.set(0, -0.32, -2.5);
+    water.renderOrder = 3;
     group.add(water);
 
     const pier = new THREE.Mesh(
@@ -3747,15 +3806,18 @@ export function buildSubzoneScene(
     clawBase.position.y = 0.58;
     const clawGlass = new THREE.Mesh(
       new RoundedBoxGeometry(1.55, 1.3, 1.2, 2, 0.06),
-      new THREE.MeshPhysicalMaterial({
+      new THREE.MeshStandardMaterial({
         color: '#DDF3FF',
         transparent: true,
-        opacity: 0.52,
-        roughness: 0.1,
+        opacity: 0.45,
+        roughness: 0.12,
+        metalness: 0.1,
+        envMapIntensity: 0.9,
         depthWrite: false,
       }),
     );
     clawGlass.position.y = 1.75;
+    clawGlass.renderOrder = 6;
     const plush = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 10), clayMat('#F4A261', 0.72));
     plush.position.set(-0.25, 1.35, 0);
     const plush2 = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10), clayMat('#F7A8B8', 0.72));
@@ -4170,14 +4232,21 @@ export function buildSubzoneScene(
     updateFishingVisuals: updateFishingVisualsFn,
     update: updateFn,
     dispose: () => {
-      disposables.forEach((t) => t.dispose());
+      disposables.forEach((t) => {
+        if (!t.userData?.sharedCache) t.dispose();
+      });
       subzoneFishingVisuals?.dispose();
       group.traverse((obj) => {
         if ((obj as THREE.Mesh).isMesh) {
           const m = obj as THREE.Mesh;
           m.geometry.dispose();
-          if (Array.isArray(m.material)) m.material.forEach((mat) => mat.dispose());
-          else m.material.dispose();
+          if (Array.isArray(m.material)) {
+            m.material.forEach((mat) => {
+              if (!mat.userData?.pooled) mat.dispose();
+            });
+          } else if (!m.material.userData?.pooled) {
+            m.material.dispose();
+          }
         }
       });
     },

@@ -22,29 +22,43 @@ function createBladeShape(width = 0.05, height = 0.32): THREE.Shape {
   return s;
 }
 
-function createWatermelonTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#62BA61';
-  ctx.fillRect(0, 0, 128, 128);
-  ctx.strokeStyle = '#1E5E2A';
-  ctx.lineWidth = 9;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  for (let x = 8; x < 128; x += 21) {
-    ctx.beginPath();
-    for (let y = 0; y <= 128; y += 16) {
-      const zig = (y / 16) % 2 === 0 ? -4 : 4;
-      if (y === 0) ctx.moveTo(x + zig, y);
-      else ctx.lineTo(x + zig, y);
+let _watermelonTex: THREE.CanvasTexture | null = null;
+let _watermelonMat: THREE.MeshStandardMaterial | null = null;
+
+function getWatermelonMaterial(): THREE.MeshStandardMaterial {
+  if (_watermelonMat) return _watermelonMat;
+  if (!_watermelonTex) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#62BA61';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = '#1E5E2A';
+    ctx.lineWidth = 9;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let x = 8; x < 128; x += 21) {
+      ctx.beginPath();
+      for (let y = 0; y <= 128; y += 16) {
+        const zig = (y / 16) % 2 === 0 ? -4 : 4;
+        if (y === 0) ctx.moveTo(x + zig, y);
+        else ctx.lineTo(x + zig, y);
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
+    _watermelonTex = new THREE.CanvasTexture(canvas);
+    _watermelonTex.colorSpace = THREE.SRGBColorSpace;
+    _watermelonTex.userData.sharedCache = true;
   }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  _watermelonMat = new THREE.MeshStandardMaterial({
+    map: _watermelonTex,
+    roughness: 0.22,
+    metalness: 0.04,
+    envMapIntensity: 0.85,
+  });
+  _watermelonMat.userData.pooled = true;
+  return _watermelonMat;
 }
 
 /** Lush multi-grain braided golden wheat ear spike (~0.36m tall) */
@@ -688,14 +702,7 @@ export function buildPlotBotanicalDecor(
         g.add(cane);
       });
     } else if (plot.crop === 'watermelon') {
-      const stripeTex = createWatermelonTexture();
-      disposables.push(stripeTex);
-      const melonMat = new THREE.MeshPhysicalMaterial({
-        map: stripeTex,
-        roughness: 0.28,
-        clearcoat: 0.62,
-        clearcoatRoughness: 0.22,
-      });
+      const melonMat = getWatermelonMaterial();
       const vineCurve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(-0.38, SOIL_Y + 0.025, -0.26),
         new THREE.Vector3(-0.1, SOIL_Y + 0.025, 0.05),

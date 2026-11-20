@@ -1,5 +1,5 @@
 import React from 'react';
-import {MapPin, Moon, Sun, Sunset, Volume2, VolumeX, X} from 'lucide-react';
+import {MapPin, Moon, Sun, Volume2, VolumeX, X} from 'lucide-react';
 import {TimeOfDay} from '../../types/game';
 import {soundFX} from '../../utils/sound';
 
@@ -81,7 +81,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="mb-2 text-xs font-bold text-[#6F4E37]">
               Thời Gian Thị Trấn
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -96,21 +96,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <Sun className="h-4 w-4" />
                 <span>Sáng Trong</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  soundFX.tap();
-                  onChangeTimeOfDay('sunset');
-                }}
-                className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-xl border py-2 text-xs font-semibold ${
-                  timeOfDay === 'sunset'
-                    ? 'border-[#6F4E37] bg-[#6F4E37] text-amber-50'
-                    : 'border-[#E0CEB6] bg-white text-[#4A3525]'
-                }`}
-              >
-                <Sunset className="h-4 w-4" />
-                <span>Hoàng Hôn</span>
               </button>
               <button
                 type="button"

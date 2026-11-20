@@ -58,6 +58,7 @@ interface ActiveInsect {
   alertTimer: number;
   respawnTimer: number;
   wingSpeed: number;
+  animAccum: number;
 }
 
 const ACTIVE_INSECT_COUNT = 38;
@@ -437,6 +438,7 @@ export class TownInsectManager {
       alertTimer: 0,
       respawnTimer: 0,
       wingSpeed: built.wingSpeed,
+      animAccum: (this.nextId * 0.019) % 0.08,
     };
   }
 
@@ -494,9 +496,13 @@ export class TownInsectManager {
     playerSpeed: number,
     isCreeping: boolean,
     frustum?: THREE.Frustum,
+    camX?: number,
+    camZ?: number,
   ): InsectFrameEvent {
     let escapedByRun = 0;
     let startledByRun = 0;
+    const refX = camX ?? playerX;
+    const refZ = camZ ?? playerZ;
 
     for (let i = 0; i < this.insects.length; i++) {
       const inst = this.insects[i];
@@ -561,22 +567,41 @@ export class TownInsectManager {
       // Active insect: check if startled by fast walking / jumping / running close by
       const dx = inst.pos.x - playerX;
       const dz = inst.pos.z - playerZ;
-      const distXZ = Math.hypot(dx, dz);
+      const distSqXZ = dx * dx + dz * dz;
       const dy = Math.abs(inst.pos.y - (playerY + 0.6));
 
-      if (!isCreeping && playerSpeed > 0.65 && distXZ < 3.4 && dy < 2.1) {
+      if (!isCreeping && playerSpeed > 0.65 && distSqXZ < 3.4 * 3.4 && dy < 2.1) {
         const res = this.startleInsect(inst);
         if (res === 'escaped') escapedByRun++;
         else startledByRun++;
         continue;
       }
 
-      // Frustum cull animation updates when far offscreen
+      // Distance culling beyond 46m from camera/viewer (no visual animation or draw cost)
+      const cdx = inst.pos.x - refX;
+      const cdz = inst.pos.z - refZ;
+      const camDistSq = cdx * cdx + cdz * cdz;
+      if (camDistSq > 46 * 46) {
+        inst.root.visible = false;
+        continue;
+      }
+
+      // Frustum cull animation updates when offscreen
       if (frustum) {
         _cullSphere.set(inst.pos, 0.6);
         const visible = frustum.intersectsSphere(_cullSphere);
         inst.root.visible = visible;
         if (!visible) continue;
+      } else {
+        inst.root.visible = true;
+      }
+
+      // Distance-based animation update throttling: full 60Hz <22m, ~12.5Hz at 22..46m
+      const isFar = camDistSq > 22 * 22;
+      if (isFar) {
+        inst.animAccum += dt;
+        if (inst.animAccum < 0.08) continue;
+        inst.animAccum = 0;
       }
 
       if (inst.isFlyingHover) {
@@ -586,15 +611,17 @@ export class TownInsectManager {
         const oy = Math.sin(t * 2.1) * 0.09;
         inst.root.position.set(inst.pos.x + ox, inst.pos.y + oy, inst.pos.z + oz);
         inst.root.rotation.y = Math.atan2(Math.cos(t) * 0.34, -Math.sin(t * 0.85) * 0.28);
-        if (inst.leftWing && inst.rightWing) {
+        if (inst.leftWing && inst.rightWing && camDistSq < 30 * 30) {
           const flap = Math.sin(elapsed * inst.wingSpeed + inst.phase) * 0.72;
           inst.leftWing.rotation.z = -flap;
           inst.rightWing.rotation.z = flap;
         }
       } else {
-        const micro = Math.sin(elapsed * 2.2 + inst.phase) * 0.04;
-        inst.root.position.set(inst.pos.x + micro, inst.pos.y, inst.pos.z);
-        inst.root.rotation.y = inst.rotY + Math.sin(elapsed * 0.9 + inst.phase) * 0.25;
+        if (!isFar) {
+          const micro = Math.sin(elapsed * 2.2 + inst.phase) * 0.04;
+          inst.root.position.set(inst.pos.x + micro, inst.pos.y, inst.pos.z);
+          inst.root.rotation.y = inst.rotY + Math.sin(elapsed * 0.9 + inst.phase) * 0.25;
+        }
       }
     }
 

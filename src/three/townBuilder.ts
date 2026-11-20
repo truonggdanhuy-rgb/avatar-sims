@@ -15,8 +15,11 @@ import {
   TownInsectManager,
 } from './insects3d';
 import {
+  createAtlasPlaneGeometry,
   createGrassTexture,
   createStoneWalkwayTexture,
+  getSharedSignAtlasMaterial,
+  getWarmGlowTexture,
   glossyClayMat,
   mergeStaticGroupByMaterial,
 } from './materials';
@@ -119,6 +122,8 @@ export interface TownWorld {
     elapsed: number,
     dt: number,
     frustum?: THREE.Frustum,
+    camX?: number,
+    camZ?: number,
   ) => {escapedByRun: number; startledByRun: number};
   tryCatchInsect?: (
     playerX: number,
@@ -126,7 +131,12 @@ export interface TownWorld {
     playerZ: number,
     playerRotY: number,
   ) => InsectCatchEvaluation;
-  update: (elapsed: number, timeOfDay: TimeOfDay, frustum?: THREE.Frustum) => void;
+  update: (
+    elapsed: number,
+    timeOfDay: TimeOfDay,
+    frustum?: THREE.Frustum,
+    cameraPos?: THREE.Vector3,
+  ) => void;
   dispose: () => void;
 }
 
@@ -181,198 +191,6 @@ function createExtrudedRoof(
   });
   geo.center();
   return new THREE.Mesh(geo, mat);
-}
-
-function createDailyQuestSignTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
-
-  ctx.fillStyle = '#FFF5E1';
-  ctx.fillRect(0, 0, 512, 256);
-
-  ctx.strokeStyle = '#9C6B3F';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(16, 16, 480, 224);
-
-  ctx.strokeStyle = '#D9B88F';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(28, 28, 456, 200);
-
-  ctx.fillStyle = '#4A2F1B';
-  ctx.font = 'bold 56px "Nunito", "Segoe UI", system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Nhiệm vụ ngày', 256, 102);
-
-  ctx.fillStyle = '#C97B49';
-  ctx.fillRect(116, 146, 280, 6);
-
-  ctx.fillStyle = '#6BA383';
-  [172, 256, 340].forEach((cx) => {
-    ctx.beginPath();
-    ctx.arc(cx, 186, 12, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
-}
-
-function createKoiStallSignTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
-
-  ctx.fillStyle = '#FDF6E6';
-  ctx.fillRect(0, 0, 512, 256);
-
-  ctx.strokeStyle = '#7A4E2D';
-  ctx.lineWidth = 12;
-  ctx.strokeRect(12, 12, 488, 232);
-
-  ctx.strokeStyle = '#3B9AB2';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(24, 24, 464, 208);
-
-  // Decorative fish illustration on the left
-  ctx.save();
-  ctx.translate(152, 108);
-  ctx.fillStyle = '#43A3B8';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 52, 26, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Fish tail
-  ctx.beginPath();
-  ctx.moveTo(46, 0);
-  ctx.lineTo(76, -22);
-  ctx.lineTo(68, 0);
-  ctx.lineTo(76, 22);
-  ctx.closePath();
-  ctx.fillStyle = '#2F7D92';
-  ctx.fill();
-  // Dorsal fin
-  ctx.beginPath();
-  ctx.moveTo(-12, -24);
-  ctx.lineTo(6, -38);
-  ctx.lineTo(22, -20);
-  ctx.closePath();
-  ctx.fillStyle = '#E87A54';
-  ctx.fill();
-  // Eye & smile
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(-28, -5, 6.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#1E2A32';
-  ctx.beginPath();
-  ctx.arc(-29, -5, 3.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Woven bamboo fish basket illustration on the right
-  ctx.save();
-  ctx.translate(358, 114);
-  ctx.fillStyle = '#D99E57';
-  ctx.beginPath();
-  ctx.moveTo(-36, -18);
-  ctx.lineTo(36, -18);
-  ctx.quadraticCurveTo(46, 28, 22, 36);
-  ctx.lineTo(-22, 36);
-  ctx.quadraticCurveTo(-46, 28, -36, -18);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#8F5A29';
-  ctx.lineWidth = 4;
-  ctx.stroke();
-  // Basket rim & weave lines
-  ctx.fillStyle = '#B87638';
-  ctx.fillRect(-40, -24, 80, 10);
-  ctx.strokeStyle = '#A66931';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(-34, 4);
-  ctx.lineTo(34, 4);
-  ctx.moveTo(-30, 18);
-  ctx.lineTo(30, 18);
-  ctx.stroke();
-  // Little tail peeking out of basket
-  ctx.fillStyle = '#FF9C6E';
-  ctx.beginPath();
-  ctx.moveTo(10, -24);
-  ctx.lineTo(26, -42);
-  ctx.lineTo(2, -38);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
-  ctx.fillStyle = '#382414';
-  ctx.font = 'bold 46px "Nunito", "Segoe UI", system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Tiệm của Koi', 256, 194);
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
-}
-
-function createPetShopSideSignTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
-
-  ctx.fillStyle = '#FFF7EA';
-  ctx.fillRect(0, 0, 512, 256);
-
-  ctx.strokeStyle = '#E0825B';
-  ctx.lineWidth = 14;
-  ctx.strokeRect(12, 12, 488, 232);
-
-  ctx.strokeStyle = '#5BB7B0';
-  ctx.lineWidth = 5;
-  ctx.strokeRect(26, 26, 460, 204);
-
-  const drawPaw = (cx: number, cy: number, s: number, col: string) => {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.scale(s, s);
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    ctx.ellipse(0, 10, 18, 15, 0, 0, Math.PI * 2);
-    ctx.fill();
-    [
-      [-18, -10],
-      [-6, -20],
-      [7, -20],
-      [18, -10],
-    ].forEach(([tx, ty]) => {
-      ctx.beginPath();
-      ctx.arc(tx, ty, 6.8, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.restore();
-  };
-
-  drawPaw(88, 130, 0.95, '#F09470');
-  drawPaw(424, 130, 0.95, '#5BB7B0');
-
-  ctx.fillStyle = '#4A3122';
-  ctx.font = '900 94px "Nunito", "Segoe UI", system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Pets', 256, 132);
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
 }
 
 function addInteractionProxy(
@@ -771,22 +589,6 @@ function buildFramedWindow(
   return g;
 }
 
-function createRadialGlowTexture(innerRgba: string, midRgba: string): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d')!;
-  const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
-  grad.addColorStop(0, innerRgba);
-  grad.addColorStop(0.45, midRgba);
-  grad.addColorStop(1, 'rgba(255, 200, 110, 0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 128, 128);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
 export function buildTownScene(): TownWorld {
   const group = new THREE.Group();
   const clickTargets: THREE.Object3D[] = [];
@@ -796,14 +598,12 @@ export function buildTownScene(): TownWorld {
   const lampBulbs: THREE.MeshStandardMaterial[] = [];
 
   const getMat = createMatPool();
-  const grassTex = createGrassTexture();
   // ShapeGeometry UVs are in world meters (110/600m ≈ 0.185 repeats/m)
-  grassTex.repeat.set(0.185, 0.185);
+  const grassTex = createGrassTexture(0.185, 0.185);
+  const hillTex = createGrassTexture(18, 18);
   const plazaStoneTex = createStoneWalkwayTexture(4, 4);
-  const signTex = createDailyQuestSignTexture();
-  const koiSignTex = createKoiStallSignTexture();
-  const petShopSignTex = createPetShopSideSignTexture();
-  const warmGlowTex = createRadialGlowTexture('rgba(255, 214, 130, 0.92)', 'rgba(255, 192, 95, 0.35)');
+  const signAtlasMat = getSharedSignAtlasMaterial();
+  const warmGlowTex = getWarmGlowTexture();
   let koiRig: AvatarRig | null = null;
 
   // ========== 1. EXPANDED TERRAIN (WITH PUNCHED LAKE BASIN) + GENTLE SCENIC HILL ==========
@@ -851,8 +651,6 @@ export function buildTownScene(): TownWorld {
     hillPosAttr.setY(i, y);
   }
   hillGeo.computeVertexNormals();
-  const hillTex = createGrassTexture();
-  hillTex.repeat.set(18, 18);
   const hillMat = new THREE.MeshStandardMaterial({
     map: hillTex,
     color: '#A5DC8E',
@@ -907,6 +705,7 @@ export function buildTownScene(): TownWorld {
     }),
   );
   moonHalo.scale.set(16, 16, 1);
+  moonHalo.renderOrder = 10;
   moonGroup.add(moonCore, moonHalo);
   group.add(moonGroup);
 
@@ -1140,10 +939,50 @@ export function buildTownScene(): TownWorld {
     colliders.push({type: 'circle', x: lx, z: lz, r: 0.3});
   });
 
-  // Warm central plaza illumination at Sunset / Night
-  const plazaNightLight = new THREE.PointLight('#FFB960', 0, 22, 1.35);
-  plazaNightLight.position.set(0, 3.0, 0);
-  group.add(plazaNightLight);
+  // Pooled warm ground light pools at Plaza & main porches (1 instanced draw call at night — zero PointLight shader lag)
+  const districtNightPoolGeo = new THREE.PlaneGeometry(4.8, 4.8);
+  districtNightPoolGeo.rotateX(-Math.PI / 2);
+  const districtNightPoolMat = new THREE.MeshBasicMaterial({
+    map: warmGlowTex,
+    transparent: true,
+    opacity: 0.36,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
+  const districtPoolSpecs: [number, number, number, number][] = [
+    [0, 0.16, 0, 2.3],
+    [-32, 0.05, -18.2, 1.9],
+    [-19.6, 0.05, 38.0, 1.7],
+    [11.8, 0.05, 42.0, 1.8],
+    [-32, 0.05, 22.0, 1.8],
+    [32, 0.05, 22.0, 1.8],
+    [-5.1, 0.16, -4.8, 1.05],
+    [5.1, 0.16, -4.8, 1.05],
+    [-5.1, 0.16, 4.8, 1.05],
+    [5.1, 0.16, 4.8, 1.05],
+    [-21.18, TOWN_LAKE_WATER_Y + 0.02, 44.3, 1.45],
+    [22.5, 0.05, -39.5, 2.35],
+  ];
+  const districtNightPoolIM = new THREE.InstancedMesh(
+    districtNightPoolGeo,
+    districtNightPoolMat,
+    districtPoolSpecs.length,
+  );
+  districtNightPoolIM.renderOrder = 2;
+  districtNightPoolIM.visible = false;
+  districtPoolSpecs.forEach(([px, py, pz, ps], i) => {
+    _instDummy.position.set(px, py, pz);
+    _instDummy.rotation.set(0, 0, 0);
+    _instDummy.scale.setScalar(ps);
+    _instDummy.updateMatrix();
+    districtNightPoolIM.setMatrixAt(i, _instDummy.matrix);
+  });
+  districtNightPoolIM.instanceMatrix.needsUpdate = true;
+  districtNightPoolIM.computeBoundingSphere();
+  group.add(districtNightPoolIM);
 
   const makeWinMat = () => {
     const m = new THREE.MeshStandardMaterial({
@@ -1421,13 +1260,9 @@ export function buildTownScene(): TownWorld {
     });
     chimneySmokeMesh = new THREE.InstancedMesh(smokeGeo, smokeMat, SMOKE_COUNT);
     chimneySmokeMesh.frustumCulled = false;
+    chimneySmokeMesh.renderOrder = 8;
     group.add(chimneySmokeMesh);
   }
-
-  // Warm cottage porch light for Sunset / Night
-  const homePorchNightLight = new THREE.PointLight('#FFB35C', 0, 16, 1.45);
-  homePorchNightLight.position.set(-32, 3.5, -18.2);
-  group.add(homePorchNightLight);
 
   // ========== BIỂN "NHIỆM VỤ NGÀY" TRƯỚC SÂN NHÀ ==========
   {
@@ -1449,15 +1284,13 @@ export function buildTownScene(): TownWorld {
     const frame = new THREE.Mesh(new RoundedBoxGeometry(1.52, 0.84, 0.14, 2, 0.04), postMat);
     frame.position.set(0, 1.24, 0);
 
-    const signFace = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.36, 0.68),
-      new THREE.MeshStandardMaterial({map: signTex, roughness: 0.65}),
-    );
+    const dailyQuestGeo = createAtlasPlaneGeometry(1.36, 0.68, 'daily_quests');
+    const signFace = new THREE.Mesh(dailyQuestGeo, signAtlasMat);
     signFace.position.set(0, 1.24, 0.076);
 
-    const backFace = signFace.clone();
+    const backFace = new THREE.Mesh(dailyQuestGeo.clone(), signAtlasMat);
     backFace.rotation.y = Math.PI;
-    backFace.position.z = -0.076;
+    backFace.position.set(0, 1.24, -0.076);
 
     const roofCap = createExtrudedRoof(1.72, 0.36, 0.36, getMat('#DB6C53', 0.58));
     roofCap.position.set(0, 1.82, 0);
@@ -2573,8 +2406,7 @@ export function buildTownScene(): TownWorld {
 
   // ========== DISTRICT 5: HỒ CÂU CÁ TƯƠNG TÁC (Large Sunken Lotus Lake, Walkable Bridge, Aquatic Flora & Fireflies) ==========
   const pierWalkableMeshes: THREE.Object3D[] = [];
-  let lakeWaterMat: THREE.MeshPhysicalMaterial | null = null;
-  let lakePierNightLight: THREE.PointLight | null = null;
+  let lakeWaterMat: THREE.MeshStandardMaterial | null = null;
   let lakeFishingVisuals: FishingSpotVisuals | null = null;
   let reedClumpIM: THREE.InstancedMesh | null = null;
   const reedClumpBaseTfs: {pos: THREE.Vector3; quat: THREE.Quaternion; scale: THREE.Vector3}[] = [];
@@ -2655,6 +2487,7 @@ export function buildTownScene(): TownWorld {
       basinGeo,
       new THREE.MeshStandardMaterial({vertexColors: true, roughness: 0.88}),
     );
+    basinMesh.renderOrder = 0;
     lake.add(basinMesh);
 
     // 2. Recessed Translucent Glossy Water Surface (sits at y = -0.26, visibly below y = 0 ground)
@@ -2669,17 +2502,18 @@ export function buildTownScene(): TownWorld {
     }
     const waterGeo = new THREE.ShapeGeometry(waterShape, 32);
     waterGeo.rotateX(-Math.PI / 2);
-    lakeWaterMat = new THREE.MeshPhysicalMaterial({
+    lakeWaterMat = new THREE.MeshStandardMaterial({
       color: '#3BB0D8',
-      roughness: 0.08,
-      metalness: 0.06,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.1,
+      roughness: 0.1,
+      metalness: 0.08,
+      envMapIntensity: 0.95,
       transparent: true,
       opacity: 0.78,
+      depthWrite: false,
     });
     const waterMesh = new THREE.Mesh(waterGeo, lakeWaterMat);
     waterMesh.position.y = LAKE_WATER_Y;
+    waterMesh.renderOrder = 3;
     waterMesh.userData = {
       kind: 'town_lake_fish',
       tx: PIER_X,
@@ -2707,9 +2541,11 @@ export function buildTownScene(): TownWorld {
         roughness: 0.14,
         transparent: true,
         opacity: 0.45,
+        depthWrite: false,
       }),
     );
     deepMesh.position.y = LAKE_WATER_Y - 0.18;
+    deepMesh.renderOrder = 1;
     lake.add(deepMesh);
 
     // 3. Walkable Timber Bridge / Fishing Pier extending out over the recessed water
@@ -2817,10 +2653,7 @@ export function buildTownScene(): TownWorld {
     lampBulbs.push(pierLampMat);
     const pierLamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 9, 9), pierLampMat);
     pierLamp.position.set(PIER_X + 1.32, 1.84, 44.3);
-
-    lakePierNightLight = new THREE.PointLight('#FFB960', 0, 18, 1.35);
-    lakePierNightLight.position.set(PIER_X + 1.32, 2.0, 44.3);
-    lake.add(lanternPost, lanternArm, lanternCord, lanternCap, pierLamp, lakePierNightLight);
+    lake.add(lanternPost, lanternArm, lanternCord, lanternCap, pierLamp);
 
     // Interactive Fishing Spot Box at Pier Tip & Center Lake
     addInteractionProxy(
@@ -2897,6 +2730,7 @@ export function buildTownScene(): TownWorld {
     lilyPadIM.instanceMatrix.needsUpdate = true;
     if (lilyPadIM.instanceColor) lilyPadIM.instanceColor.needsUpdate = true;
     lilyPadIM.computeBoundingSphere();
+    lilyPadIM.renderOrder = 4;
     lake.add(lilyPadIM);
 
     // Sculpted Open Lotus Flowers (Hoa Sen) & Stems (merged geometry -> InstancedMesh)
@@ -2962,6 +2796,8 @@ export function buildTownScene(): TownWorld {
     if (lotusPetalIM.instanceColor) lotusPetalIM.instanceColor.needsUpdate = true;
     lotusPetalIM.computeBoundingSphere();
     lotusCenterIM.computeBoundingSphere();
+    lotusPetalIM.renderOrder = 4;
+    lotusCenterIM.renderOrder = 4;
     lake.add(lotusPetalIM, lotusCenterIM);
 
     // Tall Lotus Buds on Stalks
@@ -3000,6 +2836,8 @@ export function buildTownScene(): TownWorld {
     budHeadIM.instanceMatrix.needsUpdate = true;
     budStemIM.computeBoundingSphere();
     budHeadIM.computeBoundingSphere();
+    budStemIM.renderOrder = 4;
+    budHeadIM.renderOrder = 4;
     lake.add(budStemIM, budHeadIM);
 
     // 5. Lush Aquatic Grass / Reeds & Cattails (Cỏ Thủy Sinh) in shallow water perimeter
@@ -3108,6 +2946,7 @@ export function buildTownScene(): TownWorld {
     const ffCoreMat = new THREE.MeshBasicMaterial({color: '#F4FF85'});
     fireflyCoreIM = new THREE.InstancedMesh(ffCoreGeo, ffCoreMat, FIREFLY_COUNT);
     fireflyCoreIM.frustumCulled = false;
+    fireflyCoreIM.renderOrder = 7;
     fireflyCoreIM.visible = false;
 
     const ffHaloGeo = new THREE.SphereGeometry(0.145, 6, 5);
@@ -3120,6 +2959,7 @@ export function buildTownScene(): TownWorld {
     });
     fireflyHaloIM = new THREE.InstancedMesh(ffHaloGeo, ffHaloMat, FIREFLY_COUNT);
     fireflyHaloIM.frustumCulled = false;
+    fireflyHaloIM.renderOrder = 8;
     fireflyHaloIM.visible = false;
 
     for (let i = 0; i < FIREFLY_COUNT; i++) {
@@ -3255,8 +3095,8 @@ export function buildTownScene(): TownWorld {
     );
     signBoard.position.set(0, 2.74, 1.28);
     const signFace = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.42, 0.68),
-      new THREE.MeshStandardMaterial({map: koiSignTex, roughness: 0.45}),
+      createAtlasPlaneGeometry(1.42, 0.68, 'koi_stall'),
+      signAtlasMat,
     );
     signFace.position.set(0, 2.74, 1.33);
     stall.add(signBoard, signFace);
@@ -3730,10 +3570,10 @@ export function buildTownScene(): TownWorld {
     );
     signFrame.position.set(-0.64, -0.34, 0);
 
-    const signMat = new THREE.MeshStandardMaterial({map: petShopSignTex, roughness: 0.45});
-    const signFaceF = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.48), signMat);
+    const petSignGeo = createAtlasPlaneGeometry(0.96, 0.48, 'pet_shop');
+    const signFaceF = new THREE.Mesh(petSignGeo, signAtlasMat);
     signFaceF.position.set(-0.64, -0.34, 0.055);
-    const signFaceB = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.48), signMat);
+    const signFaceB = new THREE.Mesh(petSignGeo.clone(), signAtlasMat);
     signFaceB.rotation.y = Math.PI;
     signFaceB.position.set(-0.64, -0.34, -0.055);
 
@@ -4203,11 +4043,6 @@ export function buildTownScene(): TownWorld {
     patio.add(new THREE.Mesh(mergeParts(dropCordGeos), wireMat));
     patio.add(new THREE.Mesh(mergeParts(bulbSpheres), stringBulbMat));
 
-    // Warm golden PointLight illuminating the tea patio & cherry blossoms at Sunset / Night
-    patioNightLight = new THREE.PointLight('#FFB65C', 0, 18, 1.35);
-    patioNightLight.position.set(0, 3.2, 0);
-    patio.add(patioNightLight);
-
     mergeStaticGroupByMaterial(patio);
     group.add(patio);
   }
@@ -4242,7 +4077,6 @@ export function buildTownScene(): TownWorld {
     [55.5, 29.0, 1.28, true, -Math.PI + 0.3],
     [-40.5, 59.5, 1.26, true, 0.9],
     [40.5, 55.5, 1.26, true, 2.2],
-    [-25.5, 48.0, 1.22, true, 0.4],
     [25.5, 48.0, 1.24, true, 2.7],
     [-62.0, -34.0, 1.28, true, 0.5],
     [62.5, -34.5, 1.26, true, 2.6],
@@ -4484,7 +4318,6 @@ export function buildTownScene(): TownWorld {
   // Under-Canopy Hanging Tree Lanterns (hooked onto trees across central + outer perimeter + soft warm ground pools)
   let treeLampHaloIM: THREE.InstancedMesh | null = null;
   let treeLampPoolIM: THREE.InstancedMesh | null = null;
-  const ambientLanternLights: THREE.PointLight[] = [];
   if (treeLanternSpots.length > 0) {
     const armGeo = new THREE.BoxGeometry(0.46, 0.045, 0.045);
     armGeo.translate(0.24, 0, 0);
@@ -4497,12 +4330,12 @@ export function buildTownScene(): TownWorld {
     capGeo.translate(0.44, -0.17, 0);
 
     const treeLampBracketGeo = mergeParts([armGeo, braceGeo, cordGeo, capGeo]);
-    const treeLampBulbGeo = new THREE.SphereGeometry(0.105, 10, 8);
+    const treeLampBulbGeo = new THREE.SphereGeometry(0.105, 8, 6);
     treeLampBulbGeo.translate(0.44, -0.27, 0);
-    const treeLampHaloGeo = new THREE.SphereGeometry(0.42, 8, 6);
+    const treeLampHaloGeo = new THREE.SphereGeometry(0.4, 7, 5);
     treeLampHaloGeo.translate(0.44, -0.27, 0);
 
-    const treeLampPoolGeo = new THREE.PlaneGeometry(4.2, 4.2);
+    const treeLampPoolGeo = new THREE.PlaneGeometry(3.2, 3.2);
     treeLampPoolGeo.rotateX(-Math.PI / 2);
     treeLampPoolGeo.translate(0.44, 0, 0);
 
@@ -4523,9 +4356,12 @@ export function buildTownScene(): TownWorld {
     const treeLampPoolMat = new THREE.MeshBasicMaterial({
       map: warmGlowTex,
       transparent: true,
-      opacity: 0.26,
+      opacity: 0.34,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
     });
     lampBulbs.push(treeLampBulbMat);
 
@@ -4549,6 +4385,8 @@ export function buildTownScene(): TownWorld {
       treeLampPoolMat,
       treeLanternSpots.length,
     );
+    treeLampHaloIM.renderOrder = 8;
+    treeLampPoolIM.renderOrder = 2;
     treeLampHaloIM.visible = false;
     treeLampPoolIM.visible = false;
 
@@ -4577,24 +4415,6 @@ export function buildTownScene(): TownWorld {
     treeLampHaloIM.computeBoundingSphere();
     treeLampPoolIM.computeBoundingSphere();
     group.add(treeLampBracketIM, treeLampBulbIM, treeLampHaloIM, treeLampPoolIM);
-
-    // 6 softly distributed warm PointLights positioned directly beneath outer & mid tree lanterns
-    const districtLanternLightPos: [number, number][] = [
-      [-44.5, -18.5],
-      [51.5, -18.5],
-      [-44.5, 16.5],
-      [45.0, 16.5],
-      [-37.5, 36.0],
-      [36.5, 35.5],
-    ];
-    districtLanternLightPos.forEach(([lx, lz]) => {
-      const ly = getTownGroundHeight(lx, lz) + 2.35;
-      const pl = new THREE.PointLight('#FFB85E', 0, 26, 1.28);
-      pl.position.set(lx, ly, lz);
-      pl.visible = false;
-      group.add(pl);
-      ambientLanternLights.push(pl);
-    });
   }
 
   // C. Lush Evergreen Pine & Conifer Trees (spanning outer meadows, mountain foothills & distant forest edge — zero perimeter fence!)
@@ -4808,19 +4628,22 @@ export function buildTownScene(): TownWorld {
     pondBedGeo.rotateX(-Math.PI / 2);
     const pondBedMesh = new THREE.Mesh(pondBedGeo, getMat('#28574A', 0.92));
     pondBedMesh.position.y = 0.015;
+    pondBedMesh.renderOrder = 0;
 
     const pondWaterGeo = new THREE.ShapeGeometry(pondShape, 20);
     pondWaterGeo.rotateX(-Math.PI / 2);
-    const miniPondWaterMat = new THREE.MeshPhysicalMaterial({
+    const miniPondWaterMat = new THREE.MeshStandardMaterial({
       color: '#45B8D4',
       roughness: 0.1,
-      metalness: 0.04,
-      clearcoat: 0.85,
+      metalness: 0.06,
+      envMapIntensity: 0.9,
       transparent: true,
       opacity: 0.74,
+      depthWrite: false,
     });
     const pondWaterMesh = new THREE.Mesh(pondWaterGeo, miniPondWaterMat);
     pondWaterMesh.position.y = 0.075;
+    pondWaterMesh.renderOrder = 3;
     miniPond.add(pondBedMesh, pondWaterMesh);
 
     // Underwater & bankside moss/algae cushions (Rong rêu)
@@ -4891,11 +4714,13 @@ export function buildTownScene(): TownWorld {
       const pad = new THREE.Mesh(new THREE.CylinderGeometry(lr as number, lr as number, 0.025, 12, 1, false, 0, Math.PI * 1.82), padMat);
       pad.position.set(lx as number, 0.085, lz as number);
       pad.rotation.y = i * 1.4;
+      pad.renderOrder = 4;
       miniPond.add(pad);
       if (hasFlower) {
         const lotus = new THREE.Mesh(new THREE.SphereGeometry(0.11, 7, 6), lotusMat);
         lotus.scale.set(1.15, 0.72, 1.15);
         lotus.position.set(lx as number, 0.13, lz as number);
+        lotus.renderOrder = 4;
         miniPond.add(lotus);
       }
     });
@@ -5002,24 +4827,30 @@ export function buildTownScene(): TownWorld {
 
     campfireFlameA = new THREE.Mesh(
       new THREE.ConeGeometry(0.24, 0.58, 7),
-      new THREE.MeshBasicMaterial({color: '#FF7B29', transparent: true, opacity: 0.92}),
+      new THREE.MeshBasicMaterial({color: '#FF7B29', transparent: true, opacity: 0.92, depthWrite: false}),
     );
     campfireFlameA.position.y = 0.36;
+    campfireFlameA.renderOrder = 6;
     campfireFlameB = new THREE.Mesh(
       new THREE.ConeGeometry(0.15, 0.44, 6),
-      new THREE.MeshBasicMaterial({color: '#FFE066', transparent: true, opacity: 0.95}),
+      new THREE.MeshBasicMaterial({color: '#FFE066', transparent: true, opacity: 0.95, depthWrite: false}),
     );
     campfireFlameB.position.set(0.04, 0.32, -0.03);
+    campfireFlameB.renderOrder = 6;
     campfireGlowMat = new THREE.MeshBasicMaterial({
       map: warmGlowTex,
       transparent: true,
       opacity: 0.42,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
     });
     const campGlowPool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), campfireGlowMat);
     campGlowPool.rotation.x = -Math.PI / 2;
     campGlowPool.position.y = 0.035;
+    campGlowPool.renderOrder = 2;
     campGroup.add(campfireFlameA, campfireFlameB, campGlowPool);
 
     // Rustic log stool right in front of the campfire (+Z local)
@@ -5380,7 +5211,7 @@ export function buildTownScene(): TownWorld {
     [40.8, -10.2, 1.28, '#59B061'],
     [-40.8, 26.2, 1.3, '#4A9C53'],
     [41.0, 26.0, 1.34, '#56AD5E'],
-    [-33.5, 48.5, 1.25, '#4B9F55'],
+    [-35.8, 49.5, 1.25, '#4B9F55'],
     [-12.5, 42.5, 1.14, '#54AA5D'],
     [15.0, 48.2, 1.26, '#4E9F57'],
     [32.5, 45.8, 1.3, '#57AE60'],
@@ -5827,11 +5658,11 @@ export function buildTownScene(): TownWorld {
     [47.0, 16.0, -0.5],
     [-42.0, -28.0, 1.1],
     [43.0, -27.5, -1.0],
-    [-26.5, 51.0, 0.25],
+    [-39.2, 52.5, 0.25],
     [27.0, 50.5, -0.3],
     [-55.5, -1.5, 1.3],
     [56.0, -1.0, -1.2],
-    [-16.0, 48.0, 0.8],
+    [-12.2, 55.2, 0.8],
     [16.5, 48.5, -0.75],
     [-49.5, 40.5, 0.6],
     [50.0, 40.0, -0.6],
@@ -5886,10 +5717,8 @@ export function buildTownScene(): TownWorld {
     [-39.0, 6.0, Math.PI / 2],
     [39.0, 3.0, Math.PI / 2],
     [39.0, 6.0, Math.PI / 2],
-    [-16.0, 52.5, 0.15],
-    [-13.0, 52.9, 0.15],
-    [13.0, 52.9, -0.15],
-    [16.0, 52.5, -0.15],
+    [16.8, 51.4, -0.15],
+    [19.8, 51.0, -0.15],
     [-27.0, -32.0, 0.35],
     [27.0, -32.0, -0.35],
   ];
@@ -5918,52 +5747,6 @@ export function buildTownScene(): TownWorld {
   woodenFenceIM.instanceMatrix.needsUpdate = true;
   woodenFenceIM.computeBoundingSphere();
   group.add(woodenFenceIM);
-
-  // 4. Water Lily Pads & Floating Lotus Blossoms on Main Lake Edge & Mini Pond (Lá sen & hoa súng mặt nước)
-  const lilySpots: [number, number, number][] = [];
-  for (let i = 0; i < 20; i++) {
-    const th = (i / 20) * Math.PI * 2 + 0.14;
-    if (Math.abs(Math.sin(th - 0.5)) < 0.18 && Math.cos(th - 0.5) < 0) continue; // skip fishing pier
-    const r = getLakeShoreRadius(th) - 1.05 - (i % 3) * 0.45;
-    lilySpots.push([LAKE_CENTER.x + Math.cos(th) * r, TOWN_LAKE_WATER_Y + 0.015, LAKE_CENTER.z + Math.sin(th) * r]);
-  }
-  for (let i = 0; i < 6; i++) {
-    const th = (i / 6) * Math.PI * 2 + 0.4;
-    const r = 1.45 + (i % 2) * 0.35;
-    lilySpots.push([13.8 + Math.cos(th) * r, 0.102, 13.8 + Math.sin(th) * r]);
-  }
-  const padGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.024, 12, 1, false, 0.22, Math.PI * 1.86);
-  const lilyPadIM = new THREE.InstancedMesh(padGeo, getMat('#4E9D57', 0.65), lilySpots.length);
-
-  const lilyPetalParts: THREE.BufferGeometry[] = [];
-  const lilyCenterParts: THREE.BufferGeometry[] = [];
-  append5PetalFlower(lilyPetalParts, lilyCenterParts, 0.04, 0.035, 0.02, 1.35, 0.05, 0.04, 0);
-  const lilyBloomGeo = mergeParts(lilyPetalParts);
-  const lilyCenterGeo = mergeParts(lilyCenterParts);
-  const lilyBloomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.42});
-  const lilyBloomIM = new THREE.InstancedMesh(lilyBloomGeo, lilyBloomMat, lilySpots.length);
-  const lilyCenterIM = new THREE.InstancedMesh(lilyCenterGeo, getMat('#FFD24C', 0.38), lilySpots.length);
-  const lilyColors = ['#FFA8C2', '#FFFFFF', '#FFB8D0', '#FFE3F0'];
-
-  lilySpots.forEach(([lx, ly, lz], i) => {
-    _instDummy.position.set(lx, ly, lz);
-    _instDummy.rotation.set(0, (i * 1.9) % (Math.PI * 2), 0);
-    _instDummy.scale.setScalar(0.82 + (i % 3) * 0.18);
-    _instDummy.updateMatrix();
-    lilyPadIM.setMatrixAt(i, _instDummy.matrix);
-    lilyBloomIM.setMatrixAt(i, _instDummy.matrix);
-    lilyCenterIM.setMatrixAt(i, _instDummy.matrix);
-    _instColor.set(lilyColors[i % lilyColors.length]);
-    lilyBloomIM.setColorAt(i, _instColor);
-  });
-  lilyPadIM.instanceMatrix.needsUpdate = true;
-  lilyBloomIM.instanceMatrix.needsUpdate = true;
-  lilyCenterIM.instanceMatrix.needsUpdate = true;
-  if (lilyBloomIM.instanceColor) lilyBloomIM.instanceColor.needsUpdate = true;
-  lilyPadIM.computeBoundingSphere();
-  lilyBloomIM.computeBoundingSphere();
-  lilyCenterIM.computeBoundingSphere();
-  group.add(lilyPadIM, lilyBloomIM, lilyCenterIM);
 
   // 5. Wooden Trail Direction Signposts at outer path junctions (Biển chỉ đường gỗ ngã ba)
   const signpostCoords: [number, number, number][] = [
@@ -6051,11 +5834,15 @@ export function buildTownScene(): TownWorld {
   const _fireflySphere = new THREE.Sphere(new THREE.Vector3(LAKE_CENTER.x, 1.0, LAKE_CENTER.z), 12.0);
   const _campfireSphere = new THREE.Sphere(new THREE.Vector3(16.6, 0.6, -22.2), 2.8);
   const _koiSphere = new THREE.Sphere(new THREE.Vector3(-16.8, 1.2, 37.2), 3.2);
-  const _lightSphere = new THREE.Sphere();
-  const _patioLightPos = new THREE.Vector3(patioCenter.x, 3.2, patioCenter.z);
 
   let useExternalFishingFrame = false;
   let prevTownElapsed = 0;
+  let fountainAccum = 0;
+  let smokeAccum = 0;
+  let petalAccum = 0;
+  let reedAccum = 0;
+  let fireflyAccum = 0;
+  let koiAccum = 0;
 
   const setFishingState = (state: 'idle' | 'waiting' | 'bite') => {
     useExternalFishingFrame = false;
@@ -6083,7 +5870,12 @@ export function buildTownScene(): TownWorld {
     };
   };
 
-  const update = (elapsed: number, timeOfDay: TimeOfDay, frustum?: THREE.Frustum) => {
+  const update = (
+    elapsed: number,
+    timeOfDay: TimeOfDay,
+    frustum?: THREE.Frustum,
+    cameraPos?: THREE.Vector3,
+  ) => {
     const dt = prevTownElapsed > 0 ? Math.min(0.05, elapsed - prevTownElapsed) : 0.016;
     prevTownElapsed = elapsed;
 
@@ -6091,9 +5883,8 @@ export function buildTownScene(): TownWorld {
       lastAppliedTod = timeOfDay;
       currentTod = timeOfDay;
       const isNight = timeOfDay === 'night';
-      const isSunset = timeOfDay === 'sunset';
-      const winEmissive = isNight ? 1.35 : isSunset ? 0.68 : 0.08;
-      const bulbEmissive = isNight ? 2.15 : isSunset ? 1.0 : 0.14;
+      const winEmissive = isNight ? 1.45 : 0.08;
+      const bulbEmissive = isNight ? 2.25 : 0.14;
 
       windowMeshes.forEach((m) => {
         m.emissiveIntensity = winEmissive;
@@ -6101,80 +5892,56 @@ export function buildTownScene(): TownWorld {
       lampBulbs.forEach((m) => {
         m.emissiveIntensity = m.userData?.isArcadeNeon
           ? isNight
-            ? 0.62
-            : isSunset
-              ? 0.42
-              : 0.24
+            ? 0.65
+            : 0.24
           : bulbEmissive;
       });
       if (treeLampHaloIM) {
-        treeLampHaloIM.visible = isNight || isSunset;
-        (treeLampHaloIM.material as THREE.MeshBasicMaterial).opacity = isNight ? 0.26 : 0.12;
+        treeLampHaloIM.visible = isNight;
       }
       if (treeLampPoolIM) {
-        treeLampPoolIM.visible = isNight || isSunset;
-        (treeLampPoolIM.material as THREE.MeshBasicMaterial).opacity = isNight ? 0.28 : 0.12;
+        treeLampPoolIM.visible = isNight;
       }
+      districtNightPoolIM.visible = isNight;
       moonGroup.visible = isNight;
       starPoints.visible = isNight;
-      const showLights = isNight || isSunset;
-      ambientLanternLights.forEach((pl) => {
-        pl.visible = showLights;
-        pl.intensity = isNight ? 2.85 : isSunset ? 1.1 : 0;
-      });
       if (stringBulbMat) {
-        stringBulbMat.emissiveIntensity = isNight ? 2.8 : isSunset ? 1.4 : 0.16;
-      }
-      if (patioNightLight) {
-        patioNightLight.visible = showLights;
-        patioNightLight.intensity = isNight ? 5.2 : isSunset ? 2.2 : 0;
-      }
-      if (plazaNightLight) {
-        plazaNightLight.visible = showLights;
-        plazaNightLight.intensity = isNight ? 3.8 : isSunset ? 1.6 : 0;
-      }
-      if (lakePierNightLight) {
-        lakePierNightLight.visible = showLights;
-        lakePierNightLight.intensity = isNight ? 3.4 : isSunset ? 1.5 : 0;
-      }
-      if (homePorchNightLight) {
-        homePorchNightLight.visible = showLights;
-        homePorchNightLight.intensity = isNight ? 2.6 : isSunset ? 1.15 : 0;
+        stringBulbMat.emissiveIntensity = isNight ? 2.9 : 0.16;
       }
       if (lakeWaterMat) {
-        lakeWaterMat.color.set(isNight ? '#1B4B6E' : isSunset ? '#2F87AC' : '#3BB0D8');
+        lakeWaterMat.color.set(isNight ? '#1B4B6E' : '#3BB0D8');
       }
       if (fireflyCoreIM && fireflyHaloIM) {
-        const showFireflies = isNight || isSunset;
-        fireflyCoreIM.visible = showFireflies;
-        fireflyHaloIM.visible = showFireflies;
+        fireflyCoreIM.visible = isNight;
+        fireflyHaloIM.visible = isNight;
       }
     }
 
-    // Dynamic PointLight frustum culling at Sunset/Night to save fragment shader CPU/GPU work
-    const nightOrSunset = currentTod === 'night' || currentTod === 'sunset';
-    if (nightOrSunset && frustum) {
-      for (let i = 0; i < ambientLanternLights.length; i++) {
-        const pl = ambientLanternLights[i];
-        _lightSphere.set(pl.position, pl.distance);
-        pl.visible = frustum.intersectsSphere(_lightSphere);
+    const isNight = currentTod === 'night';
+    const shouldAnimateAtDist = (center: THREE.Vector3, accum: number, setAccum: (v: number) => void, skipDist = 48, throttleDist = 22) => {
+      if (!cameraPos) return true;
+      const dSq = cameraPos.distanceToSquared(center);
+      if (dSq > skipDist * skipDist) return false;
+      if (dSq > throttleDist * throttleDist) {
+        const next = accum + dt;
+        if (next < 0.075) {
+          setAccum(next);
+          return false;
+        }
+        setAccum(0);
+        return true;
       }
-      if (patioNightLight) {
-        _lightSphere.set(_patioLightPos, patioNightLight.distance);
-        patioNightLight.visible = frustum.intersectsSphere(_lightSphere);
-      }
-      _lightSphere.set(plazaNightLight.position, plazaNightLight.distance);
-      plazaNightLight.visible = frustum.intersectsSphere(_lightSphere);
-      if (lakePierNightLight) {
-        _lightSphere.set(lakePierNightLight.position, lakePierNightLight.distance);
-        lakePierNightLight.visible = frustum.intersectsSphere(_lightSphere);
-      }
-      _lightSphere.set(homePorchNightLight.position, homePorchNightLight.distance);
-      homePorchNightLight.visible = frustum.intersectsSphere(_lightSphere);
-    }
+      setAccum(0);
+      return true;
+    };
 
-    // 1. Fountain spray (frustum-culled, zero allocations)
-    if (!frustum || frustum.intersectsSphere(_fountainSphere)) {
+    // 1. Fountain spray (frustum + distance throttled, zero allocations)
+    if (
+      (!frustum || frustum.intersectsSphere(_fountainSphere)) &&
+      shouldAnimateAtDist(_fountainSphere.center, fountainAccum, (v) => {
+        fountainAccum = v;
+      })
+    ) {
       for (let i = 0; i < DROP_COUNT; i++) {
         if (i < 6) {
           const a = (i / 6) * Math.PI * 2;
@@ -6198,8 +5965,14 @@ export function buildTownScene(): TownWorld {
       fountainDropsMesh.instanceMatrix.needsUpdate = true;
     }
 
-    // 2. Gentle chimney smoke (frustum-culled, zero allocations)
-    if (chimneySmokeMesh && (!frustum || frustum.intersectsSphere(_smokeSphere))) {
+    // 2. Gentle chimney smoke (frustum + distance throttled, zero allocations)
+    if (
+      chimneySmokeMesh &&
+      (!frustum || frustum.intersectsSphere(_smokeSphere)) &&
+      shouldAnimateAtDist(_smokeSphere.center, smokeAccum, (v) => {
+        smokeAccum = v;
+      })
+    ) {
       for (let i = 0; i < SMOKE_COUNT; i++) {
         const t = (elapsed * 0.28 + i / SMOKE_COUNT) % 1;
         const sx = smokeOriginWorld.x + Math.sin(t * Math.PI * 2 + i) * 0.28 + t * 0.42;
@@ -6215,12 +5988,22 @@ export function buildTownScene(): TownWorld {
     }
 
     // 3. Spin Windmill Sails beside the Conservatory Greenhouse
-    if (windmillSailHub && (!frustum || frustum.intersectsSphere(_windmillSphere))) {
+    if (
+      windmillSailHub &&
+      (!frustum || frustum.intersectsSphere(_windmillSphere)) &&
+      (!cameraPos || cameraPos.distanceToSquared(_windmillSphere.center) < 64 * 64)
+    ) {
       windmillSailHub.rotation.z = -elapsed * 0.55;
     }
 
-    // 4. Drifting Sakura Petals over Tea Patio (frustum-culled, zero allocations)
-    if (fallingPetalIM && (!frustum || frustum.intersectsSphere(_petalsSphere))) {
+    // 4. Drifting Sakura Petals over Tea Patio (frustum + distance throttled, zero allocations)
+    if (
+      fallingPetalIM &&
+      (!frustum || frustum.intersectsSphere(_petalsSphere)) &&
+      shouldAnimateAtDist(_petalsSphere.center, petalAccum, (v) => {
+        petalAccum = v;
+      })
+    ) {
       for (let i = 0; i < FALL_PETAL_COUNT; i++) {
         const s = fallingPetalSeeds[i];
         const t = (elapsed * s.speed + s.phase) % 1;
@@ -6241,8 +6024,15 @@ export function buildTownScene(): TownWorld {
       fallingPetalIM.instanceMatrix.needsUpdate = true;
     }
 
-    // 5. Gentle Wind Sway on Lake Aquatic Grass / Reeds (frustum-culled, zero matrix decompositions!)
-    if (reedClumpIM && reedClumpBaseTfs.length > 0 && (!frustum || frustum.intersectsSphere(_reedsSphere))) {
+    // 5. Gentle Wind Sway on Lake Aquatic Grass / Reeds (frustum + distance throttled)
+    if (
+      reedClumpIM &&
+      reedClumpBaseTfs.length > 0 &&
+      (!frustum || frustum.intersectsSphere(_reedsSphere)) &&
+      shouldAnimateAtDist(_reedsSphere.center, reedAccum, (v) => {
+        reedAccum = v;
+      }, 45, 20)
+    ) {
       for (let i = 0; i < reedClumpBaseTfs.length; i++) {
         const tf = reedClumpBaseTfs[i];
         _swayEuler.set(
@@ -6260,21 +6050,23 @@ export function buildTownScene(): TownWorld {
       reedClumpIM.instanceMatrix.needsUpdate = true;
     }
 
-    // 6. Nighttime Fireflies (Đom Đóm) over the Sunken Lotus Lake
+    // 6. Nighttime Fireflies (Đom Đóm) over the Sunken Lotus Lake (frustum + distance throttled)
     if (
       fireflyCoreIM &&
       fireflyHaloIM &&
-      nightOrSunset &&
-      (!frustum || frustum.intersectsSphere(_fireflySphere))
+      isNight &&
+      (!frustum || frustum.intersectsSphere(_fireflySphere)) &&
+      shouldAnimateAtDist(_fireflySphere.center, fireflyAccum, (v) => {
+        fireflyAccum = v;
+      }, 50, 24)
     ) {
-      const todFactor = currentTod === 'night' ? 1.0 : 0.45;
       for (let i = 0; i < FIREFLY_COUNT; i++) {
         const s = fireflySeeds[i];
         const t = elapsed * s.speed + s.phase;
         const fx = s.x + Math.sin(t) * s.rx;
         const fy = s.y + Math.sin(t * 1.35 + 1.2) * 0.24;
         const fz = s.z + Math.cos(t * 0.85) * s.rz;
-        const pulse = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(elapsed * s.blinkSpeed + s.phase))) * todFactor;
+        const pulse = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(elapsed * s.blinkSpeed + s.phase));
         _instDummy.position.set(fx, fy, fz);
         _instDummy.rotation.set(0, 0, 0);
         _instDummy.scale.setScalar(Math.max(0.05, pulse));
@@ -6296,39 +6088,49 @@ export function buildTownScene(): TownWorld {
     if (outdoorSwingPivot) {
       outdoorSwingPivot.rotation.x = Math.sin(swingPhase) * swingAmp;
     }
-    if (campfireFlameA && campfireFlameB && campfireGlowMat && (!frustum || frustum.intersectsSphere(_campfireSphere))) {
+    if (
+      campfireFlameA &&
+      campfireFlameB &&
+      campfireGlowMat &&
+      (!frustum || frustum.intersectsSphere(_campfireSphere)) &&
+      (!cameraPos || cameraPos.distanceToSquared(_campfireSphere.center) < 46 * 46)
+    ) {
       const fPulse = 0.9 + Math.sin(elapsed * 11) * 0.12 + Math.cos(elapsed * 17) * 0.06;
       campfireFlameA.scale.set(1, fPulse, 1);
       campfireFlameB.scale.set(1, 1.05 - (fPulse - 0.9) * 0.8, 1);
-      campfireGlowMat.opacity = currentTod === 'night' ? 0.52 + Math.sin(elapsed * 8) * 0.08 : 0.26;
+      campfireGlowMat.opacity = isNight ? 0.52 + Math.sin(elapsed * 8) * 0.08 : 0.26;
     }
 
     // 8. Fallback legacy lake bobber update if Play Together frame driver is idle
     if (lakeFishingVisuals && !useExternalFishingFrame) {
       lakeFishingVisuals.updateLegacy(elapsed);
     }
-    // 9. Koi NPC gentle idle animation (frustum-culled)
-    if (koiRig && (!frustum || frustum.intersectsSphere(_koiSphere))) {
+    // 9. Koi NPC gentle idle animation (frustum + distance throttled)
+    if (
+      koiRig &&
+      (!frustum || frustum.intersectsSphere(_koiSphere)) &&
+      shouldAnimateAtDist(_koiSphere.center, koiAccum, (v) => {
+        koiAccum = v;
+      }, 48, 22)
+    ) {
       updateAvatarRigAnimation(koiRig, 'idle', elapsed, false);
     }
   };
 
   const dispose = () => {
-    grassTex.dispose();
-    hillTex.dispose();
-    plazaStoneTex.dispose();
-    signTex.dispose();
-    koiSignTex.dispose();
-    petShopSignTex.dispose();
-    warmGlowTex.dispose();
     lakeFishingVisuals?.dispose();
     insectManager.dispose();
     group.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh || (obj as THREE.Points).isPoints) {
         const m = obj as THREE.Mesh;
         m.geometry.dispose();
-        if (Array.isArray(m.material)) m.material.forEach((mat) => mat.dispose());
-        else m.material.dispose();
+        if (Array.isArray(m.material)) {
+          m.material.forEach((mat) => {
+            if (!mat.userData?.pooled) mat.dispose();
+          });
+        } else if (!m.material.userData?.pooled) {
+          m.material.dispose();
+        }
       } else if ((obj as THREE.Sprite).isSprite) {
         (obj as THREE.Sprite).material.dispose();
       }
@@ -6344,6 +6146,8 @@ export function buildTownScene(): TownWorld {
     elapsed: number,
     dt: number,
     frustum?: THREE.Frustum,
+    camX?: number,
+    camZ?: number,
   ) =>
     insectManager.update(
       elapsed,
@@ -6354,6 +6158,8 @@ export function buildTownScene(): TownWorld {
       playerSpeed,
       isCreeping,
       frustum,
+      camX,
+      camZ,
     );
 
   const tryCatchInsect = (

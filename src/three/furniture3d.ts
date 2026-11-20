@@ -1017,12 +1017,14 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
         metalness: 0.05,
         transparent: true,
         opacity: 0.72,
+        depthWrite: false,
       });
       const tubWater = new THREE.Mesh(
         new RoundedBoxGeometry(1.7, 0.06, 0.78, 2, 0.02),
         waterMat,
       );
       tubWater.position.set(0, 0.34, 0);
+      tubWater.renderOrder = 3;
 
       // Flowing faucet stream dropping from spout (x=0.60, y=1.06 down to water)
       const streamMat = new THREE.MeshStandardMaterial({
@@ -1032,12 +1034,14 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
         roughness: 0.08,
         transparent: true,
         opacity: 0.76,
+        depthWrite: false,
       });
       const tubStream = new THREE.Mesh(
         new THREE.CylinderGeometry(0.018, 0.026, 0.72, 10),
         streamMat,
       );
       tubStream.position.set(0.6, 0.7, 0);
+      tubStream.renderOrder = 4;
 
       // Splash ripple ring on bathwater where stream hits
       const rippleMat = new THREE.MeshBasicMaterial({
@@ -1045,10 +1049,15 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
         transparent: true,
         opacity: 0.72,
         side: THREE.DoubleSide,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
       });
       const tubRipple = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.085, 18), rippleMat);
       tubRipple.rotation.x = -Math.PI / 2;
       tubRipple.position.set(0.6, 0.38, 0);
+      tubRipple.renderOrder = 5;
 
       g.userData.tubWaterMesh = tubWater;
       g.userData.tubStreamMesh = tubStream;

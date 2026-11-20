@@ -2,11 +2,45 @@ import {PaintPattern} from '../types/game';
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+const _textureCache = new Map<string, THREE.CanvasTexture>();
+const _clayMatPool = new Map<string, THREE.MeshStandardMaterial>();
+const _glossyClayMatPool = new Map<string, THREE.MeshStandardMaterial>();
+
+function getOrBuildCachedTexture(
+  key: string,
+  build: () => THREE.CanvasTexture,
+  repX?: number,
+  repY?: number,
+): THREE.CanvasTexture {
+  let base = _textureCache.get(key);
+  if (!base) {
+    base = build();
+    base.userData = {...base.userData, sharedCache: true};
+    _textureCache.set(key, base);
+  }
+  const rx = repX ?? base.repeat.x;
+  const ry = repY ?? base.repeat.y;
+  if (rx === base.repeat.x && ry === base.repeat.y) {
+    return base;
+  }
+  const repKey = `${key}|r:${rx}x${ry}`;
+  let variant = _textureCache.get(repKey);
+  if (!variant) {
+    variant = base.clone();
+    variant.repeat.set(rx, ry);
+    variant.needsUpdate = true;
+    variant.userData = {...variant.userData, sharedCache: true};
+    _textureCache.set(repKey, variant);
+  }
+  return variant;
+}
+
 export function createCobblestoneTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
+  return getOrBuildCachedTexture('cobblestone', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
 
   ctx.fillStyle = '#D8C19F';
   ctx.fillRect(0, 0, 256, 256);
@@ -34,16 +68,20 @@ export function createCobblestoneTexture(): THREE.CanvasTexture {
     }
   }
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(4, 4);
-  return tex;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(4, 4);
+    return tex;
+  });
 }
 
 export function createFlagstonePathTexture(repX = 2, repY = 8): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
+  return getOrBuildCachedTexture(
+    'flagstone',
+    () => {
+      const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
@@ -97,16 +135,23 @@ export function createFlagstonePathTexture(repX = 2, repY = 8): THREE.CanvasText
     ctx.fillRect(sx, sy, 2, 2);
   }
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(repX, repY);
-  return tex;
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(2, 8);
+      return tex;
+    },
+    repX,
+    repY,
+  );
 }
 
 export function createStoneWalkwayTexture(repX = 1, repY = 1): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
+  return getOrBuildCachedTexture(
+    'stone_walkway',
+    () => {
+      const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext('2d')!;
@@ -169,59 +214,77 @@ export function createStoneWalkwayTexture(repX = 1, repY = 1): THREE.CanvasTextu
     ctx.fillRect(sx, sy, 3, 3);
   }
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(repX, repY);
-  return tex;
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(1, 1);
+      return tex;
+    },
+    repX,
+    repY,
+  );
 }
 
-export function createWoodPlankTexture(base = '#CC965E', seam = '#9E6C3B'): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
+export function createWoodPlankTexture(
+  base = '#CC965E',
+  seam = '#9E6C3B',
+  repX = 3,
+  repY = 3,
+): THREE.CanvasTexture {
+  return getOrBuildCachedTexture(
+    `wood_plank:${base}:${seam}`,
+    () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = base;
-  ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = base;
+      ctx.fillRect(0, 0, 256, 256);
 
-  for (let i = 0; i < 8; i++) {
-    const y = i * 32;
-    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(90,55,25,0.05)';
-    ctx.fillRect(0, y, 256, 32);
-    ctx.fillStyle = seam;
-    ctx.fillRect(0, y, 256, 2);
-    const jointX = ((i * 89 + 40) % 210) + 20;
-    ctx.fillRect(jointX, y, 2, 32);
-  }
+      for (let i = 0; i < 8; i++) {
+        const y = i * 32;
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(90,55,25,0.05)';
+        ctx.fillRect(0, y, 256, 32);
+        ctx.fillStyle = seam;
+        ctx.fillRect(0, y, 256, 2);
+        const jointX = ((i * 89 + 40) % 210) + 20;
+        ctx.fillRect(jointX, y, 2, 32);
+      }
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(3, 3);
-  return tex;
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(3, 3);
+      return tex;
+    },
+    repX,
+    repY,
+  );
 }
 
 export function createCheckerFloorTexture(a = '#5B4D84', b = '#453969'): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d')!;
-  const size = 32;
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      ctx.fillStyle = (r + c) % 2 === 0 ? a : b;
-      ctx.fillRect(c * size, r * size, size, size);
+  return getOrBuildCachedTexture(`checker_floor:${a}:${b}`, () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+    const size = 32;
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        ctx.fillStyle = (r + c) % 2 === 0 ? a : b;
+        ctx.fillRect(c * size, r * size, size, size);
+      }
     }
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(3, 3);
-  return tex;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(3, 3);
+    return tex;
+  });
 }
 
 export function createPaintPatternTexture(
@@ -232,14 +295,20 @@ export function createPaintPatternTexture(
   repY = 3,
 ): THREE.CanvasTexture {
   if (pattern === 'wood_plank') {
-    const t = createWoodPlankTexture(primary, secondary);
-    t.repeat.set(repX, repY);
-    return t;
+    const base = createWoodPlankTexture(primary, secondary);
+    if (repX === 3 && repY === 3) return base;
+    const cloned = base.clone();
+    cloned.repeat.set(repX, repY);
+    cloned.needsUpdate = true;
+    return cloned;
   }
   if (pattern === 'checker_tile') {
-    const t = createCheckerFloorTexture(primary, secondary);
-    t.repeat.set(repX, repY);
-    return t;
+    const base = createCheckerFloorTexture(primary, secondary);
+    if (repX === 3 && repY === 3) return base;
+    const cloned = base.clone();
+    cloned.repeat.set(repX, repY);
+    cloned.needsUpdate = true;
+    return cloned;
   }
 
   const canvas = document.createElement('canvas');
@@ -306,78 +375,403 @@ export function createPaintPatternTexture(
   return tex;
 }
 
-export function createGrassTexture(): THREE.CanvasTexture {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
+export function createGrassTexture(repX = 8, repY = 12): THREE.CanvasTexture {
+  return getOrBuildCachedTexture(
+    'grass',
+    () => {
+      const size = 256;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = '#70BA58';
-  ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = '#70BA58';
+      ctx.fillRect(0, 0, size, size);
 
-  // Seeded PRNG (mulberry32) so tiling has no linear-congruence diagonal bands
-  let seed = 0x51a9c3d7;
-  const rand = () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+      // Seeded PRNG (mulberry32) so tiling has no linear-congruence diagonal bands
+      let seed = 0x51a9c3d7;
+      const rand = () => {
+        seed = (seed + 0x6d2b79f5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
 
-  // Soft toroidally-wrapped meadow tonal variations (seamless & non-banded)
-  const palette = [
-    'rgba(140, 206, 98, 0.08)',
-    'rgba(66, 134, 50, 0.065)',
-    'rgba(222, 232, 152, 0.055)',
-  ];
-  for (let i = 0; i < 64; i++) {
-    const cx = rand() * size;
-    const cy = rand() * size;
-    const radius = 14 + rand() * 24;
-    const color = palette[i % palette.length];
+      // Soft toroidally-wrapped meadow tonal variations (seamless & non-banded)
+      const palette = [
+        'rgba(140, 206, 98, 0.08)',
+        'rgba(66, 134, 50, 0.065)',
+        'rgba(222, 232, 152, 0.055)',
+      ];
+      for (let i = 0; i < 64; i++) {
+        const cx = rand() * size;
+        const cy = rand() * size;
+        const radius = 14 + rand() * 24;
+        const color = palette[i % palette.length];
 
-    for (const ox of [-size, 0, size]) {
-      for (const oy of [-size, 0, size]) {
-        const px = cx + ox;
-        const py = cy + oy;
-        if (px + radius < 0 || px - radius > size || py + radius < 0 || py - radius > size) {
-          continue;
+        for (const ox of [-size, 0, size]) {
+          for (const oy of [-size, 0, size]) {
+            const px = cx + ox;
+            const py = cy + oy;
+            if (px + radius < 0 || px - radius > size || py + radius < 0 || py - radius > size) {
+              continue;
+            }
+            const grad = ctx.createRadialGradient(px, py, 0, px, py, radius);
+            grad.addColorStop(0, color);
+            grad.addColorStop(1, 'rgba(112, 186, 88, 0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(px, py, radius, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
-        const grad = ctx.createRadialGradient(px, py, 0, px, py, radius);
-        grad.addColorStop(0, color);
-        grad.addColorStop(1, 'rgba(112, 186, 88, 0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(px, py, radius, 0, Math.PI * 2);
-        ctx.fill();
       }
-    }
-  }
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(8, 12);
-  return tex;
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(8, 12);
+      return tex;
+    },
+    repX,
+    repY,
+  );
 }
 
-export function clayMat(color: string | number, roughness = 0.68, metalness = 0.04): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
-    color,
-    roughness,
-    metalness,
+export function clayMat(
+  color: string | number,
+  roughness = 0.68,
+  metalness = 0.04,
+): THREE.MeshStandardMaterial {
+  const key = `${String(color)}|${roughness.toFixed(2)}|${metalness.toFixed(2)}`;
+  let m = _clayMatPool.get(key);
+  if (!m) {
+    m = new THREE.MeshStandardMaterial({
+      color,
+      roughness,
+      metalness,
+    });
+    m.userData.pooled = true;
+    _clayMatPool.set(key, m);
+  }
+  return m;
+}
+
+export function glossyClayMat(color: string | number, roughness = 0.28): THREE.MeshStandardMaterial {
+  const r = Math.max(0.08, roughness * 0.72);
+  const key = `${String(color)}|${r.toFixed(2)}`;
+  let m = _glossyClayMatPool.get(key);
+  if (!m) {
+    m = new THREE.MeshStandardMaterial({
+      color,
+      roughness: r,
+      metalness: 0.08,
+      envMapIntensity: 0.9,
+    });
+    m.userData.pooled = true;
+    _glossyClayMatPool.set(key, m);
+  }
+  return m;
+}
+
+export type SignAtlasRegionId =
+  | 'daily_quests'
+  | 'koi_stall'
+  | 'pet_shop'
+  | 'farm_kitchen'
+  | 'farm_shop';
+
+interface AtlasRectPx {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const ATLAS_SIZE = 1024;
+const SIGN_ATLAS_RECTS: Record<SignAtlasRegionId, AtlasRectPx> = {
+  daily_quests: {x: 16, y: 16, w: 480, h: 240},
+  koi_stall: {x: 528, y: 16, w: 480, h: 240},
+  pet_shop: {x: 16, y: 288, w: 480, h: 240},
+  farm_kitchen: {x: 528, y: 288, w: 480, h: 150},
+  farm_shop: {x: 528, y: 464, w: 480, h: 150},
+};
+
+let _signAtlasMat: THREE.MeshStandardMaterial | null = null;
+
+export function getSignTextureAtlas(): THREE.CanvasTexture {
+  return getOrBuildCachedTexture('sign_atlas_1024', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = ATLAS_SIZE;
+    canvas.height = ATLAS_SIZE;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
+
+    // 1. Daily Quests Sign
+    {
+      const {x, y, w, h} = SIGN_ATLAS_RECTS.daily_quests;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(w / 512, h / 256);
+      ctx.fillStyle = '#FFF5E1';
+      ctx.fillRect(0, 0, 512, 256);
+      ctx.strokeStyle = '#9C6B3F';
+      ctx.lineWidth = 10;
+      ctx.strokeRect(16, 16, 480, 224);
+      ctx.strokeStyle = '#D9B88F';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(28, 28, 456, 200);
+      ctx.fillStyle = '#4A2F1B';
+      ctx.font = 'bold 56px "Nunito", "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Nhiệm vụ ngày', 256, 102);
+      ctx.fillStyle = '#C97B49';
+      ctx.fillRect(116, 146, 280, 6);
+      ctx.fillStyle = '#6BA383';
+      [172, 256, 340].forEach((cx) => {
+        ctx.beginPath();
+        ctx.arc(cx, 186, 12, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    // 2. Koi Stall Sign
+    {
+      const {x, y, w, h} = SIGN_ATLAS_RECTS.koi_stall;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(w / 512, h / 256);
+      ctx.fillStyle = '#FDF6E6';
+      ctx.fillRect(0, 0, 512, 256);
+      ctx.strokeStyle = '#7A4E2D';
+      ctx.lineWidth = 12;
+      ctx.strokeRect(12, 12, 488, 232);
+      ctx.strokeStyle = '#3B9AB2';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(24, 24, 464, 208);
+      ctx.save();
+      ctx.translate(152, 108);
+      ctx.fillStyle = '#43A3B8';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 52, 26, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(46, 0);
+      ctx.lineTo(76, -22);
+      ctx.lineTo(68, 0);
+      ctx.lineTo(76, 22);
+      ctx.closePath();
+      ctx.fillStyle = '#2F7D92';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-12, -24);
+      ctx.lineTo(6, -38);
+      ctx.lineTo(22, -20);
+      ctx.closePath();
+      ctx.fillStyle = '#E87A54';
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(-28, -5, 6.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1E2A32';
+      ctx.beginPath();
+      ctx.arc(-29, -5, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.translate(358, 114);
+      ctx.fillStyle = '#D99E57';
+      ctx.beginPath();
+      ctx.moveTo(-36, -18);
+      ctx.lineTo(36, -18);
+      ctx.quadraticCurveTo(46, 28, 22, 36);
+      ctx.lineTo(-22, 36);
+      ctx.quadraticCurveTo(-46, 28, -36, -18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#8F5A29';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.fillStyle = '#B87638';
+      ctx.fillRect(-40, -24, 80, 10);
+      ctx.strokeStyle = '#A66931';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(-34, 4);
+      ctx.lineTo(34, 4);
+      ctx.moveTo(-30, 18);
+      ctx.lineTo(30, 18);
+      ctx.stroke();
+      ctx.fillStyle = '#FF9C6E';
+      ctx.beginPath();
+      ctx.moveTo(10, -24);
+      ctx.lineTo(26, -42);
+      ctx.lineTo(2, -38);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#382414';
+      ctx.font = 'bold 46px "Nunito", "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Tiệm của Koi', 256, 194);
+      ctx.restore();
+    }
+
+    // 3. Pet Shop Side Sign
+    {
+      const {x, y, w, h} = SIGN_ATLAS_RECTS.pet_shop;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(w / 512, h / 256);
+      ctx.fillStyle = '#FFF7EA';
+      ctx.fillRect(0, 0, 512, 256);
+      ctx.strokeStyle = '#E0825B';
+      ctx.lineWidth = 14;
+      ctx.strokeRect(12, 12, 488, 232);
+      ctx.strokeStyle = '#5BB7B0';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(26, 26, 460, 204);
+      const drawPaw = (cx: number, cy: number, s: number, col: string) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(s, s);
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.ellipse(0, 10, 18, 15, 0, 0, Math.PI * 2);
+        ctx.fill();
+        [
+          [-18, -10],
+          [-6, -20],
+          [7, -20],
+          [18, -10],
+        ].forEach(([tx, ty]) => {
+          ctx.beginPath();
+          ctx.arc(tx, ty, 6.8, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+      };
+      drawPaw(88, 130, 0.95, '#F09470');
+      drawPaw(424, 130, 0.95, '#5BB7B0');
+      ctx.fillStyle = '#4A3122';
+      ctx.font = '900 94px "Nunito", "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Pets', 256, 132);
+      ctx.restore();
+    }
+
+    // 4 & 5. Farm Kitchen & Farm Shop Signs
+    const drawFarmTile = (
+      rect: AtlasRectPx,
+      title: string,
+      subtitle: string,
+      bg: string,
+      border: string,
+      textColor: string,
+    ) => {
+      ctx.save();
+      ctx.translate(rect.x, rect.y);
+      ctx.scale(rect.w / 512, rect.h / 160);
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.roundRect(6, 6, 500, 148, 22);
+      ctx.fill();
+      ctx.strokeStyle = border;
+      ctx.lineWidth = 9;
+      ctx.stroke();
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 48px "Plus Jakarta Sans", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(title, 256, 64);
+      ctx.font = '600 24px "Plus Jakarta Sans", system-ui, sans-serif';
+      ctx.globalAlpha = 0.82;
+      ctx.fillText(subtitle, 256, 114);
+      ctx.restore();
+    };
+    drawFarmTile(
+      SIGN_ATLAS_RECTS.farm_kitchen,
+      'BẾP NÔNG TRẠI',
+      'Nấu ăn & làm bánh',
+      '#FFF3DA',
+      '#8A5632',
+      '#4F321D',
+    );
+    drawFarmTile(
+      SIGN_ATLAS_RECTS.farm_shop,
+      'FARM SHOP',
+      'Hạt giống · Vật tư',
+      '#FFE79B',
+      '#7C512D',
+      '#4A2F19',
+    );
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return tex;
   });
 }
 
-export function glossyClayMat(color: string | number, roughness = 0.28): THREE.MeshPhysicalMaterial {
-  return new THREE.MeshPhysicalMaterial({
-    color,
-    roughness,
-    metalness: 0.05,
-    clearcoat: 0.65,
-    clearcoatRoughness: 0.25,
+export function getSharedSignAtlasMaterial(): THREE.MeshStandardMaterial {
+  if (!_signAtlasMat) {
+    _signAtlasMat = new THREE.MeshStandardMaterial({
+      map: getSignTextureAtlas(),
+      roughness: 0.55,
+    });
+    _signAtlasMat.userData.pooled = true;
+  }
+  return _signAtlasMat;
+}
+
+export function applyAtlasRegionToGeometry<T extends THREE.BufferGeometry>(
+  geo: T,
+  region: SignAtlasRegionId,
+): T {
+  const r = SIGN_ATLAS_RECTS[region];
+  const u0 = r.x / ATLAS_SIZE;
+  const u1 = (r.x + r.w) / ATLAS_SIZE;
+  const v1 = 1 - r.y / ATLAS_SIZE;
+  const v0 = 1 - (r.y + r.h) / ATLAS_SIZE;
+  const uv = geo.attributes.uv;
+  if (uv) {
+    for (let i = 0; i < uv.count; i++) {
+      uv.setXY(i, u0 + uv.getX(i) * (u1 - u0), v0 + uv.getY(i) * (v1 - v0));
+    }
+    uv.needsUpdate = true;
+  }
+  return geo;
+}
+
+export function createAtlasPlaneGeometry(
+  width: number,
+  height: number,
+  region: SignAtlasRegionId,
+): THREE.PlaneGeometry {
+  return applyAtlasRegionToGeometry(new THREE.PlaneGeometry(width, height), region);
+}
+
+export function getWarmGlowTexture(): THREE.CanvasTexture {
+  return getOrBuildCachedTexture('warm_glow_128', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+    const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+    grad.addColorStop(0, 'rgba(255, 214, 130, 0.92)');
+    grad.addColorStop(0.45, 'rgba(255, 192, 95, 0.35)');
+    grad.addColorStop(1, 'rgba(255, 200, 110, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
   });
 }
 
@@ -421,6 +815,7 @@ export function mergeStaticGroupByMaterial(
     hasColor: boolean;
     castShadow: boolean;
     receiveShadow: boolean;
+    renderOrder: number;
   }
 
   const buckets = new Map<string, BatchItem[]>();
@@ -439,7 +834,7 @@ export function mergeStaticGroupByMaterial(
     const hasNormal = Boolean(geo.attributes.normal);
     const hasUv = Boolean(geo.attributes.uv);
     const hasColor = Boolean(geo.attributes.color);
-    const key = `${mat.uuid}|n:${hasNormal ? 1 : 0}|u:${hasUv ? 1 : 0}|c:${hasColor ? 1 : 0}|cs:${mesh.castShadow ? 1 : 0}|rs:${mesh.receiveShadow ? 1 : 0}`;
+    const key = `${mat.uuid}|n:${hasNormal ? 1 : 0}|u:${hasUv ? 1 : 0}|c:${hasColor ? 1 : 0}|cs:${mesh.castShadow ? 1 : 0}|rs:${mesh.receiveShadow ? 1 : 0}|ro:${mesh.renderOrder}`;
     let list = buckets.get(key);
     if (!list) {
       list = [];
@@ -453,6 +848,7 @@ export function mergeStaticGroupByMaterial(
       hasColor,
       castShadow: mesh.castShadow,
       receiveShadow: mesh.receiveShadow,
+      renderOrder: mesh.renderOrder,
     });
   });
 
@@ -501,6 +897,7 @@ export function mergeStaticGroupByMaterial(
       const mergedMesh = new THREE.Mesh(mergedGeo, first.material);
       mergedMesh.castShadow = first.castShadow;
       mergedMesh.receiveShadow = first.receiveShadow;
+      mergedMesh.renderOrder = first.renderOrder;
       mergedMesh.frustumCulled = true;
       toMergeReplace.push({
         merged: mergedMesh,

@@ -1306,7 +1306,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     const isTouchDevice =
       typeof window !== 'undefined' &&
       (window.matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0);
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, isTouchDevice ? 1.25 : 1.5));
+    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, isTouchDevice ? 1.15 : 1.5));
     renderer.shadowMap.enabled = false;
 
     const width = container.clientWidth || window.innerWidth || 800;
@@ -1432,10 +1432,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         transparent: true,
         opacity: 0.92,
         side: THREE.DoubleSide,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
       }),
     );
     selectionRing.rotation.x = -Math.PI / 2;
     selectionRing.position.y = 0.03;
+    selectionRing.renderOrder = 2;
     selectionRing.visible = false;
     scene.add(selectionRing);
 
@@ -2752,9 +2757,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           ? isIndoor
             ? 0x161c30
             : 0x101e38
-          : tod === 'sunset'
-            ? 0xeb9c76
-            : 0xb2ddf2;
+          : 0xb2ddf2;
       _bgColorTarget.setHex(targetBg);
       (scene.background as THREE.Color).lerp(_bgColorTarget, 0.08);
       if (scene.fog instanceof THREE.FogExp2) {
@@ -2774,9 +2777,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             ? isIndoor
               ? 0.28
               : 0.16
-            : tod === 'sunset'
-              ? 0.34
-              : 0.42,
+            : 0.42,
         5,
         delta,
       );
@@ -2794,9 +2795,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             ? isIndoor
               ? 0.65
               : 0.52
-            : tod === 'sunset'
-              ? 1.04
-              : 1.22,
+            : 1.22,
         5,
         delta,
       );
@@ -2807,14 +2806,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             ? isIndoor
               ? '#CBD8F5'
               : '#BFD6FF'
-            : tod === 'sunset'
-              ? '#FFAE70'
-              : '#FFF2D8',
+            : '#FFF2D8',
       );
       sunLight.color.lerp(_sunColorTarget, 0.08);
       hemiLight.intensity = THREE.MathUtils.damp(
         hemiLight.intensity,
-        isHomeDark ? 0.16 : tod === 'night' ? 0.38 : tod === 'sunset' ? 0.48 : 0.58,
+        isHomeDark ? 0.16 : tod === 'night' ? 0.38 : 0.58,
         5,
         delta,
       );
@@ -2825,9 +2822,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             ? isIndoor
               ? '#7A90BF'
               : '#5478B8'
-            : tod === 'sunset'
-              ? '#FFD6BA'
-              : '#DCEFFF',
+            : '#DCEFFF',
       );
       _hemiGroundTarget.set(
         isHomeDark
@@ -2836,20 +2831,18 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             ? isIndoor
               ? '#3F3A36'
               : '#223B3E'
-            : tod === 'sunset'
-              ? '#6D6854'
-              : '#6A8C58',
+            : '#6A8C58',
       );
       hemiLight.color.lerp(_hemiSkyTarget, 0.08);
       hemiLight.groundColor.lerp(_hemiGroundTarget, 0.08);
       rimLight.intensity = THREE.MathUtils.damp(
         rimLight.intensity,
-        isHomeDark ? 0.14 : tod === 'night' ? 0.26 : tod === 'sunset' ? 0.34 : 0.42,
+        isHomeDark ? 0.14 : tod === 'night' ? 0.26 : 0.42,
         5,
         delta,
       );
       _rimColorTarget.set(
-        isHomeDark || tod === 'night' ? '#87B0F0' : tod === 'sunset' ? '#FFB585' : '#A8D2FF',
+        isHomeDark || tod === 'night' ? '#87B0F0' : '#A8D2FF',
       );
       rimLight.color.lerp(_rimColorTarget, 0.08);
 
@@ -3500,6 +3493,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           elapsed,
           delta,
           _frustum,
+          camera.position.x,
+          camera.position.z,
         );
         if (
           insectEvents &&
@@ -3515,16 +3510,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               : 'Côn trùng giật mình bay sang chỗ khác! Kéo nhẹ Joystick để đi chậm.',
           );
         }
-        activeTown?.update(elapsed, tod, _frustum);
+        activeTown?.update(elapsed, tod, _frustum, camera.position);
       } else {
         if (z === 'garden' || z === 'fishing') {
           activeSubzone?.updateFishingVisuals?.(fishVisualFrame, elapsed);
         }
-        activeSubzone?.update(
-          elapsed,
-          tod,
-          z === 'home' ? {cameraPos: camera.position, playerPos} : undefined,
-        );
+        activeSubzone?.update(elapsed, tod, {cameraPos: camera.position, playerPos});
       }
 
       renderer.render(scene, camera);

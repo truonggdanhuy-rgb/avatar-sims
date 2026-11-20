@@ -74,6 +74,9 @@ export function createFishingSpotVisuals(options: {
   );
   bobberPin.position.y = 0.16;
 
+  bobberSphere.renderOrder = 7;
+  bobberBand.renderOrder = 7;
+  bobberPin.renderOrder = 7;
   bobberGroup.add(bobberSphere, bobberBand, bobberPin);
   group.add(bobberGroup);
 
@@ -86,9 +89,13 @@ export function createFishingSpotVisuals(options: {
     opacity: 0.72,
     side: THREE.DoubleSide,
     depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
   });
   const rippleMesh = new THREE.Mesh(rippleGeo, rippleMat);
   rippleMesh.position.set(defaultPos[0], waterY + 0.018, defaultPos[2]);
+  rippleMesh.renderOrder = 5;
   rippleMesh.visible = false;
   group.add(rippleMesh);
 
@@ -101,9 +108,13 @@ export function createFishingSpotVisuals(options: {
     opacity: 0.85,
     side: THREE.DoubleSide,
     depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
   });
   const burstMesh = new THREE.Mesh(burstGeo, burstMat);
   burstMesh.position.set(defaultPos[0], waterY + 0.024, defaultPos[2]);
+  burstMesh.renderOrder = 6;
   burstMesh.visible = false;
   group.add(burstMesh);
 
@@ -228,8 +239,13 @@ export function createFishingSpotVisuals(options: {
       if ((obj as THREE.Mesh).isMesh) {
         const m = obj as THREE.Mesh;
         m.geometry.dispose();
-        if (Array.isArray(m.material)) m.material.forEach((mat) => mat.dispose());
-        else m.material.dispose();
+        if (Array.isArray(m.material)) {
+          m.material.forEach((mat) => {
+            if (!mat.userData?.pooled) mat.dispose();
+          });
+        } else if (!m.material.userData?.pooled) {
+          m.material.dispose();
+        }
       }
     });
   };

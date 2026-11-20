@@ -100,16 +100,11 @@ function headOutwardNormal(latDeg: number, lonDeg: number): THREE.Vector3 {
 /**
  * Soft matte polymer-clay / Nendoroid hair material (no harsh specular glare).
  */
-export function createHairClayMaterial(color: string | number): THREE.MeshPhysicalMaterial {
-  const base = new THREE.Color(color);
-  return new THREE.MeshPhysicalMaterial({
-    color: base,
+export function createHairClayMaterial(color: string | number): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color,
     roughness: 0.72,
     metalness: 0.0,
-    sheen: 0.28,
-    sheenRoughness: 0.82,
-    sheenColor: base.clone().lerp(new THREE.Color('#ffffff'), 0.2),
-    clearcoat: 0.0,
     envMapIntensity: 0.42,
   });
 }

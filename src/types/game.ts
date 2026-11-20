@@ -7,7 +7,7 @@ export type ZoneId =
   | 'boutique'
   | 'petshop';
 
-export type TimeOfDay = 'morning' | 'sunset' | 'night';
+export type TimeOfDay = 'morning' | 'night';
 
 export type HairBackStyle =
   | 'long_wave'
