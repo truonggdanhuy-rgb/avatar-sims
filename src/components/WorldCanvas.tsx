@@ -7,10 +7,12 @@ import {
   Move,
   PackageMinus,
   RotateCw,
+  Utensils,
 } from 'lucide-react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
+import {WELL_WATER_MAX} from '../data/farmCatalog';
 import {FURNITURE_BY_ID} from '../data/furnitureCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
 import {
@@ -32,15 +34,18 @@ import {
   AvatarPose,
   CoopKind,
   CoopTroughs,
+  CropType,
   GameStats,
   GardenPlotState,
   LivestockAnimalState,
   PlacedFurniture,
   PondFishState,
   TimeOfDay,
+  WellWaterState,
   ZoneId,
 } from '../types/game';
 import {soundFX} from '../utils/sound';
+import {PlotArcMenu} from './PlotArcMenu';
 
 interface WorldCanvasProps {
   zone: ZoneId;
@@ -51,6 +56,12 @@ interface WorldCanvasProps {
   livestock: LivestockAnimalState[];
   troughs: CoopTroughs;
   pondFish: PondFishState[];
+  fishFeedCount: number;
+  pondFeedPulse: number;
+  seeds: Partial<Record<CropType, number>>;
+  bugSprayCount: number;
+  waterCount: number;
+  wellWater: WellWaterState;
   placedFurniture: PlacedFurniture[];
   editFurnitureMode: boolean;
   selectedFurnitureId: string | null;
@@ -70,13 +81,26 @@ interface WorldCanvasProps {
   onFishCaught: () => void;
   onRestoreEnergy: () => void;
   onBoostMood: () => void;
-  onDrinkWellWater: () => void;
-  onOpenPlot: (plotId: number) => void;
+  onCollectWellWater: () => {
+    gained: number;
+    waterCan: number;
+    wellRemaining: number;
+    nextDropSec: number;
+  };
+  onPlantPlot: (plotId: number, crop: CropType) => void;
+  onWaterPlot: (plotId: number) => void;
+  onSprayPestPlot: (plotId: number) => void;
+  onWeedPlot: (plotId: number) => void;
+  onCancelCropPlot: (plotId: number) => void;
   onHarvestPlot: (plotId: number) => void;
+  onUpgradePlot: (plotId: number) => void;
   onOpenWorkshop: (tab: 'mill' | 'kitchen') => void;
-  onOpenOrders: () => void;
+  onOpenOrders: (tab?: 'orders' | 'storage') => void;
   onOpenPasture: (coop?: CoopKind) => void;
   onOpenPond: () => void;
+  onOpenFarmShop: () => void;
+  onScatterPondFeed: () => void;
+  onPondProximityChange: (near: boolean) => void;
   onAddCoins: (amount: number) => void;
 }
 
@@ -145,12 +169,12 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
 
   if (zone === 'garden') {
     if (isPortrait) {
-      return {fov, pos: [0, 16.5, 22.8] as const, look: [0, 0.8, 0.5] as const};
+      return {fov, pos: [0, 18.4, 25.5] as const, look: [0, 0.8, 0.5] as const};
     }
     if (isSquare) {
-      return {fov, pos: [0, 15.2, 20.8] as const, look: [0, 0.8, 0.2] as const};
+      return {fov, pos: [0, 17.0, 23.2] as const, look: [0, 0.8, 0.2] as const};
     }
-    return {fov, pos: [0, 14.0, 18.8] as const, look: [0, 0.8, 0] as const};
+    return {fov, pos: [0, 15.6, 21.0] as const, look: [0, 0.8, 0] as const};
   }
 
   if (zone === 'boutique') {
@@ -174,7 +198,7 @@ function getZoneWalkBounds(zone: ZoneId) {
     return {minX: -12.85, maxX: 9.85, minZ: -8.95, maxZ: 6.95};
   }
   if (zone === 'garden') {
-    return {minX: -14.5, maxX: 14.5, minZ: -12.4, maxZ: 12.4};
+    return {minX: -21.8, maxX: 21.8, minZ: -14.8, maxZ: 14.6};
   }
   if (zone === 'boutique') {
     return {minX: -5.6, maxX: 5.6, minZ: -4.8, maxZ: 4.9};
@@ -325,6 +349,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   livestock,
   troughs,
   pondFish,
+  fishFeedCount,
+  pondFeedPulse,
+  seeds,
+  bugSprayCount,
+  waterCount,
+  wellWater,
   placedFurniture,
   editFurnitureMode,
   selectedFurnitureId,
@@ -344,13 +374,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onFishCaught,
   onRestoreEnergy,
   onBoostMood,
-  onDrinkWellWater,
-  onOpenPlot,
+  onCollectWellWater,
+  onPlantPlot,
+  onWaterPlot,
+  onSprayPestPlot,
+  onWeedPlot,
+  onCancelCropPlot,
   onHarvestPlot,
+  onUpgradePlot,
   onOpenWorkshop,
   onOpenOrders,
   onOpenPasture,
   onOpenPond,
+  onOpenFarmShop,
+  onScatterPondFeed,
+  onPondProximityChange,
   onAddCoins,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -358,6 +396,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
   const [tags, setTags] = useState<ProjectedTag[]>([]);
   const [speechBubble, setSpeechBubble] = useState<{text: string; x: number; y: number} | null>(null);
+  const [arcMenuPos, setArcMenuPos] = useState<{plotId: number; x: number; y: number} | null>(null);
   const [fishingState, setFishingState] = useState<'idle' | 'waiting' | 'bite'>('idle');
   const [miniActive, setMiniActive] = useState(false);
   const [miniScore, setMiniScore] = useState(0);
@@ -365,6 +404,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [nearbyDoor, setNearbyDoor] = useState<{id: string; label: string; isOpen: boolean} | null>(
     null,
   );
+  const [nearPond, setNearPond] = useState(false);
+  const [confirmPondFeed, setConfirmPondFeed] = useState(false);
   const [webglError, setWebglError] = useState(false);
 
   const stateRef = useRef({
@@ -376,6 +417,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     livestock,
     troughs,
     pondFish,
+    wellWater,
     fishingState,
     placedFurniture,
     editFurnitureMode,
@@ -390,6 +432,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     livestock,
     troughs,
     pondFish,
+    wellWater,
     fishingState,
     placedFurniture,
     editFurnitureMode,
@@ -412,13 +455,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onFishCaught,
     onRestoreEnergy,
     onBoostMood,
-    onDrinkWellWater,
-    onOpenPlot,
+    onCollectWellWater,
     onHarvestPlot,
     onOpenWorkshop,
     onOpenOrders,
     onOpenPasture,
     onOpenPond,
+    onOpenFarmShop,
+    onScatterPondFeed,
+    onPondProximityChange,
     onAddCoins,
   });
   callbacksRef.current = {
@@ -437,24 +482,29 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onFishCaught,
     onRestoreEnergy,
     onBoostMood,
-    onDrinkWellWater,
-    onOpenPlot,
+    onCollectWellWater,
     onHarvestPlot,
     onOpenWorkshop,
     onOpenOrders,
     onOpenPasture,
     onOpenPond,
+    onOpenFarmShop,
+    onScatterPondFeed,
+    onPondProximityChange,
     onAddCoins,
   };
 
   const rebuildSceneTriggerRef = useRef<(() => void) | null>(null);
   const rebuildAvatarTriggerRef = useRef<((cfg: AvatarConfig) => void) | null>(null);
+  const activeSubzoneRef = useRef<SubzoneWorld | null>(null);
   const playerBubbleRef = useRef<BubbleState | null>(null);
   const bubbleTimerRef = useRef<number | null>(null);
   const fishTimerRef = useRef<number | null>(null);
   const openDoorsRef = useRef<Record<string, boolean>>({});
   const activeDoorsRef = useRef<HouseDoorHandle[]>([]);
   const nearbyDoorKeyRef = useRef<string>('');
+  const nearPondRef = useRef<boolean>(false);
+  const selectedPlotRef = useRef<{plotId: number; worldPos: THREE.Vector3} | null>(null);
 
   const showBubble = (text: string, x: number, y: number, z: number) => {
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
@@ -472,12 +522,28 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       nearbyDoorKeyRef.current = '';
       setNearbyDoor(null);
     }
+    if (zone !== 'garden') {
+      selectedPlotRef.current = null;
+      setArcMenuPos(null);
+      setConfirmPondFeed(false);
+      if (nearPondRef.current) {
+        nearPondRef.current = false;
+        setNearPond(false);
+        callbacksRef.current.onPondProximityChange(false);
+      }
+    }
   }, [zone]);
+
+  useEffect(() => {
+    if (pondFeedPulse <= 0) return;
+    activeSubzoneRef.current?.triggerPondFeed?.();
+    showBubble('Rải 1 túi thức ăn thủy sinh!', 14.2, 2.0, 3.0);
+  }, [pondFeedPulse]);
 
   const plotVisualKey = plots
     .map(
       (p) =>
-        `${p.id}:${p.stage}:${p.crop ?? ''}:${p.watered ? 1 : 0}:${p.hasPest ? 1 : 0}:${p.level}`,
+        `${p.id}:${p.stage}:${p.crop ?? ''}:${p.watered ? 1 : 0}:${p.hasPest ? 1 : 0}:${p.hasWeed ? 1 : 0}:${p.level}`,
     )
     .join('|');
 
@@ -654,6 +720,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         scene.remove(activeSubzone.group);
         activeSubzone.dispose();
         activeSubzone = null;
+        activeSubzoneRef.current = null;
       }
 
       if (z === 'town') {
@@ -696,6 +763,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           troughs: z === 'garden' ? stateRef.current.troughs : undefined,
           pondFish: z === 'garden' ? stateRef.current.pondFish : undefined,
         });
+        activeSubzoneRef.current = activeSubzone;
         scene.add(activeSubzone.group);
         currentAnchors = activeSubzone.labelAnchors;
         currentClickTargets = [...activeSubzone.clickTargets, playerProxy];
@@ -825,6 +893,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
         return;
       }
+
+      selectedPlotRef.current = null;
+      setArcMenuPos(null);
 
       // 1. Check interactive buildings/objects/NPCs/player
       const hits = raycaster.intersectObjects(currentClickTargets, true);
@@ -1000,9 +1071,33 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               z: data.tz as number,
               arrivePose: 'idle',
               onArrive: () => {
+                const res = callbacksRef.current.onCollectWellWater();
                 soundFX.splash();
-                callbacksRef.current.onDrinkWellWater();
-                showBubble('Nước giếng mát lành! (+15 Năng lượng)', data.tx as number, 2.0, data.tz as number);
+                if (res.gained > 0) {
+                  showBubble(
+                    `Thu +${res.gained} nước từ giếng! (${res.waterCan}/${WELL_WATER_MAX})`,
+                    data.tx as number,
+                    2.0,
+                    data.tz as number,
+                  );
+                } else if (res.waterCan >= WELL_WATER_MAX) {
+                  showBubble(
+                    `Bình tưới đã đầy (${WELL_WATER_MAX}/${WELL_WATER_MAX})!`,
+                    data.tx as number,
+                    2.0,
+                    data.tz as number,
+                  );
+                } else {
+                  const m = Math.floor(res.nextDropSec / 60);
+                  const s = res.nextDropSec % 60;
+                  const waitStr = m > 0 ? `${m}p${s}s` : `${s}s`;
+                  showBubble(
+                    `Giếng đang tích nước (còn ${waitStr} · Bình ${res.waterCan}/${WELL_WATER_MAX})`,
+                    data.tx as number,
+                    2.0,
+                    data.tz as number,
+                  );
+                }
               },
             };
             return;
@@ -1011,15 +1106,57 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (kind === 'plot') {
             soundFX.tap();
             const plotId = data.plotId as number;
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
+            const plotCenterX = (data.px as number) ?? (data.tx as number);
+            const plotCenterZ = (data.pz as number) ?? (data.tz as number);
+            const tx = data.tx as number;
+            const tz = data.tz as number;
+            const targetPlot = stateRef.current.plots.find((p) => p.id === plotId);
+
+            if (targetPlot && targetPlot.stage === 'ready' && !targetPlot.hasPest) {
+              selectedPlotRef.current = null;
+              setArcMenuPos(null);
+              const distNow = Math.hypot(playerPos.x - tx, playerPos.z - tz);
+              if (distNow < 0.85) {
                 soundFX.sparkle();
-                callbacksRef.current.onOpenPlot(plotId);
-              },
-            };
+                callbacksRef.current.onHarvestPlot(plotId);
+                showBubble('Thu hoạch +2 nông sản!', tx, 2.0, tz);
+              } else {
+                activeTarget = {
+                  x: tx,
+                  z: tz,
+                  arrivePose: 'idle',
+                  onArrive: () => {
+                    soundFX.sparkle();
+                    callbacksRef.current.onHarvestPlot(plotId);
+                    showBubble('Thu hoạch +2 nông sản!', tx, 2.0, tz);
+                  },
+                };
+              }
+              return;
+            }
+
+            if (targetPlot) {
+              const anchorVec = new THREE.Vector3(plotCenterX, 0.38, plotCenterZ);
+              const cw = container?.clientWidth || window.innerWidth || 800;
+              const ch = container?.clientHeight || window.innerHeight || 600;
+              _projVec.copy(anchorVec).project(camera);
+              const rawX = ((_projVec.x + 1) / 2) * cw;
+              const rawY = ((-_projVec.y + 1) / 2) * ch;
+              const padX = Math.min(185, cw * 0.38);
+              const minY = Math.min(185, ch * 0.45);
+              selectedPlotRef.current = {plotId, worldPos: anchorVec};
+              setArcMenuPos({
+                plotId,
+                x: Math.max(padX, Math.min(cw - padX, rawX)),
+                y: Math.max(minY, Math.min(ch - 60, rawY)),
+              });
+              // Auto-walk to plot in background without blocking the radial menu
+              activeTarget = {
+                x: tx,
+                z: tz,
+                arrivePose: 'idle',
+              };
+            }
             return;
           }
 
@@ -1059,7 +1196,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               arrivePose: 'idle',
               onArrive: () => {
                 soundFX.sparkle();
-                callbacksRef.current.onOpenOrders();
+                callbacksRef.current.onOpenOrders('orders');
+              },
+            };
+            return;
+          }
+
+          if (kind === 'farm_storage') {
+            soundFX.tap();
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'idle',
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onOpenOrders('storage');
               },
             };
             return;
@@ -1089,6 +1240,20 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               onArrive: () => {
                 soundFX.splash();
                 callbacksRef.current.onOpenPond();
+              },
+            };
+            return;
+          }
+
+          if (kind === 'farm_shop') {
+            soundFX.tap();
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'idle',
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onOpenFarmShop();
               },
             };
             return;
@@ -1227,10 +1392,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
-      // 2. Tap on walkable ground or hill -> nudge outside any obstacle & walk there
+      // 2. Tap on walkable ground or hill -> close arc menu, nudge outside any obstacle & walk there
       if (currentGrounds.length > 0) {
         const groundHits = raycaster.intersectObjects(currentGrounds, false);
         if (groundHits.length > 0) {
+          if (selectedPlotRef.current) {
+            selectedPlotRef.current = null;
+            setArcMenuPos(null);
+          }
           releaseSeatIfNeeded();
           const pt = groundHits[0].point;
           const b = getZoneWalkBounds(stateRef.current.zone);
@@ -1476,8 +1645,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         groundOffset = 0;
       } else if (z === 'town') {
         groundOffset = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
-      } else if (z === 'garden' && playerPos.x > 8.1 && Math.abs(playerPos.z - 2.1) < 0.92) {
-        groundOffset = 0.22;
+      } else if (z === 'garden' && playerPos.x > 9.35 && playerPos.x < 15.9 && Math.abs(playerPos.z - 3.0) < 0.98) {
+        groundOffset = 0.36;
       }
 
       if (z === 'town') {
@@ -1532,12 +1701,19 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
         if (currentAnchors.length > 0) {
           const nextTags: ProjectedTag[] = [];
+          const storedWell = stateRef.current.wellWater.stored;
           for (const a of currentAnchors) {
             _projVec.copy(a.worldPos).project(camera);
             if (_projVec.z <= 1) {
+              const label =
+                a.id === 'well'
+                  ? storedWell >= WELL_WATER_MAX
+                    ? `Giếng Nước (Đầy ${WELL_WATER_MAX}/${WELL_WATER_MAX})`
+                    : `Giếng Nước (${storedWell}/${WELL_WATER_MAX})`
+                  : a.label;
               nextTags.push({
                 id: a.id,
-                label: a.label,
+                label,
                 x: ((_projVec.x + 1) / 2) * cw,
                 y: ((-_projVec.y + 1) / 2) * ch,
               });
@@ -1574,6 +1750,19 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           setNearbyDoor(null);
         }
 
+        const isNearPondNow =
+          z === 'garden' &&
+          playerPos.x >= 8.4 &&
+          playerPos.x <= 21.4 &&
+          playerPos.z >= -4.2 &&
+          playerPos.z <= 10.2;
+        if (isNearPondNow !== nearPondRef.current) {
+          nearPondRef.current = isNearPondNow;
+          setNearPond(isNearPondNow);
+          if (!isNearPondNow) setConfirmPondFeed(false);
+          callbacksRef.current.onPondProximityChange(isNearPondNow);
+        }
+
         if (playerBubbleRef.current) {
           _projVec.copy(playerBubbleRef.current.worldPos).project(camera);
           if (_projVec.z <= 1) {
@@ -1584,6 +1773,24 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             });
           } else {
             setSpeechBubble(null);
+          }
+        }
+
+        if (selectedPlotRef.current && z === 'garden') {
+          _projVec.copy(selectedPlotRef.current.worldPos).project(camera);
+          if (_projVec.z <= 1) {
+            const rawX = ((_projVec.x + 1) / 2) * cw;
+            const rawY = ((-_projVec.y + 1) / 2) * ch;
+            const padX = Math.min(185, cw * 0.38);
+            const minY = Math.min(185, ch * 0.45);
+            const nx = Math.max(padX, Math.min(cw - padX, rawX));
+            const ny = Math.max(minY, Math.min(ch - 60, rawY));
+            const pid = selectedPlotRef.current.plotId;
+            setArcMenuPos((prev) =>
+              prev && prev.plotId === pid && Math.abs(prev.x - nx) < 1 && Math.abs(prev.y - ny) < 1
+                ? prev
+                : {plotId: pid, x: nx, y: ny},
+            );
           }
         }
       }
@@ -1687,6 +1894,35 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         )}
       </div>
 
+      {/* Radial Arc Plot Menu (Pure icon-only buttons over the tapped garden bed) */}
+      {zone === 'garden' &&
+        arcMenuPos &&
+        (() => {
+          const arcPlot = plots.find((p) => p.id === arcMenuPos.plotId);
+          if (!arcPlot) return null;
+          return (
+            <PlotArcMenu
+              plot={arcPlot}
+              screenX={arcMenuPos.x}
+              screenY={arcMenuPos.y}
+              coins={stats.coins}
+              seeds={seeds}
+              bugSprayCount={bugSprayCount}
+              waterCount={waterCount}
+              onPlant={onPlantPlot}
+              onWater={onWaterPlot}
+              onSprayPest={onSprayPestPlot}
+              onWeed={onWeedPlot}
+              onCancelCrop={onCancelCropPlot}
+              onUpgradePlot={onUpgradePlot}
+              onClose={() => {
+                selectedPlotRef.current = null;
+                setArcMenuPos(null);
+              }}
+            />
+          );
+        })()}
+
       {/* Top-corner 2 small buttons inside House: Tủ nội thất & Di chuyển */}
       {zone === 'home' && (
         <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
@@ -1739,6 +1975,57 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           </button>
         </div>
       )}
+
+      {/* Proximity Scatter Feed Button beside Pond in Garden */}
+      {zone === 'garden' &&
+        nearPond &&
+        pondFish.some((f) => f.stage === 'growing' && f.hunger < 95) && (
+          <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
+            {confirmPondFeed && fishFeedCount > 0 ? (
+              <div className="anim-pop flex items-center gap-2 rounded-2xl border-2 border-[#3C7C99] bg-[#E8F6FC] px-3 py-2 text-xs font-bold text-[#224457] shadow-lg">
+                <span>Xác nhận rải 1 túi? (còn {fishFeedCount})</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setConfirmPondFeed(false);
+                  }}
+                  className="rounded-xl bg-[#D6E5EC] px-2.5 py-1 text-[11px] font-bold text-[#415C6B] transition-transform active:scale-95"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.splash();
+                    setConfirmPondFeed(false);
+                    onScatterPondFeed();
+                  }}
+                  className="rounded-xl bg-[#3C7C99] px-3 py-1 text-[11px] font-bold text-white transition-transform active:scale-95"
+                >
+                  Xác nhận
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={fishFeedCount <= 0}
+                onClick={() => {
+                  soundFX.tap();
+                  setConfirmPondFeed(true);
+                }}
+                className="anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 border-[#3C7C99] bg-[#E8F6FC] px-4 py-2 text-xs font-bold text-[#224457] shadow-lg transition-transform active:scale-95 disabled:cursor-not-allowed disabled:border-[#C2CED4] disabled:bg-[#EFF3F5] disabled:text-[#7D8C94]"
+              >
+                <Utensils className="h-4 w-4 text-[#D98A2B]" />
+                <span>
+                  {fishFeedCount > 0
+                    ? `Rải Thức Ăn Hồ (1 Túi · còn ${fishFeedCount})`
+                    : 'Hết thức ăn thủy sinh · Ghé Xe Bus Shop'}
+                </span>
+              </button>
+            )}
+          </div>
+        )}
 
       {/* Bottom Action Bar in Furniture Move Mode */}
       {zone === 'home' && editFurnitureMode && (

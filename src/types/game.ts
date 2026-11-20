@@ -114,9 +114,12 @@ export interface ShopItem {
 
 export type CropType =
   | 'wheat'
+  | 'scallion'
+  | 'rice'
   | 'carrot'
   | 'corn'
   | 'strawberry'
+  | 'vanilla'
   | 'tomato'
   | 'lemon'
   | 'sugarcane'
@@ -136,6 +139,7 @@ export interface GardenPlotState {
   crop: CropType | null;
   watered: boolean;
   hasPest: boolean;
+  hasWeed: boolean;
   pestRolled: boolean;
   plantedAt: number | null;
   readyAt: number | null;
@@ -176,7 +180,7 @@ export interface CoopTroughs {
   cattle: number;
 }
 
-export type PondFishSpecies = 'carp_24h' | 'tilapia_24h' | 'salmon_48h' | 'sturgeon_48h';
+export type PondFishSpecies = 'fish_12h' | 'duck_24h' | 'turtle_48h';
 
 export interface PondFishState {
   id: string;
@@ -195,19 +199,25 @@ export interface FarmSupplies {
   bugSpray: number; // 2 Xu / bình
   animalFeed: number; // 2 Xu / túi
   animalMedicine: number;
-  fishFeed: number;
+  fishFeed: number; // 5 Xu / túi (cho 3-4 con ăn)
   fishMedicine: number;
-  pondBooster: number;
+}
+
+export interface WellWaterState {
+  stored: number; // Nước đang tích trong giếng (0..50)
+  lastTickAt: number; // Mốc thời gian cộng nước gần nhất
 }
 
 export type ProcessedId =
   | 'brown_sugar'
   | 'cane_syrup'
   | 'flour'
+  | 'rice_noodle'
   | 'berry_jam'
   | 'roasted_coffee'
   | 'cacao_powder'
-  | 'cheese';
+  | 'cheese'
+  | 'fresh_cream';
 
 export type RecipeId =
   | 'sugarcane_juice'
@@ -223,18 +233,31 @@ export type RecipeId =
   | 'pumpkin_pie'
   | 'egg_tart'
   | 'duck_egg_flan'
+  | 'panna_cotta'
   | 'cacao_brownie'
   | 'berry_cheesecake'
   | 'carrot_soup'
   | 'tomato_pasta'
   | 'glazed_carrot'
+  | 'pork_pho'
   | 'cheese_omelet'
   | 'salted_duck_porridge'
   | 'roasted_pork_corn';
 
 export type FarmItemKind = 'crop' | 'animal_product' | 'processed' | 'dish';
 
+export type KitchenLevel = 1 | 2 | 3;
+
+export interface CookingJob {
+  id: string;
+  recipeId: RecipeId;
+  startedAt: number;
+  readyAt: number;
+  durationMs: number;
+}
+
 export interface FarmInventory {
+  seeds: Partial<Record<CropType, number>>;
   crops: Partial<Record<CropType, number>>;
   animalProducts: Partial<Record<AnimalProduceId, number>>;
   processed: Partial<Record<ProcessedId, number>>;

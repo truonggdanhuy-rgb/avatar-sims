@@ -40,6 +40,69 @@ export function createCobblestoneTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+export function createFlagstonePathTexture(repX = 2, repY = 8): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  // Earthy mortar bed between stones
+  ctx.fillStyle = '#8F7A5E';
+  ctx.fillRect(0, 0, 256, 256);
+
+  const stoneColors = [
+    '#DFCDB1',
+    '#CCB594',
+    '#D6C1A2',
+    '#E5D7BF',
+    '#C3AB89',
+    '#D8C5A8',
+  ];
+
+  // Irregular staggered flagstones
+  const rows = 6;
+  const rowH = 256 / rows;
+  for (let r = 0; r < rows; r++) {
+    const cols = r % 2 === 0 ? 4 : 5;
+    let x = r % 2 === 0 ? 2 : -18;
+    for (let c = 0; c <= cols; c++) {
+      const w = r % 2 === 0 ? 54 + ((r * 13 + c * 19) % 16) : 44 + ((r * 7 + c * 23) % 18);
+      const y = r * rowH + 3;
+      const h = rowH - 6;
+      const col = stoneColors[(r * 5 + c * 3) % stoneColors.length];
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.roundRect(x + 2, y, w - 4, h, 8);
+      ctx.fill();
+
+      // Subtle bevel highlight & shadow on each flagstone
+      ctx.strokeStyle = 'rgba(255, 248, 232, 0.38)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(84, 64, 42, 0.28)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 3, y + 1, w - 6, h - 2);
+
+      x += w;
+    }
+  }
+
+  // Subtle stone mineral speckles
+  for (let i = 0; i < 160; i++) {
+    const sx = (i * 71 + 17) % 256;
+    const sy = (i * 113 + 31) % 256;
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(95, 76, 52, 0.14)' : 'rgba(255, 252, 240, 0.16)';
+    ctx.fillRect(sx, sy, 2, 2);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(repX, repY);
+  return tex;
+}
+
 export function createWoodPlankTexture(base = '#CC965E', seam = '#9E6C3B'): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 256;

@@ -1,10 +1,10 @@
 import {useEffect, useRef, useState} from 'react';
 import {BoutiqueModal} from './components/modals/BoutiqueModal';
 import {DailyQuestsModal} from './components/modals/DailyQuestsModal';
+import {FarmShopModal} from './components/modals/FarmShopModal';
 import {FarmWorkshopModal} from './components/modals/FarmWorkshopModal';
 import {FurnitureModal} from './components/modals/FurnitureModal';
 import {FurnitureShopModal} from './components/modals/FurnitureShopModal';
-import {GardenPlotModal} from './components/modals/GardenPlotModal';
 import {LivestockModal} from './components/modals/LivestockModal';
 import {OrderBoardModal} from './components/modals/OrderBoardModal';
 import {PondModal} from './components/modals/PondModal';
@@ -26,6 +26,9 @@ import {
   CROPS,
   getFarmItemCount,
   getFarmItemDirectSellPrice,
+  INITIAL_WATER_CAN,
+  INITIAL_WELL_STORED,
+  KITCHEN_LEVELS,
   KITCHEN_RECIPES,
   MAX_COOP_ANIMALS,
   MAX_POND_FISH,
@@ -34,6 +37,9 @@ import {
   POND_FISH_SPECIES,
   PROCESSED_ITEMS,
   SUPPLY_PRICES,
+  WATER_CAN_MAX,
+  WELL_WATER_INTERVAL_MS,
+  WELL_WATER_MAX,
 } from './data/farmCatalog';
 import {
   FURNITURE_BY_ID,
@@ -44,6 +50,7 @@ import {
   AnimalProduceId,
   AnimalType,
   AvatarConfig,
+  CookingJob,
   CoopKind,
   CoopTroughs,
   CropType,
@@ -51,9 +58,11 @@ import {
   FarmInventory,
   FarmItemKind,
   FarmOrder,
+  FarmSupplies,
   FurnitureCatalogItem,
   GameStats,
   GardenPlotState,
+  KitchenLevel,
   LivestockAnimalState,
   PlacedFurniture,
   PlotLevel,
@@ -63,6 +72,7 @@ import {
   RecipeId,
   ShopItem,
   TimeOfDay,
+  WellWaterState,
   ZoneId,
 } from './types/game';
 import {soundFX} from './utils/sound';
@@ -100,6 +110,7 @@ function migrateSavedPlots(rawPlots: unknown): GardenPlotState[] {
           level?: number;
           watered?: boolean;
           hasPest?: boolean;
+          hasWeed?: boolean;
           pestRolled?: boolean;
           plantedAt?: number | null;
           readyAt?: number | null;
@@ -120,6 +131,7 @@ function migrateSavedPlots(rawPlots: unknown): GardenPlotState[] {
         crop: validCrop,
         watered: Boolean(old.watered),
         hasPest: Boolean(old.hasPest),
+        hasWeed: Boolean(old.hasWeed),
         pestRolled: true,
         plantedAt: old.plantedAt ?? now - 20000,
         readyAt: old.readyAt ?? now,
@@ -137,6 +149,7 @@ function migrateSavedPlots(rawPlots: unknown): GardenPlotState[] {
         crop: validCrop,
         watered: Boolean(old.watered || old.stage === 'watered'),
         hasPest: Boolean(old.hasPest),
+        hasWeed: Boolean(old.hasWeed),
         pestRolled: Boolean(old.pestRolled),
         plantedAt: old.plantedAt ?? now,
         readyAt,
@@ -151,6 +164,7 @@ function migrateSavedPlots(rawPlots: unknown): GardenPlotState[] {
       crop: null,
       watered: false,
       hasPest: false,
+      hasWeed: Boolean(old.hasWeed),
       pestRolled: false,
       plantedAt: null,
       readyAt: null,
@@ -184,7 +198,52 @@ function adjustFarmInventory(
     }
   }
 
-  return {crops, animalProducts, processed, dishes, supplies: inv.supplies};
+  return {
+    seeds: inv.seeds,
+    crops,
+    animalProducts,
+    processed,
+    dishes,
+    supplies: inv.supplies,
+  };
+}
+
+function migrateSavedPondFish(raw: unknown): PondFishState[] {
+  const now = Date.now();
+  if (!Array.isArray(raw)) return createInitialPondFish(now);
+  const speciesMap: Record<string, PondFishSpecies> = {
+    fish_12h: 'fish_12h',
+    duck_24h: 'duck_24h',
+    turtle_48h: 'turtle_48h',
+    carp_24h: 'fish_12h',
+    tilapia_24h: 'duck_24h',
+    salmon_48h: 'turtle_48h',
+    sturgeon_48h: 'turtle_48h',
+  };
+  return raw
+    .filter((f): f is Partial<PondFishState> => Boolean(f && typeof f === 'object'))
+    .map((f, idx) => {
+      const mapped = speciesMap[String(f.species)] ?? 'fish_12h';
+      const spec = POND_FISH_SPECIES[mapped];
+      const totalDurationMs = spec.durationHours * 3600 * 1000;
+      const remainingMs =
+        typeof f.remainingMs === 'number'
+          ? Math.max(0, Math.min(totalDurationMs, f.remainingMs))
+          : totalDurationMs;
+      const stage = f.stage === 'ready' || remainingMs <= 0 ? 'ready' : 'growing';
+      return {
+        id: typeof f.id === 'string' ? f.id : `fish_mig_${idx}`,
+        species: mapped,
+        stage,
+        stockedAt: typeof f.stockedAt === 'number' ? f.stockedAt : now,
+        remainingMs: stage === 'ready' ? 0 : remainingMs,
+        totalDurationMs,
+        hunger: typeof f.hunger === 'number' ? Math.max(0, Math.min(100, f.hunger)) : 88,
+        sick: Boolean(f.sick),
+        lastCareCheckAt: typeof f.lastCareCheckAt === 'number' ? f.lastCareCheckAt : now,
+        lastTickAt: typeof f.lastTickAt === 'number' ? f.lastTickAt : now,
+      };
+    });
 }
 
 export default function App() {
@@ -195,11 +254,13 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dailyQuestsOpen, setDailyQuestsOpen] = useState(false);
   const [furnitureModalOpen, setFurnitureModalOpen] = useState(false);
-  const [activePlotId, setActivePlotId] = useState<number | null>(null);
   const [workshopTab, setWorkshopTab] = useState<'mill' | 'kitchen' | null>(null);
-  const [orderBoardOpen, setOrderBoardOpen] = useState(false);
+  const [orderBoardTab, setOrderBoardTab] = useState<'orders' | 'storage' | null>(null);
   const [pastureCoop, setPastureCoop] = useState<CoopKind | null>(null);
   const [pondOpen, setPondOpen] = useState(false);
+  const [farmShopOpen, setFarmShopOpen] = useState(false);
+  const [nearPond, setNearPond] = useState(false);
+  const [pondFeedPulse, setPondFeedPulse] = useState(0);
   const [editFurnitureMode, setEditFurnitureMode] = useState(false);
   const [selectedFurnitureId, setSelectedFurnitureId] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -262,14 +323,34 @@ export default function App() {
             rawProducts.chicken_egg = (rawProducts.chicken_egg || 0) + rawProducts.egg;
             delete rawProducts.egg;
           }
+          const rawSupplies = parsed.farmInventory.supplies || {};
+          const defaults = createInitialSupplies();
           return {
+            seeds:
+              parsed.farmInventory.seeds && typeof parsed.farmInventory.seeds === 'object'
+                ? parsed.farmInventory.seeds
+                : {wheat: 4, scallion: 2, rice: 2, carrot: 2, corn: 1},
             crops: parsed.farmInventory.crops || {},
             animalProducts: rawProducts as FarmInventory['animalProducts'],
             processed: parsed.farmInventory.processed || {},
             dishes: parsed.farmInventory.dishes || {},
             supplies: {
-              ...createInitialSupplies(),
-              ...(parsed.farmInventory.supplies || {}),
+              bugSpray:
+                typeof rawSupplies.bugSpray === 'number' ? rawSupplies.bugSpray : defaults.bugSpray,
+              animalFeed:
+                typeof rawSupplies.animalFeed === 'number'
+                  ? rawSupplies.animalFeed
+                  : defaults.animalFeed,
+              animalMedicine:
+                typeof rawSupplies.animalMedicine === 'number'
+                  ? rawSupplies.animalMedicine
+                  : defaults.animalMedicine,
+              fishFeed:
+                typeof rawSupplies.fishFeed === 'number' ? rawSupplies.fishFeed : defaults.fishFeed,
+              fishMedicine:
+                typeof rawSupplies.fishMedicine === 'number'
+                  ? rawSupplies.fishMedicine
+                  : defaults.fishMedicine,
             },
           };
         }
@@ -278,6 +359,46 @@ export default function App() {
       // ignore storage errors
     }
     return createInitialFarmInventory();
+  });
+
+  const [kitchenLevel, setKitchenLevel] = useState<KitchenLevel>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.kitchenLevel === 2 || parsed.kitchenLevel === 3) {
+          return parsed.kitchenLevel;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return 1;
+  });
+
+  const [cookingQueue, setCookingQueue] = useState<CookingJob[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.cookingQueue)) {
+          return parsed.cookingQueue.filter(
+            (j: Partial<CookingJob>): j is CookingJob =>
+              Boolean(
+                j &&
+                  typeof j.id === 'string' &&
+                  typeof j.recipeId === 'string' &&
+                  j.recipeId in KITCHEN_RECIPES &&
+                  typeof j.readyAt === 'number' &&
+                  typeof j.durationMs === 'number',
+              ),
+          );
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return [];
   });
 
   const [livestock, setLivestock] = useState<LivestockAnimalState[]>(() => {
@@ -348,7 +469,7 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed.pondFish)) {
-          return parsed.pondFish;
+          return migrateSavedPondFish(parsed.pondFish);
         }
       }
     } catch {
@@ -356,6 +477,47 @@ export default function App() {
     }
     return createInitialPondFish();
   });
+
+  const [waterCan, setWaterCan] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.waterCan === 'number') {
+          return Math.max(0, Math.min(WATER_CAN_MAX, Math.floor(parsed.waterCan)));
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return INITIAL_WATER_CAN;
+  });
+  const waterCanRef = useRef(waterCan);
+  waterCanRef.current = waterCan;
+
+  const [wellWater, setWellWater] = useState<WellWaterState>(() => {
+    const now = Date.now();
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.wellWater && typeof parsed.wellWater === 'object') {
+          return {
+            stored: Math.max(0, Math.min(WELL_WATER_MAX, Math.floor(Number(parsed.wellWater.stored) || 0))),
+            lastTickAt:
+              typeof parsed.wellWater.lastTickAt === 'number'
+                ? parsed.wellWater.lastTickAt
+                : now,
+          };
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return {stored: INITIAL_WELL_STORED, lastTickAt: now};
+  });
+  const wellWaterRef = useRef(wellWater);
+  wellWaterRef.current = wellWater;
 
   const [farmOrders, setFarmOrders] = useState<FarmOrder[]>(() => {
     try {
@@ -475,13 +637,14 @@ export default function App() {
 
           let updated = plot;
           if (!plot.pestRolled && plot.plantedAt && plot.durationMs > 0) {
-            const pestCheckAt = plot.plantedAt + plot.durationMs * 0.35;
+            const pestCheckAt = plot.plantedAt + plot.durationMs * 0.2;
             if (now >= pestCheckAt) {
               const chance = PLOT_LEVELS[plot.level].pestChance;
               updated = {
                 ...updated,
                 pestRolled: true,
                 hasPest: Math.random() < chance,
+                hasWeed: updated.hasWeed || Math.random() < 0.15,
               };
               changed = true;
             }
@@ -649,6 +812,25 @@ export default function App() {
         });
         return changed ? next : prev;
       });
+
+      // 4. Well Water Offline & Online Generation (+1 water per WELL_WATER_INTERVAL_MS up to 50)
+      setWellWater((prev) => {
+        if (prev.stored >= WELL_WATER_MAX) {
+          if (now - prev.lastTickAt > 10000) {
+            return {...prev, lastTickAt: now};
+          }
+          return prev;
+        }
+        const elapsedMs = Math.max(0, now - prev.lastTickAt);
+        const generated = Math.floor(elapsedMs / WELL_WATER_INTERVAL_MS);
+        if (generated <= 0) return prev;
+        const nextStored = Math.min(WELL_WATER_MAX, prev.stored + generated);
+        const nextTickAt =
+          nextStored >= WELL_WATER_MAX
+            ? now
+            : prev.lastTickAt + generated * WELL_WATER_INTERVAL_MS;
+        return {stored: nextStored, lastTickAt: nextTickAt};
+      });
     };
 
     tickFarmWorld();
@@ -666,9 +848,13 @@ export default function App() {
           stats,
           plots,
           farmInventory,
+          kitchenLevel,
+          cookingQueue,
           livestock,
           troughs,
           pondFish,
+          waterCan,
+          wellWater,
           farmOrders,
           ownedIds,
           dailyQuests,
@@ -684,9 +870,13 @@ export default function App() {
     stats,
     plots,
     farmInventory,
+    kitchenLevel,
+    cookingQueue,
     livestock,
     troughs,
     pondFish,
+    waterCan,
+    wellWater,
     farmOrders,
     ownedIds,
     dailyQuests,
@@ -702,11 +892,11 @@ export default function App() {
       setSelectedFurnitureId(null);
     }
     if (next !== 'garden') {
-      setActivePlotId(null);
       setWorkshopTab(null);
-      setOrderBoardOpen(false);
+      setOrderBoardTab(null);
       setPastureCoop(null);
       setPondOpen(false);
+      setFarmShopOpen(false);
     }
   };
 
@@ -737,12 +927,19 @@ export default function App() {
   // === FARMING & PLOT HANDLERS ===
   const handlePlantPlot = (plotId: number, crop: CropType) => {
     const def = CROPS[crop];
-    if (stats.coins < def.seedPrice) return;
+    const seedOwned = farmInventory.seeds[crop] || 0;
+    if (seedOwned <= 0) return;
     const now = Date.now();
 
+    setFarmInventory((prev) => ({
+      ...prev,
+      seeds: {
+        ...prev.seeds,
+        [crop]: Math.max(0, (prev.seeds[crop] || 0) - 1),
+      },
+    }));
     setStats((prev) => ({
       ...prev,
-      coins: prev.coins - def.seedPrice,
       energy: Math.max(5, prev.energy - 2),
     }));
 
@@ -768,6 +965,14 @@ export default function App() {
   };
 
   const handleWaterPlot = (plotId: number) => {
+    if (waterCanRef.current <= 0) return;
+    const target = plots.find((p) => p.id === plotId);
+    if (!target || target.stage !== 'growing' || target.watered || !target.readyAt) return;
+
+    const nextCan = Math.max(0, waterCanRef.current - 1);
+    waterCanRef.current = nextCan;
+    setWaterCan(nextCan);
+
     const now = Date.now();
     setPlots((prev) =>
       prev.map((plot) => {
@@ -789,21 +994,51 @@ export default function App() {
     }));
   };
 
+  const handleCollectWellWater = (): {
+    gained: number;
+    waterCan: number;
+    wellRemaining: number;
+    nextDropSec: number;
+  } => {
+    const now = Date.now();
+    const curWell = wellWaterRef.current;
+    const curCan = waterCanRef.current;
+    const spaceInCan = Math.max(0, WATER_CAN_MAX - curCan);
+    const gained = Math.min(curWell.stored, spaceInCan);
+
+    const nextCan = curCan + gained;
+    const nextWellStored = curWell.stored - gained;
+    const nextLastTick = curWell.stored >= WELL_WATER_MAX && gained > 0 ? now : curWell.lastTickAt;
+
+    if (gained > 0) {
+      waterCanRef.current = nextCan;
+      wellWaterRef.current = {stored: nextWellStored, lastTickAt: nextLastTick};
+      setWaterCan(nextCan);
+      setWellWater({stored: nextWellStored, lastTickAt: nextLastTick});
+      setStats((prev) => ({
+        ...prev,
+        energy: Math.min(100, prev.energy + 10),
+      }));
+    }
+
+    const remMs = Math.max(0, WELL_WATER_INTERVAL_MS - (now - nextLastTick));
+    return {
+      gained,
+      waterCan: nextCan,
+      wellRemaining: nextWellStored,
+      nextDropSec: Math.ceil(remMs / 1000),
+    };
+  };
+
   const handleSprayPest = (plotId: number) => {
     const target = plots.find((p) => p.id === plotId);
     if (!target || !target.hasPest) return;
+    if (farmInventory.supplies.bugSpray <= 0) return;
 
-    const hasSpray = farmInventory.supplies.bugSpray > 0;
-    if (!hasSpray && stats.coins < SUPPLY_PRICES.bugSpray) return;
-
-    if (hasSpray) {
-      setFarmInventory((prev) => ({
-        ...prev,
-        supplies: {...prev.supplies, bugSpray: prev.supplies.bugSpray - 1},
-      }));
-    } else {
-      setStats((prev) => ({...prev, coins: prev.coins - SUPPLY_PRICES.bugSpray}));
-    }
+    setFarmInventory((prev) => ({
+      ...prev,
+      supplies: {...prev.supplies, bugSpray: prev.supplies.bugSpray - 1},
+    }));
 
     setPlots((prev) =>
       prev.map((plot) => (plot.id === plotId ? {...plot, hasPest: false} : plot)),
@@ -812,6 +1047,18 @@ export default function App() {
       ...prev,
       energy: Math.max(5, prev.energy - 1),
       mood: Math.min(100, prev.mood + 2),
+    }));
+  };
+
+  const handleWeedPlot = (plotId: number) => {
+    const target = plots.find((p) => p.id === plotId);
+    if (!target || !target.hasWeed) return;
+    setPlots((prev) =>
+      prev.map((plot) => (plot.id === plotId ? {...plot, hasWeed: false} : plot)),
+    );
+    setStats((prev) => ({
+      ...prev,
+      mood: Math.min(100, prev.mood + 1),
     }));
   };
 
@@ -825,6 +1072,7 @@ export default function App() {
               crop: null,
               watered: false,
               hasPest: false,
+              hasWeed: false,
               pestRolled: false,
               plantedAt: null,
               readyAt: null,
@@ -833,7 +1081,6 @@ export default function App() {
           : p,
       ),
     );
-    setActivePlotId(null);
   };
 
   const handleHarvestPlot = (plotId: number) => {
@@ -855,6 +1102,7 @@ export default function App() {
               crop: null,
               watered: false,
               hasPest: false,
+              hasWeed: Math.random() < 0.25,
               pestRolled: false,
               plantedAt: null,
               readyAt: null,
@@ -869,7 +1117,6 @@ export default function App() {
       mood: Math.min(100, prev.mood + 2),
     }));
     markQuestDone('garden');
-    setActivePlotId(null);
   };
 
   const handleUpgradePlot = (plotId: number) => {
@@ -889,7 +1136,7 @@ export default function App() {
     );
   };
 
-  // === MILL, KITCHEN & ORDERS ===
+  // === MILL, KITCHEN (UPGRADEABLE + TIMED QUEUE) & ORDERS ===
   const handleProcessItem = (id: ProcessedId) => {
     const proc = PROCESSED_ITEMS[id];
     if (!proc) return;
@@ -906,20 +1153,88 @@ export default function App() {
     setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 2)}));
   };
 
-  const handleCookRecipe = (id: RecipeId) => {
+  const handleStartCook = (id: RecipeId) => {
     const rec = KITCHEN_RECIPES[id];
-    if (!rec) return;
+    const kInfo = KITCHEN_LEVELS[kitchenLevel];
+    if (!rec || cookingQueue.length >= kInfo.slots) return;
     const hasAll = rec.inputs.every(
       (inp) => getFarmItemCount(farmInventory, inp.kind, inp.id) >= inp.qty,
     );
     if (!hasAll) return;
 
-    const deltas = [
-      ...rec.inputs.map((inp) => ({kind: inp.kind, id: inp.id, delta: -inp.qty})),
-      {kind: 'dish' as const, id: rec.id, delta: 1},
-    ];
+    const deltas = rec.inputs.map((inp) => ({
+      kind: inp.kind,
+      id: inp.id,
+      delta: -inp.qty,
+    }));
+    const now = Date.now();
+    const durationMs = Math.max(
+      120000,
+      Math.round(rec.cookSeconds * 1000 * kInfo.speedMultiplier),
+    );
     setFarmInventory((prev) => adjustFarmInventory(prev, deltas));
+    setCookingQueue((prev) => [
+      ...prev,
+      {
+        id: `cook_${now.toString(36)}_${Math.random().toString(36).slice(2, 5)}`,
+        recipeId: id,
+        startedAt: now,
+        readyAt: now + durationMs,
+        durationMs,
+      },
+    ]);
+    setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 2)}));
+  };
+
+  const handleCollectDish = (jobId: string) => {
+    const job = cookingQueue.find((j) => j.id === jobId);
+    if (!job || Date.now() < job.readyAt) return;
+    setCookingQueue((prev) => prev.filter((j) => j.id !== jobId));
+    setFarmInventory((prev) =>
+      adjustFarmInventory(prev, [{kind: 'dish', id: job.recipeId, delta: 1}]),
+    );
     setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 3)}));
+    markQuestDone('garden');
+  };
+
+  const handleUpgradeKitchen = () => {
+    if (kitchenLevel >= 3) return;
+    const cost = KITCHEN_LEVELS[kitchenLevel].upgradeCostToNext;
+    if (cost === null || stats.coins < cost) return;
+    const nextLevel = (kitchenLevel + 1) as KitchenLevel;
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - cost,
+      mood: Math.min(100, prev.mood + 5),
+    }));
+    setKitchenLevel(nextLevel);
+  };
+
+  // === FARM BUS SHOP HANDLERS ===
+  const handleBuySeedBag = (crop: CropType, qty = 1) => {
+    const cost = CROPS[crop].seedPrice * qty;
+    if (stats.coins < cost) return;
+    setStats((prev) => ({...prev, coins: prev.coins - cost}));
+    setFarmInventory((prev) => ({
+      ...prev,
+      seeds: {
+        ...prev.seeds,
+        [crop]: (prev.seeds[crop] || 0) + qty,
+      },
+    }));
+  };
+
+  const handleBuyFarmSupply = (supply: keyof FarmSupplies, qty = 1) => {
+    const cost = SUPPLY_PRICES[supply] * qty;
+    if (stats.coins < cost) return;
+    setStats((prev) => ({...prev, coins: prev.coins - cost}));
+    setFarmInventory((prev) => ({
+      ...prev,
+      supplies: {
+        ...prev.supplies,
+        [supply]: prev.supplies[supply] + qty,
+      },
+    }));
   };
 
   const handleFulfillOrder = (orderId: string) => {
@@ -980,17 +1295,12 @@ export default function App() {
   };
 
   const handleFeedAnimal = (animalId: string) => {
-    const hasSupply = farmInventory.supplies.animalFeed > 0;
-    if (!hasSupply && stats.coins < SUPPLY_PRICES.animalFeed) return;
+    if (farmInventory.supplies.animalFeed <= 0) return;
 
-    if (hasSupply) {
-      setFarmInventory((prev) => ({
-        ...prev,
-        supplies: {...prev.supplies, animalFeed: prev.supplies.animalFeed - 1},
-      }));
-    } else {
-      setStats((prev) => ({...prev, coins: prev.coins - SUPPLY_PRICES.animalFeed}));
-    }
+    setFarmInventory((prev) => ({
+      ...prev,
+      supplies: {...prev.supplies, animalFeed: prev.supplies.animalFeed - 1},
+    }));
 
     setLivestock((prev) =>
       prev.map((a) => {
@@ -1020,42 +1330,28 @@ export default function App() {
   const handleFillCoopTrough = (coop: CoopKind) => {
     const coopCount = livestock.filter((a) => a.coop === coop).length;
     const needed = Math.max(0, coopCount - troughs[coop]);
-    if (needed <= 0) return;
-
     const inBag = farmInventory.supplies.animalFeed;
-    const fromBag = Math.min(inBag, needed);
-    const needBuy = needed - fromBag;
-    const cost = needBuy * SUPPLY_PRICES.animalFeed;
-    if (stats.coins < cost) return;
+    const used = Math.min(needed, inBag);
+    if (used <= 0) return;
 
-    if (fromBag > 0) {
-      setFarmInventory((prev) => ({
-        ...prev,
-        supplies: {...prev.supplies, animalFeed: prev.supplies.animalFeed - fromBag},
-      }));
-    }
-    if (cost > 0) {
-      setStats((prev) => ({...prev, coins: prev.coins - cost}));
-    }
+    setFarmInventory((prev) => ({
+      ...prev,
+      supplies: {...prev.supplies, animalFeed: prev.supplies.animalFeed - used},
+    }));
     setTroughs((prev) => {
-      const next = {...prev, [coop]: Math.max(prev[coop], coopCount)};
+      const next = {...prev, [coop]: Math.min(coopCount, prev[coop] + used)};
       troughsRef.current = next;
       return next;
     });
   };
 
   const handleCureAnimal = (animalId: string) => {
-    const hasMed = farmInventory.supplies.animalMedicine > 0;
-    if (!hasMed && stats.coins < SUPPLY_PRICES.animalMedicine) return;
+    if (farmInventory.supplies.animalMedicine <= 0) return;
 
-    if (hasMed) {
-      setFarmInventory((prev) => ({
-        ...prev,
-        supplies: {...prev.supplies, animalMedicine: prev.supplies.animalMedicine - 1},
-      }));
-    } else {
-      setStats((prev) => ({...prev, coins: prev.coins - SUPPLY_PRICES.animalMedicine}));
-    }
+    setFarmInventory((prev) => ({
+      ...prev,
+      supplies: {...prev.supplies, animalMedicine: prev.supplies.animalMedicine - 1},
+    }));
 
     setLivestock((prev) =>
       prev.map((a) => (a.id === animalId ? {...a, sick: false} : a)),
@@ -1101,30 +1397,7 @@ export default function App() {
     setStats((prev) => ({...prev, coins: prev.coins + sellPrice}));
   };
 
-  const handleBuyLivestockSupply = (supply: 'animalFeed' | 'animalMedicine', qty = 1) => {
-    const cost = SUPPLY_PRICES[supply] * qty;
-    if (stats.coins < cost) return;
-    setStats((prev) => ({...prev, coins: prev.coins - cost}));
-    setFarmInventory((prev) => ({
-      ...prev,
-      supplies: {...prev.supplies, [supply]: prev.supplies[supply] + qty},
-    }));
-  };
-
-  const handleCraftFeedFromCrop = (crop: 'wheat' | 'corn') => {
-    const have = farmInventory.crops[crop] || 0;
-    if (have < 1) return;
-    const gain = crop === 'corn' ? 3 : 2;
-    setFarmInventory((prev) => {
-      const next = adjustFarmInventory(prev, [{kind: 'crop', id: crop, delta: -1}]);
-      return {
-        ...next,
-        supplies: {...next.supplies, animalFeed: next.supplies.animalFeed + gain},
-      };
-    });
-  };
-
-  // === POND AQUACULTURE (24H / 48H FISH) HANDLERS ===
+  // === POND AQUACULTURE (CÁ 12H · VỊT VÀNG 1 NGÀY · RÙA 2 NGÀY) HANDLERS ===
   const handleStockFish = (species: PondFishSpecies) => {
     const spec = POND_FISH_SPECIES[species];
     if (pondFish.length >= MAX_POND_FISH || stats.coins < spec.fryPrice) return;
@@ -1152,72 +1425,37 @@ export default function App() {
     ]);
   };
 
-  const handleFeedFish = (fishId: string) => {
-    const hasSupply = farmInventory.supplies.fishFeed > 0;
-    if (!hasSupply && stats.coins < SUPPLY_PRICES.fishFeed) return;
-    if (hasSupply) {
-      setFarmInventory((prev) => ({
-        ...prev,
-        supplies: {...prev.supplies, fishFeed: prev.supplies.fishFeed - 1},
-      }));
-    } else {
-      setStats((prev) => ({...prev, coins: prev.coins - SUPPLY_PRICES.fishFeed}));
-    }
+  // 1 túi thức ăn thủy sinh (5 Xu) rải khi đứng gần hồ -> cho tối đa 4 con ăn
+  const handleScatterPondFeed = () => {
+    if (!nearPond || farmInventory.supplies.fishFeed <= 0) return;
+    const candidates = pondFish
+      .filter((f) => f.stage === 'growing' && f.hunger < 95)
+      .sort((a, b) => a.hunger - b.hunger)
+      .slice(0, 4);
+    if (candidates.length === 0) return;
 
+    const fedIds = new Set(candidates.map((c) => c.id));
+    setFarmInventory((prev) => ({
+      ...prev,
+      supplies: {...prev.supplies, fishFeed: prev.supplies.fishFeed - 1},
+    }));
     setPondFish((prev) =>
-      prev.map((f) => {
-        if (f.id !== fishId || f.stage === 'ready') return f;
-        // Feeding grants +60 hunger and -15 min bonus growth
-        const nextRem = Math.max(0, f.remainingMs - 15 * 60 * 1000);
-        return {
-          ...f,
-          hunger: Math.min(100, f.hunger + 60),
-          remainingMs: nextRem,
-          stage: nextRem <= 0 ? 'ready' : 'growing',
-        };
-      }),
+      prev.map((f) =>
+        fedIds.has(f.id) ? {...f, hunger: Math.min(100, f.hunger + 65)} : f,
+      ),
     );
+    setPondFeedPulse((n) => n + 1);
   };
 
   const handleCureFish = (fishId: string) => {
-    const hasMed = farmInventory.supplies.fishMedicine > 0;
-    if (!hasMed && stats.coins < SUPPLY_PRICES.fishMedicine) return;
-    if (hasMed) {
-      setFarmInventory((prev) => ({
-        ...prev,
-        supplies: {...prev.supplies, fishMedicine: prev.supplies.fishMedicine - 1},
-      }));
-    } else {
-      setStats((prev) => ({...prev, coins: prev.coins - SUPPLY_PRICES.fishMedicine}));
-    }
+    if (farmInventory.supplies.fishMedicine <= 0) return;
+    setFarmInventory((prev) => ({
+      ...prev,
+      supplies: {...prev.supplies, fishMedicine: prev.supplies.fishMedicine - 1},
+    }));
 
     setPondFish((prev) =>
       prev.map((f) => (f.id === fishId ? {...f, sick: false, lastCareCheckAt: Date.now()} : f)),
-    );
-  };
-
-  const handleBoostFish = (fishId: string) => {
-    const hasBooster = farmInventory.supplies.pondBooster > 0;
-    if (!hasBooster && stats.coins < SUPPLY_PRICES.pondBooster) return;
-    if (hasBooster) {
-      setFarmInventory((prev) => ({
-        ...prev,
-        supplies: {...prev.supplies, pondBooster: prev.supplies.pondBooster - 1},
-      }));
-    } else {
-      setStats((prev) => ({...prev, coins: prev.coins - SUPPLY_PRICES.pondBooster}));
-    }
-
-    setPondFish((prev) =>
-      prev.map((f) => {
-        if (f.id !== fishId || f.stage === 'ready' || f.sick) return f;
-        const nextRem = Math.max(0, f.remainingMs - 4 * 3600 * 1000);
-        return {
-          ...f,
-          remainingMs: nextRem,
-          stage: nextRem <= 0 ? 'ready' : 'growing',
-        };
-      }),
     );
   };
 
@@ -1232,19 +1470,6 @@ export default function App() {
       mood: Math.min(100, prev.mood + 6),
     }));
     markQuestDone('garden');
-  };
-
-  const handleBuyPondSupply = (
-    supply: 'fishFeed' | 'fishMedicine' | 'pondBooster',
-    qty = 1,
-  ) => {
-    const cost = SUPPLY_PRICES[supply] * qty;
-    if (stats.coins < cost) return;
-    setStats((prev) => ({...prev, coins: prev.coins - cost}));
-    setFarmInventory((prev) => ({
-      ...prev,
-      supplies: {...prev.supplies, [supply]: prev.supplies[supply] + qty},
-    }));
   };
 
   // === AVATAR, SHOPS & HOUSE FURNITURE ===
@@ -1387,9 +1612,6 @@ export default function App() {
     });
   };
 
-  const activePlot =
-    activePlotId !== null ? plots.find((p) => p.id === activePlotId) ?? null : null;
-
   return (
     <main className="relative h-[100dvh] w-full overflow-hidden bg-[#BFE6F7] select-none">
       <WorldCanvas
@@ -1401,6 +1623,12 @@ export default function App() {
         livestock={livestock}
         troughs={troughs}
         pondFish={pondFish}
+        fishFeedCount={farmInventory.supplies.fishFeed}
+        pondFeedPulse={pondFeedPulse}
+        seeds={farmInventory.seeds}
+        bugSprayCount={farmInventory.supplies.bugSpray}
+        waterCount={waterCan}
+        wellWater={wellWater}
         placedFurniture={placedFurniture}
         editFurnitureMode={editFurnitureMode}
         selectedFurnitureId={selectedFurnitureId}
@@ -1426,15 +1654,21 @@ export default function App() {
         onBoostMood={() =>
           setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 10)}))
         }
-        onDrinkWellWater={() =>
-          setStats((prev) => ({...prev, energy: Math.min(100, prev.energy + 15)}))
-        }
-        onOpenPlot={(plotId) => setActivePlotId(plotId)}
+        onCollectWellWater={handleCollectWellWater}
+        onPlantPlot={handlePlantPlot}
+        onWaterPlot={handleWaterPlot}
+        onSprayPestPlot={handleSprayPest}
+        onWeedPlot={handleWeedPlot}
+        onCancelCropPlot={handleCancelCrop}
         onHarvestPlot={handleHarvestPlot}
+        onUpgradePlot={handleUpgradePlot}
         onOpenWorkshop={(tab) => setWorkshopTab(tab)}
-        onOpenOrders={() => setOrderBoardOpen(true)}
+        onOpenOrders={(tab) => setOrderBoardTab(tab ?? 'orders')}
         onOpenPasture={(coop) => setPastureCoop(coop ?? 'poultry')}
         onOpenPond={() => setPondOpen(true)}
+        onOpenFarmShop={() => setFarmShopOpen(true)}
+        onScatterPondFeed={handleScatterPondFeed}
+        onPondProximityChange={setNearPond}
         onAddCoins={addCoins}
       />
 
@@ -1456,59 +1690,63 @@ export default function App() {
         />
       )}
 
-      {zone === 'garden' && activePlot && (
-        <GardenPlotModal
-          plot={activePlot}
-          coins={stats.coins}
-          bugSprayCount={farmInventory.supplies.bugSpray}
-          onPlant={handlePlantPlot}
-          onWater={handleWaterPlot}
-          onSprayPest={handleSprayPest}
-          onCancelCrop={handleCancelCrop}
-          onHarvest={handleHarvestPlot}
-          onUpgradePlot={handleUpgradePlot}
-          onClose={() => setActivePlotId(null)}
-        />
-      )}
-
       {zone === 'garden' && workshopTab && (
         <FarmWorkshopModal
-          initialTab={workshopTab}
+          station={workshopTab}
+          coins={stats.coins}
+          kitchenLevel={kitchenLevel}
+          cookingQueue={cookingQueue}
           inventory={farmInventory}
           onProcessItem={handleProcessItem}
-          onCookRecipe={handleCookRecipe}
+          onStartCook={handleStartCook}
+          onCollectDish={handleCollectDish}
+          onUpgradeKitchen={handleUpgradeKitchen}
           onClose={() => setWorkshopTab(null)}
         />
       )}
 
-      {zone === 'garden' && orderBoardOpen && (
+      {zone === 'garden' && farmShopOpen && (
+        <FarmShopModal
+          coins={stats.coins}
+          inventory={farmInventory}
+          poultryCount={livestock.filter((a) => a.coop === 'poultry').length}
+          cattleCount={livestock.filter((a) => a.coop === 'cattle').length}
+          pondCount={pondFish.length}
+          onBuySeed={handleBuySeedBag}
+          onBuySupply={handleBuyFarmSupply}
+          onBuyAnimal={handleBuyAnimal}
+          onStockFish={handleStockFish}
+          onClose={() => setFarmShopOpen(false)}
+        />
+      )}
+
+      {zone === 'garden' && orderBoardTab && (
         <OrderBoardModal
+          key={orderBoardTab}
+          initialTab={orderBoardTab}
           coins={stats.coins}
           orders={farmOrders}
           inventory={farmInventory}
           onFulfillOrder={handleFulfillOrder}
           onRefreshOrder={handleRefreshOrder}
           onDirectSell={handleDirectSell}
-          onClose={() => setOrderBoardOpen(false)}
+          onClose={() => setOrderBoardTab(null)}
         />
       )}
 
       {zone === 'garden' && pastureCoop && (
         <LivestockModal
           key={pastureCoop}
-          initialCoop={pastureCoop}
+          coop={pastureCoop}
           coins={stats.coins}
           animals={livestock}
           troughs={troughs}
           inventory={farmInventory}
-          onBuyAnimal={handleBuyAnimal}
           onFeedAnimal={handleFeedAnimal}
           onFillTrough={handleFillCoopTrough}
           onCureAnimal={handleCureAnimal}
           onCollectProduce={handleCollectProduce}
           onSellAnimal={handleSellAnimal}
-          onBuySupply={handleBuyLivestockSupply}
-          onCraftFeedFromCrop={handleCraftFeedFromCrop}
           onClose={() => setPastureCoop(null)}
         />
       )}
@@ -1518,12 +1756,10 @@ export default function App() {
           coins={stats.coins}
           fishList={pondFish}
           supplies={farmInventory.supplies}
-          onStockFish={handleStockFish}
-          onFeedFish={handleFeedFish}
+          nearPond={nearPond}
+          onScatterFeed={handleScatterPondFeed}
           onCureFish={handleCureFish}
-          onBoostFish={handleBoostFish}
           onHarvestFish={handleHarvestFish}
-          onBuySupply={handleBuyPondSupply}
           onClose={() => setPondOpen(false)}
         />
       )}

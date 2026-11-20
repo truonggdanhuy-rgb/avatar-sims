@@ -860,159 +860,343 @@ export function buildTownScene(): TownWorld {
     group.add(signBoardGroup);
   }
 
-  // ========== DISTRICT 2: KHU VƯỜN NÔNG TRẠI (Victorian Botanical Conservatory) ==========
+  // ========== DISTRICT 2: KHU VƯỜN NÔNG TRẠI (Beautified Conservatory + Rooster + Windmill) ==========
+  let windmillSailHub: THREE.Group | null = null;
   {
     const garden = new THREE.Group();
     garden.position.set(18.8, 0, -15.0);
     garden.rotation.y = -0.45;
 
-    const stoneBaseMat2 = getMat('#C2B49E', 0.8);
-    const brickKneeMat = getMat('#E8D7BE', 0.76);
-    const frameMat = getMat('#3D6E55', 0.5, 0.18);
+    const stoneBaseMat2 = getMat('#BFB19A', 0.82);
+    const brickKneeMat = getMat('#EFE0C9', 0.76);
+    const sillMat = getMat('#D8C3A4', 0.72);
+    const frameMat = getMat('#2F5D46', 0.45, 0.22);
+    const goldAccentMat = glossyClayMat('#F6C84C', 0.24);
     const glassMat = new THREE.MeshStandardMaterial({
-      color: '#D4F5FF',
-      roughness: 0.12,
-      metalness: 0.08,
+      color: '#D8F6FF',
+      roughness: 0.1,
+      metalness: 0.1,
       transparent: true,
-      opacity: 0.38,
+      opacity: 0.34,
       depthWrite: false,
     });
 
+    // Multi-step stone foundation & doorway-split perimeter knee walls
     const foundation = new THREE.Mesh(
-      new RoundedBoxGeometry(5.5, 0.28, 4.7, 2, 0.06),
+      new RoundedBoxGeometry(5.85, 0.32, 4.95, 2, 0.06),
       stoneBaseMat2,
     );
-    foundation.position.y = 0.14;
+    foundation.position.y = 0.16;
 
-    const kneeWall = new THREE.Mesh(
-      new RoundedBoxGeometry(5.1, 0.78, 4.2, 2, 0.06),
+    // Back, Left & Right knee walls + Front-Left / Front-Right wings (leaving center door x: -0.86..+0.86 clear!)
+    const backKneeWall = new THREE.Mesh(
+      new RoundedBoxGeometry(5.32, 0.84, 0.24, 2, 0.05),
       brickKneeMat,
     );
-    kneeWall.position.y = 0.62;
+    backKneeWall.position.set(0, 0.68, -2.07);
+    const leftKneeWall = new THREE.Mesh(
+      new RoundedBoxGeometry(0.24, 0.84, 4.38, 2, 0.05),
+      brickKneeMat,
+    );
+    leftKneeWall.position.set(-2.54, 0.68, 0);
+    const rightKneeWall = leftKneeWall.clone();
+    rightKneeWall.position.x = 2.54;
+    const frontKneeL = new THREE.Mesh(
+      new RoundedBoxGeometry(1.8, 0.84, 0.24, 2, 0.05),
+      brickKneeMat,
+    );
+    frontKneeL.position.set(-1.76, 0.68, 2.07);
+    const frontKneeR = frontKneeL.clone();
+    frontKneeR.position.x = 1.76;
 
-    // Corner brick pilasters
+    const backSill = new THREE.Mesh(
+      new RoundedBoxGeometry(5.48, 0.12, 0.34, 2, 0.03),
+      sillMat,
+    );
+    backSill.position.set(0, 1.12, -2.1);
+    const leftSill = new THREE.Mesh(
+      new RoundedBoxGeometry(0.34, 0.12, 4.54, 2, 0.03),
+      sillMat,
+    );
+    leftSill.position.set(-2.57, 1.12, 0);
+    const rightSill = leftSill.clone();
+    rightSill.position.x = 2.57;
+    const frontSillL = new THREE.Mesh(
+      new RoundedBoxGeometry(1.9, 0.12, 0.34, 2, 0.03),
+      sillMat,
+    );
+    frontSillL.position.set(-1.79, 1.12, 2.1);
+    const frontSillR = frontSillL.clone();
+    frontSillR.position.x = 1.79;
+
+    // Corner pilasters & intermediate window mullions + perimeter transoms (nothing crosses front doorway!)
     [
-      [-2.5, 2.05],
-      [2.5, 2.05],
-      [-2.5, -2.05],
-      [2.5, -2.05],
+      [-2.58, 2.1],
+      [2.58, 2.1],
+      [-2.58, -2.1],
+      [2.58, -2.1],
     ].forEach(([px, pz]) => {
-      const pil = new THREE.Mesh(new RoundedBoxGeometry(0.24, 2.55, 0.24, 2, 0.04), frameMat);
-      pil.position.set(px, 1.5, pz);
+      const pil = new THREE.Mesh(new RoundedBoxGeometry(0.24, 2.15, 0.24, 2, 0.04), frameMat);
+      pil.position.set(px, 2.08, pz);
       garden.add(pil);
     });
 
-    const glassWalls = new THREE.Mesh(new THREE.BoxGeometry(4.85, 1.85, 3.95), glassMat);
-    glassWalls.position.y = 1.92;
-
-    // Main conservatory pitched glass roof
-    const roofShape = new THREE.Shape();
-    roofShape.moveTo(-2.55, 0);
-    roofShape.lineTo(0, 1.48);
-    roofShape.lineTo(2.55, 0);
-    roofShape.closePath();
-    const roofGlassGeo = new THREE.ExtrudeGeometry(roofShape, {depth: 4.05, bevelEnabled: false});
-    roofGlassGeo.center();
-    const glassRoof = new THREE.Mesh(roofGlassGeo, glassMat);
-    glassRoof.position.y = 3.55;
-
-    // Iron ridge cresting + decorative leaf finial
-    const ridgeBeam = new THREE.Mesh(
-      new RoundedBoxGeometry(0.2, 0.2, 4.2, 2, 0.03),
-      frameMat,
-    );
-    ridgeBeam.position.y = 4.3;
-    const finialStem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.55, 7), frameMat);
-    finialStem.position.set(0, 4.6, 0);
-    const finialBall = new THREE.Mesh(
-      new THREE.SphereGeometry(0.16, 8, 8),
-      glossyClayMat('#FFD166', 0.24),
-    );
-    finialBall.position.set(0, 4.9, 0);
-
-    // Iron roof rafters & side mullions
-    [-1.95, -0.65, 0.65, 1.95].forEach((mz) => {
-      [-2.44, 2.44].forEach((mx) => {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.92, 0.1), frameMat);
-        post.position.set(mx, 1.92, mz);
-        garden.add(post);
+    // Side glazing bars & vertical mullions
+    [-1.4, -0.48, 0.48, 1.4].forEach((mz) => {
+      [-2.54, 2.54].forEach((mx) => {
+        const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.92, 0.08), frameMat);
+        mullion.position.set(mx, 2.04, mz);
+        garden.add(mullion);
       });
     });
+    // Front/back vertical mullions (excluding center x = 0 at front)
+    [-1.65, -0.86, 0.86, 1.65].forEach((mx) => {
+      const fMullion = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.92, 0.08), frameMat);
+      fMullion.position.set(mx, 2.04, 2.08);
+      garden.add(fMullion);
+    });
+    [-1.65, -0.82, 0, 0.82, 1.65].forEach((mx) => {
+      const bMullion = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.92, 0.08), frameMat);
+      bMullion.position.set(mx, 2.04, -2.08);
+      garden.add(bMullion);
+    });
 
-    // Projecting Front Glass Portico + Double Doors
+    // Perimeter glazing transoms at y = 2.24 (back, sides, and split front wings — front doorway open up to y = 2.42!)
+    const transomBack = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.07, 0.08), frameMat);
+    transomBack.position.set(0, 2.24, -2.08);
+    const transomSideL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 4.24), frameMat);
+    transomSideL.position.set(-2.54, 2.24, 0);
+    const transomSideR = transomSideL.clone();
+    transomSideR.position.x = 2.54;
+    const transomFrontL = new THREE.Mesh(new THREE.BoxGeometry(1.74, 0.07, 0.08), frameMat);
+    transomFrontL.position.set(-1.75, 2.24, 2.08);
+    const transomFrontR = transomFrontL.clone();
+    transomFrontR.position.x = 1.75;
+
+    // Separate perimeter glass wall panes (back, sides, front-left & front-right wings)
+    const glassBack = new THREE.Mesh(new THREE.BoxGeometry(5.05, 1.84, 0.04), glassMat);
+    glassBack.position.set(0, 2.06, -2.06);
+    const glassSideL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.84, 4.12), glassMat);
+    glassSideL.position.set(-2.52, 2.06, 0);
+    const glassSideR = glassSideL.clone();
+    glassSideR.position.x = 2.52;
+    const glassFrontL = new THREE.Mesh(new THREE.BoxGeometry(1.66, 1.84, 0.04), glassMat);
+    glassFrontL.position.set(-1.72, 2.06, 2.06);
+    const glassFrontR = glassFrontL.clone();
+    glassFrontR.position.x = 1.72;
+
+    // Main conservatory pitched glass roof + exterior structural iron rafters
+    const roofShape = new THREE.Shape();
+    roofShape.moveTo(-2.65, 0);
+    roofShape.lineTo(0, 1.46);
+    roofShape.lineTo(2.65, 0);
+    roofShape.closePath();
+    const roofGlassGeo = new THREE.ExtrudeGeometry(roofShape, {depth: 4.24, bevelEnabled: false});
+    roofGlassGeo.center();
+    const glassRoof = new THREE.Mesh(roofGlassGeo, glassMat);
+    glassRoof.position.y = 3.68;
+
+    const eaveBeam = new THREE.Mesh(new RoundedBoxGeometry(5.48, 0.14, 4.48, 2, 0.03), frameMat);
+    eaveBeam.position.y = 3.0;
+
+    [-1.95, -0.95, 0, 0.95, 1.95].forEach((rz) => {
+      for (const side of [-1, 1]) {
+        const rafter = new THREE.Mesh(new THREE.BoxGeometry(2.96, 0.08, 0.08), frameMat);
+        rafter.position.set(side * 1.32, 3.7, rz);
+        rafter.rotation.z = side * -0.5;
+        garden.add(rafter);
+      }
+    });
+
+    const ridgeBeam = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.18, 4.4, 2, 0.03), frameMat);
+    ridgeBeam.position.y = 4.42;
+
+    // Raised Glass Roof Cupola Lantern
+    const cupolaFrame = new THREE.Mesh(new RoundedBoxGeometry(1.26, 0.56, 1.42, 2, 0.03), frameMat);
+    cupolaFrame.position.y = 4.62;
+    const cupolaGlass = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.44, 1.28), glassMat);
+    cupolaGlass.position.y = 4.62;
+    const cupolaRoof = createExtrudedRoof(1.48, 0.46, 1.56, frameMat);
+    cupolaRoof.position.y = 5.08;
+
+    // === CHÚ GÀ TRỐNG ĐẬU TRÊN NÓC NHÀ KÍNH ===
+    const rooster = new THREE.Group();
+    rooster.position.set(0, 5.26, 0);
+    rooster.rotation.y = 0.35;
+
+    const perchBase = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 0.16, 8), goldAccentMat);
+    perchBase.position.y = 0.08;
+    const perchPole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.055, 0.32, 7), frameMat);
+    perchPole.position.y = 0.26;
+    const rBodyMat = getMat('#FFF6E6', 0.52);
+    const rWingMat = getMat('#D67B3E', 0.58);
+    const rCombMat = glossyClayMat('#DF3B42', 0.28);
+    const rTailGreen = glossyClayMat('#2A7C59', 0.32);
+    const rTailGold = glossyClayMat('#F4BA42', 0.28);
+
+    const rBody = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 9), rBodyMat);
+    rBody.scale.set(0.86, 0.92, 1.28);
+    rBody.position.set(0, 0.58, 0);
+    const rChest = new THREE.Mesh(new THREE.SphereGeometry(0.18, 9, 8), rBodyMat);
+    rChest.position.set(0, 0.68, 0.18);
+    const rHead = new THREE.Mesh(new THREE.SphereGeometry(0.145, 9, 8), rBodyMat);
+    rHead.position.set(0, 0.88, 0.24);
+    const rComb = new THREE.Mesh(new RoundedBoxGeometry(0.06, 0.15, 0.2, 2, 0.025), rCombMat);
+    rComb.position.set(0, 1.03, 0.23);
+    const rWattle = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), rCombMat);
+    rWattle.scale.set(0.75, 1.35, 0.75);
+    rWattle.position.set(0, 0.77, 0.33);
+    const rBeak = new THREE.Mesh(new THREE.ConeGeometry(0.048, 0.14, 6), goldAccentMat);
+    rBeak.rotation.x = Math.PI / 2;
+    rBeak.position.set(0, 0.86, 0.41);
+
+    const rWingL = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 7), rWingMat);
+    rWingL.scale.set(0.42, 0.82, 1.25);
+    rWingL.position.set(-0.21, 0.58, -0.02);
+    const rWingR = rWingL.clone();
+    rWingR.position.x = 0.21;
+
+    // Arching sculpted tail plumes
+    for (const [ty, tz, rx, mat] of [
+      [0.78, -0.28, -0.85, rTailGreen],
+      [0.86, -0.24, -0.58, rTailGold],
+      [0.72, -0.32, -1.1, rCombMat],
+    ] as const) {
+      const plume = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.36, 6), mat);
+      plume.rotation.x = rx;
+      plume.position.set(0, ty, tz);
+      rooster.add(plume);
+    }
+    rooster.add(perchBase, perchPole, rBody, rChest, rHead, rComb, rWattle, rBeak, rWingL, rWingR);
+
+    // Projecting Front Entrance Portico + Clean Recessed French Double Doors (unobstructed!)
     const porticoBase = new THREE.Mesh(
-      new RoundedBoxGeometry(1.9, 0.28, 0.85, 2, 0.04),
+      new RoundedBoxGeometry(2.15, 0.3, 0.95, 2, 0.04),
       stoneBaseMat2,
     );
-    porticoBase.position.set(0, 0.14, 2.45);
-    const porticoRoof = createExtrudedRoof(2.05, 0.72, 0.95, frameMat);
-    porticoRoof.position.set(0, 2.75, 2.38);
-    const doorFrame = new THREE.Mesh(
-      new RoundedBoxGeometry(1.48, 2.08, 0.18, 2, 0.04),
-      frameMat,
-    );
-    doorFrame.position.set(0, 1.32, 2.12);
-    const doorGlass = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.82, 0.2), glassMat);
-    doorGlass.position.set(0, 1.3, 2.13);
+    porticoBase.position.set(0, 0.15, 2.52);
+    const porticoRoof = createExtrudedRoof(2.26, 0.78, 1.05, frameMat);
+    porticoRoof.position.set(0, 2.95, 2.46);
+    const porticoColL = new THREE.Mesh(new RoundedBoxGeometry(0.14, 2.28, 0.14, 2, 0.03), frameMat);
+    porticoColL.position.set(-0.92, 1.44, 2.86);
+    const porticoColR = porticoColL.clone();
+    porticoColR.position.x = 0.92;
 
-    // Interior shelves & colorful botanical plants visible through glass
+    const doorJambL = new THREE.Mesh(new RoundedBoxGeometry(0.14, 2.26, 0.18, 2, 0.03), frameMat);
+    doorJambL.position.set(-0.79, 1.43, 2.15);
+    const doorJambR = doorJambL.clone();
+    doorJambR.position.x = 0.79;
+    const doorHeader = new THREE.Mesh(new RoundedBoxGeometry(1.72, 0.18, 0.2, 2, 0.03), frameMat);
+    doorHeader.position.set(0, 2.49, 2.15);
+    const doorGlass = new THREE.Mesh(new THREE.BoxGeometry(1.42, 2.08, 0.06), glassMat);
+    doorGlass.position.set(0, 1.36, 2.15);
+    const doorMullion = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.08, 0.12), frameMat);
+    doorMullion.position.set(0, 1.36, 2.16);
+    const handleL = new THREE.Mesh(new RoundedBoxGeometry(0.045, 0.22, 0.06, 2, 0.015), goldAccentMat);
+    handleL.position.set(-0.11, 1.24, 2.23);
+    const handleR = handleL.clone();
+    handleR.position.x = 0.11;
+
+    // Warm interior pendant lantern + tiered botanical shelves inside conservatory
+    const ghBulbMat = new THREE.MeshStandardMaterial({
+      color: '#FFF4C8',
+      emissive: '#FFCC66',
+      emissiveIntensity: 0.15,
+      roughness: 0.25,
+    });
+    lampBulbs.push(ghBulbMat);
+    const ghLantern = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), ghBulbMat);
+    ghLantern.position.set(0, 3.15, 0);
+
     const interiorBed = new THREE.Mesh(
-      new RoundedBoxGeometry(3.7, 0.44, 2.5, 2, 0.04),
+      new RoundedBoxGeometry(4.0, 0.44, 2.7, 2, 0.04),
       getMat('#7D5333', 0.88),
     );
-    interiorBed.position.set(0, 1.05, -0.2);
+    interiorBed.position.set(0, 1.05, -0.18);
     const leafMat = getMat('#54B860', 0.68);
     const sunMat = getMat('#F9C74F', 0.52);
     const berryMat = getMat('#E85D68', 0.55);
     [
-      [-1.15, -0.55, sunMat],
-      [0, -0.65, berryMat],
-      [1.15, -0.5, sunMat],
-      [-0.85, 0.4, berryMat],
-      [0.85, 0.4, sunMat],
+      [-1.25, -0.65, sunMat],
+      [0, -0.75, berryMat],
+      [1.25, -0.6, sunMat],
+      [-0.95, 0.45, berryMat],
+      [0.95, 0.45, sunMat],
     ].forEach(([px, pz, bm]) => {
-      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.45, 9, 8), leafMat);
-      bush.position.set(px as number, 1.52, pz as number);
-      const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), bm as THREE.Material);
-      bloom.position.set(px as number, 1.98, pz as number);
+      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.46, 9, 8), leafMat);
+      bush.position.set(px as number, 1.54, pz as number);
+      const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.23, 8, 8), bm as THREE.Material);
+      bloom.position.set(px as number, 2.0, pz as number);
       garden.add(bush, bloom);
     });
 
-    // Outdoor potting bench + raised flower box beside entrance
-    const outdoorBed = new THREE.Mesh(
-      new RoundedBoxGeometry(1.65, 0.38, 0.95, 2, 0.05),
+    // Flanking terracotta pots & wooden flower boxes outside entrance
+    const outdoorBedL = new THREE.Mesh(
+      new RoundedBoxGeometry(1.55, 0.38, 0.85, 2, 0.05),
       getMat('#8C5C38', 0.85),
     );
-    outdoorBed.position.set(-1.85, 0.34, 2.65);
-    [-2.25, -1.85, -1.45].forEach((sx, idx) => {
+    outdoorBedL.position.set(-1.9, 0.34, 2.68);
+    const outdoorBedR = outdoorBedL.clone();
+    outdoorBedR.position.x = 1.9;
+    [-2.25, -1.9, -1.55, 1.55, 1.9, 2.25].forEach((sx, idx) => {
       const sprout = new THREE.Mesh(
         new THREE.SphereGeometry(0.2, 8, 7),
-        idx === 1 ? sunMat : leafMat,
+        idx % 2 === 1 ? sunMat : idx % 3 === 0 ? berryMat : leafMat,
       );
-      sprout.position.set(sx, 0.64, 2.65);
+      sprout.position.set(sx, 0.65, 2.68);
       garden.add(sprout);
     });
 
     garden.add(
       foundation,
-      kneeWall,
-      glassWalls,
+      backKneeWall,
+      leftKneeWall,
+      rightKneeWall,
+      frontKneeL,
+      frontKneeR,
+      backSill,
+      leftSill,
+      rightSill,
+      frontSillL,
+      frontSillR,
+      transomBack,
+      transomSideL,
+      transomSideR,
+      transomFrontL,
+      transomFrontR,
+      glassBack,
+      glassSideL,
+      glassSideR,
+      glassFrontL,
+      glassFrontR,
       glassRoof,
+      eaveBeam,
       ridgeBeam,
-      finialStem,
-      finialBall,
+      cupolaFrame,
+      cupolaGlass,
+      cupolaRoof,
+      rooster,
       porticoBase,
       porticoRoof,
-      doorFrame,
+      porticoColL,
+      porticoColR,
+      doorJambL,
+      doorJambR,
+      doorHeader,
       doorGlass,
+      doorMullion,
+      handleL,
+      handleR,
+      ghLantern,
       interiorBed,
-      outdoorBed,
+      outdoorBedL,
+      outdoorBedR,
     );
 
     addInteractionProxy(
       garden,
-      [5.6, 5.0, 5.0],
-      2.3,
+      [5.8, 5.4, 5.2],
+      2.5,
       {
         kind: 'zone',
         zone: 'garden' as ZoneId,
@@ -1021,8 +1205,102 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'garden', x: 18.8, z: -15.0, hw: 2.8, hd: 2.4, rotY: -0.45});
+    colliders.push({type: 'box', id: 'garden', x: 18.8, z: -15.0, hw: 2.9, hd: 2.5, rotY: -0.45});
     group.add(garden);
+
+    // === CỐI XAY GIÓ BÊN CẠNH NHÀ KÍNH (X = 24.3, Z = -15.6) ===
+    const windmill = new THREE.Group();
+    windmill.position.set(24.3, 0, -15.6);
+    windmill.rotation.y = -0.48;
+
+    const wmPlinth = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.52, 1.66, 0.42, 14),
+      stoneBaseMat2,
+    );
+    wmPlinth.position.y = 0.21;
+    const wmTower = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.04, 1.46, 3.85, 14),
+      getMat('#FFF3DD', 0.72),
+    );
+    wmTower.position.y = 2.25;
+    const wmBand1 = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.36, 1.4, 0.14, 14),
+      getMat('#8F5C38', 0.75),
+    );
+    wmBand1.position.y = 1.45;
+    const wmBand2 = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.14, 1.18, 0.14, 14),
+      getMat('#8F5C38', 0.75),
+    );
+    wmBand2.position.y = 3.25;
+    const wmDoor = new THREE.Mesh(
+      new RoundedBoxGeometry(0.74, 1.15, 0.2, 2, 0.04),
+      getMat('#7D5031', 0.75),
+    );
+    wmDoor.position.set(0, 0.92, 1.32);
+
+    const wmWinMat = new THREE.MeshStandardMaterial({
+      color: '#FFF1BD',
+      emissive: '#FFCC66',
+      emissiveIntensity: 0.1,
+      roughness: 0.3,
+    });
+    windowMeshes.push(wmWinMat);
+    const wmWin = new THREE.Mesh(new RoundedBoxGeometry(0.48, 0.56, 0.18, 2, 0.04), wmWinMat);
+    wmWin.position.set(0, 2.45, 1.16);
+
+    const wmRoof = new THREE.Mesh(
+      new THREE.ConeGeometry(1.42, 1.38, 14),
+      getMat('#C8664D', 0.62),
+    );
+    wmRoof.position.y = 4.78;
+    const wmFinial = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), goldAccentMat);
+    wmFinial.position.y = 5.5;
+
+    // Rotating 4-blade Wooden & Cream Canvas Sail Hub
+    const sailHub = new THREE.Group();
+    sailHub.position.set(0, 3.72, 1.18);
+    const hubCap = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.36, 10), getMat('#6E4427', 0.7));
+    hubCap.rotation.x = Math.PI / 2;
+    sailHub.add(hubCap);
+
+    const sparMat = getMat('#8A5A36', 0.74);
+    const sailMat = getMat('#FFFDF5', 0.62);
+    for (let b = 0; b < 4; b++) {
+      const arm = new THREE.Group();
+      arm.rotation.z = (b * Math.PI) / 2 + 0.35;
+      const spar = new THREE.Mesh(new RoundedBoxGeometry(0.11, 2.35, 0.08, 2, 0.02), sparMat);
+      spar.position.y = 1.18;
+      const canvasBlade = new THREE.Mesh(
+        new RoundedBoxGeometry(0.54, 1.72, 0.03, 2, 0.02),
+        sailMat,
+      );
+      canvasBlade.position.set(0.29, 1.4, 0.02);
+      canvasBlade.rotation.y = 0.16;
+      const crossRung = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.05, 0.05), sparMat);
+      crossRung.position.set(0.29, 0.85, 0.03);
+      const crossRung2 = crossRung.clone();
+      crossRung2.position.y = 1.75;
+      arm.add(spar, canvasBlade, crossRung, crossRung2);
+      sailHub.add(arm);
+    }
+    windmillSailHub = sailHub;
+
+    windmill.add(wmPlinth, wmTower, wmBand1, wmBand2, wmDoor, wmWin, wmRoof, wmFinial, sailHub);
+    addInteractionProxy(
+      windmill,
+      [3.0, 5.4, 3.0],
+      2.6,
+      {
+        kind: 'zone',
+        zone: 'garden' as ZoneId,
+        tx: TOWN_ZONE_ENTRANCES.garden.tx,
+        tz: TOWN_ZONE_ENTRANCES.garden.tz,
+      },
+      clickTargets,
+    );
+    colliders.push({type: 'circle', id: 'garden_windmill', x: 24.3, z: -15.6, r: 1.58});
+    group.add(windmill);
   }
 
   // ========== DISTRICT 3: TIỆM THỜI TRANG (Parisian Pastel Boutique) ==========
@@ -1849,7 +2127,7 @@ export function buildTownScene(): TownWorld {
     [-22.5, -15.8, '#F9C74F'],
     [-16.2, -16.2, '#F28482'],
     [14.8, -18.2, '#F7A8B8'],
-    [22.4, -17.4, '#F9C74F'],
+    [21.2, -19.2, '#F9C74F'],
     [-25.0, 2.8, '#A8D8EA'],
     [-19.6, 9.8, '#F7A8B8'],
     [25.6, 2.4, '#F28482'],
@@ -2075,6 +2353,11 @@ export function buildTownScene(): TownWorld {
         chimneySmokeMesh.setMatrixAt(i, _smokeDummy.matrix);
       }
       chimneySmokeMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // 3. Spin Windmill Sails beside the Conservatory Greenhouse
+    if (windmillSailHub) {
+      windmillSailHub.rotation.z = -elapsed * 0.55;
     }
   };
 

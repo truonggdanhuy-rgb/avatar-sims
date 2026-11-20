@@ -14,6 +14,7 @@ import {
   ZoneId,
 } from '../types/game';
 import {buildAvatarRig, updateAvatarRigAnimation} from './avatar3d';
+import {buildPlotBotanicalDecor} from './crops3d';
 import {buildFurnitureMesh} from './furniture3d';
 import {
   clayMat,
@@ -57,6 +58,7 @@ export interface SubzoneWorld {
   colliders: WorldCollider[];
   doors?: HouseDoorHandle[];
   wallSurfaces?: HouseWallSurface[];
+  triggerPondFeed?: () => void;
   update: (elapsed: number, timeOfDay: TimeOfDay, context?: SubzoneUpdateContext) => void;
   dispose: () => void;
 }
@@ -144,6 +146,7 @@ export function buildSubzoneScene(
   const disposables: THREE.Texture[] = [];
   let doors: HouseDoorHandle[] | undefined;
   let wallSurfaces: HouseWallSurface[] | undefined;
+  let triggerPondFeedFn: (() => void) | undefined;
   let updateFn: (elapsed: number, timeOfDay: TimeOfDay, context?: SubzoneUpdateContext) => void =
     () => {};
 
@@ -939,13 +942,13 @@ export function buildSubzoneScene(
       }
     };
   } else if (zone === 'garden') {
-    // Spacious Open Farm Estate (42m x 34m) — lush grass, tall trees, 2 separate coops, fish pond + bridge, covered farm kitchen & 20 crop beds
+    // Spacious Open Farm Estate (54m x 40m) — lush grass, tall trees, 2 wide coops with low fences, big fish pond + bridge, back workshop row + mini warehouse & 20 crop beds
     const farmGrassTex = createGrassTexture();
-    farmGrassTex.repeat.set(10, 9);
+    farmGrassTex.repeat.set(13, 10);
     disposables.push(farmGrassTex);
 
     const grassFloor = new THREE.Mesh(
-      new THREE.PlaneGeometry(42.0, 34.0),
+      new THREE.PlaneGeometry(54.0, 40.0),
       new THREE.MeshStandardMaterial({map: farmGrassTex, roughness: 0.88, metalness: 0}),
     );
     grassFloor.rotation.x = -Math.PI / 2;
@@ -953,48 +956,90 @@ export function buildSubzoneScene(
     groundMesh = grassFloor;
     group.add(grassFloor);
 
-    // Warm stone farm paths connecting Entrance, 20 Crop Beds, Back Workshop Row, 2 Coops & Pond
-    const pathMat = clayMat('#E6D4B5', 0.88);
-    const centerWalk = new THREE.Mesh(new RoundedBoxGeometry(2.5, 0.04, 19.2, 2, 0.02), pathMat);
-    centerWalk.position.set(0, 0.015, 3.8);
-    const crossRoad = new THREE.Mesh(new RoundedBoxGeometry(22.4, 0.04, 2.3, 2, 0.02), pathMat);
-    crossRoad.position.set(0, 0.016, -4.6);
-    const poultryPath = new THREE.Mesh(new RoundedBoxGeometry(2.6, 0.04, 2.0, 2, 0.02), pathMat);
-    poultryPath.position.set(-8.2, 0.016, -0.3);
-    const cattlePath = new THREE.Mesh(new RoundedBoxGeometry(2.6, 0.04, 2.0, 2, 0.02), pathMat);
-    cattlePath.position.set(-8.2, 0.016, 5.9);
-    const pondPath = new THREE.Mesh(new RoundedBoxGeometry(2.5, 0.04, 2.0, 2, 0.02), pathMat);
-    pondPath.position.set(7.6, 0.016, 2.1);
-    group.add(centerWalk, crossRoad, poultryPath, cattlePath, pondPath);
+    // Sparse Town-Style Natural Stepping Stones directly on the grass (1 lightweight InstancedMesh draw call)
+    const stepStoneSpots: [number, number, number, number][] = [];
+    // Main center north-south stepping stones
+    for (let i = 0, pz = -4.2; pz <= 12.2; i++, pz += 1.18) {
+      const sx = (i % 2 === 0 ? -0.44 : 0.44) + ((i % 3) - 1) * 0.08;
+      const scale = 0.88 + (i % 3) * 0.14;
+      stepStoneSpots.push([sx, pz, scale, (i * 0.55) % (Math.PI * 2)]);
+    }
+    // East-west workshop cross-path stepping stones
+    for (let i = 0; i < 24; i++) {
+      const px = -12.6 + i * 1.22;
+      if (px > 15.2) break;
+      if (Math.abs(px) < 1.15) continue;
+      const sz = -4.8 + (i % 2 === 0 ? -0.36 : 0.36);
+      const scale = 0.86 + ((i + 1) % 3) * 0.12;
+      stepStoneSpots.push([px, sz, scale, (i * 0.72) % (Math.PI * 2)]);
+    }
+    // Branches to Poultry Coop, Cattle Barn & Fish Pond Bridge
+    for (const [bx, bz, s, rot] of [
+      [-6.8, -0.6, 0.94, 0.3],
+      [-7.9, -0.9, 1.05, 1.1],
+      [-9.0, -0.5, 0.9, 2.0],
+      [-6.8, 6.8, 1.0, 0.6],
+      [-7.9, 6.4, 0.92, 1.4],
+      [-9.0, 6.8, 1.04, 2.5],
+      [6.8, 2.75, 0.95, 0.4],
+      [7.85, 3.2, 1.06, 1.3],
+      [8.8, 2.95, 0.98, 2.1],
+    ] as [number, number, number, number][]) {
+      stepStoneSpots.push([bx, bz, s, rot]);
+    }
 
-    // Tall broad-canopy trees surrounding the Farm Estate perimeter (3 draw calls total!)
+    const stepStoneGeo = new THREE.CylinderGeometry(0.42, 0.48, 0.055, 9);
+    const stepStoneMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.84});
+    const stepStoneIM = new THREE.InstancedMesh(stepStoneGeo, stepStoneMat, stepStoneSpots.length);
+    const stoneDummy = new THREE.Object3D();
+    const stoneCol = new THREE.Color();
+    const stonePalette = ['#E4D6C0', '#D6C5AC', '#EBE0CD', '#CBBBA2'];
+    stepStoneSpots.forEach(([sx, sz, s, rot], i) => {
+      stoneDummy.position.set(sx, 0.025, sz);
+      stoneDummy.rotation.set(0, rot, 0);
+      stoneDummy.scale.set(s * (1 + (i % 2) * 0.16), 1, s * 0.86);
+      stoneDummy.updateMatrix();
+      stepStoneIM.setMatrixAt(i, stoneDummy.matrix);
+      stoneCol.set(stonePalette[i % stonePalette.length]);
+      stepStoneIM.setColorAt(i, stoneCol);
+    });
+    stepStoneIM.instanceMatrix.needsUpdate = true;
+    if (stepStoneIM.instanceColor) stepStoneIM.instanceColor.needsUpdate = true;
+    stepStoneIM.computeBoundingSphere();
+    group.add(stepStoneIM);
+
+    // Tall broad-canopy trees surrounding the expanded Farm Estate perimeter (3 draw calls total!)
     const {trunkGeo, lowerCanopyGeo, upperCanopyGeo} = createTreeGeometries();
     const farmTreeList: [number, number, number][] = [
       // Back grove (-Z)
-      [-18.0, -14.4, 1.68],
-      [-12.2, -14.6, 1.56],
-      [-6.2, -14.8, 1.7],
-      [0.0, -15.0, 1.75],
-      [6.4, -14.8, 1.64],
-      [12.2, -14.6, 1.58],
-      [18.0, -14.2, 1.72],
+      [-23.5, -17.2, 1.72],
+      [-17.5, -17.4, 1.62],
+      [-11.5, -17.5, 1.7],
+      [-5.5, -17.6, 1.66],
+      [0.5, -17.6, 1.76],
+      [6.5, -17.5, 1.64],
+      [12.5, -17.4, 1.6],
+      [18.5, -17.3, 1.7],
+      [23.8, -17.0, 1.74],
       // Left forest border (-X)
-      [-18.8, -9.6, 1.66],
-      [-19.0, -3.8, 1.76],
-      [-19.0, 2.4, 1.64],
-      [-18.8, 8.6, 1.72],
-      [-18.0, 13.4, 1.58],
+      [-24.2, -12.2, 1.68],
+      [-24.4, -5.8, 1.76],
+      [-24.4, 0.8, 1.66],
+      [-24.2, 7.4, 1.72],
+      [-23.6, 13.8, 1.62],
       // Right forest border (+X)
-      [18.6, -9.2, 1.66],
-      [19.0, -3.2, 1.74],
-      [18.8, 3.0, 1.64],
-      [18.6, 8.8, 1.7],
-      [17.8, 13.4, 1.58],
+      [24.0, -12.0, 1.68],
+      [24.4, -5.6, 1.75],
+      [24.4, 1.0, 1.66],
+      [24.2, 7.6, 1.7],
+      [23.5, 13.8, 1.6],
       // Front corner shade trees flanking the entrance (clear of center gate)
-      [-12.2, 13.8, 1.54],
-      [-6.5, 14.2, 1.48],
-      [6.5, 14.2, 1.5],
-      [12.2, 13.8, 1.56],
+      [-19.2, 16.0, 1.6],
+      [-12.8, 16.2, 1.54],
+      [-6.8, 16.4, 1.5],
+      [6.8, 16.4, 1.52],
+      [12.8, 16.2, 1.56],
+      [19.2, 16.0, 1.62],
     ];
     const treeTrunkIM = new THREE.InstancedMesh(
       trunkGeo,
@@ -1036,7 +1081,7 @@ export function buildSubzoneScene(
     if (treeUpperIM.instanceColor) treeUpperIM.instanceColor.needsUpdate = true;
     group.add(treeTrunkIM, treeLowerIM, treeUpperIM);
 
-    // Helper for small wooden fences (used for crop borders & animal pasture)
+    // Helper for small wooden fences (used for crop borders & low symbolic pasture borders)
     const picketWoodMat = clayMat('#F7ECD9', 0.72);
     const railWoodMat = clayMat('#DFCAA8', 0.74);
     const ranchPostMat = clayMat('#9E6B40', 0.78);
@@ -1061,45 +1106,42 @@ export function buildSubzoneScene(
       colliders.push({type: 'box', x: midX, z: zPos, hw: len / 2 + 0.08, hd: 0.16});
     };
 
+    // Low symbolic ranch fences (~0.42m posts + single low rail at y=0.25) so coops stay open & airy
     const buildRanchFenceX = (xStart: number, xEnd: number, zPos: number) => {
       const len = Math.abs(xEnd - xStart);
       const midX = (xStart + xEnd) / 2;
-      const railTop = new THREE.Mesh(new RoundedBoxGeometry(len, 0.1, 0.09, 2, 0.02), ranchRailMat);
-      railTop.position.set(midX, 0.68, zPos);
-      const railBot = new THREE.Mesh(new RoundedBoxGeometry(len, 0.1, 0.09, 2, 0.02), ranchRailMat);
-      railBot.position.set(midX, 0.36, zPos);
-      group.add(railTop, railBot);
-      const count = Math.max(2, Math.round(len / 1.45) + 1);
+      const railLow = new THREE.Mesh(new RoundedBoxGeometry(len, 0.07, 0.07, 2, 0.02), ranchRailMat);
+      railLow.position.set(midX, 0.25, zPos);
+      group.add(railLow);
+      const count = Math.max(2, Math.round(len / 1.75) + 1);
       for (let i = 0; i < count; i++) {
         const px = xStart + (i / (count - 1)) * (xEnd - xStart);
-        const post = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.92, 0.16, 2, 0.04), ranchPostMat);
-        post.position.set(px, 0.46, zPos);
+        const post = new THREE.Mesh(new RoundedBoxGeometry(0.13, 0.42, 0.13, 2, 0.03), ranchPostMat);
+        post.position.set(px, 0.21, zPos);
         group.add(post);
       }
-      colliders.push({type: 'box', x: midX, z: zPos, hw: len / 2 + 0.08, hd: 0.18});
+      colliders.push({type: 'box', x: midX, z: zPos, hw: len / 2 + 0.06, hd: 0.14});
     };
 
     const buildRanchFenceZ = (xPos: number, zStart: number, zEnd: number) => {
       const len = Math.abs(zEnd - zStart);
       const midZ = (zStart + zEnd) / 2;
-      const railTop = new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.1, len, 2, 0.02), ranchRailMat);
-      railTop.position.set(xPos, 0.68, midZ);
-      const railBot = new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.1, len, 2, 0.02), ranchRailMat);
-      railBot.position.set(xPos, 0.36, midZ);
-      group.add(railTop, railBot);
-      const count = Math.max(2, Math.round(len / 1.45) + 1);
+      const railLow = new THREE.Mesh(new RoundedBoxGeometry(0.07, 0.07, len, 2, 0.02), ranchRailMat);
+      railLow.position.set(xPos, 0.25, midZ);
+      group.add(railLow);
+      const count = Math.max(2, Math.round(len / 1.75) + 1);
       for (let i = 0; i < count; i++) {
         const pz = zStart + (i / (count - 1)) * (zEnd - zStart);
-        const post = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.92, 0.16, 2, 0.04), ranchPostMat);
-        post.position.set(xPos, 0.46, pz);
+        const post = new THREE.Mesh(new RoundedBoxGeometry(0.13, 0.42, 0.13, 2, 0.03), ranchPostMat);
+        post.position.set(xPos, 0.21, pz);
         group.add(post);
       }
-      colliders.push({type: 'box', x: xPos, z: midZ, hw: 0.18, hd: len / 2 + 0.08});
+      colliders.push({type: 'box', x: xPos, z: midZ, hw: 0.14, hd: len / 2 + 0.06});
     };
 
-    // === 1. BẾP NÔNG TRẠI CÓ MÁI CHE DỄ THƯƠNG (Back Center: X = 0, Z = -8.6) ===
+    // === 1. BẾP NÔNG TRẠI CÓ MÁI CHE DỄ THƯƠNG (Back Center: X = 0, Z = -8.8) ===
     const kitchenCottage = new THREE.Group();
-    kitchenCottage.position.set(0, 0, -8.6);
+    kitchenCottage.position.set(0, 0, -8.8);
 
     const kDeck = new THREE.Mesh(
       new RoundedBoxGeometry(4.8, 0.18, 3.6, 2, 0.05),
@@ -1231,17 +1273,17 @@ export function buildSubzoneScene(
       {kind: 'farm_kitchen', tx: 0, tz: -5.4},
       clickTargets,
     );
-    colliders.push({type: 'box', x: 0, z: -8.6, hw: 2.45, hd: 1.85});
+    colliders.push({type: 'box', x: 0, z: -8.8, hw: 2.45, hd: 1.85});
     labelAnchors.push({
       id: 'farm_kitchen',
       label: 'Bếp Nông Trại',
-      worldPos: new THREE.Vector3(0, 4.25, -8.6),
+      worldPos: new THREE.Vector3(0, 4.25, -8.8),
     });
     group.add(kitchenCottage);
 
-    // === 2. MÁY ÉP & XAY CÓ MÁI CHE (Back Left: X = -5.8, Z = -8.3) ===
+    // === 2. MÁY ÉP & XAY CÓ MÁI CHE (Back Left: X = -6.6, Z = -8.6) ===
     const millShed = new THREE.Group();
-    millShed.position.set(-5.8, 0, -8.3);
+    millShed.position.set(-6.6, 0, -8.6);
     const mDeck = new THREE.Mesh(
       new RoundedBoxGeometry(3.2, 0.14, 2.5, 2, 0.04),
       clayMat('#D9C3A3', 0.8),
@@ -1293,46 +1335,147 @@ export function buildSubzoneScene(
       millShed,
       [3.3, 2.6, 2.6],
       [0, 1.25, 0],
-      {kind: 'farm_mill', tx: -5.8, tz: -5.4},
+      {kind: 'farm_mill', tx: -6.6, tz: -5.4},
       clickTargets,
     );
-    colliders.push({type: 'box', x: -5.8, z: -8.3, hw: 1.65, hd: 1.3});
+    colliders.push({type: 'box', x: -6.6, z: -8.6, hw: 1.65, hd: 1.3});
     labelAnchors.push({
       id: 'farm_mill',
       label: 'Máy Ép & Xay',
-      worldPos: new THREE.Vector3(-5.8, 2.75, -8.3),
+      worldPos: new THREE.Vector3(-6.6, 2.75, -8.6),
     });
     group.add(millShed);
 
-    // === 3. GIẾNG NƯỚC (Back Far Left: X = -10.8, Z = -7.8) ===
+    // === 3. GIẾNG NƯỚC ĐÁ XẾP MÁI NGÓI CỔ TÍCH (Back Far Left: X = -12.6, Z = -8.2) ===
     const well = new THREE.Group();
-    well.position.set(-10.8, 0, -7.8);
-    const wellWall = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.78, 0.86, 0.78, 14),
-      clayMat('#9EA8B3', 0.78),
+    well.position.set(-12.6, 0, -8.2);
+    const wellApron = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.18, 1.24, 0.08, 16),
+      clayMat('#D7C7AE', 0.88),
     );
-    wellWall.position.y = 0.39;
+    wellApron.position.y = 0.04;
+    const wellCore = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.74, 0.8, 0.72, 14),
+      clayMat('#8D969E', 0.84),
+    );
+    wellCore.position.y = 0.4;
+    // Outer ring of 12 rustic beveled cobble bricks
+    const wellBrickColors = ['#A8B1B8', '#98A2AB', '#B7BEC4', '#8A949E'];
+    for (let bi = 0; bi < 12; bi++) {
+      const ang = (bi / 12) * Math.PI * 2;
+      const brick = new THREE.Mesh(
+        new RoundedBoxGeometry(0.36, 0.24, 0.22, 2, 0.04),
+        clayMat(wellBrickColors[bi % wellBrickColors.length], 0.82),
+      );
+      brick.position.set(Math.sin(ang) * 0.78, 0.24 + (bi % 2) * 0.24, Math.cos(ang) * 0.78);
+      brick.rotation.y = ang;
+      well.add(brick);
+    }
+    const wellCoping = new THREE.Mesh(
+      new THREE.TorusGeometry(0.76, 0.12, 8, 18),
+      clayMat('#C4B9A5', 0.78),
+    );
+    wellCoping.rotation.x = Math.PI / 2;
+    wellCoping.position.y = 0.76;
     const wellWater = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.6, 0.6, 0.08, 14),
-      glossyClayMat('#5CC2EB', 0.12),
+      new THREE.CylinderGeometry(0.64, 0.64, 0.06, 16),
+      glossyClayMat('#3AB7E2', 0.1),
     );
-    wellWater.position.y = 0.76;
-    const wellPostL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.15, 8), clayMat('#8C5D38'));
-    wellPostL.position.set(-0.68, 1.15, 0);
+    wellWater.position.y = 0.66;
+
+    // Timber uprights, knee braces & crossbeam
+    const wellPostL = new THREE.Mesh(new RoundedBoxGeometry(0.14, 1.52, 0.14, 2, 0.03), timberMat);
+    wellPostL.position.set(-0.78, 1.48, 0);
     const wellPostR = wellPostL.clone();
-    wellPostR.position.set(0.68, 1.15, 0);
-    const wellRoof = new THREE.Mesh(new THREE.ConeGeometry(1.02, 0.65, 4), clayMat('#C9735B', 0.68));
-    wellRoof.rotation.y = Math.PI / 4;
-    wellRoof.position.y = 1.88;
-    well.add(wellWall, wellWater, wellPostL, wellPostR, wellRoof);
-    addBoxProxy(well, [1.9, 2.2, 1.9], [0, 1.0, 0], {kind: 'well', tx: -9.4, tz: -5.6}, clickTargets);
-    colliders.push({type: 'circle', x: -10.8, z: -7.8, r: 0.96});
-    labelAnchors.push({id: 'well', label: 'Giếng Nước', worldPos: new THREE.Vector3(-10.8, 2.45, -7.8)});
+    wellPostR.position.x = 0.78;
+    const wellBraceL = new THREE.Mesh(new RoundedBoxGeometry(0.1, 0.42, 0.1, 2, 0.02), timberMat);
+    wellBraceL.position.set(-0.6, 1.88, 0);
+    wellBraceL.rotation.z = -0.65;
+    const wellBraceR = wellBraceL.clone();
+    wellBraceR.position.x = 0.6;
+    wellBraceR.rotation.z = 0.65;
+
+    // Pitched shingle gable roof + cream pediment
+    const wellRoofShape = new THREE.Shape();
+    wellRoofShape.moveTo(-1.12, 0);
+    wellRoofShape.lineTo(0, 0.74);
+    wellRoofShape.lineTo(1.12, 0);
+    wellRoofShape.closePath();
+    const wellRoofGeo = new THREE.ExtrudeGeometry(wellRoofShape, {
+      depth: 1.54,
+      bevelEnabled: true,
+      bevelThickness: 0.04,
+      bevelSize: 0.04,
+      bevelSegments: 2,
+    });
+    wellRoofGeo.center();
+    const wellRoof = new THREE.Mesh(wellRoofGeo, clayMat('#C96A4F', 0.66));
+    wellRoof.rotation.y = Math.PI / 2;
+    wellRoof.position.y = 2.36;
+    const wellRidge = new THREE.Mesh(
+      new RoundedBoxGeometry(1.68, 0.12, 0.14, 2, 0.03),
+      clayMat('#9F4A36', 0.62),
+    );
+    wellRidge.position.y = 2.74;
+
+    // Windlass roller + crank + hanging wooden rope bucket
+    const windlass = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 1.56, 10),
+      clayMat('#9E6B40', 0.72),
+    );
+    windlass.rotation.z = Math.PI / 2;
+    windlass.position.y = 1.66;
+    const crankArm = new THREE.Mesh(
+      new RoundedBoxGeometry(0.06, 0.24, 0.06, 2, 0.02),
+      clayMat('#4F5861', 0.48),
+    );
+    crankArm.position.set(0.92, 1.58, 0.06);
+    const rope = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.018, 0.54, 6),
+      clayMat('#E2C892', 0.85),
+    );
+    rope.position.set(0, 1.38, 0);
+    const hangBucket = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.14, 0.26, 10),
+      clayMat('#AA7041', 0.72),
+    );
+    hangBucket.position.set(0, 1.04, 0);
+    const bucketRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.17, 0.02, 6, 12),
+      clayMat('#5E6873', 0.42),
+    );
+    bucketRim.rotation.x = Math.PI / 2;
+    bucketRim.position.set(0, 1.14, 0);
+    const groundBucket = hangBucket.clone();
+    groundBucket.position.set(0.76, 0.2, 0.68);
+    groundBucket.scale.setScalar(0.9);
+
+    well.add(
+      wellApron,
+      wellCore,
+      wellCoping,
+      wellWater,
+      wellPostL,
+      wellPostR,
+      wellBraceL,
+      wellBraceR,
+      wellRoof,
+      wellRidge,
+      windlass,
+      crankArm,
+      rope,
+      hangBucket,
+      bucketRim,
+      groundBucket,
+    );
+    addBoxProxy(well, [2.1, 2.6, 2.1], [0, 1.2, 0], {kind: 'well', tx: -11.0, tz: -5.6}, clickTargets);
+    colliders.push({type: 'circle', x: -12.6, z: -8.2, r: 1.05});
+    labelAnchors.push({id: 'well', label: 'Giếng Nước', worldPos: new THREE.Vector3(-12.6, 2.95, -8.2)});
     group.add(well);
 
-    // === 4. BẢNG ĐƠN HÀNG & KHO (Back Right: X = 5.8, Z = -8.1) ===
+    // === 4A. BẢNG ĐƠN HÀNG (Back Right: X = 5.2, Z = -8.4) ===
     const board = new THREE.Group();
-    board.position.set(5.8, 0, -8.1);
+    board.position.set(5.2, 0, -8.4);
     const postL = new THREE.Mesh(new RoundedBoxGeometry(0.18, 2.0, 0.18, 2, 0.03), clayMat('#8C5D38'));
     postL.position.set(-0.95, 1.0, 0);
     const postR = postL.clone();
@@ -1364,34 +1507,234 @@ export function buildSubzoneScene(
       board,
       [2.5, 2.4, 1.6],
       [0, 1.15, 0.15],
-      {kind: 'order_board', tx: 5.8, tz: -5.4},
+      {kind: 'order_board', tx: 5.2, tz: -5.4},
       clickTargets,
     );
-    colliders.push({type: 'box', x: 5.8, z: -8.1, hw: 1.3, hd: 0.75});
+    colliders.push({type: 'box', x: 5.2, z: -8.4, hw: 1.3, hd: 0.75});
     labelAnchors.push({
       id: 'order_board',
-      label: 'Đơn Hàng & Kho',
-      worldPos: new THREE.Vector3(5.8, 2.65, -8.1),
+      label: 'Bảng Đơn Hàng',
+      worldPos: new THREE.Vector3(5.2, 2.65, -8.4),
     });
     group.add(board);
 
-    // === 5. HAI CHUỒNG NUÔI THÚ RIÊNG BIỆT (Left Wing: X -16.2..-9.2) ===
-    // 5A. CHUỒNG GIA CẦM (GÀ & VỊT: Z -3.2..+2.0, cổng tại Z -1.2..+0.6)
-    buildRanchFenceZ(-16.2, -3.2, 2.0);
-    buildRanchFenceX(-16.2, -9.2, -3.2);
-    buildRanchFenceX(-16.2, -9.2, 2.0);
-    buildRanchFenceZ(-9.2, -3.2, -1.25);
-    buildRanchFenceZ(-9.2, 0.65, 2.0);
+    // === 4B. NHÀ KHO BÉ BÊN CẠNH BẢNG ĐƠN HÀNG (X = 9.0, Z = -8.5) ===
+    const storageShed = new THREE.Group();
+    storageShed.position.set(9.0, 0, -8.5);
+    const sDeck = new THREE.Mesh(
+      new RoundedBoxGeometry(2.45, 0.14, 2.05, 2, 0.04),
+      clayMat('#D9C3A3', 0.8),
+    );
+    sDeck.position.y = 0.07;
+    const sWalls = new THREE.Mesh(
+      new RoundedBoxGeometry(2.1, 1.32, 1.72, 2, 0.05),
+      clayMat('#FFF2DD', 0.76),
+    );
+    sWalls.position.y = 0.78;
+    const sRoofShape = new THREE.Shape();
+    sRoofShape.moveTo(-1.35, 0);
+    sRoofShape.lineTo(0, 0.92);
+    sRoofShape.lineTo(1.35, 0);
+    sRoofShape.closePath();
+    const sRoofGeo = new THREE.ExtrudeGeometry(sRoofShape, {
+      depth: 2.08,
+      bevelEnabled: true,
+      bevelThickness: 0.05,
+      bevelSize: 0.05,
+      bevelSegments: 2,
+    });
+    sRoofGeo.center();
+    const sRoof = new THREE.Mesh(sRoofGeo, clayMat('#C66A4E', 0.64));
+    sRoof.position.set(0, 1.92, 0);
+    const sDoor = new THREE.Mesh(
+      new RoundedBoxGeometry(0.95, 1.02, 0.1, 2, 0.03),
+      clayMat('#9E673D', 0.74),
+    );
+    sDoor.position.set(0, 0.62, 0.86);
+    const sDoorStrap = new THREE.Mesh(
+      new RoundedBoxGeometry(0.98, 0.1, 0.12, 2, 0.02),
+      clayMat('#4B5563', 0.5),
+    );
+    sDoorStrap.position.set(0, 0.85, 0.87);
+    const sWindow = new THREE.Mesh(
+      new RoundedBoxGeometry(0.38, 0.28, 0.1, 2, 0.02),
+      glossyClayMat('#B5E0F5', 0.2),
+    );
+    sWindow.position.set(0, 1.66, 0.88);
+    const sSack = new THREE.Mesh(
+      new THREE.SphereGeometry(0.24, 9, 8),
+      clayMat('#E0BE7D', 0.82),
+    );
+    sSack.scale.set(1.0, 1.25, 0.9);
+    sSack.position.set(0.78, 0.32, 0.94);
+    const sCrate = new THREE.Mesh(
+      new RoundedBoxGeometry(0.46, 0.36, 0.42, 2, 0.03),
+      clayMat('#B8804E', 0.72),
+    );
+    sCrate.position.set(-0.76, 0.28, 0.94);
+    storageShed.add(sDeck, sWalls, sRoof, sDoor, sDoorStrap, sWindow, sSack, sCrate);
+    addBoxProxy(
+      storageShed,
+      [2.6, 2.5, 2.2],
+      [0, 1.25, 0.1],
+      {kind: 'farm_storage', tx: 9.0, tz: -5.4},
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: 9.0, z: -8.5, hw: 1.25, hd: 1.05});
+    labelAnchors.push({
+      id: 'farm_storage',
+      label: 'Nhà Kho',
+      worldPos: new THREE.Vector3(9.0, 2.65, -8.5),
+    });
+    group.add(storageShed);
+
+    // === 4C. XE BUS SHOP NÔNG TRẠI LƯU ĐỘNG (Back Far Right: X = 14.8, Z = -8.4) ===
+    const shopBus = new THREE.Group();
+    shopBus.position.set(14.8, 0, -8.4);
+
+    // 4 Rubber Tires + Cream Hubcaps
+    const tireMat = clayMat('#2E343A', 0.85);
+    const hubMat = clayMat('#FFF3DC', 0.55);
+    [
+      [-1.42, 0.94],
+      [1.42, 0.94],
+      [-1.42, -0.94],
+      [1.42, -0.94],
+    ].forEach(([wx, wz]) => {
+      const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.26, 14), tireMat);
+      tire.rotation.x = Math.PI / 2;
+      tire.position.set(wx, 0.38, wz);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.28, 12), hubMat);
+      hub.rotation.x = Math.PI / 2;
+      hub.position.set(wx, 0.38, wz);
+      shopBus.add(tire, hub);
+    });
+
+    // Lower Mint Skirt & Upper Cream Body
+    const busLower = new THREE.Mesh(
+      new RoundedBoxGeometry(4.65, 0.92, 1.98, 3, 0.14),
+      clayMat('#6EB48C', 0.58),
+    );
+    busLower.position.set(0, 0.82, 0);
+    const busUpper = new THREE.Mesh(
+      new RoundedBoxGeometry(4.5, 1.06, 1.9, 3, 0.16),
+      clayMat('#FFF6E3', 0.65),
+    );
+    busUpper.position.set(0.05, 1.68, 0);
+
+    // Cab Front (-X): Panoramic Windshield, Headlights & Bumper
+    const windshield = new THREE.Mesh(
+      new RoundedBoxGeometry(0.14, 0.68, 1.54, 2, 0.05),
+      glossyClayMat('#9BD4EE', 0.16),
+    );
+    windshield.position.set(-2.22, 1.66, 0);
+    const frontBumper = new THREE.Mesh(
+      new RoundedBoxGeometry(0.24, 0.22, 2.04, 2, 0.06),
+      clayMat('#E8DEC8', 0.6),
+    );
+    frontBumper.position.set(-2.34, 0.44, 0);
+    const headLightL = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.11, 0.1, 10),
+      glossyClayMat('#FFE694', 0.18),
+    );
+    headLightL.rotation.z = Math.PI / 2;
+    headLightL.position.set(-2.33, 0.78, -0.62);
+    const headLightR = headLightL.clone();
+    headLightR.position.z = 0.62;
+
+    // Cut-out Serving Window Hatch on Front-Facing Side (+Z)
+    const hatchBack = new THREE.Mesh(
+      new RoundedBoxGeometry(2.55, 0.9, 0.14, 2, 0.04),
+      clayMat('#5E402D', 0.82),
+    );
+    hatchBack.position.set(0.38, 1.62, 0.89);
+
+    // Wooden Serving Counter Shelf + Goods
+    const counterShelf = new THREE.Mesh(
+      new RoundedBoxGeometry(2.72, 0.12, 0.48, 2, 0.04),
+      clayMat('#D99A5B', 0.65),
+    );
+    counterShelf.position.set(0.38, 1.18, 1.12);
+
+    // Little Seed Pouches & Feed Jars on Counter
+    [
+      [-0.55, '#E7B94B'],
+      [-0.22, '#6BA383'],
+      [0.12, '#EF8432'],
+      [0.45, '#59A6CE'],
+      [0.78, '#D95970'],
+    ].forEach(([gx, col], gi) => {
+      const item = new THREE.Mesh(
+        gi >= 3
+          ? new THREE.CylinderGeometry(0.11, 0.11, 0.24, 8)
+          : new RoundedBoxGeometry(0.22, 0.26, 0.14, 2, 0.03),
+        glossyClayMat(col as string, 0.35),
+      );
+      item.position.set(0.38 + (gx as number), 1.36, 1.14);
+      shopBus.add(item);
+    });
+
+    // Striped Awning Over Cut-out Window (+Z)
+    for (let s = 0; s < 6; s++) {
+      const stripe = new THREE.Mesh(
+        new RoundedBoxGeometry(0.46, 0.1, 0.86, 2, 0.03),
+        clayMat(s % 2 === 0 ? '#E4725B' : '#FFF7E8', 0.6),
+      );
+      stripe.position.set(0.38 - 1.15 + s * 0.46, 2.06, 1.24);
+      stripe.rotation.x = 0.28;
+      shopBus.add(stripe);
+    }
+
+    // Rooftop Rack & Signboard
+    const roofSignBoard = new THREE.Mesh(
+      new RoundedBoxGeometry(2.1, 0.42, 0.16, 2, 0.05),
+      clayMat('#F5C85B', 0.55),
+    );
+    roofSignBoard.position.set(0.15, 2.42, 0.35);
+
+    shopBus.add(
+      busLower,
+      busUpper,
+      windshield,
+      frontBumper,
+      headLightL,
+      headLightR,
+      hatchBack,
+      counterShelf,
+      roofSignBoard,
+    );
+    addBoxProxy(
+      shopBus,
+      [5.0, 2.8, 2.6],
+      [0, 1.35, 0.15],
+      {kind: 'farm_shop', tx: 14.8, tz: -5.4},
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: 14.8, z: -8.4, hw: 2.45, hd: 1.15});
+    labelAnchors.push({
+      id: 'farm_shop',
+      label: 'Xe Bus Shop',
+      worldPos: new THREE.Vector3(14.8, 2.95, -8.4),
+    });
+    group.add(shopBus);
+
+    // === 5. HAI CHUỒNG NUÔI THÚ RỘNG RÃI VỚI ĐẤT CHUỒNG PHỦ ĐẦY & ĐỒ VẬT CÂN ĐỐI ===
+    // 5A. CHUỒNG GIA CẦM (GÀ & VỊT: X -21.2..-10.4, Z -4.0..+2.2, cổng tại Z -1.75..+0.35)
+    buildRanchFenceZ(-21.2, -4.0, 2.2);
+    buildRanchFenceX(-21.2, -10.4, -4.0);
+    buildRanchFenceX(-21.2, -10.4, 2.2);
+    buildRanchFenceZ(-10.4, -4.0, -1.75);
+    buildRanchFenceZ(-10.4, 0.35, 2.2);
 
     const poultryEarth = new THREE.Mesh(
-      new RoundedBoxGeometry(5.6, 0.03, 4.1, 2, 0.02),
+      new RoundedBoxGeometry(10.35, 0.03, 5.8, 2, 0.02),
       clayMat('#C8B482', 0.9),
     );
-    poultryEarth.position.set(-12.7, 0.012, -0.6);
+    poultryEarth.position.set(-15.8, 0.012, -0.9);
     group.add(poultryEarth);
 
     const coopHouse = new THREE.Group();
-    coopHouse.position.set(-14.2, 0, -1.65);
+    coopHouse.position.set(-19.25, 0, -2.55);
     const cBody = new THREE.Mesh(new RoundedBoxGeometry(2.2, 1.35, 1.7, 2, 0.05), clayMat('#F2D59B', 0.68));
     cBody.position.y = 0.68;
     const cRoof = new THREE.Mesh(new RoundedBoxGeometry(2.55, 0.2, 2.05, 2, 0.05), clayMat('#D97A54', 0.62));
@@ -1401,55 +1744,66 @@ export function buildSubzoneScene(
     cDoor.position.set(0.35, 0.36, 0.85);
     coopHouse.add(cBody, cRoof, cDoor);
     group.add(coopHouse);
-    colliders.push({type: 'box', x: -14.2, z: -1.65, hw: 1.2, hd: 0.95});
+    colliders.push({type: 'box', x: -19.25, z: -2.55, hw: 1.25, hd: 0.98});
+
+    // Cozy nesting straw box along the back fence of the expanded poultry yard
+    const nestRack = new THREE.Group();
+    nestRack.position.set(-15.2, 0, -3.15);
+    const nestBox = new THREE.Mesh(new RoundedBoxGeometry(1.5, 0.34, 0.72, 2, 0.04), clayMat('#A97447', 0.78));
+    nestBox.position.y = 0.17;
+    const nestStraw = new THREE.Mesh(new RoundedBoxGeometry(1.3, 0.14, 0.54, 2, 0.04), clayMat('#E8C666', 0.85));
+    nestStraw.position.y = 0.34;
+    nestRack.add(nestBox, nestStraw);
+    group.add(nestRack);
+    colliders.push({type: 'box', x: -15.2, z: -3.15, hw: 0.85, hd: 0.45});
 
     const poultryTroughCount = options.troughs?.poultry ?? 0;
     const poultryTrough = new THREE.Mesh(
-      new RoundedBoxGeometry(1.35, 0.34, 0.56, 2, 0.04),
+      new RoundedBoxGeometry(1.4, 0.34, 0.56, 2, 0.04),
       clayMat('#9E6B40', 0.76),
     );
-    poultryTrough.position.set(-11.4, 0.17, 1.15);
+    poultryTrough.position.set(-12.3, 0.17, 1.18);
     group.add(poultryTrough);
     if (poultryTroughCount > 0) {
       const feedFill = Math.min(1, 0.35 + poultryTroughCount * 0.14);
       const grain = new THREE.Mesh(
-        new RoundedBoxGeometry(1.12, 0.14 * feedFill, 0.38, 2, 0.03),
+        new RoundedBoxGeometry(1.16, 0.14 * feedFill, 0.38, 2, 0.03),
         clayMat('#F3C95B', 0.7),
       );
-      grain.position.set(-11.4, 0.33, 1.15);
+      grain.position.set(-12.3, 0.33, 1.18);
       group.add(grain);
     }
-    colliders.push({type: 'box', x: -11.4, z: 1.15, hw: 0.75, hd: 0.36});
+    colliders.push({type: 'box', x: -12.3, z: 1.18, hw: 0.78, hd: 0.38});
 
     addBoxProxy(
       group,
-      [6.4, 1.5, 4.8],
-      [-12.7, 0.75, -0.6],
-      {kind: 'pasture_spot', coop: 'poultry' as CoopKind, tx: -8.3, tz: -0.3},
+      [10.8, 1.5, 6.2],
+      [-15.8, 0.75, -0.9],
+      {kind: 'pasture_spot', coop: 'poultry' as CoopKind, tx: -9.2, tz: -0.7},
       clickTargets,
     );
     labelAnchors.push({
       id: 'pasture_poultry',
       label: poultryTroughCount > 0 ? 'Chuồng Gia Cầm' : 'Gia Cầm (Hết cám)',
-      worldPos: new THREE.Vector3(-12.7, 2.25, -1.6),
+      worldPos: new THREE.Vector3(-15.8, 2.25, -1.8),
     });
 
-    // 5B. CHUỒNG GIA SÚC (LỢN & BÒ SỮA: Z +3.0..+8.8, cổng tại Z +5.0..+6.8)
-    buildRanchFenceZ(-16.2, 3.0, 8.8);
-    buildRanchFenceX(-16.2, -9.2, 3.0);
-    buildRanchFenceX(-16.2, -9.2, 8.8);
-    buildRanchFenceZ(-9.2, 3.0, 4.95);
-    buildRanchFenceZ(-9.2, 6.85, 8.8);
+    // 5B. CHUỒNG GIA SÚC (LỢN & BÒ SỮA: X -21.2..-10.4, Z +3.2..+10.2, cổng tại Z +5.65..+7.75)
+    buildRanchFenceZ(-21.2, 3.2, 10.2);
+    buildRanchFenceX(-21.2, -10.4, 3.2);
+    buildRanchFenceX(-21.2, -10.4, 10.2);
+    buildRanchFenceZ(-10.4, 3.2, 5.65);
+    buildRanchFenceZ(-10.4, 7.75, 10.2);
 
     const cattleEarth = new THREE.Mesh(
-      new RoundedBoxGeometry(5.6, 0.03, 4.6, 2, 0.02),
+      new RoundedBoxGeometry(10.35, 0.03, 6.55, 2, 0.02),
       clayMat('#C4AD79', 0.9),
     );
-    cattleEarth.position.set(-12.7, 0.012, 5.9);
+    cattleEarth.position.set(-15.8, 0.012, 6.7);
     group.add(cattleEarth);
 
     const barn = new THREE.Group();
-    barn.position.set(-14.0, 0, 4.4);
+    barn.position.set(-19.2, 0, 4.7);
     const barnWallB = new THREE.Mesh(new RoundedBoxGeometry(2.5, 1.55, 0.2, 2, 0.04), clayMat('#D86E58', 0.66));
     barnWallB.position.set(0, 0.78, -0.85);
     const barnWallL = new THREE.Mesh(new RoundedBoxGeometry(0.2, 1.55, 1.8, 2, 0.04), clayMat('#D86E58', 0.66));
@@ -1461,43 +1815,58 @@ export function buildSubzoneScene(
     barnRoof.rotation.x = 0.12;
     barn.add(barnWallB, barnWallL, barnPostR, barnRoof);
     group.add(barn);
-    colliders.push({type: 'box', x: -14.0, z: 4.4, hw: 1.35, hd: 1.0});
+    colliders.push({type: 'box', x: -19.2, z: 4.7, hw: 1.38, hd: 1.02});
 
-    const hay1 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.66, 10), clayMat('#E8C05A', 0.82));
+    const hay1 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.68, 10), clayMat('#E8C05A', 0.82));
     hay1.rotation.z = Math.PI / 2;
-    hay1.position.set(-11.4, 0.4, 4.1);
-    group.add(hay1);
-    colliders.push({type: 'box', x: -11.4, z: 4.1, hw: 0.46, hd: 0.48});
+    hay1.position.set(-12.0, 0.4, 4.25);
+    const hay2 = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.58, 10), clayMat('#DFB44D', 0.84));
+    hay2.rotation.z = Math.PI / 2;
+    hay2.rotation.y = 0.35;
+    hay2.position.set(-13.05, 0.34, 4.05);
+    group.add(hay1, hay2);
+    colliders.push({type: 'box', x: -12.5, z: 4.2, hw: 1.05, hd: 0.6});
+
+    // Wooden drinking water tub in front-left corner of the expanded cattle yard
+    const waterTub = new THREE.Group();
+    waterTub.position.set(-19.1, 0, 9.05);
+    const tubWall = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.48, 0.42, 12), clayMat('#8E5D38', 0.78));
+    tubWall.position.y = 0.21;
+    const tubWater = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.06, 12), glossyClayMat('#55BCE6', 0.12));
+    tubWater.position.y = 0.39;
+    waterTub.add(tubWall, tubWater);
+    group.add(waterTub);
+    colliders.push({type: 'circle', x: -19.1, z: 9.05, r: 0.64});
 
     const cattleTroughCount = options.troughs?.cattle ?? 0;
     const cattleTrough = new THREE.Mesh(
-      new RoundedBoxGeometry(1.5, 0.4, 0.62, 2, 0.05),
+      new RoundedBoxGeometry(1.55, 0.4, 0.62, 2, 0.05),
       clayMat('#9E6B40', 0.76),
     );
-    cattleTrough.position.set(-11.4, 0.2, 7.65);
+    cattleTrough.position.set(-12.3, 0.2, 9.05);
     group.add(cattleTrough);
     if (cattleTroughCount > 0) {
       const feedFill = Math.min(1, 0.35 + cattleTroughCount * 0.16);
       const grain = new THREE.Mesh(
-        new RoundedBoxGeometry(1.26, 0.16 * feedFill, 0.42, 2, 0.03),
+        new RoundedBoxGeometry(1.3, 0.16 * feedFill, 0.42, 2, 0.03),
         clayMat('#F3C95B', 0.7),
       );
-      grain.position.set(-11.4, 0.39, 7.65);
+      grain.position.set(-12.3, 0.39, 9.05);
       group.add(grain);
     }
-    colliders.push({type: 'box', x: -11.4, z: 7.65, hw: 0.82, hd: 0.4});
+    colliders.push({type: 'box', x: -12.3, z: 9.05, hw: 0.84, hd: 0.42});
 
     addBoxProxy(
       group,
-      [6.4, 1.6, 5.2],
-      [-12.7, 0.8, 5.9],
-      {kind: 'pasture_spot', coop: 'cattle' as CoopKind, tx: -8.3, tz: 5.9},
+      [10.8, 1.6, 7.0],
+      [-15.8, 0.8, 6.7],
+      {kind: 'pasture_spot', coop: 'cattle' as CoopKind, tx: -9.2, tz: 6.7},
       clickTargets,
     );
     labelAnchors.push({
       id: 'pasture_cattle',
       label: cattleTroughCount > 0 ? 'Chuồng Gia Súc' : 'Gia Súc (Hết cám)',
-      worldPos: new THREE.Vector3(-12.7, 2.35, 4.4),
+      worldPos: new THREE.Vector3(-15.8, 2.35, 5.2),
     });
 
     // === 5C. ĐÀN VẬT NUÔI THẢ TỰ DO (GÀ, VỊT, LỢN, BÒ SỮA) · CON BỊ BỆNH SẼ CHUYỂN MÀU XANH LÁ ===
@@ -1520,14 +1889,19 @@ export function buildSubzoneScene(
       const s = ((idx * 37 + seedOffset * 13) % 97) / 97;
       const t = ((idx * 53 + seedOffset * 29) % 89) / 89;
       if (coop === 'poultry') {
-        let px = -15.2 + s * 5.0;
-        let pz = -0.3 + t * 1.65;
-        if (px > -12.3 && pz > 0.4) px = -13.6;
+        let px = -20.1 + s * 8.9;
+        let pz = -3.2 + t * 4.7;
+        if (px < -17.3 && pz < -1.1) pz = -0.3;
+        if (px > -16.4 && px < -13.9 && pz < -2.3) pz = -1.6;
+        if (px > -13.6 && pz > 0.3) px = -14.7;
         return [px, pz];
       }
-      let px = -15.2 + s * 5.0;
-      let pz = 5.75 + t * 2.2;
-      if (px > -12.5 && pz > 6.8) px = -13.8;
+      let px = -20.1 + s * 8.9;
+      let pz = 3.95 + t * 5.5;
+      if (px < -17.2 && pz < 6.1) pz = 6.9;
+      if (px > -14.0 && pz < 5.1) pz = 5.7;
+      if (px < -17.9 && pz > 8.1) pz = 7.7;
+      if (px > -13.7 && pz > 8.1) px = -14.9;
       return [px, pz];
     };
 
@@ -1705,7 +2079,7 @@ export function buildSubzoneScene(
         aRoot,
         [0.9, 1.2, 0.9],
         [0, 0.6, 0],
-        {kind: 'pasture_spot', coop: ani.coop, tx: -8.3, tz: ani.coop === 'poultry' ? -0.3 : 5.9},
+        {kind: 'pasture_spot', coop: ani.coop, tx: -9.2, tz: ani.coop === 'poultry' ? -0.7 : 6.7},
         clickTargets,
       );
       group.add(aRoot);
@@ -1727,129 +2101,460 @@ export function buildSubzoneScene(
       });
     });
 
-    // === 6. AO NUÔI CÁ HÌNH CHỮ NHẬT CÓ CẦU GỖ BẮT RA (Right Wing: X 8.6..14.4, Z -2.4..6.6) ===
-    const pondBank = new THREE.Mesh(
-      new RoundedBoxGeometry(6.2, 0.12, 9.4, 2, 0.06),
-      clayMat('#B7A88C', 0.86),
-    );
-    pondBank.position.set(11.5, 0.02, 2.1);
-    const pondBed = new THREE.Mesh(
-      new THREE.BoxGeometry(5.5, 0.08, 8.7),
-      clayMat('#2D6373', 0.9),
-    );
-    pondBed.position.set(11.5, 0.045, 2.1);
-    const pondWater = new THREE.Mesh(
-      new THREE.BoxGeometry(5.4, 0.08, 8.6),
-      glossyClayMat('#4AB7DE', 0.14),
-    );
-    pondWater.position.set(11.5, 0.07, 2.1);
-    group.add(pondBank, pondBed, pondWater);
+    // === 6. AO NUÔI CÁ HÌNH CHỮ NHẬT UỐN LƯỢN · BỜ RỖNG · CẦU GỖ CAO HƠN MẶT NƯỚC ===
+    const pondCX = 15.6;
+    const pondCZ = 3.0;
+    const pondSamples = 64;
+    const evalPondEdge = (th: number, scale = 1.0): [number, number] => {
+      const c = Math.cos(th);
+      const s = Math.sin(th);
+      // Soft superellipse -> wavy hand-dug rectangular lagoon instead of a circle
+      const sqX = Math.sign(c) * Math.pow(Math.abs(c), 0.56);
+      const sqZ = Math.sign(s) * Math.pow(Math.abs(s), 0.58);
+      const wX = 0.24 * Math.sin(3 * th + 0.4) + 0.14 * Math.cos(5 * th - 0.6);
+      const wZ = 0.26 * Math.cos(3 * th - 0.5) + 0.16 * Math.sin(4 * th + 0.7);
+      const wx = (sqX * 4.45 + wX) * scale;
+      const wz = (sqZ * 5.35 + wZ) * scale;
+      return [wx, wz];
+    };
 
-    // Floating lilypads & corner reeds
-    const lilyMat = clayMat('#5BB563', 0.62);
+    const makeContourPts = (scale: number): THREE.Vector2[] => {
+      const pts: THREE.Vector2[] = [];
+      for (let i = 0; i < pondSamples; i++) {
+        const th = (i / pondSamples) * Math.PI * 2;
+        const [wx, wz] = evalPondEdge(th, scale);
+        // After rotateX(-PI/2), shape.y -> -worldZ, so shape.y = -wz puts point at (wx, wz)
+        pts.push(new THREE.Vector2(wx, -wz));
+      }
+      return pts;
+    };
+
+    // Deep basin floor & bright turquoise water at y = 0.055
+    const waterShape = new THREE.Shape(makeContourPts(0.99));
+    const pondBedGeo = new THREE.ShapeGeometry(waterShape);
+    pondBedGeo.rotateX(-Math.PI / 2);
+    const pondBed = new THREE.Mesh(pondBedGeo, clayMat('#1A4E61', 0.94));
+    pondBed.position.set(pondCX, 0.015, pondCZ);
+
+    const pondWaterGeo = new THREE.ShapeGeometry(waterShape);
+    pondWaterGeo.rotateX(-Math.PI / 2);
+    const pondWater = new THREE.Mesh(pondWaterGeo, glossyClayMat('#3AB7E2', 0.12));
+    pondWater.position.set(pondCX, 0.055, pondCZ);
+
+    // HOLLOW inner sandy-earth shelf (outer = 1.07, hole = 0.94 -> never covers the water!)
+    const innerShoreShape = new THREE.Shape(makeContourPts(1.07));
+    innerShoreShape.holes.push(new THREE.Path(makeContourPts(0.94).reverse()));
+    const innerShoreGeo = new THREE.ExtrudeGeometry(innerShoreShape, {
+      depth: 0.075,
+      bevelEnabled: true,
+      bevelThickness: 0.018,
+      bevelSize: 0.08,
+      bevelSegments: 2,
+    });
+    innerShoreGeo.rotateX(-Math.PI / 2);
+    const innerShore = new THREE.Mesh(innerShoreGeo, clayMat('#A78A62', 0.9));
+    innerShore.position.set(pondCX, 0.015, pondCZ);
+
+    // HOLLOW outer grassy-mossy berm ring (outer = 1.15, hole = 1.04)
+    const outerBermShape = new THREE.Shape(makeContourPts(1.15));
+    outerBermShape.holes.push(new THREE.Path(makeContourPts(1.04).reverse()));
+    const outerBermGeo = new THREE.ExtrudeGeometry(outerBermShape, {
+      depth: 0.1,
+      bevelEnabled: true,
+      bevelThickness: 0.025,
+      bevelSize: 0.12,
+      bevelSegments: 2,
+    });
+    outerBermGeo.rotateX(-Math.PI / 2);
+    const outerBerm = new THREE.Mesh(outerBermGeo, clayMat('#7AA154', 0.88));
+    outerBerm.position.set(pondCX, 0.02, pondCZ);
+
+    group.add(pondBed, pondWater, innerShore, outerBerm);
+
+    // Instanced river boulders & pebbles lining the lagoon banks (skip bridge approach X < 11.8 & |Z - 3.0| < 1.35)
+    const pondRockList: [number, number, number, number, number][] = [];
+    for (let i = 0; i < 48; i++) {
+      const th = (i / 48) * Math.PI * 2 + ((i % 3) - 1) * 0.03;
+      const [wx, wz] = evalPondEdge(th, 1.02 + (i % 3) * 0.035);
+      const bx = pondCX + wx;
+      const bz = pondCZ + wz;
+      if (bx < 12.1 && Math.abs(bz - 3.0) < 1.35) continue;
+      const s = 0.25 + ((i * 17) % 10) * 0.028;
+      pondRockList.push([bx, bz, s, i * 1.13, i]);
+    }
+    const pondRockGeo = new THREE.DodecahedronGeometry(0.62, 1);
+    pondRockGeo.scale(1.18, 0.7, 1.0);
+    const pondRockMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.82});
+    const pondRockIM = new THREE.InstancedMesh(pondRockGeo, pondRockMat, pondRockList.length);
+    const rockDummy = new THREE.Object3D();
+    const rockCol = new THREE.Color();
+    const rockPalette = ['#939CA1', '#A6ADA6', '#7F888F', '#B6B09F', '#8E998E'];
+    pondRockList.forEach(([rx, rz, rs, rot, ci], idx) => {
+      rockDummy.position.set(rx, 0.1 + rs * 0.16, rz);
+      rockDummy.rotation.set(0.12, rot, -0.08);
+      rockDummy.scale.set(rs * (1 + (ci % 2) * 0.22), rs * 0.88, rs);
+      rockDummy.updateMatrix();
+      pondRockIM.setMatrixAt(idx, rockDummy.matrix);
+      rockCol.set(rockPalette[ci % rockPalette.length]);
+      pondRockIM.setColorAt(idx, rockCol);
+    });
+    pondRockIM.instanceMatrix.needsUpdate = true;
+    if (pondRockIM.instanceColor) pondRockIM.instanceColor.needsUpdate = true;
+    pondRockIM.computeBoundingSphere();
+    group.add(pondRockIM);
+
+    // Lightweight instanced aquatic grass blades + tiny shore wildflowers along the perimeter
+    const shoreBladeSpots: [number, number, number, number][] = [];
+    const shoreFlowerSpots: [number, number, number][] = [];
+    for (let i = 0; i < 64; i++) {
+      const th = (i / 64) * Math.PI * 2;
+      const [wx, wz] = evalPondEdge(th, 1.075);
+      const sx = pondCX + wx;
+      const sz = pondCZ + wz;
+      if (sx < 12.0 && Math.abs(sz - 3.0) < 1.45) continue;
+      shoreBladeSpots.push([sx, sz, 0.72 + (i % 4) * 0.16, i * 0.9]);
+      if (i % 2 === 0) {
+        const [fx, fz] = evalPondEdge(th + 0.04, 1.11);
+        shoreFlowerSpots.push([pondCX + fx, pondCZ + fz, i]);
+      }
+    }
+    const bladeGeo = new THREE.ConeGeometry(0.065, 0.36, 5);
+    bladeGeo.translate(0, 0.18, 0);
+    const bladeMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.75});
+    const pondGrassIM = new THREE.InstancedMesh(bladeGeo, bladeMat, shoreBladeSpots.length * 2);
+    const bladeDummy = new THREE.Object3D();
+    const bladeCol = new THREE.Color();
+    const bladePalette = ['#5BA452', '#6FB85F', '#4E9448', '#83C76A'];
+    shoreBladeSpots.forEach(([sx, sz, sc, rot], idx) => {
+      for (let b = 0; b < 2; b++) {
+        const ii = idx * 2 + b;
+        bladeDummy.position.set(sx + (b === 0 ? -0.05 : 0.05), 0.11, sz + (b === 0 ? 0.03 : -0.03));
+        bladeDummy.rotation.set(b === 0 ? 0.14 : -0.1, rot + b, b === 0 ? -0.12 : 0.14);
+        bladeDummy.scale.setScalar(sc * (b === 0 ? 1 : 0.82));
+        bladeDummy.updateMatrix();
+        pondGrassIM.setMatrixAt(ii, bladeDummy.matrix);
+        bladeCol.set(bladePalette[ii % bladePalette.length]);
+        pondGrassIM.setColorAt(ii, bladeCol);
+      }
+    });
+    pondGrassIM.instanceMatrix.needsUpdate = true;
+    if (pondGrassIM.instanceColor) pondGrassIM.instanceColor.needsUpdate = true;
+    pondGrassIM.computeBoundingSphere();
+    group.add(pondGrassIM);
+
+    const flowerBaseGeo = new THREE.CylinderGeometry(0.018, 0.024, 0.16, 5);
+    const flowerHeadGeo = new THREE.SphereGeometry(0.065, 7, 6);
+    const flowerStemIM = new THREE.InstancedMesh(
+      flowerBaseGeo,
+      clayMat('#529A49', 0.78),
+      shoreFlowerSpots.length,
+    );
+    const flowerTopIM = new THREE.InstancedMesh(
+      flowerHeadGeo,
+      new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.45}),
+      shoreFlowerSpots.length,
+    );
+    const flDummy = new THREE.Object3D();
+    const flCol = new THREE.Color();
+    const flPalette = ['#FFB6C9', '#FFF6D6', '#FCD34D', '#D8B4FE', '#FFFFFF'];
+    shoreFlowerSpots.forEach(([fx, fz, ci], idx) => {
+      flDummy.position.set(fx, 0.19, fz);
+      flDummy.rotation.set(0, 0, 0);
+      flDummy.scale.setScalar(1);
+      flDummy.updateMatrix();
+      flowerStemIM.setMatrixAt(idx, flDummy.matrix);
+      flDummy.position.set(fx, 0.27, fz);
+      flDummy.scale.set(1.15, 0.72, 1.15);
+      flDummy.updateMatrix();
+      flowerTopIM.setMatrixAt(idx, flDummy.matrix);
+      flCol.set(flPalette[ci % flPalette.length]);
+      flowerTopIM.setColorAt(idx, flCol);
+    });
+    flowerStemIM.instanceMatrix.needsUpdate = true;
+    flowerTopIM.instanceMatrix.needsUpdate = true;
+    if (flowerTopIM.instanceColor) flowerTopIM.instanceColor.needsUpdate = true;
+    group.add(flowerStemIM, flowerTopIM);
+
+    // Tall cattail pond reed clusters at wavy lagoon corners
+    const reedMat = clayMat('#5E9D53', 0.72);
+    const cattailMat = clayMat('#7D5233', 0.78);
     [
-      [10.2, -0.8],
-      [13.0, 0.2],
-      [10.6, 4.8],
-      [12.8, 5.1],
-    ].forEach(([lx, lz]) => {
-      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.04, 12), lilyMat);
-      pad.position.set(lx, 0.115, lz);
-      group.add(pad);
+      [11.7, -1.7],
+      [19.7, -0.9],
+      [19.6, 6.8],
+      [11.8, 7.6],
+      [16.2, -2.5],
+      [15.6, 8.5],
+    ].forEach(([rx, rz], ci) => {
+      const clump = new THREE.Group();
+      clump.position.set(rx, 0.06, rz);
+      for (let k = 0; k < 4; k++) {
+        const stalk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.025, 0.036, 0.68 + (k % 2) * 0.18, 5),
+          reedMat,
+        );
+        const ox = (k - 1.5) * 0.08;
+        const oz = (k % 2 === 0 ? 1 : -1) * 0.06;
+        stalk.position.set(ox, 0.34, oz);
+        stalk.rotation.z = (k - 1.5) * 0.08;
+        clump.add(stalk);
+        if (k === 1 || k === 2) {
+          const tip = new THREE.Mesh(new THREE.CapsuleGeometry(0.042, 0.14, 4, 6), cattailMat);
+          tip.position.set(ox, 0.62 + (k % 2) * 0.12, oz);
+          clump.add(tip);
+        }
+      }
+      clump.rotation.y = ci * 0.8;
+      group.add(clump);
     });
 
-    // Wooden pier/bridge extending out over the rectangular pond (X: 8.1..12.2, Z: 1.25..2.95)
+    // Floating lilypads & lotus blossoms resting cleanly on water surface y = 0.055
+    const lilyMat = clayMat('#5BB563', 0.62);
+    const lotusMat = glossyClayMat('#F8A4BA', 0.35);
+    [
+      [12.7, -0.8, true],
+      [18.3, -0.5, false],
+      [17.4, 1.1, true],
+      [12.8, 7.0, false],
+      [18.1, 6.9, true],
+    ].forEach(([lx, lz, hasBloom]) => {
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.03, 12), lilyMat);
+      pad.position.set(lx as number, 0.062, lz as number);
+      group.add(pad);
+      if (hasBloom) {
+        const lotus = new THREE.Mesh(new THREE.SphereGeometry(0.11, 7, 6), lotusMat);
+        lotus.scale.set(1.2, 0.72, 1.2);
+        lotus.position.set((lx as number) + 0.06, 0.1, lz as number);
+        group.add(lotus);
+      }
+    });
+
+    // Elevated Wooden Bridge/Pier clearly arching above the water (top y = 0.36 >> water y = 0.055!)
     const pierDeck = new THREE.Mesh(
-      new RoundedBoxGeometry(4.2, 0.14, 1.75, 2, 0.04),
+      new RoundedBoxGeometry(6.3, 0.14, 1.84, 2, 0.04),
       clayMat('#C58F5B', 0.72),
     );
-    pierDeck.position.set(10.15, 0.15, 2.1);
-    group.add(pierDeck);
+    pierDeck.position.set(12.65, 0.29, 3.0);
+    const pierStep = new THREE.Mesh(
+      new RoundedBoxGeometry(0.45, 0.14, 1.84, 2, 0.04),
+      clayMat('#B87F4B', 0.74),
+    );
+    pierStep.position.set(9.45, 0.14, 3.0);
+    const curbMat = clayMat('#A87040', 0.74);
+    const curbN = new THREE.Mesh(new RoundedBoxGeometry(6.2, 0.06, 0.1, 2, 0.02), curbMat);
+    curbN.position.set(12.65, 0.38, 2.13);
+    const curbS = curbN.clone();
+    curbS.position.z = 3.87;
+    group.add(pierDeck, pierStep, curbN, curbS);
     [
-      [9.4, 1.35],
-      [9.4, 2.85],
-      [11.9, 1.35],
-      [11.9, 2.85],
+      [10.6, 2.18],
+      [10.6, 3.82],
+      [13.0, 2.18],
+      [13.0, 3.82],
+      [15.4, 2.18],
+      [15.4, 3.82],
     ].forEach(([px, pz]) => {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.65, 8), timberMat);
-      post.position.set(px, 0.26, pz);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.095, 0.78, 8), timberMat);
+      post.position.set(px, 0.36, pz);
       group.add(post);
     });
 
-    // Water colliders leave the bridge corridor (X: 8.1..12.0, Z: 1.3..2.9) completely walkable!
-    colliders.push({type: 'box', x: 11.5, z: -0.45, hw: 2.9, hd: 1.75});
-    colliders.push({type: 'box', x: 11.5, z: 4.65, hw: 2.9, hd: 1.75});
-    colliders.push({type: 'box', x: 13.35, z: 2.1, hw: 1.15, hd: 0.9});
+    // Water colliders leave the bridge corridor (X: 9.4..15.6, Z: 2.15..3.85) completely walkable!
+    colliders.push({type: 'box', x: 15.6, z: -0.45, hw: 5.1, hd: 2.6});
+    colliders.push({type: 'box', x: 15.6, z: 6.45, hw: 5.1, hd: 2.6});
+    colliders.push({type: 'box', x: 18.2, z: 3.0, hw: 2.45, hd: 1.0});
 
-    // Swimming 3D Fish inside the Rectangular Pond
+    // Swimming 3D Creatures inside the Enlarged Pond (1 full-size adult state per species!)
     interface SwimmingFishCtrl {
       group: THREE.Group;
-      tail: THREE.Mesh;
+      tail: THREE.Object3D;
       cx: number;
       cz: number;
+      x: number;
+      z: number;
+      rotY: number;
       rx: number;
       rz: number;
       speed: number;
       phase: number;
+      isSurface: boolean;
+      sick: boolean;
     }
     const swimmingFish: SwimmingFishCtrl[] = [];
     const fishListToSpawn = options.pondFish ?? [];
     fishListToSpawn.forEach((fish, idx) => {
-      const spec = POND_FISH_SPECIES[fish.species];
-      const fScale = fish.stage === 'ready' ? 1.15 : 0.65;
+      const spec = POND_FISH_SPECIES[fish.species] ?? POND_FISH_SPECIES.fish_12h;
       const fGroup = new THREE.Group();
-      const bodyMat = glossyClayMat(fish.sick ? '#A7B3BD' : spec.bodyColor, 0.26);
-      const finMat = glossyClayMat(fish.sick ? '#CBD5DE' : spec.accentColor, 0.3);
+      const bodyMat = glossyClayMat(fish.sick ? '#9DB2A6' : spec.bodyColor, 0.24);
+      const finMat = glossyClayMat(fish.sick ? '#C1D1C8' : spec.accentColor, 0.28);
+      let animPart: THREE.Object3D;
+      let isSurface = false;
 
-      const fBody = new THREE.Mesh(new THREE.SphereGeometry(0.18, 9, 8), bodyMat);
-      fBody.scale.set(0.75, 0.72, 1.55);
-      const fTail = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.24, 5), finMat);
-      fTail.rotation.x = Math.PI / 2;
-      fTail.position.z = -0.28;
-      fGroup.add(fBody, fTail);
+      if (fish.species === 'duck_24h') {
+        isSurface = true;
+        // Cute Golden Yellow Duck swimming on surface
+        const duckBody = new THREE.Mesh(new THREE.SphereGeometry(0.21, 10, 8), bodyMat);
+        duckBody.scale.set(0.95, 0.78, 1.32);
+        const duckHead = new THREE.Mesh(new THREE.SphereGeometry(0.145, 9, 8), bodyMat);
+        duckHead.position.set(0, 0.2, 0.16);
+        const bill = new THREE.Mesh(new RoundedBoxGeometry(0.12, 0.045, 0.15, 2, 0.02), finMat);
+        bill.position.set(0, 0.18, 0.3);
+        const wingL = new THREE.Mesh(new THREE.SphereGeometry(0.11, 7, 6), bodyMat);
+        wingL.scale.set(0.45, 0.75, 1.2);
+        wingL.position.set(-0.18, 0.04, -0.02);
+        const wingR = wingL.clone();
+        wingR.position.x = 0.18;
+        const duckTail = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.16, 6), bodyMat);
+        duckTail.rotation.x = -0.85;
+        duckTail.position.set(0, 0.1, -0.26);
+        const eyeMat = clayMat('#2B2623', 0.4);
+        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 6), eyeMat);
+        eyeL.position.set(-0.08, 0.24, 0.26);
+        const eyeR = eyeL.clone();
+        eyeR.position.x = 0.08;
+        fGroup.add(duckBody, duckHead, bill, wingL, wingR, duckTail, eyeL, eyeR);
+        animPart = duckTail;
+      } else if (fish.species === 'turtle_48h') {
+        isSurface = true;
+        // Cute Green Pond Turtle
+        const shellMat = glossyClayMat(fish.sick ? '#8FA89B' : '#3B7244', 0.28);
+        const rimMat = clayMat(fish.sick ? '#A7BDB2' : '#73A65E', 0.45);
+        const skinMat = clayMat(fish.sick ? '#B5C9BF' : '#85BD78', 0.48);
+
+        const shell = new THREE.Mesh(
+          new THREE.SphereGeometry(0.24, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.58),
+          shellMat,
+        );
+        shell.scale.set(0.96, 0.78, 1.18);
+        shell.position.y = -0.02;
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.25, 0.07, 12), rimMat);
+        rim.scale.set(0.98, 1, 1.2);
+        rim.position.y = -0.02;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), skinMat);
+        head.position.set(0, 0.04, 0.29);
+        const flipperGroup = new THREE.Group();
+        [
+          [-0.22, -0.02, 0.12],
+          [0.22, -0.02, 0.12],
+          [-0.19, -0.02, -0.16],
+          [0.19, -0.02, -0.16],
+        ].forEach(([fx, fy, fz]) => {
+          const fl = new THREE.Mesh(new THREE.SphereGeometry(0.08, 7, 6), skinMat);
+          fl.scale.set(1.3, 0.36, 0.8);
+          fl.position.set(fx, fy, fz);
+          flipperGroup.add(fl);
+        });
+        fGroup.add(shell, rim, head, flipperGroup);
+        animPart = flipperGroup;
+      } else {
+        // Swimming Koi / Carp Fish
+        const fBody = new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 8), bodyMat);
+        fBody.scale.set(0.74, 0.72, 1.55);
+        const fTail = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.26, 5), finMat);
+        fTail.rotation.x = Math.PI / 2;
+        fTail.position.z = -0.29;
+        const dorsal = new THREE.Mesh(new RoundedBoxGeometry(0.04, 0.12, 0.18, 2, 0.02), finMat);
+        dorsal.position.set(0, 0.14, -0.04);
+        fGroup.add(fBody, fTail, dorsal);
+        animPart = fTail;
+      }
 
       if (fish.sick || fish.stage === 'ready') {
         const indicator = new THREE.Mesh(
-          new THREE.SphereGeometry(0.08, 7, 7),
+          new THREE.SphereGeometry(0.085, 7, 7),
           glossyClayMat(fish.sick ? '#E84A5F' : '#FFD166', 0.2),
         );
-        indicator.position.y = 0.26;
+        indicator.position.y = isSurface ? 0.36 : 0.28;
         fGroup.add(indicator);
       }
 
-      fGroup.scale.setScalar(fScale);
       const inNorthHalf = idx % 2 === 0;
-      const cx = 11.4 + (idx % 3 - 1) * 0.45;
-      const cz = inNorthHalf ? -0.35 : 4.55;
-      fGroup.position.set(cx, 0.08, cz);
+      const cx = 15.5 + ((idx % 3) - 1) * 0.9;
+      const cz = inNorthHalf ? -0.25 : 6.25;
+      fGroup.position.set(cx, isSurface ? 0.082 : 0.052, cz);
       group.add(fGroup);
 
       swimmingFish.push({
         group: fGroup,
-        tail: fTail,
+        tail: animPart,
         cx,
         cz,
-        rx: 1.25 + (idx % 2) * 0.35,
-        rz: 0.95 + (idx % 3) * 0.25,
+        x: cx,
+        z: cz,
+        rotY: 0,
+        rx: 1.85 + (idx % 2) * 0.55,
+        rz: 1.15 + (idx % 3) * 0.28,
         speed: fish.sick ? 0.32 : 0.68 + (idx % 3) * 0.14,
         phase: idx * 1.7,
+        isSurface,
+        sick: fish.sick,
       });
     });
 
+    // Pond Scattered Feed Pellets Pool (animated when player feeds near pond!)
+    interface PondPelletCtrl {
+      mesh: THREE.Mesh;
+      active: boolean;
+      eaten: boolean;
+      startX: number;
+      startZ: number;
+      targetX: number;
+      targetZ: number;
+      flight: number;
+    }
+    const pelletMat = glossyClayMat('#E8B145', 0.28);
+    const pelletGeo = new THREE.SphereGeometry(0.06, 7, 6);
+    const pondPellets: PondPelletCtrl[] = Array.from({length: 16}, () => {
+      const mesh = new THREE.Mesh(pelletGeo, pelletMat);
+      mesh.visible = false;
+      group.add(mesh);
+      return {
+        mesh,
+        active: false,
+        eaten: false,
+        startX: 14.2,
+        startZ: 3.0,
+        targetX: 15.5,
+        targetZ: 0,
+        flight: 0,
+      };
+    });
+    let pondFeedTimer = 0;
+
+    triggerPondFeedFn = () => {
+      pondFeedTimer = 4.2;
+      pondPellets.forEach((p, idx) => {
+        const north = idx % 2 === 0;
+        p.active = true;
+        p.eaten = false;
+        p.flight = 0;
+        p.startX = 14.2;
+        p.startZ = 3.0;
+        p.targetX = 12.2 + ((idx * 37) % 100) / 100 * 6.4;
+        p.targetZ = north
+          ? -1.35 + ((idx * 53) % 100) / 100 * 2.7
+          : 4.65 + ((idx * 41) % 100) / 100 * 2.7;
+        p.mesh.visible = true;
+        p.mesh.scale.setScalar(1);
+        p.mesh.position.set(p.startX, 0.85, p.startZ);
+      });
+    };
+
     addBoxProxy(
       group,
-      [5.4, 1.4, 8.4],
-      [11.5, 0.55, 2.1],
-      {kind: 'pond_spot', tx: 11.3, tz: 2.1},
+      [10.0, 1.4, 11.8],
+      [15.5, 0.55, 3.0],
+      {kind: 'pond_spot', tx: 14.5, tz: 3.0},
       clickTargets,
     );
+    const readyPondCount = fishListToSpawn.filter((f) => f.stage === 'ready').length;
     labelAnchors.push({
       id: 'pond_spot',
-      label: 'Ao Nuôi Cá',
-      worldPos: new THREE.Vector3(11.6, 1.25, 2.1),
+      label: readyPondCount > 0 ? `Hồ Thủy Sinh (${readyPondCount} sẵn sàng!)` : 'Hồ Thủy Sinh',
+      worldPos: new THREE.Vector3(15.5, 1.35, 3.0),
     });
 
-    // === 7. 20 Ô ĐẤT TRỒNG TRỌT (10 Ô MỖI BÊN, NHỎ GỌN & ĐẤT SẪM ĐẸP MẮT) ===
+    // === 7. 20 Ô ĐẤT TRỒNG TRỌT (10 Ô MỖI BÊN, MÀU ĐỒNG BỘ MỌI CẤP) ===
     buildPicketRunX(-6.5, -1.9, 7.95);
     buildPicketRunX(1.9, 6.5, 7.95);
 
@@ -1867,11 +2572,9 @@ export function buildSubzoneScene(
       const plotGroup = new THREE.Group();
       plotGroup.position.set(px, 0, pz);
 
-      const frameCol =
-        plot.level === 3 ? '#C89B4B' : plot.level === 2 ? '#6A8A58' : '#8D6240';
       const frame = new THREE.Mesh(
         new RoundedBoxGeometry(1.42, 0.22, 1.32, 2, 0.045),
-        clayMat(frameCol, 0.72),
+        clayMat('#8D6240', 0.72),
       );
       frame.position.y = 0.11;
       const dirt = new THREE.Mesh(
@@ -1881,155 +2584,14 @@ export function buildSubzoneScene(
       dirt.position.y = 0.13;
       plotGroup.add(frame, dirt);
 
-      if (plot.level >= 2) {
-        const pegCol = plot.level === 3 ? '#FFD166' : '#A9DF9C';
-        const pegMat = glossyClayMat(pegCol, 0.3);
-        const peg1 = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), pegMat);
-        peg1.position.set(-0.6, 0.25, -0.55);
-        const peg2 = peg1.clone();
-        peg2.position.set(0.6, 0.25, -0.55);
-        plotGroup.add(peg1, peg2);
-      }
-
-      if (plot.stage === 'growing') {
-        // Universal identical sprout (Mầm) for every crop type
-        const sproutMat = clayMat(plot.watered ? '#55C968' : '#73BA62', 0.56);
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.055, 0.24, 7), sproutMat);
-        stem.position.y = 0.34;
-        const leafL = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), sproutMat);
-        leafL.scale.set(1.25, 0.45, 0.78);
-        leafL.position.set(-0.12, 0.45, 0);
-        leafL.rotation.z = 0.38;
-        const leafR = leafL.clone();
-        leafR.position.set(0.12, 0.45, 0);
-        leafR.rotation.z = -0.38;
-        plotGroup.add(stem, leafL, leafR);
-      } else if (plot.stage === 'ready') {
-        const greenMat = clayMat('#4C9A4E', 0.65);
-        if (plot.crop === 'wheat') {
-          const wheatMat = clayMat('#E7B94B', 0.55);
-          for (const [ox, oz] of [[-0.22, -0.12], [0, 0.1], [0.22, -0.08]]) {
-            const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.036, 0.54, 6), wheatMat);
-            stalk.position.set(ox, 0.48, oz);
-            const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.18, 4, 7), wheatMat);
-            ear.position.set(ox, 0.78, oz);
-            ear.rotation.z = ox * 0.6;
-            plotGroup.add(stalk, ear);
-          }
-        } else if (plot.crop === 'carrot') {
-          const carrotMat = glossyClayMat('#EF8432', 0.38);
-          for (const [ox, oz] of [[-0.18, 0.04], [0.18, -0.04]]) {
-            const root = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 9), carrotMat);
-            root.rotation.x = Math.PI;
-            root.position.set(ox, 0.3, oz);
-            const plume = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.3, 7), greenMat);
-            plume.position.set(ox, 0.56, oz);
-            plotGroup.add(root, plume);
-          }
-        } else if (plot.crop === 'sugarcane') {
-          const caneMat = clayMat('#76B856', 0.52);
-          for (const [ox, oz, h] of [[-0.18, -0.06, 0.84], [0.04, 0.12, 0.94], [0.22, -0.08, 0.78]]) {
-            const cane = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, h, 8), caneMat);
-            cane.position.set(ox, 0.22 + h / 2, oz);
-            const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.24, 6), greenMat);
-            tuft.position.set(ox, 0.25 + h, oz);
-            plotGroup.add(cane, tuft);
-          }
-        } else if (plot.crop === 'pumpkin') {
-          const pumpMat = glossyClayMat('#E57925', 0.36);
-          const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), pumpMat);
-          body.scale.set(1.2, 0.85, 1.15);
-          body.position.y = 0.46;
-          const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.065, 0.2, 7), greenMat);
-          stem.position.y = 0.74;
-          plotGroup.add(body, stem);
-        } else if (plot.crop === 'corn') {
-          const cobMat = glossyClayMat('#F4CB46', 0.38);
-          for (const [ox, oz] of [[-0.18, -0.08], [0.18, 0.08]]) {
-            const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.055, 0.82, 7), greenMat);
-            stalk.position.set(ox, 0.58, oz);
-            const cob = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.22, 4, 8), cobMat);
-            cob.position.set(ox + 0.06, 0.62, oz + 0.04);
-            cob.rotation.z = -0.35;
-            plotGroup.add(stalk, cob);
-          }
-        } else if (plot.crop === 'watermelon') {
-          const melonMat = glossyClayMat('#3F934B', 0.32);
-          const melon = new THREE.Mesh(new THREE.SphereGeometry(0.31, 12, 10), melonMat);
-          melon.scale.set(1.18, 0.92, 1.0);
-          melon.position.set(0, 0.44, 0);
-          const leafPatch = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), greenMat);
-          leafPatch.scale.set(1.3, 0.45, 1.1);
-          leafPatch.position.set(-0.24, 0.3, 0.18);
-          plotGroup.add(melon, leafPatch);
-        } else if (plot.crop === 'lemon') {
-          const lemonMat = glossyClayMat('#F7D44C', 0.28);
-          const bush = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 9), greenMat);
-          bush.scale.set(1.15, 0.95, 1.1);
-          bush.position.y = 0.48;
-          plotGroup.add(bush);
-          for (const [fx, fy, fz] of [[-0.18, 0.52, 0.18], [0.18, 0.46, 0.16], [0, 0.68, 0.05]]) {
-            const cit = new THREE.Mesh(new THREE.SphereGeometry(0.095, 8, 8), lemonMat);
-            cit.scale.set(1.2, 0.95, 0.95);
-            cit.position.set(fx, fy, fz);
-            plotGroup.add(cit);
-          }
-        } else if (plot.crop === 'cacao') {
-          const podMat = glossyClayMat('#9B5233', 0.38);
-          const cacaoGreen = clayMat('#4C8E4B', 0.68);
-          const shrub = new THREE.Mesh(new THREE.SphereGeometry(0.31, 10, 9), cacaoGreen);
-          shrub.scale.set(1.1, 1.0, 1.1);
-          shrub.position.y = 0.52;
-          plotGroup.add(shrub);
-          for (const [fx, fy, fz] of [[-0.16, 0.52, 0.22], [0.18, 0.46, 0.2], [0, 0.7, 0.14]]) {
-            const pod = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 0.1, 4, 7), podMat);
-            pod.rotation.z = fx * 1.4;
-            pod.position.set(fx, fy, fz);
-            plotGroup.add(pod);
-          }
-        } else if (plot.crop === 'coffee') {
-          const cherryMat = glossyClayMat('#C83E4D', 0.32);
-          const darkGreen = clayMat('#3B7B42', 0.68);
-          const shrub = new THREE.Mesh(new THREE.SphereGeometry(0.31, 10, 9), darkGreen);
-          shrub.scale.set(1.1, 1.05, 1.1);
-          shrub.position.y = 0.52;
-          plotGroup.add(shrub);
-          for (const [fx, fy, fz] of [[-0.16, 0.56, 0.2], [0.18, 0.48, 0.18], [0.02, 0.7, 0.12], [-0.12, 0.44, -0.18]]) {
-            const bean = new THREE.Mesh(new THREE.SphereGeometry(0.075, 7, 7), cherryMat);
-            bean.position.set(fx, fy, fz);
-            plotGroup.add(bean);
-          }
-        } else {
-          const fruitCol = plot.crop === 'tomato' ? '#DF483B' : '#E54E63';
-          const fruitMat = glossyClayMat(fruitCol, 0.32);
-          const bush = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 9), greenMat);
-          bush.scale.set(1.2, 0.82, 1.1);
-          bush.position.y = 0.44;
-          plotGroup.add(bush);
-          for (const [fx, fy, fz] of [[-0.18, 0.48, 0.18], [0.18, 0.44, 0.16], [0, 0.62, 0.06]]) {
-            const berry = new THREE.Mesh(new THREE.SphereGeometry(0.105, 9, 9), fruitMat);
-            berry.position.set(fx, fy, fz);
-            plotGroup.add(berry);
-          }
-        }
-      }
-
-      if (plot.hasPest && plot.stage !== 'empty') {
-        const bugMat = glossyClayMat('#4D2C52', 0.28);
-        const bug = new THREE.Mesh(new THREE.SphereGeometry(0.12, 9, 9), bugMat);
-        bug.scale.set(1.25, 0.8, 0.95);
-        bug.position.set(0.32, 0.56, 0.32);
-        const spot = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), clayMat('#F45B69'));
-        spot.position.set(0.35, 0.65, 0.34);
-        plotGroup.add(bug, spot);
-      }
+      plotGroup.add(buildPlotBotanicalDecor(plot, disposables));
 
       const approachX = px < 0 ? px + 1.05 : px - 1.05;
       addBoxProxy(
         plotGroup,
         [1.48, 1.2, 1.38],
         [0, 0.52, 0],
-        {kind: 'plot', plotId: plot.id, tx: approachX, tz: pz},
+        {kind: 'plot', plotId: plot.id, tx: approachX, tz: pz, px, pz},
         clickTargets,
       );
       colliders.push({type: 'box', x: px, z: pz, hw: 0.71, hd: 0.66});
@@ -2093,16 +2655,78 @@ export function buildSubzoneScene(
         }
       }
 
-      // Animate swimming fish inside rectangular pond
+      // Animate scattered feed pellets & swimming creatures inside rectangular pond
+      if (pondFeedTimer > 0) {
+        pondFeedTimer = Math.max(0, pondFeedTimer - dt);
+        for (const p of pondPellets) {
+          if (!p.active) continue;
+          if (p.flight < 1) {
+            p.flight = Math.min(1, p.flight + dt * 2.4);
+            const u = p.flight;
+            const px = THREE.MathUtils.lerp(p.startX, p.targetX, u);
+            const pz = THREE.MathUtils.lerp(p.startZ, p.targetZ, u);
+            const py = THREE.MathUtils.lerp(0.85, 0.065, u) + Math.sin(u * Math.PI) * 0.72;
+            p.mesh.position.set(px, py, pz);
+          } else if (!p.eaten) {
+            p.mesh.position.y = 0.062 + Math.sin(elapsed * 5 + p.targetX) * 0.012;
+          }
+        }
+        if (pondFeedTimer <= 0) {
+          for (const p of pondPellets) {
+            p.active = false;
+            p.mesh.visible = false;
+          }
+        }
+      }
+
       for (const f of swimmingFish) {
-        const t = elapsed * f.speed + f.phase;
-        const nx = f.cx + Math.cos(t) * f.rx;
-        const nz = f.cz + Math.sin(t) * f.rz;
-        const vx = -Math.sin(t) * f.rx * f.speed;
-        const vz = Math.cos(t) * f.rz * f.speed;
-        f.group.position.set(nx, 0.09 + Math.sin(elapsed * 3 + f.phase) * 0.015, nz);
-        f.group.rotation.y = Math.atan2(vx, vz);
-        f.tail.rotation.y = Math.sin(elapsed * 10 + f.phase) * 0.35;
+        const baseY = f.isSurface ? 0.082 : 0.052;
+        // Look for nearest landed, uneaten pellet if feeding is active
+        let nearestPellet: PondPelletCtrl | null = null;
+        let bestDist = Infinity;
+        if (pondFeedTimer > 0 && !f.sick) {
+          for (const p of pondPellets) {
+            if (!p.active || p.eaten || p.flight < 1) continue;
+            const d = Math.hypot(p.targetX - f.x, p.targetZ - f.z);
+            if (d < bestDist) {
+              bestDist = d;
+              nearestPellet = p;
+            }
+          }
+        }
+
+        if (nearestPellet) {
+          const dx = nearestPellet.targetX - f.x;
+          const dz = nearestPellet.targetZ - f.z;
+          const step = Math.min(bestDist, 1.55 * dt);
+          if (bestDist < 0.36) {
+            nearestPellet.eaten = true;
+            nearestPellet.mesh.visible = false;
+          } else {
+            f.x += (dx / bestDist) * step;
+            f.z += (dz / bestDist) * step;
+            const desiredRot = Math.atan2(dx, dz);
+            let diff = desiredRot - f.rotY;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            f.rotY += diff * Math.min(1, dt * 8);
+          }
+          f.group.position.set(f.x, baseY + Math.sin(elapsed * 5 + f.phase) * 0.02, f.z);
+          f.group.rotation.y = f.rotY;
+          f.tail.rotation.y = Math.sin(elapsed * 14 + f.phase) * 0.42;
+        } else {
+          const t = elapsed * f.speed + f.phase;
+          const nx = f.cx + Math.cos(t) * f.rx;
+          const nz = f.cz + Math.sin(t) * f.rz;
+          const vx = nx - f.x;
+          const vz = nz - f.z;
+          f.x += vx * Math.min(1, dt * 4);
+          f.z += vz * Math.min(1, dt * 4);
+          f.rotY = Math.atan2(-Math.sin(t) * f.rx * f.speed, Math.cos(t) * f.rz * f.speed);
+          f.group.position.set(f.x, baseY + Math.sin(elapsed * 3 + f.phase) * 0.015, f.z);
+          f.group.rotation.y = f.rotY;
+          f.tail.rotation.y = Math.sin(elapsed * 10 + f.phase) * 0.35;
+        }
       }
     };
   } else if (zone === 'fishing') {
@@ -2396,6 +3020,7 @@ export function buildSubzoneScene(
     colliders,
     doors,
     wallSurfaces,
+    triggerPondFeed: triggerPondFeedFn,
     update: updateFn,
     dispose: () => {
       disposables.forEach((t) => t.dispose());
