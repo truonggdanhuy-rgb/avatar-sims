@@ -9,6 +9,7 @@ interface AvatarPreview3DProps {
   avatar: AvatarConfig;
   className?: string;
   showInspectorControls?: boolean;
+  portraitFraming?: boolean;
 }
 
 type AngleKey = 'front' | 'angle45' | 'side90' | 'back';
@@ -24,14 +25,15 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
   avatar,
   className = '',
   showInspectorControls = true,
+  portraitFraming = false,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const avatarRef = useRef<AvatarConfig>(avatar);
   const rebuildFnRef = useRef<((cfg: AvatarConfig) => void) | null>(null);
-  const rotYRef = useRef(0.25);
+  const rotYRef = useRef(portraitFraming ? 0.14 : 0.25);
   const targetRotYRef = useRef<number | null>(null);
-  const autoSpinRef = useRef(true);
-  const headZoomRef = useRef(false);
+  const autoSpinRef = useRef(!portraitFraming);
+  const headZoomRef = useRef(portraitFraming);
 
   const [activeAngle, setActiveAngle] = useState<AngleKey | null>(null);
   const [headZoom, setHeadZoom] = useState(false);
@@ -177,9 +179,9 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
     let disposed = false;
     const clock = new THREE.Clock();
     let lastNow = performance.now();
-    let camY = 1.25;
-    let camZ = 4.25;
-    let lookY = 0.96;
+    let camY = headZoomRef.current ? 1.36 : 1.25;
+    let camZ = headZoomRef.current ? 2.18 : 4.25;
+    let lookY = headZoomRef.current ? 1.28 : 0.96;
 
     function afterDraw(cb: () => void) {
       const gl = renderer.getContext() as WebGL2RenderingContext;

@@ -196,7 +196,7 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
 
 function getZoneWalkBounds(zone: ZoneId) {
   if (zone === 'town') {
-    return {minX: -29.5, maxX: 29.5, minZ: -31.5, maxZ: 27.5};
+    return {minX: -54, maxX: 54, minZ: -56, maxZ: 48};
   }
   if (zone === 'home') {
     return {minX: -12.85, maxX: 9.85, minZ: -8.95, maxZ: 6.95};
@@ -633,7 +633,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#B2DDF2');
-    scene.fog = new THREE.FogExp2('#B2DDF2', 0.0056);
+    scene.fog = new THREE.FogExp2('#B2DDF2', 0.0034);
 
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -642,7 +642,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     pmrem.dispose();
 
     const initCam = getResponsiveCameraSettings(stateRef.current.zone, width / height);
-    const camera = new THREE.PerspectiveCamera(initCam.fov, width / height, 0.4, 190);
+    const camera = new THREE.PerspectiveCamera(initCam.fov, width / height, 0.4, 320);
     camera.position.set(initCam.pos[0], initCam.pos[1], initCam.pos[2]);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -655,7 +655,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     controls.rotateSpeed = 0.78;
     controls.zoomSpeed = 0.9;
     controls.minDistance = 4.8;
-    controls.maxDistance = 68;
+    controls.maxDistance = 90;
     controls.minPolarAngle = Math.PI * 0.14;
     controls.maxPolarAngle = Math.PI * 0.46;
     controls.update();
@@ -1564,14 +1564,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         camera.fov = THREE.MathUtils.damp(camera.fov, camCfg.fov, 6, delta);
         camera.updateProjectionMatrix();
         const camOffX =
-          z === 'town' || z === 'garden'
-            ? playerPos.x * 0.65
-            : z === 'home'
-              ? (playerPos.x + 1.8) * 0.65
-              : 0;
+          z === 'town'
+            ? playerPos.x
+            : z === 'garden'
+              ? playerPos.x * 0.65
+              : z === 'home'
+                ? (playerPos.x + 1.8) * 0.65
+                : 0;
         const camOffZ =
           z === 'town'
-            ? (playerPos.z - 3.6) * 0.65
+            ? playerPos.z - 3.6
             : z === 'home'
               ? (playerPos.z - 5.2) * 0.65
               : z === 'garden'
@@ -1662,10 +1664,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           playerPos.z = nextZ;
 
           if (!cameraTransitionActive) {
-            camera.position.x += moveX * 0.65;
-            camera.position.z += moveZ * 0.65;
-            controls.target.x += moveX * 0.65;
-            controls.target.z += moveZ * 0.65;
+            const trackFactor = z === 'town' ? 1.0 : 0.65;
+            camera.position.x += moveX * trackFactor;
+            camera.position.z += moveZ * trackFactor;
+            controls.target.x += moveX * trackFactor;
+            controls.target.z += moveZ * trackFactor;
           }
 
           if (Math.hypot(moveX, moveZ) > 0.002) {
@@ -1707,8 +1710,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (z === 'town') {
         const dGroundY = groundOffset - prevGroundY;
         if (!cameraTransitionActive && Math.abs(dGroundY) > 0.0001) {
-          camera.position.y += dGroundY * 0.65;
-          controls.target.y += dGroundY * 0.65;
+          camera.position.y += dGroundY;
+          controls.target.y += dGroundY;
         }
         prevGroundY = groundOffset;
       }
@@ -1982,7 +1985,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           );
         })()}
 
-      {/* Top-Left Compact Smartphone Menu Button */}
+      {/* Top-Left Compact Smartphone Icon Button */}
       {!miniActive && !(zone === 'home' && editFurnitureMode) && (
         <button
           type="button"
@@ -1991,7 +1994,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             onOpenPhone();
           }}
           aria-label="Mở điện thoại"
-          className="phone-ui absolute top-2.5 left-2.5 z-30 flex min-h-[38px] items-center gap-2 rounded-2xl border-2 border-[#3C3128] bg-[#FFF9EF]/95 px-2.5 py-1.5 text-[#3B2B1E] shadow-lg transition-transform hover:scale-[1.02] active:scale-95"
+          className="phone-ui absolute top-2.5 left-2.5 z-30 flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-[#3C3128] bg-[#FFF9EF]/95 text-[#3B2B1E] shadow-lg transition-transform hover:scale-105 active:scale-95"
         >
           <span
             aria-hidden="true"
@@ -2005,9 +2008,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               <span className="h-1 w-1 rounded-[1px] bg-white/95" />
             </span>
             <span className="h-[2px] w-2.5 rounded-full bg-white/80" />
-          </span>
-          <span className="text-xs font-extrabold tracking-tight text-[#3B2B1E]">
-            Menu
           </span>
         </button>
       )}
