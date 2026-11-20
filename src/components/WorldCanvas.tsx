@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   Armchair,
+  ArrowUp,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -88,6 +89,9 @@ interface WorldCanvasProps {
   editFurnitureMode: boolean;
   selectedFurnitureId: string | null;
   homeSpotRef: React.MutableRefObject<{x: number; z: number}>;
+  showJoystick: boolean;
+  showJumpButton: boolean;
+  teleportToPlazaPulse: number;
   onChangeZone: (next: ZoneId) => void;
   onOpenWardrobe: () => void;
   onOpenShop: () => void;
@@ -167,7 +171,30 @@ interface SeatTarget {
   isBed?: boolean;
 }
 
+interface NavPoint {
+  x: number;
+  z: number;
+}
+
+interface NavGrid {
+  minX: number;
+  minZ: number;
+  step: number;
+  cols: number;
+  rows: number;
+  blocked: Uint8Array;
+  gScore: Float32Array;
+  fScore: Float32Array;
+  parent: Int32Array;
+  seen: Uint32Array;
+  closed: Uint32Array;
+  heap: Int32Array;
+  searchId: number;
+}
+
 const PLAYER_RADIUS = 0.34;
+const JUMP_VELOCITY = 9.8;
+const JUMP_GRAVITY = 28.0; // Peak ~1.71m: clears plaza flower bed rims (0.98m) & blooms (~1.30m)
 
 // Reusable math objects (zero allocations in render loop)
 const _projVec = new THREE.Vector3();
@@ -377,6 +404,312 @@ function resolvePointAgainstColliders(
   return {x, z, collided};
 }
 
+function isPointBlockedByColliders(
+  px: number,
+  pz: number,
+  colliders: WorldCollider[],
+  radius = PLAYER_RADIUS + 0.12,
+): boolean {
+  for (let i = 0; i < colliders.length; i++) {
+    const col = colliders[i];
+    if (col.type === 'circle') {
+      const dx = px - col.x;
+      const dz = pz - col.z;
+      const minDist = col.r + radius;
+      if (dx * dx + dz * dz < minDist * minDist) return true;
+    } else {
+      const rot = col.rotY || 0;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const dx = px - col.x;
+      const dz = pz - col.z;
+      const lx = dx * cos - dz * sin;
+      const lz = dx * sin + dz * cos;
+      const cx = Math.max(-col.hw, Math.min(col.hw, lx));
+      const cz = Math.max(-col.hd, Math.min(col.hd, lz));
+      const vx = lx - cx;
+      const vz = lz - cz;
+      if (vx * vx + vz * vz < radius * radius) return true;
+    }
+  }
+  return false;
+}
+
+function buildNavGrid(zone: ZoneId, colliders: WorldCollider[]): NavGrid {
+  const b = getZoneWalkBounds(zone);
+  const step = zone === 'town' ? 1.15 : zone === 'garden' ? 0.72 : 0.48;
+  const cols = Math.max(4, Math.floor((b.maxX - b.minX) / step) + 1);
+  const rows = Math.max(4, Math.floor((b.maxZ - b.minZ) / step) + 1);
+  const total = cols * rows;
+  const blocked = new Uint8Array(total);
+  const inflate = PLAYER_RADIUS + (zone === 'town' ? 0.14 : 0.08);
+
+  for (let r = 0; r < rows; r++) {
+    const wz = b.minZ + r * step;
+    const rowOff = r * cols;
+    for (let c = 0; c < cols; c++) {
+      const wx = b.minX + c * step;
+      if (isPointBlockedByColliders(wx, wz, colliders, inflate)) {
+        blocked[rowOff + c] = 1;
+      }
+    }
+  }
+
+  return {
+    minX: b.minX,
+    minZ: b.minZ,
+    step,
+    cols,
+    rows,
+    blocked,
+    gScore: new Float32Array(total),
+    fScore: new Float32Array(total),
+    parent: new Int32Array(total),
+    seen: new Uint32Array(total),
+    closed: new Uint32Array(total),
+    heap: new Int32Array(Math.max(1024, total * 2)),
+    searchId: 0,
+  };
+}
+
+function hasColliderLineOfSight(
+  x0: number,
+  z0: number,
+  x1: number,
+  z1: number,
+  colliders: WorldCollider[],
+  stepSize: number,
+  radius: number,
+): boolean {
+  const dist = Math.hypot(x1 - x0, z1 - z0);
+  if (dist < stepSize) return true;
+  const samples = Math.ceil(dist / stepSize);
+  for (let i = 1; i < samples; i++) {
+    const t = i / samples;
+    const sx = x0 + (x1 - x0) * t;
+    const sz = z0 + (z1 - z0) * t;
+    if (isPointBlockedByColliders(sx, sz, colliders, radius)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function findNearestWalkableCell(nav: NavGrid, startC: number, startR: number): number {
+  const c0 = Math.max(0, Math.min(nav.cols - 1, startC));
+  const r0 = Math.max(0, Math.min(nav.rows - 1, startR));
+  const idx0 = r0 * nav.cols + c0;
+  if (nav.blocked[idx0] === 0) return idx0;
+
+  let bestIdx = -1;
+  let bestD2 = Infinity;
+  for (let rad = 1; rad <= 6; rad++) {
+    const minC = Math.max(0, c0 - rad);
+    const maxC = Math.min(nav.cols - 1, c0 + rad);
+    const minR = Math.max(0, r0 - rad);
+    const maxR = Math.min(nav.rows - 1, r0 + rad);
+    for (let r = minR; r <= maxR; r++) {
+      for (let c = minC; c <= maxC; c++) {
+        const idx = r * nav.cols + c;
+        if (nav.blocked[idx] === 0) {
+          const d2 = (c - c0) * (c - c0) + (r - r0) * (r - r0);
+          if (d2 < bestD2) {
+            bestD2 = d2;
+            bestIdx = idx;
+          }
+        }
+      }
+    }
+    if (bestIdx !== -1) return bestIdx;
+  }
+  return -1;
+}
+
+const ASTAR_DIRS: readonly [number, number, number][] = [
+  [1, 0, 1],
+  [-1, 0, 1],
+  [0, 1, 1],
+  [0, -1, 1],
+  [1, 1, Math.SQRT2],
+  [1, -1, Math.SQRT2],
+  [-1, 1, Math.SQRT2],
+  [-1, -1, Math.SQRT2],
+];
+
+function findSmartPath(
+  nav: NavGrid | null,
+  colliders: WorldCollider[],
+  startX: number,
+  startZ: number,
+  goalX: number,
+  goalZ: number,
+): NavPoint[] {
+  const losStep = nav ? nav.step * 0.42 : 0.45;
+  const losRadius = PLAYER_RADIUS + 0.06;
+  if (hasColliderLineOfSight(startX, startZ, goalX, goalZ, colliders, losStep, losRadius)) {
+    return [{x: goalX, z: goalZ}];
+  }
+  if (!nav) {
+    return [{x: goalX, z: goalZ}];
+  }
+
+  const sC = Math.round((startX - nav.minX) / nav.step);
+  const sR = Math.round((startZ - nav.minZ) / nav.step);
+  const gC = Math.round((goalX - nav.minX) / nav.step);
+  const gR = Math.round((goalZ - nav.minZ) / nav.step);
+
+  const startIdx = findNearestWalkableCell(nav, sC, sR);
+  const goalIdx = findNearestWalkableCell(nav, gC, gR);
+  if (startIdx === -1 || goalIdx === -1 || startIdx === goalIdx) {
+    return [{x: goalX, z: goalZ}];
+  }
+
+  nav.searchId = (nav.searchId + 1) >>> 0;
+  if (nav.searchId === 0) {
+    nav.seen.fill(0);
+    nav.closed.fill(0);
+    nav.searchId = 1;
+  }
+  const sid = nav.searchId;
+  const {cols, rows, blocked, gScore, fScore, parent, seen, closed, heap} = nav;
+  const goalCol = goalIdx % cols;
+  const goalRow = (goalIdx / cols) | 0;
+
+  let heapSize = 0;
+  const pushHeap = (idx: number) => {
+    if (heapSize >= heap.length) return;
+    let i = heapSize++;
+    heap[i] = idx;
+    const f = fScore[idx];
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      const pIdx = heap[p];
+      if (fScore[pIdx] <= f) break;
+      heap[i] = pIdx;
+      i = p;
+    }
+    heap[i] = idx;
+  };
+  const popHeap = (): number => {
+    const top = heap[0];
+    const last = heap[--heapSize];
+    if (heapSize > 0) {
+      let i = 0;
+      const half = heapSize >> 1;
+      const fLast = fScore[last];
+      while (i < half) {
+        let c = (i << 1) + 1;
+        const r = c + 1;
+        if (r < heapSize && fScore[heap[r]] < fScore[heap[c]]) c = r;
+        const cIdx = heap[c];
+        if (fLast <= fScore[cIdx]) break;
+        heap[i] = cIdx;
+        i = c;
+      }
+      heap[i] = last;
+    }
+    return top;
+  };
+
+  const octile = (c: number, r: number) => {
+    const dx = Math.abs(goalCol - c);
+    const dz = Math.abs(goalRow - r);
+    return dx + dz + (Math.SQRT2 - 2) * (dx < dz ? dx : dz);
+  };
+
+  seen[startIdx] = sid;
+  gScore[startIdx] = 0;
+  fScore[startIdx] = octile(startIdx % cols, (startIdx / cols) | 0);
+  parent[startIdx] = -1;
+  pushHeap(startIdx);
+
+  let found = false;
+  let iter = 0;
+  while (heapSize > 0 && iter < 9000) {
+    iter++;
+    const cur = popHeap();
+    if (closed[cur] === sid) continue;
+    if (cur === goalIdx) {
+      found = true;
+      break;
+    }
+    closed[cur] = sid;
+
+    const cc = cur % cols;
+    const cr = (cur / cols) | 0;
+    const curG = gScore[cur];
+
+    for (let d = 0; d < 8; d++) {
+      const dir = ASTAR_DIRS[d];
+      const nc = cc + dir[0];
+      const nr = cr + dir[1];
+      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
+      const nb = nr * cols + nc;
+      if (blocked[nb] === 1 || closed[nb] === sid) continue;
+      // Prevent corner cutting across diagonal blocked neighbors
+      if (dir[0] !== 0 && dir[1] !== 0) {
+        if (blocked[cr * cols + nc] === 1 || blocked[nr * cols + cc] === 1) continue;
+      }
+
+      const nextG = curG + dir[2];
+      if (seen[nb] !== sid || nextG < gScore[nb]) {
+        seen[nb] = sid;
+        gScore[nb] = nextG;
+        fScore[nb] = nextG + octile(nc, nr) * 1.02;
+        parent[nb] = cur;
+        pushHeap(nb);
+      }
+    }
+  }
+
+  if (!found) {
+    return [{x: goalX, z: goalZ}];
+  }
+
+  const rawPoints: NavPoint[] = [];
+  let trace = goalIdx;
+  while (trace !== -1 && trace !== startIdx) {
+    const tc = trace % cols;
+    const tr = (trace / cols) | 0;
+    rawPoints.push({x: nav.minX + tc * nav.step, z: nav.minZ + tr * nav.step});
+    trace = parent[trace];
+  }
+  rawPoints.reverse();
+  rawPoints.push({x: goalX, z: goalZ});
+
+  // String-pull smoothing: collapse collinear/clear segments into sleek direct corners
+  const smoothed: NavPoint[] = [];
+  let anchorX = startX;
+  let anchorZ = startZ;
+  let idx = 0;
+  while (idx < rawPoints.length) {
+    let farthest = idx;
+    for (let j = rawPoints.length - 1; j > idx; j--) {
+      if (
+        hasColliderLineOfSight(
+          anchorX,
+          anchorZ,
+          rawPoints[j].x,
+          rawPoints[j].z,
+          colliders,
+          losStep,
+          losRadius,
+        )
+      ) {
+        farthest = j;
+        break;
+      }
+    }
+    const chosen = rawPoints[farthest];
+    smoothed.push(chosen);
+    anchorX = chosen.x;
+    anchorZ = chosen.z;
+    idx = farthest + 1;
+  }
+
+  return smoothed.length > 0 ? smoothed : [{x: goalX, z: goalZ}];
+}
+
 export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   zone,
   avatar,
@@ -398,6 +731,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   editFurnitureMode,
   selectedFurnitureId,
   homeSpotRef,
+  showJoystick,
+  showJumpButton,
+  teleportToPlazaPulse,
   onChangeZone,
   onOpenWardrobe,
   onOpenShop,
@@ -437,6 +773,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const labelLayerRef = useRef<HTMLDivElement | null>(null);
+  const joystickBaseRef = useRef<HTMLDivElement | null>(null);
+  const joystickKnobRef = useRef<HTMLDivElement | null>(null);
+  const joystickInputRef = useRef<{x: number; y: number; active: boolean}>({
+    x: 0,
+    y: 0,
+    active: false,
+  });
+  const joystickOriginRef = useRef<{x: number; y: number; pointerId: number | null}>({
+    x: 0,
+    y: 0,
+    pointerId: null,
+  });
+  const jumpActionRef = useRef<(() => void) | null>(null);
+  const teleportPlazaActionRef = useRef<(() => void) | null>(null);
+  const pendingPlazaSpawnRef = useRef<boolean>(false);
 
   const [tags, setTags] = useState<ProjectedTag[]>([]);
   const [speechBubble, setSpeechBubble] = useState<string | null>(null);
@@ -656,6 +1007,22 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     farmPondFishActionRef.current?.();
   }, [farmPondFishPulse]);
 
+  useEffect(() => {
+    if (!showJoystick) {
+      joystickInputRef.current = {x: 0, y: 0, active: false};
+      joystickOriginRef.current.pointerId = null;
+      if (joystickBaseRef.current) {
+        joystickBaseRef.current.style.opacity = '0';
+      }
+    }
+  }, [showJoystick]);
+
+  useEffect(() => {
+    if (teleportToPlazaPulse <= 0) return;
+    pendingPlazaSpawnRef.current = true;
+    teleportPlazaActionRef.current?.();
+  }, [teleportToPlazaPulse]);
+
   const plotVisualKey = plots
     .map(
       (p) =>
@@ -806,9 +1173,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     // Player Avatar State & Rig
     const playerPos = {x: 0, z: 3.4, rotY: 0, pose: 'idle' as AvatarPose};
+    let jumpY = 0;
+    let jumpVel = 0;
     let activeTarget: {
       x: number;
       z: number;
+      waypoints: NavPoint[];
+      waypointIdx: number;
       arrivePose: AvatarPose;
       seat?: SeatTarget;
       onArrive?: () => void;
@@ -837,6 +1208,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let currentAnchors: TownAnchor[] = [];
     let currentClickTargets: THREE.Object3D[] = [];
     let currentColliders: WorldCollider[] = [];
+    let currentNavGrid: NavGrid | null = null;
     let currentPlazaRadius = 6.8;
     let currentGrounds: THREE.Object3D[] = [];
     let currentWallSurfaces: HouseWallSurface[] = [];
@@ -884,6 +1256,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         currentAnchors = activeTown.labelAnchors;
         currentClickTargets = [...activeTown.clickTargets, playerProxy];
         currentColliders = activeTown.colliders;
+        currentNavGrid = buildNavGrid('town', currentColliders);
         currentPlazaRadius = activeTown.plazaRadius;
         currentGrounds = activeTown.groundMeshes;
         activeDoorsRef.current = [];
@@ -891,7 +1264,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         if (activeZoneLoaded !== 'town') {
           activeTarget = null;
           activeSeat = null;
-          if (activeZoneLoaded !== null) {
+          jumpY = 0;
+          jumpVel = 0;
+          if (pendingPlazaSpawnRef.current) {
+            pendingPlazaSpawnRef.current = false;
+            playerPos.x = 0;
+            playerPos.z = 3.6;
+            playerPos.rotY = 0;
+          } else if (activeZoneLoaded !== null) {
             const exitSpawn = TOWN_ZONE_ENTRANCES[activeZoneLoaded];
             playerPos.x = exitSpawn.tx;
             playerPos.z = exitSpawn.tz;
@@ -926,12 +1306,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         currentAnchors = activeSubzone.labelAnchors;
         currentClickTargets = [...activeSubzone.clickTargets, playerProxy];
         currentColliders = activeSubzone.colliders;
+        currentNavGrid = buildNavGrid(z, currentColliders);
         currentGrounds = [activeSubzone.groundMesh];
         activeDoorsRef.current = activeSubzone.doors ?? [];
         currentWallSurfaces = activeSubzone.wallSurfaces ?? [];
         if (activeZoneLoaded !== z) {
           activeTarget = null;
           activeSeat = null;
+          jumpY = 0;
+          jumpVel = 0;
           if (z === 'home') {
             playerPos.x = -1.8;
             playerPos.z = 5.2;
@@ -1203,6 +1586,77 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
     };
 
+    const releaseSeatIfNeeded = () => {
+      if (activeSeat) {
+        playerPos.x = activeSeat.standX;
+        playerPos.z = activeSeat.standZ;
+        activeSeat = null;
+      }
+    };
+
+    const startWalkTo = (
+      x: number,
+      z: number,
+      arrivePose: AvatarPose,
+      seat?: SeatTarget,
+      onArrive?: () => void,
+    ) => {
+      stallTimer = 0;
+      prevDistToTarget = Infinity;
+      const b = getZoneWalkBounds(stateRef.current.zone);
+      const clampedX = THREE.MathUtils.clamp(x, b.minX, b.maxX);
+      const clampedZ = THREE.MathUtils.clamp(z, b.minZ, b.maxZ);
+      const waypoints = findSmartPath(
+        currentNavGrid,
+        currentColliders,
+        playerPos.x,
+        playerPos.z,
+        clampedX,
+        clampedZ,
+      );
+      activeTarget = {
+        x: clampedX,
+        z: clampedZ,
+        waypoints,
+        waypointIdx: 0,
+        arrivePose,
+        seat,
+        onArrive,
+      };
+    };
+
+    jumpActionRef.current = () => {
+      if (jumpY > 0.02 || jumpVel > 0.02) return;
+      if (fishCtrl.phase !== 'idle') {
+        resetFishing(true);
+      }
+      releaseSeatIfNeeded();
+      jumpVel = JUMP_VELOCITY;
+      soundFX.tap();
+    };
+
+    teleportPlazaActionRef.current = () => {
+      if (stateRef.current.zone !== 'town') return;
+      pendingPlazaSpawnRef.current = false;
+      activeTarget = null;
+      activeSeat = null;
+      jumpY = 0;
+      jumpVel = 0;
+      if (fishCtrl.phase !== 'idle') {
+        resetFishing(false);
+      }
+      playerPos.x = 0;
+      playerPos.z = 3.6;
+      playerPos.rotY = 0;
+      playerPos.pose = 'idle';
+      const spawnY = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+      prevGroundY = spawnY;
+      playerRig.root.position.set(playerPos.x, spawnY, playerPos.z);
+      playerRig.root.rotation.y = playerPos.rotY;
+      cameraTransitionActive = true;
+      showBubble('Đã di chuyển về Quảng Trường!', 0, spawnY + 2.05, 3.6);
+    };
+
     farmPondFishActionRef.current = () => {
       if (stateRef.current.zone !== 'garden') return;
       const spotX = 15.2;
@@ -1211,24 +1665,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (dist < 1.35 || fishCtrl.phase !== 'idle') {
         handleSpotFishing(spotX, spotZ, Math.PI / 2);
       } else {
-        activeTarget = {
-          x: spotX,
-          z: spotZ,
-          arrivePose: 'idle',
-          onArrive: () => handleSpotFishing(spotX, spotZ, Math.PI / 2),
-        };
+        startWalkTo(spotX, spotZ, 'idle', undefined, () =>
+          handleSpotFishing(spotX, spotZ, Math.PI / 2),
+        );
       }
     };
 
     loadCurrentWorld();
-
-    const releaseSeatIfNeeded = () => {
-      if (activeSeat) {
-        playerPos.x = activeSeat.standX;
-        playerPos.z = activeSeat.standZ;
-        activeSeat = null;
-      }
-    };
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -1369,13 +1812,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               standX: data.tx as number,
               standZ: data.tz as number,
             };
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'sit',
-              seat: seatInfo,
-              onArrive: () => soundFX.sparkle(),
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'sit', seatInfo, () =>
+              soundFX.sparkle(),
+            );
             return;
           }
 
@@ -1389,17 +1828,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               standX: data.tx as number,
               standZ: data.tz as number,
             };
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'sit',
-              seat: seatInfo,
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onBoostMood();
-                showBubble('Đung đưa xích đu ngoài trời thật thư giãn! (+Vui vẻ)');
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'sit', seatInfo, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onBoostMood();
+              showBubble('Đung đưa xích đu ngoài trời thật thư giãn! (+Vui vẻ)');
+            });
             return;
           }
 
@@ -1413,108 +1846,72 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               standX: data.tx as number,
               standZ: data.tz as number,
             };
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'sit',
-              seat: seatInfo,
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onBoostMood();
-                showBubble('Ngồi sưởi ấm bên bếp lửa trại thật chill! (+Vui vẻ)');
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'sit', seatInfo, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onBoostMood();
+              showBubble('Ngồi sưởi ấm bên bếp lửa trại thật chill! (+Vui vẻ)');
+            });
             return;
           }
 
           if (kind === 'outdoor_telescope') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onBoostMood();
-                const isNightNow = stateRef.current.timeOfDay === 'night';
-                showBubble(
-                  isNightNow
-                    ? 'Ngắm trăng sao qua kính thiên văn thật lung linh! (+Vui vẻ)'
-                    : 'Ngắm cảnh thị trấn qua kính thiên văn thật tuyệt! (+Vui vẻ)',
-                );
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onBoostMood();
+              const isNightNow = stateRef.current.timeOfDay === 'night';
+              showBubble(
+                isNightNow
+                  ? 'Ngắm trăng sao qua kính thiên văn thật lung linh! (+Vui vẻ)'
+                  : 'Ngắm cảnh thị trấn qua kính thiên văn thật tuyệt! (+Vui vẻ)',
+              );
+            });
             return;
           }
 
           if (kind === 'zone') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.enterDoor();
-                callbacksRef.current.onChangeZone(data.zone as ZoneId);
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.enterDoor();
+              callbacksRef.current.onChangeZone(data.zone as ZoneId);
+            });
             return;
           }
 
           if (kind === 'settings') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenSettings();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenSettings();
+            });
             return;
           }
 
           if (kind === 'daily_quests') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenDailyQuests();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenDailyQuests();
+            });
             return;
           }
 
           if (kind === 'exit') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.enterDoor();
-                setFishingState('idle');
-                callbacksRef.current.onChangeZone('town');
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.enterDoor();
+              setFishingState('idle');
+              callbacksRef.current.onChangeZone('town');
+            });
             return;
           }
 
           if (kind === 'wardrobe') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenWardrobe();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenWardrobe();
+            });
             return;
           }
 
@@ -1529,17 +1926,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               standZ: data.tz as number,
               isBed: true,
             };
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'sleep',
-              seat: bedSeat,
-              onArrive: () => {
-                soundFX.nap();
-                callbacksRef.current.onRestoreEnergy();
-                showBubble('Ngủ thật ngon! (+Năng lượng)', bedSeat.seatX, 2.1, bedSeat.seatZ);
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'sleep', bedSeat, () => {
+              soundFX.nap();
+              callbacksRef.current.onRestoreEnergy();
+              showBubble('Ngủ thật ngon! (+Năng lượng)', bedSeat.seatX, 2.1, bedSeat.seatZ);
+            });
             return;
           }
 
@@ -1553,56 +1944,45 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               standX: data.tx as number,
               standZ: data.tz as number,
             };
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'sit',
-              seat: sofaSeat,
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onBoostMood();
-                showBubble('Thư giãn thật thích! (+Vui vẻ)', sofaSeat.seatX, 2.0, sofaSeat.seatZ);
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'sit', sofaSeat, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onBoostMood();
+              showBubble('Thư giãn thật thích! (+Vui vẻ)', sofaSeat.seatX, 2.0, sofaSeat.seatZ);
+            });
             return;
           }
 
           if (kind === 'well') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                const res = callbacksRef.current.onCollectWellWater();
-                soundFX.splash();
-                if (res.gained > 0) {
-                  showBubble(
-                    `Thu +${res.gained} nước từ giếng! (${res.waterCan}/${WELL_WATER_MAX})`,
-                    data.tx as number,
-                    2.0,
-                    data.tz as number,
-                  );
-                } else if (res.waterCan >= WELL_WATER_MAX) {
-                  showBubble(
-                    `Bình tưới đã đầy (${WELL_WATER_MAX}/${WELL_WATER_MAX})!`,
-                    data.tx as number,
-                    2.0,
-                    data.tz as number,
-                  );
-                } else {
-                  const m = Math.floor(res.nextDropSec / 60);
-                  const s = res.nextDropSec % 60;
-                  const waitStr = m > 0 ? `${m}p${s}s` : `${s}s`;
-                  showBubble(
-                    `Giếng đang tích nước (còn ${waitStr} · Bình ${res.waterCan}/${WELL_WATER_MAX})`,
-                    data.tx as number,
-                    2.0,
-                    data.tz as number,
-                  );
-                }
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              const res = callbacksRef.current.onCollectWellWater();
+              soundFX.splash();
+              if (res.gained > 0) {
+                showBubble(
+                  `Thu +${res.gained} nước từ giếng! (${res.waterCan}/${WELL_WATER_MAX})`,
+                  data.tx as number,
+                  2.0,
+                  data.tz as number,
+                );
+              } else if (res.waterCan >= WELL_WATER_MAX) {
+                showBubble(
+                  `Bình tưới đã đầy (${WELL_WATER_MAX}/${WELL_WATER_MAX})!`,
+                  data.tx as number,
+                  2.0,
+                  data.tz as number,
+                );
+              } else {
+                const m = Math.floor(res.nextDropSec / 60);
+                const s = res.nextDropSec % 60;
+                const waitStr = m > 0 ? `${m}p${s}s` : `${s}s`;
+                showBubble(
+                  `Giếng đang tích nước (còn ${waitStr} · Bình ${res.waterCan}/${WELL_WATER_MAX})`,
+                  data.tx as number,
+                  2.0,
+                  data.tz as number,
+                );
+              }
+            });
             return;
           }
 
@@ -1632,12 +2012,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               if (distNow < 0.85) {
                 doHarvest();
               } else {
-                activeTarget = {
-                  x: tx,
-                  z: tz,
-                  arrivePose: 'idle',
-                  onArrive: doHarvest,
-                };
+                startWalkTo(tx, tz, 'idle', undefined, doHarvest);
               }
               return;
             }
@@ -1658,83 +2033,54 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 y: Math.max(minY, Math.min(ch - 60, rawY)),
               });
               // Auto-walk to plot in background without blocking the radial menu
-              activeTarget = {
-                x: tx,
-                z: tz,
-                arrivePose: 'idle',
-              };
+              startWalkTo(tx, tz, 'idle');
             }
             return;
           }
 
           if (kind === 'farm_mill') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenWorkshop('mill');
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenWorkshop('mill');
+            });
             return;
           }
 
           if (kind === 'farm_kitchen') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenWorkshop('kitchen');
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenWorkshop('kitchen');
+            });
             return;
           }
 
           if (kind === 'order_board') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenOrders();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenOrders();
+            });
             return;
           }
 
           if (kind === 'farm_storage') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenStorage();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenStorage();
+            });
             return;
           }
 
           if (kind === 'pasture_spot') {
             soundFX.tap();
             const targetCoop = data.coop as CoopKind | undefined;
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenPasture(targetCoop);
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenPasture(targetCoop);
+            });
             return;
           }
 
@@ -1744,29 +2090,19 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               handleSpotFishing(15.2, 3.0, Math.PI / 2);
               return;
             }
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.splash();
-                callbacksRef.current.onOpenPond();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.splash();
+              callbacksRef.current.onOpenPond();
+            });
             return;
           }
 
           if (kind === 'farm_shop') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenFarmShop();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenFarmShop();
+            });
             return;
           }
 
@@ -1778,14 +2114,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               handleSpotFishing(spotX, spotZ, 0);
               return;
             }
-            activeTarget = {
-              x: spotX,
-              z: spotZ,
-              arrivePose: 'idle',
-              onArrive: () => {
-                handleSpotFishing(spotX, spotZ, 0);
-              },
-            };
+            startWalkTo(spotX, spotZ, 'idle', undefined, () => {
+              handleSpotFishing(spotX, spotZ, 0);
+            });
             return;
           }
 
@@ -1797,45 +2128,30 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               handleSpotFishing(spotX, spotZ, Math.PI);
               return;
             }
-            activeTarget = {
-              x: spotX,
-              z: spotZ,
-              arrivePose: 'idle',
-              onArrive: () => {
-                handleSpotFishing(spotX, spotZ, Math.PI);
-              },
-            };
+            startWalkTo(spotX, spotZ, 'idle', undefined, () => {
+              handleSpotFishing(spotX, spotZ, Math.PI);
+            });
             return;
           }
 
           if (kind === 'arcade_star') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                setMiniScore(0);
-                setMiniActive(true);
-                setStarPos({x: 30 + Math.random() * 45, y: 25 + Math.random() * 50});
-                soundFX.sparkle();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              setMiniScore(0);
+              setMiniActive(true);
+              setStarPos({x: 30 + Math.random() * 45, y: 25 + Math.random() * 50});
+              soundFX.sparkle();
+            });
             return;
           }
 
           if (kind === 'arcade_claw') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onAddCoins(8);
-                showBubble('Gắp trúng Gấu Bông! +8 Xu', playerPos.x, 2.1, playerPos.z);
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onAddCoins(8);
+              showBubble('Gắp trúng Gấu Bông! +8 Xu', playerPos.x, 2.1, playerPos.z);
+            });
             return;
           }
 
@@ -1856,11 +2172,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 const dx = playerPos.x - door.x;
                 const dz = playerPos.z - door.z;
                 const len = Math.hypot(dx, dz) || 1;
-                activeTarget = {
-                  x: door.x + (dx / len) * 1.15,
-                  z: door.z + (dz / len) * 1.15,
-                  arrivePose: 'idle',
-                  onArrive: () => {
+                startWalkTo(
+                  door.x + (dx / len) * 1.15,
+                  door.z + (dz / len) * 1.15,
+                  'idle',
+                  undefined,
+                  () => {
                     const nextOpen = !door.isOpen;
                     door.setOpen(nextOpen);
                     openDoorsRef.current[door.id] = nextOpen;
@@ -1868,7 +2185,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                     nearbyDoorKeyRef.current = `${door.id}:${nextOpen}`;
                     setNearbyDoor({id: door.id, label: door.label, isOpen: nextOpen});
                   },
-                };
+                );
               }
             }
             return;
@@ -1880,49 +2197,34 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'open_shop') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenShop();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenShop();
+            });
             return;
           }
 
           if (kind === 'open_furniture_shop') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenFurnitureShop();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenFurnitureShop();
+            });
             return;
           }
 
           if (kind === 'koi_shop') {
             soundFX.tap();
-            activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
-              arrivePose: 'idle',
-              onArrive: () => {
-                soundFX.sparkle();
-                callbacksRef.current.onOpenKoiShop();
-              },
-            };
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenKoiShop();
+            });
             return;
           }
         }
       }
 
-      // 2. Tap on walkable ground or hill -> close arc menu, cancel active wait if walking away, nudge outside obstacle & walk
+      // 2. Tap on walkable ground or hill -> smart A* route around obstacles cleanly
       if (currentGrounds.length > 0) {
         const groundHits = raycaster.intersectObjects(currentGrounds, false);
         if (groundHits.length > 0) {
@@ -1939,13 +2241,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           const clampedX = THREE.MathUtils.clamp(pt.x, b.minX, b.maxX);
           const clampedZ = THREE.MathUtils.clamp(pt.z, b.minZ, b.maxZ);
           const safeTarget = resolvePointAgainstColliders(clampedX, clampedZ, currentColliders);
-          stallTimer = 0;
-          prevDistToTarget = Infinity;
-          activeTarget = {
-            x: THREE.MathUtils.clamp(safeTarget.x, b.minX, b.maxX),
-            z: THREE.MathUtils.clamp(safeTarget.z, b.minZ, b.maxZ),
-            arrivePose: 'idle',
-          };
+          startWalkTo(safeTarget.x, safeTarget.z, 'idle');
         }
       }
     };
@@ -2173,87 +2469,175 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
-      // Walk kinematics with collision sliding & exact seat alignment
-      if (activeTarget) {
-        const dx = activeTarget.x - playerPos.x;
-        const dz = activeTarget.z - playerPos.z;
-        const dist = Math.hypot(dx, dz);
-        const speed = z === 'town' ? 5.6 : 3.6;
-
-        if (dist < 0.16) {
-          if (activeTarget.seat) {
-            activeSeat = activeTarget.seat;
-            playerPos.x = activeTarget.seat.seatX;
-            playerPos.z = activeTarget.seat.seatZ;
-            playerPos.rotY = activeTarget.seat.rotY;
-          } else {
-            playerPos.x = activeTarget.x;
-            playerPos.z = activeTarget.z;
-          }
-          playerPos.pose = activeTarget.arrivePose;
-          const cb = activeTarget.onArrive;
-          activeTarget = null;
-          stallTimer = 0;
-          cb?.();
-        } else {
-          playerPos.pose = 'walk';
-          const dirX = dx / dist;
-          const dirZ = dz / dist;
-          const stepLen = Math.min(dist, speed * delta);
-          const rawX = playerPos.x + dirX * stepLen;
-          const rawZ = playerPos.z + dirZ * stepLen;
-
-          let resolved = resolvePointAgainstColliders(rawX, rawZ, currentColliders);
-          // Tangential slide around circular/box obstacles if direct path is blocked
-          const progress = (resolved.x - playerPos.x) * dirX + (resolved.z - playerPos.z) * dirZ;
-          if (resolved.collided && progress < stepLen * 0.35) {
-            const perpX = -dirZ;
-            const perpZ = dirX;
-            const optA = resolvePointAgainstColliders(
-              playerPos.x + perpX * stepLen * 0.9,
-              playerPos.z + perpZ * stepLen * 0.9,
-              currentColliders,
-            );
-            const optB = resolvePointAgainstColliders(
-              playerPos.x - perpX * stepLen * 0.9,
-              playerPos.z - perpZ * stepLen * 0.9,
-              currentColliders,
-            );
-            const distA = Math.hypot(activeTarget.x - optA.x, activeTarget.z - optA.z);
-            const distB = Math.hypot(activeTarget.x - optB.x, activeTarget.z - optB.z);
-            resolved = distA <= distB ? optA : optB;
-          }
-
-          const b = getZoneWalkBounds(z);
-          const nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
-          const nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
-
-          const moveX = nextX - playerPos.x;
-          const moveZ = nextZ - playerPos.z;
-          playerPos.x = nextX;
-          playerPos.z = nextZ;
-
-          if (Math.hypot(moveX, moveZ) > 0.002) {
-            const targetRot = Math.atan2(moveX, moveZ);
-            let diff = targetRot - playerPos.rotY;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            while (diff < -Math.PI) diff += Math.PI * 2;
-            playerPos.rotY += diff * Math.min(1, delta * 12);
-          }
-
-          const newDist = Math.hypot(activeTarget.x - playerPos.x, activeTarget.z - playerPos.z);
-          if (prevDistToTarget - newDist < stepLen * 0.15) {
-            stallTimer += delta;
-            if (stallTimer > 0.45) {
-              activeTarget = null;
-              playerPos.pose = 'idle';
-              stallTimer = 0;
-            }
-          } else {
-            stallTimer = 0;
-            prevDistToTarget = newDist;
+      // Jump vertical physics
+      if (jumpY > 0 || jumpVel !== 0) {
+        jumpY += jumpVel * delta;
+        jumpVel -= JUMP_GRAVITY * delta;
+        if (jumpY <= 0) {
+          jumpY = 0;
+          jumpVel = 0;
+          if (!activeTarget && playerPos.pose === 'jump') {
+            playerPos.pose = 'idle';
           }
         }
+      }
+      const isAirborne = jumpY > 0.01;
+
+      // Dynamic Virtual Joystick steering OR Smart Waypoint Walk Kinematics
+      const joy = joystickInputRef.current;
+      const joyMag = joy.active ? Math.hypot(joy.x, joy.y) : 0;
+      if (joyMag > 0.08) {
+        if (activeTarget) activeTarget = null;
+        releaseSeatIfNeeded();
+        if (fishCtrl.phase !== 'idle') {
+          resetFishing(true);
+        }
+        if (selectedPlotRef.current) {
+          selectedPlotRef.current = null;
+          setArcMenuPos(null);
+        }
+
+        let fwdX = controls.target.x - camera.position.x;
+        let fwdZ = controls.target.z - camera.position.z;
+        const fwdLen = Math.hypot(fwdX, fwdZ);
+        if (fwdLen > 0.001) {
+          fwdX /= fwdLen;
+          fwdZ /= fwdLen;
+        } else {
+          fwdX = 0;
+          fwdZ = -1;
+        }
+        const rightX = -fwdZ;
+        const rightZ = fwdX;
+        const moveDirX = rightX * joy.x + fwdX * -joy.y;
+        const moveDirZ = rightZ * joy.x + fwdZ * -joy.y;
+        const moveLen = Math.hypot(moveDirX, moveDirZ) || 1;
+        const speed = (z === 'town' ? 5.6 : 3.6) * Math.min(1, joyMag);
+        const stepLen = speed * delta;
+        const rawX = playerPos.x + (moveDirX / moveLen) * stepLen;
+        const rawZ = playerPos.z + (moveDirZ / moveLen) * stepLen;
+        const resolved = resolvePointAgainstColliders(rawX, rawZ, currentColliders);
+        const b = getZoneWalkBounds(z);
+        const nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
+        const nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
+        const dmx = nextX - playerPos.x;
+        const dmz = nextZ - playerPos.z;
+        playerPos.x = nextX;
+        playerPos.z = nextZ;
+
+        const targetRot =
+          Math.hypot(dmx, dmz) > 0.002
+            ? Math.atan2(dmx, dmz)
+            : Math.atan2(moveDirX, moveDirZ);
+        let diff = targetRot - playerPos.rotY;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        playerPos.rotY += diff * Math.min(1, delta * 14);
+        playerPos.pose = isAirborne ? 'jump' : 'walk';
+      } else {
+        if (!activeTarget && playerPos.pose === 'walk') {
+          playerPos.pose = isAirborne ? 'jump' : 'idle';
+        }
+        // Smart waypoint walk kinematics with collision sliding & exact seat alignment
+        if (activeTarget) {
+          while (
+            activeTarget.waypointIdx < activeTarget.waypoints.length - 1 &&
+            Math.hypot(
+              activeTarget.waypoints[activeTarget.waypointIdx].x - playerPos.x,
+              activeTarget.waypoints[activeTarget.waypointIdx].z - playerPos.z,
+            ) < 0.34
+          ) {
+            activeTarget.waypointIdx++;
+            prevDistToTarget = Infinity;
+            stallTimer = 0;
+          }
+
+          const isFinalWp = activeTarget.waypointIdx >= activeTarget.waypoints.length - 1;
+          const wp = activeTarget.waypoints[activeTarget.waypointIdx] ?? activeTarget;
+          const dx = wp.x - playerPos.x;
+          const dz = wp.z - playerPos.z;
+          const dist = Math.hypot(dx, dz);
+          const speed = z === 'town' ? 5.6 : 3.6;
+
+          if (isFinalWp && dist < 0.16) {
+            if (activeTarget.seat && !isAirborne) {
+              activeSeat = activeTarget.seat;
+              playerPos.x = activeTarget.seat.seatX;
+              playerPos.z = activeTarget.seat.seatZ;
+              playerPos.rotY = activeTarget.seat.rotY;
+            } else {
+              playerPos.x = activeTarget.x;
+              playerPos.z = activeTarget.z;
+            }
+            playerPos.pose = isAirborne ? 'jump' : activeTarget.arrivePose;
+            const cb = activeTarget.onArrive;
+            activeTarget = null;
+            stallTimer = 0;
+            cb?.();
+          } else {
+            playerPos.pose = isAirborne ? 'jump' : 'walk';
+            const dirX = dist > 0.0001 ? dx / dist : 0;
+            const dirZ = dist > 0.0001 ? dz / dist : 0;
+            const stepLen = Math.min(dist, speed * delta);
+            const rawX = playerPos.x + dirX * stepLen;
+            const rawZ = playerPos.z + dirZ * stepLen;
+
+            let resolved = resolvePointAgainstColliders(rawX, rawZ, currentColliders);
+            // Secondary tangential slide around obstacle corners
+            const progress = (resolved.x - playerPos.x) * dirX + (resolved.z - playerPos.z) * dirZ;
+            if (resolved.collided && progress < stepLen * 0.35) {
+              const perpX = -dirZ;
+              const perpZ = dirX;
+              const optA = resolvePointAgainstColliders(
+                playerPos.x + perpX * stepLen * 0.9,
+                playerPos.z + perpZ * stepLen * 0.9,
+                currentColliders,
+              );
+              const optB = resolvePointAgainstColliders(
+                playerPos.x - perpX * stepLen * 0.9,
+                playerPos.z - perpZ * stepLen * 0.9,
+                currentColliders,
+              );
+              const distA = Math.hypot(wp.x - optA.x, wp.z - optA.z);
+              const distB = Math.hypot(wp.x - optB.x, wp.z - optB.z);
+              resolved = distA <= distB ? optA : optB;
+            }
+
+            const b = getZoneWalkBounds(z);
+            const nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
+            const nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
+
+            const moveX = nextX - playerPos.x;
+            const moveZ = nextZ - playerPos.z;
+            playerPos.x = nextX;
+            playerPos.z = nextZ;
+
+            if (Math.hypot(moveX, moveZ) > 0.002) {
+              const targetRot = Math.atan2(moveX, moveZ);
+              let diff = targetRot - playerPos.rotY;
+              while (diff > Math.PI) diff -= Math.PI * 2;
+              while (diff < -Math.PI) diff += Math.PI * 2;
+              playerPos.rotY += diff * Math.min(1, delta * 12);
+            }
+
+            const newDist = Math.hypot(wp.x - playerPos.x, wp.z - playerPos.z);
+            if (prevDistToTarget - newDist < stepLen * 0.15) {
+              stallTimer += delta;
+              if (stallTimer > 0.5) {
+                activeTarget = null;
+                playerPos.pose = isAirborne ? 'jump' : 'idle';
+                stallTimer = 0;
+              }
+            } else {
+              stallTimer = 0;
+              prevDistToTarget = newDist;
+            }
+          }
+        }
+      }
+
+      if (isAirborne) {
+        playerPos.pose = 'jump';
       }
 
       let groundOffset = 0.02;
@@ -2557,8 +2941,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (playerRig.rodBobber) playerRig.rodBobber.visible = showHeldMiniBobber;
       if (playerRig.rodLine) playerRig.rodLine.visible = showHeldMiniBobber;
 
-      playerRig.root.position.set(playerPos.x, groundOffset, playerPos.z);
+      playerRig.root.position.set(playerPos.x, groundOffset + jumpY, playerPos.z);
       playerRig.root.rotation.y = playerPos.rotY;
+      if (playerRig.shadowDisc) {
+        playerRig.shadowDisc.position.y = 0.004 - jumpY;
+        const shScale = Math.max(0.42, 1 - jumpY * 0.28);
+        playerRig.shadowDisc.scale.setScalar(shScale);
+      }
       updateAvatarRigAnimation(
         playerRig,
         playerPos.pose,
@@ -3303,6 +3692,104 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Dynamic Hidden Touch Joystick (Bottom-Left) — appears only while touching */}
+      {showJoystick && !miniActive && !(zone === 'home' && editFurnitureMode) && (
+        <div
+          className="phone-ui absolute bottom-2 left-2 z-30 h-44 w-44 touch-none select-none"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            const cx = e.clientX - rect.left;
+            const cy = e.clientY - rect.top;
+            joystickOriginRef.current = {x: cx, y: cy, pointerId: e.pointerId};
+            joystickInputRef.current = {x: 0, y: 0, active: true};
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {
+              // ignore pointer capture unavailability
+            }
+            if (joystickBaseRef.current) {
+              joystickBaseRef.current.style.left = `${cx}px`;
+              joystickBaseRef.current.style.top = `${cy}px`;
+              joystickBaseRef.current.style.opacity = '1';
+            }
+            if (joystickKnobRef.current) {
+              joystickKnobRef.current.style.transform = 'translate(-50%, -50%)';
+            }
+          }}
+          onPointerMove={(e) => {
+            if (
+              !joystickInputRef.current.active ||
+              joystickOriginRef.current.pointerId !== e.pointerId
+            ) {
+              return;
+            }
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            const dx = e.clientX - rect.left - joystickOriginRef.current.x;
+            const dy = e.clientY - rect.top - joystickOriginRef.current.y;
+            const maxR = 40;
+            const dist = Math.hypot(dx, dy);
+            const clampedDist = Math.min(dist, maxR);
+            const angle = dist > 0.001 ? Math.atan2(dy, dx) : 0;
+            const ox = Math.cos(angle) * clampedDist;
+            const oy = Math.sin(angle) * clampedDist;
+            joystickInputRef.current.x = ox / maxR;
+            joystickInputRef.current.y = oy / maxR;
+            if (joystickKnobRef.current) {
+              joystickKnobRef.current.style.transform = `translate(calc(-50% + ${ox}px), calc(-50% + ${oy}px))`;
+            }
+          }}
+          onPointerUp={(e) => {
+            if (joystickOriginRef.current.pointerId !== e.pointerId) return;
+            e.stopPropagation();
+            joystickOriginRef.current.pointerId = null;
+            joystickInputRef.current = {x: 0, y: 0, active: false};
+            if (joystickBaseRef.current) {
+              joystickBaseRef.current.style.opacity = '0';
+            }
+            if (joystickKnobRef.current) {
+              joystickKnobRef.current.style.transform = 'translate(-50%, -50%)';
+            }
+          }}
+          onPointerCancel={(e) => {
+            if (joystickOriginRef.current.pointerId !== e.pointerId) return;
+            joystickOriginRef.current.pointerId = null;
+            joystickInputRef.current = {x: 0, y: 0, active: false};
+            if (joystickBaseRef.current) {
+              joystickBaseRef.current.style.opacity = '0';
+            }
+          }}
+        >
+          <div
+            ref={joystickBaseRef}
+            style={{opacity: 0, transform: 'translate(-50%, -50%)'}}
+            className="pointer-events-none absolute top-1/2 left-1/2 h-24 w-24 rounded-full border-2 border-white/75 bg-[#4A3525]/25 shadow-lg backdrop-blur-[2px] transition-opacity duration-100"
+          >
+            <div
+              ref={joystickKnobRef}
+              style={{transform: 'translate(-50%, -50%)'}}
+              className="absolute top-1/2 left-1/2 h-11 w-11 rounded-full border-2 border-[#4A3525]/40 bg-[#FFF8EB]/95 shadow-md"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Right-Side Jump Button */}
+      {showJumpButton && !miniActive && !(zone === 'home' && editFurnitureMode) && (
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            jumpActionRef.current?.();
+          }}
+          aria-label="Nhảy lên"
+          className="phone-ui absolute right-5 bottom-6 z-30 flex h-14 w-14 flex-col items-center justify-center rounded-full border-[3px] border-[#3C95AD] bg-[#FFFDF8]/95 text-[#1F5E72] shadow-xl transition-transform active:scale-90"
+        >
+          <ArrowUp className="h-6 w-6" strokeWidth={2.75} />
+        </button>
       )}
     </div>
   );

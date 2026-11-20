@@ -2877,8 +2877,8 @@ export function buildSubzoneScene(
         shoreFlowerSpots.push([pondCX + fx, pondCZ + fz, i]);
       }
     }
-    const bladeGeo = new THREE.ConeGeometry(0.065, 0.36, 5);
-    bladeGeo.translate(0, 0.18, 0);
+    const bladeGeo = new THREE.ConeGeometry(0.072, 0.54, 5);
+    bladeGeo.translate(0, 0.27, 0);
     const bladeMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.75});
     const pondGrassIM = new THREE.InstancedMesh(bladeGeo, bladeMat, shoreBladeSpots.length * 2);
     const bladeDummy = new THREE.Object3D();

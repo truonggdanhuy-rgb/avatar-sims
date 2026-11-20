@@ -107,6 +107,7 @@ import {soundFX} from './utils/sound';
 
 const STORAGE_KEY = 'thi_tran_may_save_v1';
 const HOUSE_LAYOUT_VERSION = 5;
+const TELEPORT_COOLDOWN_MS = 15000;
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -771,6 +772,71 @@ export default function App() {
     return base;
   });
 
+  const [accountId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.accountId === 'string' && parsed.accountId.trim()) {
+          return parsed.accountId.trim();
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    const randCode = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    return `MAY-${randCode}-${randNum}`;
+  });
+
+  const [showJoystick, setShowJoystick] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.showJoystick === true;
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return false;
+  });
+
+  const [showJumpButton, setShowJumpButton] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.showJumpButton === true;
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return false;
+  });
+
+  const [teleportToPlazaPulse, setTeleportToPlazaPulse] = useState(0);
+  const [teleportCooldownEndAt, setTeleportCooldownEndAt] = useState(0);
+  const [teleportClockNow, setTeleportClockNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (teleportCooldownEndAt <= Date.now()) return;
+    setTeleportClockNow(Date.now());
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      setTeleportClockNow(now);
+      if (now >= teleportCooldownEndAt) {
+        window.clearInterval(timer);
+      }
+    }, 450);
+    return () => window.clearInterval(timer);
+  }, [teleportCooldownEndAt]);
+
+  const teleportCooldownSec = Math.max(
+    0,
+    Math.ceil((teleportCooldownEndAt - teleportClockNow) / 1000),
+  );
+
   // Ensure plots count stays synced to PLOT_COUNT
   useEffect(() => {
     if (plots.length !== PLOT_COUNT) {
@@ -1019,6 +1085,9 @@ export default function App() {
           fishingRod,
           fishBasket,
           fishDex,
+          accountId,
+          showJoystick,
+          showJumpButton,
         }),
       );
     } catch {
@@ -1046,6 +1115,9 @@ export default function App() {
     fishingRod,
     fishBasket,
     fishDex,
+    accountId,
+    showJoystick,
+    showJumpButton,
   ]);
 
   const handleZoneChange = (next: ZoneId) => {
@@ -1063,6 +1135,17 @@ export default function App() {
       setPondOpen(false);
       setFarmShopOpen(false);
     }
+  };
+
+  const handleTeleportToPlaza = () => {
+    const now = Date.now();
+    if (now < teleportCooldownEndAt) return;
+    setTeleportCooldownEndAt(now + TELEPORT_COOLDOWN_MS);
+    setTeleportClockNow(now);
+    if (zone !== 'town') {
+      handleZoneChange('town');
+    }
+    setTeleportToPlazaPulse((p) => p + 1);
   };
 
   const markQuestDone = (key: keyof DailyQuestProgress['tasks']) => {
@@ -2125,6 +2208,9 @@ export default function App() {
         editFurnitureMode={editFurnitureMode}
         selectedFurnitureId={selectedFurnitureId}
         homeSpotRef={homeSpotRef}
+        showJoystick={showJoystick}
+        showJumpButton={showJumpButton}
+        teleportToPlazaPulse={teleportToPlazaPulse}
         onChangeZone={handleZoneChange}
         onOpenWardrobe={() => setWardrobeOpen(true)}
         onOpenShop={() => setBoutiqueOpen(true)}
@@ -2344,9 +2430,16 @@ export default function App() {
           storageCapacity={storageCapacity}
           fishingRod={fishingRod}
           fishDex={fishDex}
+          accountId={accountId}
+          showJoystick={showJoystick}
+          showJumpButton={showJumpButton}
+          teleportCooldownSec={teleportCooldownSec}
           initialTab={phoneInitialTab}
           initialBagSubTab={phoneBagSubTab}
           onToggleEquipRod={handleToggleEquipRod}
+          onToggleJoystick={() => setShowJoystick((prev) => !prev)}
+          onToggleJumpButton={() => setShowJumpButton((prev) => !prev)}
+          onTeleportToPlaza={handleTeleportToPlaza}
           onOpenWardrobe={() => {
             setPhoneOpen(false);
             setWardrobeOpen(true);

@@ -71,6 +71,7 @@ export type HandheldStyle =
 export type AvatarPose =
   | 'idle'
   | 'walk'
+  | 'jump'
   | 'sit'
   | 'sleep'
   | 'fish_cast'

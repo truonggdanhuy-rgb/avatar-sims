@@ -23,6 +23,7 @@ export interface AvatarRig {
   root: THREE.Group;
   bodyPivot: THREE.Group;
   torsoGroup?: THREE.Group;
+  skirtPivot?: THREE.Group;
   headPivot: THREE.Group;
   leftArm: THREE.Group;
   rightArm: THREE.Group;
@@ -455,15 +456,15 @@ export function buildAvatarRig(
     const hipCap = new THREE.Mesh(new THREE.SphereGeometry(0.078, 14, 12), legMat);
     legPivot.add(hipCap);
 
-    // Upper thigh (hip y=0 down to knee y=-0.215)
+    // Upper thigh (hip y=0 down to knee y=-0.215) — openEnded meets seamless sphere cap without dark ring seam
     const thighMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.078, 0.068, 0.225, 18),
+      new THREE.CylinderGeometry(0.077, 0.066, 0.218, 18, 1, true),
       legMat,
     );
-    thighMesh.position.y = -0.11;
+    thighMesh.position.y = -0.109;
     legPivot.add(thighMesh);
 
-    const kneeCap = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 12), legMat);
+    const kneeCap = new THREE.Mesh(new THREE.SphereGeometry(0.0685, 14, 12), legMat);
     kneeCap.position.y = KNEE_Y;
     legPivot.add(kneeCap);
 
@@ -502,10 +503,10 @@ export function buildAvatarRig(
     legPivot.add(kneePivot);
 
     const shinMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.068, 0.056, 0.23, 18),
+      new THREE.CylinderGeometry(0.066, 0.055, 0.225, 18, 1, true),
       legMat,
     );
-    shinMesh.position.y = -0.115;
+    shinMesh.position.y = -0.112;
     kneePivot.add(shinMesh);
 
     if (config.bottom === 'wide_trousers') {
@@ -905,7 +906,8 @@ export function buildAvatarRig(
     torsoGroup.add(neckTrim, waistSash);
   }
 
-  // Bottoms on Torso (clean radial hierarchy so skirts & trousers never clip through tops)
+  // Bottoms on Torso (clean radial hierarchy so skirts drape smoothly over seated lap without clipping)
+  let skirtPivot: THREE.Group | undefined;
   if (config.bottom === 'pleated_skirt' || config.bottom === 'midi_skirt') {
     const isMidi = config.bottom === 'midi_skirt';
     const waistband = new THREE.Mesh(
@@ -915,6 +917,10 @@ export function buildAvatarRig(
     waistband.position.set(0, -0.158, 0);
     torsoGroup.add(waistband);
 
+    skirtPivot = new THREE.Group();
+    skirtPivot.position.set(0, -0.158, 0);
+    torsoGroup.add(skirtPivot);
+
     const skirtGeo = createPleatedSkirtGeometry(
       0.216,
       isMidi ? 0.325 : 0.285,
@@ -923,16 +929,16 @@ export function buildAvatarRig(
       isMidi ? 0.011 : 0.016,
     );
     const skirtMesh = new THREE.Mesh(skirtGeo, bottomMat);
-    skirtMesh.position.set(0, isMidi ? -0.34 : -0.288, 0);
-    torsoGroup.add(skirtMesh);
+    skirtMesh.position.set(0, isMidi ? -0.182 : -0.13, 0);
+    skirtPivot.add(skirtMesh);
 
     const hemRing = new THREE.Mesh(
       new THREE.TorusGeometry(isMidi ? 0.322 : 0.282, 0.012, 8, 32),
       bottomLightMat,
     );
     hemRing.rotation.x = Math.PI / 2;
-    hemRing.position.set(0, isMidi ? -0.49 : -0.388, 0);
-    torsoGroup.add(hemRing);
+    hemRing.position.set(0, isMidi ? -0.332 : -0.23, 0);
+    skirtPivot.add(hemRing);
   } else {
     const waist = new THREE.Mesh(
       new THREE.CylinderGeometry(0.22, 0.224, 0.078, 26),
@@ -2268,6 +2274,7 @@ export function buildAvatarRig(
     root,
     bodyPivot,
     torsoGroup,
+    skirtPivot,
     headPivot,
     leftArm,
     rightArm,
@@ -2308,6 +2315,16 @@ export function updateAvatarRigAnimation(
 
   const hold = rig.holdPose || 'none';
 
+  if (pose !== 'sit') {
+    rig.leftLeg.position.z = 0;
+    rig.rightLeg.position.z = 0;
+    if (rig.skirtPivot) {
+      rig.skirtPivot.rotation.x = 0;
+      rig.skirtPivot.position.set(0, -0.158, 0);
+      rig.skirtPivot.scale.set(1, 1, 1);
+    }
+  }
+
   if (pose === 'walk') {
     const swing = Math.sin(elapsed * 12);
     rig.leftLeg.rotation.x = swing * 0.55;
@@ -2339,6 +2356,36 @@ export function updateAvatarRigAnimation(
     rig.bodyPivot.rotation.x = 0.06;
     rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = Math.sin(elapsed * 6) * 0.03;
+  } else if (pose === 'jump') {
+    rig.leftLeg.rotation.x = -0.34;
+    rig.rightLeg.rotation.x = 0.24;
+    rig.leftLeg.rotation.z = -0.05;
+    rig.rightLeg.rotation.z = 0.05;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.62;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.42;
+
+    rig.leftArm.rotation.x = -0.58;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.42;
+    if (hold === 'carry_umbrella') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX - 0.08;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
+    } else if (hold === 'carry_front') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_front.armX - 0.12;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX;
+    } else if (hold === 'carry_bag') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX - 0.15;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
+    } else {
+      rig.rightArm.rotation.x = -0.58;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = -0.42;
+    }
+
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.bodyPivot.position.y = 0.03;
+    rig.bodyPivot.rotation.x = -0.06;
+    rig.headPivot.rotation.x = -0.04;
+    rig.headPivot.rotation.z = 0;
   } else if (pose === 'fish_cast') {
     const u = THREE.MathUtils.clamp(poseProgress, 0, 1);
     // Smooth two-beat cast: wind up back (0..0.38) then brisk forward throw (0.38..1)
@@ -2413,16 +2460,25 @@ export function updateAvatarRigAnimation(
     const sitBreath = Math.sin(elapsed * 1.9);
     const breath01 = 0.5 + 0.5 * sitBreath;
 
-    // Natural bent-knee sitting posture: thighs rest along seat, knees bend down so shins & shoes hang naturally
-    rig.leftLeg.rotation.x = -1.42;
-    rig.rightLeg.rotation.x = -1.42;
-    rig.leftLeg.rotation.z = -0.04;
-    rig.rightLeg.rotation.z = 0.04;
-    if (rig.leftKnee) rig.leftKnee.rotation.x = 1.38;
-    if (rig.rightKnee) rig.rightKnee.rotation.x = 1.38;
+    // Unified natural sitting posture across all skirts, shorts, and trousers:
+    // shift hips slightly forward, drape skirt smoothly forward over lap, pitch thighs along bench & bend knees cleanly downward
+    rig.leftLeg.position.z = 0.052;
+    rig.rightLeg.position.z = 0.052;
+    rig.leftLeg.rotation.x = -1.24;
+    rig.rightLeg.rotation.x = -1.24;
+    rig.leftLeg.rotation.z = -0.025;
+    rig.rightLeg.rotation.z = 0.025;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 1.14;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 1.14;
 
-    rig.leftArm.rotation.x = -0.52 + sitBreath * 0.015;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.68;
+    if (rig.skirtPivot) {
+      rig.skirtPivot.rotation.x = -0.58;
+      rig.skirtPivot.position.set(0, -0.144, 0.036);
+      rig.skirtPivot.scale.set(1.06, 0.84, 1.28);
+    }
+
+    rig.leftArm.rotation.x = -0.44 + sitBreath * 0.015;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.62;
 
     if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + sitBreath * 0.012;
@@ -2434,14 +2490,14 @@ export function updateAvatarRigAnimation(
       rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX + sitBreath * 0.012;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
     } else {
-      rig.rightArm.rotation.x = -0.52 + sitBreath * 0.015;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = -0.68;
+      rig.rightArm.rotation.x = -0.44 + sitBreath * 0.015;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = -0.62;
     }
 
     if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77 + breath01 * 0.008;
     rig.headPivot.position.y = HEAD_PIVOT_Y + breath01 * 0.01;
-    rig.bodyPivot.position.y = -0.19;
-    rig.bodyPivot.rotation.x = 0.03 + sitBreath * 0.008;
+    rig.bodyPivot.position.y = -0.152;
+    rig.bodyPivot.rotation.x = 0.02 + sitBreath * 0.008;
     rig.headPivot.rotation.x = Math.sin(elapsed * 1.9 - 0.5) * 0.015;
     rig.headPivot.rotation.z = Math.sin(elapsed * 0.85) * 0.01;
   } else if (pose === 'sleep') {

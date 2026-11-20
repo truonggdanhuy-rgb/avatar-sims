@@ -1,19 +1,25 @@
 import React, {useEffect, useState} from 'react';
 import {
   ArrowLeft,
+  ArrowUp,
   Backpack,
   BookOpen,
   ClipboardList,
   CloudSun,
   Coins,
+  Database,
   Fish,
+  Gamepad2,
+  Gift,
   Heart,
   Home,
   Moon,
+  Send,
   Settings,
   Shirt,
   Sun,
   Sunset,
+  UserCircle2,
   Volume2,
   VolumeX,
   Warehouse,
@@ -58,9 +64,16 @@ interface PhoneMenuModalProps {
   storageCapacity: number;
   fishingRod: FishingRodState;
   fishDex: Partial<Record<RiverFishSpeciesId, FishDexRecord>>;
-  initialTab?: 'menu' | 'guide' | 'bag' | 'fishdex';
+  accountId: string;
+  showJoystick: boolean;
+  showJumpButton: boolean;
+  teleportCooldownSec: number;
+  initialTab?: 'menu' | 'account' | 'guide' | 'bag' | 'fishdex';
   initialBagSubTab?: 'list' | 'tools' | 'pets' | 'mounts';
   onToggleEquipRod: () => void;
+  onToggleJoystick: () => void;
+  onToggleJumpButton: () => void;
+  onTeleportToPlaza: () => void;
   onOpenWardrobe: () => void;
   onOpenDailyQuests: () => void;
   onOpenSettings: () => void;
@@ -70,7 +83,7 @@ interface PhoneMenuModalProps {
   onClose: () => void;
 }
 
-type PhoneTab = 'menu' | 'guide' | 'bag' | 'fishdex';
+type PhoneTab = 'menu' | 'account' | 'guide' | 'bag' | 'fishdex';
 type BagSubTab = 'list' | 'tools' | 'pets' | 'mounts';
 
 const ZONE_LABELS: Record<ZoneId, string> = {
@@ -100,9 +113,16 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   storageCapacity,
   fishingRod,
   fishDex,
+  accountId,
+  showJoystick,
+  showJumpButton,
+  teleportCooldownSec,
   initialTab = 'menu',
   initialBagSubTab = 'list',
   onToggleEquipRod,
+  onToggleJoystick,
+  onToggleJumpButton,
+  onTeleportToPlaza,
   onOpenWardrobe,
   onOpenDailyQuests,
   onOpenSettings,
@@ -115,6 +135,8 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   const [bagSubTab, setBagSubTab] = useState<BagSubTab>(initialBagSubTab);
   const [fishDexWater, setFishDexWater] = useState<FishWaterType>('river');
   const [deviceTime, setDeviceTime] = useState<string>(() => formatDeviceTime());
+  const [giftCodeInput, setGiftCodeInput] = useState('');
+  const [giftCodeMessage, setGiftCodeMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -253,7 +275,25 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
             <div className="space-y-4">
               {/* Main Smartphone App Launcher Icons */}
               <div className="grid grid-cols-3 gap-x-2.5 gap-y-3.5 pt-1">
-                {/* 1. Tủ Đồ (Shirt Icon) */}
+                {/* 1. Tài khoản */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setGiftCodeMessage(null);
+                    setTab('account');
+                  }}
+                  className="group flex flex-col items-center gap-1.5 transition-transform active:scale-95"
+                >
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#C6DAFA] bg-gradient-to-br from-[#EEF5FF] to-[#CFE2FE] text-[#2F5B9E] shadow-sm transition-transform group-hover:-translate-y-0.5">
+                    <UserCircle2 className="h-7 w-7" strokeWidth={2.1} />
+                  </div>
+                  <span className="text-[11px] font-bold leading-tight text-[#4A3525]">
+                    Tài khoản
+                  </span>
+                </button>
+
+                {/* 2. Tủ Đồ (Shirt Icon) */}
                 <button
                   type="button"
                   onClick={() => {
@@ -271,7 +311,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </span>
                 </button>
 
-                {/* 2. Túi Đồ (Cần & Vợt · Pets · Cưỡi) */}
+                {/* 3. Túi Đồ (Cần & Vợt · Pets · Cưỡi) */}
                 <button
                   type="button"
                   onClick={() => {
@@ -294,7 +334,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </span>
                 </button>
 
-                {/* 3. Sổ Cá */}
+                {/* 4. Sổ Cá */}
                 <button
                   type="button"
                   onClick={() => {
@@ -311,7 +351,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </span>
                 </button>
 
-                {/* 4. Nhiệm Vụ Ngày */}
+                {/* 5. Nhiệm Vụ Ngày */}
                 <button
                   type="button"
                   onClick={() => {
@@ -334,7 +374,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </span>
                 </button>
 
-                {/* 5. Nhà Kho Nông Trại */}
+                {/* 6. Nhà Kho Nông Trại */}
                 <button
                   type="button"
                   onClick={() => {
@@ -352,7 +392,32 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </span>
                 </button>
 
-                {/* 6. Cài Đặt (Mở Trạm Bưu Điện) */}
+                {/* 7. Di chuyển về Quảng Trường (Paper Plane Icon + anti-spam cooldown) */}
+                <button
+                  type="button"
+                  disabled={teleportCooldownSec > 0}
+                  onClick={() => {
+                    if (teleportCooldownSec > 0) return;
+                    soundFX.enterDoor();
+                    onTeleportToPlaza();
+                    onClose();
+                  }}
+                  className="group relative flex flex-col items-center gap-1.5 transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-65"
+                >
+                  {teleportCooldownSec > 0 && (
+                    <span className="absolute -top-1 right-2 z-10 rounded-md bg-[#7A6048] px-1.5 py-0.5 text-[9px] font-extrabold tabular-nums text-white shadow-xs">
+                      {teleportCooldownSec}s
+                    </span>
+                  )}
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#BAE3DA] bg-gradient-to-br from-[#EBFAF6] to-[#C2EDE2] text-[#227664] shadow-sm transition-transform group-hover:-translate-y-0.5">
+                    <Send className="h-7 w-7 -translate-x-0.5 translate-y-0.5" strokeWidth={2.1} />
+                  </div>
+                  <span className="text-[11px] font-bold leading-tight text-[#4A3525]">
+                    {teleportCooldownSec > 0 ? `Chờ ${teleportCooldownSec}s` : 'Di chuyển'}
+                  </span>
+                </button>
+
+                {/* 8. Cài Đặt (Mở Trạm Bưu Điện) */}
                 <button
                   type="button"
                   onClick={() => {
@@ -402,7 +467,148 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                     )}
                     <span>{soundEnabled ? 'Âm Bật' : 'Âm Tắt'}</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFX.tap();
+                      onToggleJoystick();
+                    }}
+                    className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border px-2 py-1.5 text-[11px] font-bold transition-transform active:scale-95 ${
+                      showJoystick
+                        ? 'border-[#54A773] bg-[#EAF7EF] text-[#25603B]'
+                        : 'border-[#E0CEB6] bg-white text-[#7A6652]'
+                    }`}
+                  >
+                    <Gamepad2
+                      className={`h-3.5 w-3.5 ${
+                        showJoystick ? 'text-[#398E59]' : 'text-[#9A846E]'
+                      }`}
+                    />
+                    <span>{showJoystick ? 'Joystick: Bật' : 'Ẩn joystick'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFX.tap();
+                      onToggleJumpButton();
+                    }}
+                    className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border px-2 py-1.5 text-[11px] font-bold transition-transform active:scale-95 ${
+                      showJumpButton
+                        ? 'border-[#3C95AD] bg-[#E8F6FA] text-[#1E5D70]'
+                        : 'border-[#E0CEB6] bg-white text-[#7A6652]'
+                    }`}
+                  >
+                    <ArrowUp
+                      className={`h-3.5 w-3.5 ${
+                        showJumpButton ? 'text-[#2E8299]' : 'text-[#9A846E]'
+                      }`}
+                    />
+                    <span>{showJumpButton ? 'Nút Nhảy: Bật' : 'Ẩn nhảy'}</span>
+                  </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'account' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setTab('menu');
+                  }}
+                  className="flex min-h-[34px] items-center gap-1 rounded-xl bg-[#EFE0C9] px-2.5 py-1 text-xs font-bold text-[#5B422E] active:scale-95"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <span>Quay lại</span>
+                </button>
+                <span className="text-xs font-extrabold text-[#4A3525]">Tài khoản</span>
+                <span className="w-16" />
+              </div>
+
+              <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3.5 shadow-xs space-y-2.5">
+                <div className="flex items-center gap-3">
+                  <div className="h-14 w-12 shrink-0 overflow-hidden rounded-xl border border-[#E5D4BB] bg-[#EFE3D0]">
+                    <AvatarPreview3D
+                      avatar={avatar}
+                      showInspectorControls={false}
+                      portraitFraming
+                      className="pointer-events-none h-full w-full"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-black text-[#3B2A1A]">
+                      {avatar.name}
+                    </div>
+                    <div className="mt-0.5 text-[11px] font-bold text-[#7A6048] tabular-nums">
+                      ID: <span className="font-mono text-[#4A3525]">{accountId}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[#D4E2F5] bg-[#F2F7FF] p-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-[11px] font-extrabold text-[#2B538C]">
+                      <Database className="h-3.5 w-3.5" />
+                      <span>Đồng bộ Supabase</span>
+                    </span>
+                    <span className="rounded-md bg-[#DCE9FC] px-2 py-0.5 text-[9px] font-black text-[#2F5B9E]">
+                      Sắp ra mắt
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[10px] font-semibold leading-relaxed text-[#526D94]">
+                    Tài khoản hiện đang lưu trên thiết bị. Tính năng liên kết Supabase để sao lưu đám mây sẽ sớm được mở khóa.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3.5 shadow-xs space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-black text-[#4A3525]">
+                  <Gift className="h-4 w-4 text-[#D96B43]" />
+                  <span>Nhập Code Quà Tặng</span>
+                </div>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    soundFX.tap();
+                    const cleaned = giftCodeInput.trim();
+                    if (!cleaned) {
+                      setGiftCodeMessage('Vui lòng nhập mã code trước khi xác nhận.');
+                      return;
+                    }
+                    setGiftCodeMessage(
+                      `Mã "${cleaned}" chưa thể quy đổi do máy chủ Gift Code Supabase đang chờ liên kết.`,
+                    );
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={giftCodeInput}
+                    onChange={(e) => {
+                      setGiftCodeInput(e.target.value.toUpperCase());
+                      if (giftCodeMessage) setGiftCodeMessage(null);
+                    }}
+                    maxLength={24}
+                    placeholder="Nhập gift code..."
+                    className="min-w-0 flex-1 rounded-xl border border-[#DECBB0] bg-[#FAF4EA] px-3 py-2 text-xs font-bold uppercase text-[#3B2A1A] placeholder:normal-case placeholder:font-semibold placeholder:text-[#9D856B] focus:border-[#6F4E37] focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="shrink-0 rounded-xl bg-[#6F4E37] px-3 py-2 text-xs font-black text-amber-50 transition-transform active:scale-95"
+                  >
+                    Nhập
+                  </button>
+                </form>
+                {giftCodeMessage && (
+                  <p className="rounded-xl bg-[#FBF2E4] px-2.5 py-2 text-[11px] font-semibold leading-relaxed text-[#7B5939]">
+                    {giftCodeMessage}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -844,7 +1050,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 setTab('menu');
               }}
               className={`flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-colors ${
-                tab === 'menu' || tab === 'bag' || tab === 'fishdex'
+                tab === 'menu' || tab === 'account' || tab === 'bag' || tab === 'fishdex'
                   ? 'bg-[#6F4E37] text-amber-50 shadow-xs'
                   : 'bg-[#E9D9C3] text-[#5B422E]'
               }`}

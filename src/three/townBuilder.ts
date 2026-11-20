@@ -4918,22 +4918,26 @@ export function buildTownScene(): TownWorld {
   flowerTopIM.computeBoundingSphere();
   group.add(flowerBaseIM, flowerTopIM);
 
-  // D. Small & Tall Grass Clusters (Cỏ lớn bé rải khắp đồng cỏ & chân cây, tảng đá)
-  const TUFT_COUNT = 360;
-  const t1 = new THREE.ConeGeometry(0.08, 0.24, 4);
+  // D. Sculpted Layered Meadow Grass Clusters (Cỏ vừa & cỏ cao mượt mà dùng static InstancedMesh)
+  const TUFT_COUNT = 460;
+  const t1 = new THREE.ConeGeometry(0.085, 0.38, 4);
   t1.rotateZ(0.22);
-  t1.translate(-0.06, 0.11, 0);
-  const t2 = new THREE.ConeGeometry(0.07, 0.28, 4);
+  t1.translate(-0.07, 0.17, 0);
+  const t2 = new THREE.ConeGeometry(0.078, 0.44, 4);
   t2.rotateZ(-0.18);
-  t2.translate(0.06, 0.13, 0.04);
-  const t3 = new THREE.ConeGeometry(0.07, 0.2, 4);
+  t2.translate(0.07, 0.2, 0.04);
+  const t3 = new THREE.ConeGeometry(0.074, 0.34, 4);
   t3.rotateX(0.2);
-  t3.translate(0, 0.09, -0.06);
-  const tuftGeo = mergeParts([t1, t2, t3]);
-  const tuftMat = getMat('#66B868', 0.8);
+  t3.translate(0, 0.15, -0.07);
+  const t4 = new THREE.ConeGeometry(0.068, 0.36, 4);
+  t4.rotateX(-0.16);
+  t4.translate(-0.03, 0.16, 0.06);
+  const tuftGeo = mergeParts([t1, t2, t3, t4]);
+  const tuftMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.78});
   const tuftIM = new THREE.InstancedMesh(tuftGeo, tuftMat, TUFT_COUNT);
+  const tuftPalette = ['#5EB662', '#68C16B', '#54AA58', '#73C972'];
   let placedTufts = 0;
-  for (let i = 0; i < 680 && placedTufts < TUFT_COUNT; i++) {
+  for (let i = 0; i < 820 && placedTufts < TUFT_COUNT; i++) {
     const angle = i * 2.39996 + 0.9;
     const rad = 8.4 + ((i * 1.53) % 68.0);
     const gx = Math.cos(angle) * rad;
@@ -4942,45 +4946,52 @@ export function buildTownScene(): TownWorld {
     const gy = getTownGroundHeight(gx, gz) - 0.01;
     _instDummy.position.set(gx, gy, gz);
     _instDummy.rotation.set(0, angle, 0);
-    _instDummy.scale.setScalar(0.75 + (placedTufts % 4) * 0.18);
+    _instDummy.scale.setScalar(0.86 + (placedTufts % 4) * 0.18);
     _instDummy.updateMatrix();
     tuftIM.setMatrixAt(placedTufts, _instDummy.matrix);
+    _instColor.set(tuftPalette[placedTufts % tuftPalette.length]);
+    tuftIM.setColorAt(placedTufts, _instColor);
     placedTufts++;
   }
   tuftIM.count = placedTufts;
   tuftIM.instanceMatrix.needsUpdate = true;
+  if (tuftIM.instanceColor) tuftIM.instanceColor.needsUpdate = true;
   tuftIM.computeBoundingSphere();
   group.add(tuftIM);
 
-  // Tall Meadow Grass Clumps (Cỏ lớn rậm tự nhiên)
-  const TALL_GRASS_COUNT = 110;
-  const tg1 = new THREE.ConeGeometry(0.11, 0.56, 4);
-  tg1.rotateZ(0.2);
-  tg1.translate(-0.1, 0.26, 0.04);
-  const tg2 = new THREE.ConeGeometry(0.1, 0.64, 4);
-  tg2.rotateZ(-0.16);
-  tg2.translate(0.11, 0.3, -0.05);
-  const tg3 = new THREE.ConeGeometry(0.1, 0.5, 4);
+  // Tall Lush Meadow Grass Clumps (Cỏ cao rậm tự nhiên)
+  const TALL_GRASS_COUNT = 240;
+  const tg1 = new THREE.ConeGeometry(0.115, 0.72, 4);
+  tg1.rotateZ(0.22);
+  tg1.translate(-0.12, 0.34, 0.04);
+  const tg2 = new THREE.ConeGeometry(0.105, 0.84, 4);
+  tg2.rotateZ(-0.17);
+  tg2.translate(0.12, 0.39, -0.05);
+  const tg3 = new THREE.ConeGeometry(0.105, 0.68, 4);
   tg3.rotateX(0.22);
-  tg3.translate(0, 0.24, 0.12);
-  const tg4 = new THREE.ConeGeometry(0.09, 0.52, 4);
-  tg4.rotateX(-0.2);
-  tg4.translate(-0.04, 0.25, -0.11);
-  const tallGrassGeo = mergeParts([tg1, tg2, tg3, tg4]);
-  const tallGrassMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.78});
+  tg3.translate(0.02, 0.32, 0.13);
+  const tg4 = new THREE.ConeGeometry(0.095, 0.76, 4);
+  tg4.rotateX(-0.19);
+  tg4.translate(-0.05, 0.35, -0.12);
+  const tg5 = new THREE.ConeGeometry(0.09, 0.9, 4);
+  tg5.rotateZ(0.05);
+  tg5.rotateX(-0.04);
+  tg5.translate(0.01, 0.43, 0.01);
+  const tallGrassGeo = mergeParts([tg1, tg2, tg3, tg4, tg5]);
+  const tallGrassMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.76});
   const tallGrassIM = new THREE.InstancedMesh(tallGrassGeo, tallGrassMat, TALL_GRASS_COUNT);
-  const tallGrassPalette = ['#50A255', '#5CB060', '#48964D', '#67BA6A'];
+  const tallGrassPalette = ['#50A255', '#5CB060', '#48964D', '#67BA6A', '#72C474'];
   let placedTall = 0;
-  for (let i = 0; i < 320 && placedTall < TALL_GRASS_COUNT; i++) {
+  for (let i = 0; i < 600 && placedTall < TALL_GRASS_COUNT; i++) {
     const angle = i * 2.39996 + 1.85;
-    const rad = 11.5 + ((i * 2.13) % 62.0);
+    const rad = 9.4 + ((i * 2.13) % 64.0);
     const gx = Math.cos(angle) * rad;
     const gz = Math.sin(angle) * rad;
     if (isOnRoadOrPlaza(gx, gz)) continue;
     const gy = getTownGroundHeight(gx, gz) - 0.02;
     _instDummy.position.set(gx, gy, gz);
     _instDummy.rotation.set(0, angle * 1.3, 0);
-    _instDummy.scale.setScalar(0.88 + (placedTall % 4) * 0.14);
+    _instDummy.scale.setScalar(0.92 + (placedTall % 5) * 0.12);
     _instDummy.updateMatrix();
     tallGrassIM.setMatrixAt(placedTall, _instDummy.matrix);
     _instColor.set(tallGrassPalette[placedTall % tallGrassPalette.length]);
