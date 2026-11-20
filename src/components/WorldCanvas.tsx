@@ -141,11 +141,6 @@ interface ProjectedTag {
   y: number;
 }
 
-interface BubbleState {
-  text: string;
-  worldPos: THREE.Vector3;
-}
-
 interface SeatTarget {
   seatX: number;
   seatZ: number;
@@ -427,7 +422,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const labelLayerRef = useRef<HTMLDivElement | null>(null);
 
   const [tags, setTags] = useState<ProjectedTag[]>([]);
-  const [speechBubble, setSpeechBubble] = useState<{text: string; x: number; y: number} | null>(null);
+  const [speechBubble, setSpeechBubble] = useState<string | null>(null);
   const [arcMenuPos, setArcMenuPos] = useState<{plotId: number; x: number; y: number} | null>(null);
   const [fishingState, setFishingState] = useState<FishingPhase>('idle');
   const [biteAlertPos, setBiteAlertPos] = useState<{x: number; y: number} | null>(null);
@@ -552,7 +547,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const cancelFishingRef = useRef<(() => void) | null>(null);
   const activeTownRef = useRef<TownWorld | null>(null);
   const activeSubzoneRef = useRef<SubzoneWorld | null>(null);
-  const playerBubbleRef = useRef<BubbleState | null>(null);
   const bubbleTimerRef = useRef<number | null>(null);
   const fishTimerRef = useRef<number | null>(null);
   const openDoorsRef = useRef<Record<string, boolean>>({});
@@ -562,11 +556,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const homeExitTriggeredRef = useRef<boolean>(false);
   const selectedPlotRef = useRef<{plotId: number; worldPos: THREE.Vector3} | null>(null);
 
-  const showBubble = (text: string, x: number, y: number, z: number) => {
+  const showBubble = (text: string, _x?: number, _y?: number, _z?: number) => {
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
-    playerBubbleRef.current = {text, worldPos: new THREE.Vector3(x, y, z)};
+    setSpeechBubble(text);
     bubbleTimerRef.current = window.setTimeout(() => {
-      playerBubbleRef.current = null;
       setSpeechBubble(null);
     }, 2600);
   };
@@ -1107,12 +1100,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         };
         fishCtrl.shadowScale = cfg.shadowScale;
         fishCtrl.biteWindowSec = cfg.biteWindowMs / 1000;
-        fishCtrl.waitDelaySec = 0.55 + Math.random() * 0.55;
-        fishCtrl.approachDurationSec = 0.85 + Math.random() * 0.3;
+        fishCtrl.waitDelaySec = 4.0;
+        fishCtrl.approachDurationSec = 2.5;
         fishCtrl.nibbleTarget =
           cfg.nibbleMin + Math.floor(Math.random() * (cfg.nibbleMax - cfg.nibbleMin + 1));
         fishCtrl.nibblesDone = 0;
-        fishCtrl.nextNibbleTimer = 0.32;
+        fishCtrl.nextNibbleTimer = 0.05;
         fishCtrl.nibbleAnimTimer = 0;
         fishCtrl.strikeSuspenseSec = 0.35 + Math.random() * 0.55;
         fishCtrl.inStrikeSuspense = false;
@@ -1326,6 +1319,74 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               arrivePose: 'sit',
               seat: seatInfo,
               onArrive: () => soundFX.sparkle(),
+            };
+            return;
+          }
+
+          if (kind === 'outdoor_swing') {
+            soundFX.tap();
+            const seatInfo: SeatTarget = {
+              seatX: data.seatX as number,
+              seatZ: data.seatZ as number,
+              seatY: (data.seatY as number) || 0.62,
+              rotY: (data.sitRotY as number) ?? 0,
+              standX: data.tx as number,
+              standZ: data.tz as number,
+            };
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'sit',
+              seat: seatInfo,
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onBoostMood();
+                showBubble('Đung đưa xích đu ngoài trời thật thư giãn! (+Vui vẻ)');
+              },
+            };
+            return;
+          }
+
+          if (kind === 'outdoor_campfire') {
+            soundFX.tap();
+            const seatInfo: SeatTarget = {
+              seatX: data.seatX as number,
+              seatZ: data.seatZ as number,
+              seatY: (data.seatY as number) || 0.42,
+              rotY: (data.sitRotY as number) ?? Math.PI,
+              standX: data.tx as number,
+              standZ: data.tz as number,
+            };
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'sit',
+              seat: seatInfo,
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onBoostMood();
+                showBubble('Ngồi sưởi ấm bên bếp lửa trại thật chill! (+Vui vẻ)');
+              },
+            };
+            return;
+          }
+
+          if (kind === 'outdoor_telescope') {
+            soundFX.tap();
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'idle',
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onBoostMood();
+                const isNightNow = stateRef.current.timeOfDay === 'night';
+                showBubble(
+                  isNightNow
+                    ? 'Ngắm trăng sao qua kính thiên văn thật lung linh! (+Vui vẻ)'
+                    : 'Ngắm cảnh thị trấn qua kính thiên văn thật tuyệt! (+Vui vẻ)',
+                );
+              },
             };
             return;
           }
@@ -1901,7 +1962,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         tod === 'night'
           ? isIndoor
             ? 0x161c30
-            : 0x050914
+            : 0x101e38
           : tod === 'sunset'
             ? 0xeb9c76
             : 0xb2ddf2;
@@ -1911,26 +1972,26 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         scene.fog.color.copy(scene.background as THREE.Color);
         scene.fog.density = THREE.MathUtils.damp(
           scene.fog.density,
-          tod === 'night' && !isIndoor ? 0.0046 : 0.0021,
+          tod === 'night' && !isIndoor ? 0.0025 : 0.0021,
           5,
           delta,
         );
       }
       scene.environmentIntensity = THREE.MathUtils.damp(
         scene.environmentIntensity,
-        tod === 'night' ? (isIndoor ? 0.28 : 0.045) : tod === 'sunset' ? 0.34 : 0.42,
+        tod === 'night' ? (isIndoor ? 0.28 : 0.16) : tod === 'sunset' ? 0.34 : 0.42,
         5,
         delta,
       );
       renderer.toneMappingExposure = THREE.MathUtils.damp(
         renderer.toneMappingExposure,
-        tod === 'night' ? (isIndoor ? 0.88 : 0.62) : 0.96,
+        tod === 'night' ? 0.88 : 0.96,
         5,
         delta,
       );
       sunLight.intensity = THREE.MathUtils.damp(
         sunLight.intensity,
-        tod === 'night' ? (isIndoor ? 0.65 : 0.14) : tod === 'sunset' ? 1.04 : 1.22,
+        tod === 'night' ? (isIndoor ? 0.65 : 0.52) : tod === 'sunset' ? 1.04 : 1.22,
         5,
         delta,
       );
@@ -1938,7 +1999,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         tod === 'night'
           ? isIndoor
             ? '#CBD8F5'
-            : '#597BB8'
+            : '#BFD6FF'
           : tod === 'sunset'
             ? '#FFAE70'
             : '#FFF2D8',
@@ -1946,7 +2007,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       sunLight.color.lerp(_sunColorTarget, 0.08);
       hemiLight.intensity = THREE.MathUtils.damp(
         hemiLight.intensity,
-        tod === 'night' ? (isIndoor ? 0.38 : 0.12) : tod === 'sunset' ? 0.48 : 0.58,
+        tod === 'night' ? 0.38 : tod === 'sunset' ? 0.48 : 0.58,
         5,
         delta,
       );
@@ -1954,7 +2015,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         tod === 'night'
           ? isIndoor
             ? '#7A90BF'
-            : '#122042'
+            : '#5478B8'
           : tod === 'sunset'
             ? '#FFD6BA'
             : '#DCEFFF',
@@ -1963,7 +2024,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         tod === 'night'
           ? isIndoor
             ? '#3F3A36'
-            : '#050B0A'
+            : '#223B3E'
           : tod === 'sunset'
             ? '#6D6854'
             : '#6A8C58',
@@ -1972,12 +2033,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       hemiLight.groundColor.lerp(_hemiGroundTarget, 0.08);
       rimLight.intensity = THREE.MathUtils.damp(
         rimLight.intensity,
-        tod === 'night' ? (isIndoor ? 0.26 : 0.07) : tod === 'sunset' ? 0.34 : 0.42,
+        tod === 'night' ? 0.26 : tod === 'sunset' ? 0.34 : 0.42,
         5,
         delta,
       );
       _rimColorTarget.set(
-        tod === 'night' ? '#33508A' : tod === 'sunset' ? '#FFB585' : '#A8D2FF',
+        tod === 'night' ? '#87B0F0' : tod === 'sunset' ? '#FFB585' : '#A8D2FF',
       );
       rimLight.color.lerp(_rimColorTarget, 0.08);
 
@@ -2265,7 +2326,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               fishCtrl.phase = 'nibbling';
               fishCtrl.phaseElapsed = 0;
               fishCtrl.nibblesDone = 0;
-              fishCtrl.nextNibbleTimer = 0.25;
+              fishCtrl.nextNibbleTimer = 0.05;
               fishCtrl.nibbleAnimTimer = 0;
               fishCtrl.inStrikeSuspense = false;
               setFishingState('nibbling');
@@ -2521,19 +2582,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           callbacksRef.current.onPondProximityChange(isNearPondNow);
         }
 
-        if (playerBubbleRef.current) {
-          _projVec.copy(playerBubbleRef.current.worldPos).project(camera);
-          if (_projVec.z <= 1) {
-            setSpeechBubble({
-              text: playerBubbleRef.current.text,
-              x: ((_projVec.x + 1) / 2) * cw,
-              y: ((-_projVec.y + 1) / 2) * ch,
-            });
-          } else {
-            setSpeechBubble(null);
-          }
-        }
-
         if (selectedPlotRef.current && z === 'garden') {
           _projVec.copy(selectedPlotRef.current.worldPos).project(camera);
           if (_projVec.z <= 1) {
@@ -2656,17 +2704,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           </div>
         )}
 
-        {speechBubble && (
-          <div
-            style={{
-              transform: `translate3d(${speechBubble.x}px, ${speechBubble.y}px, 0) translate(-50%, -100%)`,
-            }}
-            className="anim-pop absolute top-0 left-0 max-w-[220px] rounded-2xl border border-[#7A5230]/25 bg-white/95 px-3 py-1.5 text-center text-xs font-semibold text-stone-800 shadow-md"
-          >
-            {speechBubble.text}
-          </div>
-        )}
       </div>
+
+      {speechBubble && (
+        <div className="anim-pop pointer-events-none absolute top-3 left-1/2 z-30 w-max max-w-[min(78vw,360px)] -translate-x-1/2 rounded-2xl border-2 border-[#7A5230]/35 bg-[#FFFDF8]/95 px-4 py-1.5 text-center text-xs font-bold text-[#3F2C1E] shadow-lg">
+          {speechBubble}
+        </div>
+      )}
 
       {/* Radial Arc Plot Menu (Pure icon-only buttons over the tapped garden bed) */}
       {zone === 'garden' &&
