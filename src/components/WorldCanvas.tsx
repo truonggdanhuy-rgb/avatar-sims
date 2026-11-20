@@ -16,8 +16,10 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {WELL_WATER_MAX} from '../data/farmCatalog';
+import {FISH_RARITY_CONFIG, rollRandomRiverFish} from '../data/fishingCatalog';
 import {FURNITURE_BY_ID, isPointOnFurnitureSurface} from '../data/furnitureCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
+import {FishingVisualFrame} from '../three/fishingVisuals3d';
 import {
   buildSubzoneScene,
   HouseDoorHandle,
@@ -27,6 +29,7 @@ import {
 import {
   buildTownScene,
   getTownGroundHeight,
+  TOWN_LAKE_WATER_Y,
   TOWN_ZONE_ENTRANCES,
   TownAnchor,
   TownWorld,
@@ -38,6 +41,7 @@ import {
   CoopKind,
   CoopTroughs,
   CropType,
+  FishingPhase,
   FishingRodState,
   FishRarity,
   GameStats,
@@ -45,6 +49,7 @@ import {
   LivestockAnimalState,
   PlacedFurniture,
   PondFishState,
+  RiverFishSpeciesId,
   TimeOfDay,
   ToolId,
   WellWaterState,
@@ -88,13 +93,21 @@ interface WorldCanvasProps {
   onMoveFurniture: (id: string, x: number, z: number, rotY?: number) => void;
   onRotateFurniture: (id: string) => void;
   onStowFurniture: (id: string) => void;
-  onCatchRiverFish: () => {
+  onCatchRiverFish: (preRolled?: {
+    speciesId: RiverFishSpeciesId;
+    weightKg: number;
+    sellPrice: number;
+  }) => {
     name: string;
     rarity: FishRarity;
     weightKg: number;
     durabilityLeft: number;
     maxDurability: number;
   } | null;
+  onLoseFishingDurability: () => {
+    durabilityLeft: number;
+    maxDurability: number;
+  };
   onRestoreEnergy: () => void;
   onBoostMood: () => void;
   onCollectWellWater: () => {
@@ -388,6 +401,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onRotateFurniture,
   onStowFurniture,
   onCatchRiverFish,
+  onLoseFishingDurability,
   onRestoreEnergy,
   onBoostMood,
   onCollectWellWater,
@@ -415,7 +429,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [tags, setTags] = useState<ProjectedTag[]>([]);
   const [speechBubble, setSpeechBubble] = useState<{text: string; x: number; y: number} | null>(null);
   const [arcMenuPos, setArcMenuPos] = useState<{plotId: number; x: number; y: number} | null>(null);
-  const [fishingState, setFishingState] = useState<'idle' | 'waiting' | 'bite'>('idle');
+  const [fishingState, setFishingState] = useState<FishingPhase>('idle');
+  const [biteAlertPos, setBiteAlertPos] = useState<{x: number; y: number} | null>(null);
   const [miniActive, setMiniActive] = useState(false);
   const [miniScore, setMiniScore] = useState(0);
   const [starPos, setStarPos] = useState({x: 50, y: 50});
@@ -475,6 +490,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onRotateFurniture,
     onStowFurniture,
     onCatchRiverFish,
+    onLoseFishingDurability,
     onRestoreEnergy,
     onBoostMood,
     onCollectWellWater,
@@ -509,6 +525,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onRotateFurniture,
     onStowFurniture,
     onCatchRiverFish,
+    onLoseFishingDurability,
     onRestoreEnergy,
     onBoostMood,
     onCollectWellWater,
@@ -532,6 +549,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const rebuildSceneTriggerRef = useRef<(() => void) | null>(null);
   const rebuildAvatarTriggerRef = useRef<((cfg: AvatarConfig, equippedTool: ToolId | null) => void) | null>(null);
   const farmPondFishActionRef = useRef<(() => void) | null>(null);
+  const cancelFishingRef = useRef<(() => void) | null>(null);
   const activeTownRef = useRef<TownWorld | null>(null);
   const activeSubzoneRef = useRef<SubzoneWorld | null>(null);
   const playerBubbleRef = useRef<BubbleState | null>(null);
@@ -560,7 +578,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         clearTimeout(fishTimerRef.current);
         fishTimerRef.current = null;
       }
+      cancelFishingRef.current?.();
       setFishingState('idle');
+      setBiteAlertPos(null);
     }
     if (zone !== 'home') {
       openDoorsRef.current = {};
@@ -622,10 +642,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   ]);
 
   useEffect(() => {
+    const legacyState: 'idle' | 'waiting' | 'bite' =
+      fishingState === 'idle' ? 'idle' : fishingState === 'bite' ? 'bite' : 'waiting';
     if (zone === 'town') {
-      activeTownRef.current?.setFishingState?.(fishingState);
+      activeTownRef.current?.setFishingState?.(legacyState);
     } else if (zone === 'garden' || zone === 'fishing') {
-      activeSubzoneRef.current?.setFishingState?.(fishingState);
+      activeSubzoneRef.current?.setFishingState?.(legacyState);
     }
   }, [zone, fishingState]);
 
@@ -783,6 +805,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     const loadCurrentWorld = () => {
       const {zone: z, plots: pl, fishingState: fs, placedFurniture: pf} = stateRef.current;
+      const legacyFs: 'idle' | 'waiting' | 'bite' =
+        fs === 'idle' ? 'idle' : fs === 'bite' ? 'bite' : 'waiting';
 
       if (activeTown) {
         scene.remove(activeTown.group);
@@ -800,7 +824,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (z === 'town') {
         activeTown = buildTownScene();
         activeTownRef.current = activeTown;
-        activeTown.setFishingState?.(fs);
+        activeTown.setFishingState?.(legacyFs);
         scene.add(activeTown.group);
         currentAnchors = activeTown.labelAnchors;
         currentClickTargets = [...activeTown.clickTargets, playerProxy];
@@ -832,7 +856,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       } else {
         activeSubzone = buildSubzoneScene(z, {
           plots: pl,
-          fishingState: fs,
+          fishingState: legacyFs,
           placedFurniture: z === 'home' ? pf : undefined,
           editFurnitureMode: z === 'home' ? stateRef.current.editFurnitureMode : undefined,
           openDoors: z === 'home' ? openDoorsRef.current : undefined,
@@ -897,6 +921,111 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       scene.add(playerRig.root);
     };
 
+    // Real-time Play Together Fishing State Machine (cast arc -> shadow swim -> 1-4 nibbles -> fast '!' bite -> catch or escape)
+    const fishVisualFrame: FishingVisualFrame = {
+      active: false,
+      bobberVisible: false,
+      bobberX: 0,
+      bobberY: 0,
+      bobberZ: 0,
+      bobberTiltX: 0,
+      bobberTiltZ: 0,
+      rippleVisible: false,
+      rippleX: 0,
+      rippleZ: 0,
+      rippleScale: 1,
+      rippleOpacity: 0,
+      burstVisible: false,
+      burstX: 0,
+      burstZ: 0,
+      burstScale: 1,
+      burstOpacity: 0,
+      shadowVisible: false,
+      shadowX: 0,
+      shadowZ: 0,
+      shadowRotY: 0,
+      shadowScale: 0.72,
+      shadowOpacity: 0,
+      shadowTailSpeed: 8,
+    };
+
+    const fishCtrl = {
+      phase: 'idle' as FishingPhase,
+      phaseElapsed: 0,
+      spotX: 0,
+      spotZ: 0,
+      facingRotY: 0,
+      targetX: -22.5,
+      targetZ: 46.6,
+      waterY: TOWN_LAKE_WATER_Y,
+      startX: 0,
+      startY: 1.5,
+      startZ: 0,
+      spawnX: -22.5,
+      spawnZ: 48.8,
+      dirToBobberX: 0,
+      dirToBobberZ: -1,
+      approachRotY: Math.PI,
+      rolledCatch: null as {
+        speciesId: RiverFishSpeciesId;
+        name: string;
+        rarity: FishRarity;
+        weightKg: number;
+        sellPrice: number;
+      } | null,
+      shadowScale: 0.72,
+      biteWindowSec: 1.45,
+      waitDelaySec: 0.75,
+      approachDurationSec: 0.95,
+      nibbleTarget: 2,
+      nibblesDone: 0,
+      nextNibbleTimer: 0.35,
+      nibbleAnimTimer: 0,
+      strikeSuspenseSec: 0.5,
+      inStrikeSuspense: false,
+      landingSplashTimer: 0,
+      pullPoseTimer: 0,
+      spookTimer: 0,
+      spookX: 0,
+      spookZ: 0,
+      spookRotY: 0,
+      spookScale: 0.72,
+    };
+
+    const getZoneFishingWaterTarget = (z: ZoneId) => {
+      if (z === 'garden') {
+        return {targetX: 17.0, targetZ: 3.0, waterY: 0.06};
+      }
+      if (z === 'fishing') {
+        return {targetX: 0, targetZ: -3.25, waterY: -0.14};
+      }
+      return {targetX: -22.5, targetZ: 46.6, waterY: TOWN_LAKE_WATER_Y};
+    };
+
+    const resetFishing = (showSpook = false) => {
+      if (showSpook && fishCtrl.phase !== 'idle') {
+        fishCtrl.spookTimer = 0.6;
+        fishCtrl.spookX = fishVisualFrame.shadowVisible ? fishVisualFrame.shadowX : fishCtrl.targetX;
+        fishCtrl.spookZ = fishVisualFrame.shadowVisible ? fishVisualFrame.shadowZ : fishCtrl.targetZ;
+        fishCtrl.spookRotY = fishCtrl.approachRotY + Math.PI;
+        fishCtrl.spookScale = fishCtrl.shadowScale;
+      }
+      fishCtrl.phase = 'idle';
+      fishCtrl.phaseElapsed = 0;
+      fishCtrl.rolledCatch = null;
+      fishCtrl.nibbleAnimTimer = 0;
+      fishCtrl.inStrikeSuspense = false;
+      playerPos.pose = 'idle';
+      setFishingState('idle');
+      setBiteAlertPos(null);
+    };
+
+    cancelFishingRef.current = () => {
+      fishCtrl.spookTimer = 0;
+      fishCtrl.pullPoseTimer = 0;
+      resetFishing(false);
+    };
+
     const handleSpotFishing = (spotX: number, spotZ: number, facingRotY: number) => {
       const rod = stateRef.current.fishingRod;
       if (!rod.owned) {
@@ -931,20 +1060,82 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
 
       playerPos.rotY = facingRotY;
-      const curFs = stateRef.current.fishingState;
-      if (curFs === 'idle') {
-        setFishingState('waiting');
-        soundFX.splash();
-        showBubble('Thả phao... chờ cá sông cắn câu!', spotX, 2.25, spotZ);
-        if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
-        fishTimerRef.current = window.setTimeout(() => {
-          setFishingState('bite');
-          soundFX.sparkle();
-          showBubble('Cá cắn câu rồi! Chạm hồ hoặc bấm Giật Cần!', spotX, 2.25, spotZ);
-        }, 2600);
-      } else if (curFs === 'bite') {
-        setFishingState('idle');
-        const res = callbacksRef.current.onCatchRiverFish();
+
+      if (fishCtrl.phase === 'idle') {
+        const zNow = stateRef.current.zone;
+        const target = getZoneFishingWaterTarget(zNow);
+        const rolled = rollRandomRiverFish();
+        const cfg = FISH_RARITY_CONFIG[rolled.species.rarity];
+
+        const gy =
+          zNow === 'town'
+            ? getTownGroundHeight(spotX, spotZ, currentPlazaRadius)
+            : zNow === 'garden'
+              ? 0.36
+              : 0;
+
+        // Random angle behind/beside the bobber in open water so shadow glides in naturally
+        const forwardX = Math.sin(facingRotY);
+        const forwardZ = Math.cos(facingRotY);
+        const spread = (Math.random() - 0.5) * 1.45;
+        const appDirX = Math.sin(facingRotY + spread);
+        const appDirZ = Math.cos(facingRotY + spread);
+
+        fishCtrl.phase = 'casting';
+        fishCtrl.phaseElapsed = 0;
+        fishCtrl.spotX = spotX;
+        fishCtrl.spotZ = spotZ;
+        fishCtrl.facingRotY = facingRotY;
+        fishCtrl.targetX = target.targetX;
+        fishCtrl.targetZ = target.targetZ;
+        fishCtrl.waterY = target.waterY;
+        fishCtrl.startX = spotX + forwardX * 0.72;
+        fishCtrl.startY = gy + 1.55;
+        fishCtrl.startZ = spotZ + forwardZ * 0.72;
+        fishCtrl.spawnX = target.targetX + appDirX * 2.15;
+        fishCtrl.spawnZ = target.targetZ + appDirZ * 2.15;
+        fishCtrl.dirToBobberX = -appDirX;
+        fishCtrl.dirToBobberZ = -appDirZ;
+        fishCtrl.approachRotY = Math.atan2(-appDirX, -appDirZ);
+
+        fishCtrl.rolledCatch = {
+          speciesId: rolled.species.id,
+          name: rolled.species.name,
+          rarity: rolled.species.rarity,
+          weightKg: rolled.weightKg,
+          sellPrice: rolled.sellPrice,
+        };
+        fishCtrl.shadowScale = cfg.shadowScale;
+        fishCtrl.biteWindowSec = cfg.biteWindowMs / 1000;
+        fishCtrl.waitDelaySec = 0.55 + Math.random() * 0.55;
+        fishCtrl.approachDurationSec = 0.85 + Math.random() * 0.3;
+        fishCtrl.nibbleTarget =
+          cfg.nibbleMin + Math.floor(Math.random() * (cfg.nibbleMax - cfg.nibbleMin + 1));
+        fishCtrl.nibblesDone = 0;
+        fishCtrl.nextNibbleTimer = 0.32;
+        fishCtrl.nibbleAnimTimer = 0;
+        fishCtrl.strikeSuspenseSec = 0.35 + Math.random() * 0.55;
+        fishCtrl.inStrikeSuspense = false;
+        fishCtrl.landingSplashTimer = 0;
+        fishCtrl.pullPoseTimer = 0;
+        fishCtrl.spookTimer = 0;
+
+        playerPos.pose = 'fish_cast';
+        setFishingState('casting');
+        soundFX.tap();
+        showBubble('Quăng phao gỗ tròn xuống nước...', spotX, 2.25, spotZ);
+      } else if (fishCtrl.phase === 'bite') {
+        const preRolled = fishCtrl.rolledCatch
+          ? {
+              speciesId: fishCtrl.rolledCatch.speciesId,
+              weightKg: fishCtrl.rolledCatch.weightKg,
+              sellPrice: fishCtrl.rolledCatch.sellPrice,
+            }
+          : undefined;
+        resetFishing(false);
+        fishCtrl.pullPoseTimer = 0.44;
+        playerPos.pose = 'fish_pull';
+        const res = callbacksRef.current.onCatchRiverFish(preRolled);
         if (res) {
           soundFX.sparkle();
           const rareTag = res.rarity === 'rare' ? ' ★ Hiếm!' : '';
@@ -952,14 +1143,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           showBubble(
             `Câu được ${res.name} (${res.weightKg.toFixed(2)} kg)${rareTag}! Độ bền ${res.durabilityLeft}/${res.maxDurability}${brokeTag}`,
             spotX,
-            2.35,
+            2.38,
             spotZ,
           );
         }
-      } else {
-        if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
-        setFishingState('idle');
-        showBubble('Thu cần câu lại.', spotX, 2.25, spotZ);
+      } else if (fishCtrl.phase === 'waiting' || fishCtrl.phase === 'nibbling') {
+        resetFishing(true);
+        soundFX.tap();
+        showBubble('Kéo sớm quá! Cá giật mình bơi mất rồi.', spotX, 2.25, spotZ);
       }
     };
 
@@ -968,7 +1159,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const spotX = 15.2;
       const spotZ = 3.0;
       const dist = Math.hypot(playerPos.x - spotX, playerPos.z - spotZ);
-      if (dist < 1.35) {
+      if (dist < 1.35 || fishCtrl.phase !== 'idle') {
         handleSpotFishing(spotX, spotZ, Math.PI / 2);
       } else {
         activeTarget = {
@@ -994,6 +1185,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     const pointer = new THREE.Vector2();
 
     const handlePointerTap = (clientX: number, clientY: number) => {
+      // Fast-reflex bite catch: tapping anywhere while '!' is active pulls immediately!
+      if (fishCtrl.phase === 'bite') {
+        handleSpotFishing(fishCtrl.spotX, fishCtrl.spotZ, fishCtrl.facingRotY);
+        return;
+      }
+
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -1460,6 +1657,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             soundFX.tap();
             const spotX = data.tx as number;
             const spotZ = data.tz as number;
+            if (fishCtrl.phase !== 'idle') {
+              handleSpotFishing(spotX, spotZ, 0);
+              return;
+            }
             activeTarget = {
               x: spotX,
               z: spotZ,
@@ -1475,6 +1676,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             soundFX.tap();
             const spotX = data.tx as number;
             const spotZ = data.tz as number;
+            if (fishCtrl.phase !== 'idle') {
+              handleSpotFishing(spotX, spotZ, Math.PI);
+              return;
+            }
             activeTarget = {
               x: spotX,
               z: spotZ,
@@ -1600,10 +1805,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
-      // 2. Tap on walkable ground or hill -> close arc menu, nudge outside any obstacle & walk there
+      // 2. Tap on walkable ground or hill -> close arc menu, cancel active wait if walking away, nudge outside obstacle & walk
       if (currentGrounds.length > 0) {
         const groundHits = raycaster.intersectObjects(currentGrounds, false);
         if (groundHits.length > 0) {
+          if (fishCtrl.phase !== 'idle') {
+            resetFishing(true);
+          }
           if (selectedPlotRef.current) {
             selectedPlotRef.current = null;
             setArcMenuPos(null);
@@ -1632,7 +1840,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       downY = e.clientY;
     };
     const onPointerUp = (e: PointerEvent) => {
-      if (Math.hypot(e.clientX - downX, e.clientY - downY) < 12) {
+      const tapLimit = fishCtrl.phase === 'bite' ? 36 : 12;
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) < tapLimit) {
         handlePointerTap(e.clientX, e.clientY);
       }
     };
@@ -1659,6 +1868,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let disposed = false;
     let lastTagPush = 0;
     let lastHadTags = false;
+    let biteAlertShown = false;
+    let lastBiteAlertX = -9999;
+    let lastBiteAlertY = -9999;
     const clock = new THREE.Clock();
 
     function afterDraw(cb: () => void) {
@@ -1962,18 +2174,290 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         selectionRing.visible = false;
       }
 
+      // Play Together Fishing Timeline Driver
+      let avatarPoseProgress = 0;
+      if (fishCtrl.pullPoseTimer > 0) {
+        fishCtrl.pullPoseTimer = Math.max(0, fishCtrl.pullPoseTimer - delta);
+        playerPos.pose = fishCtrl.pullPoseTimer > 0 ? 'fish_pull' : 'idle';
+        avatarPoseProgress = 1 - fishCtrl.pullPoseTimer / 0.44;
+      }
+
+      if (fishCtrl.spookTimer > 0) {
+        fishCtrl.spookTimer = Math.max(0, fishCtrl.spookTimer - delta);
+      }
+
+      if (fishCtrl.landingSplashTimer > 0) {
+        fishCtrl.landingSplashTimer = Math.max(0, fishCtrl.landingSplashTimer - delta);
+      }
+
+      if (fishCtrl.phase !== 'idle') {
+        fishCtrl.phaseElapsed += delta;
+        fishVisualFrame.active = true;
+        fishVisualFrame.bobberVisible = true;
+        fishVisualFrame.rippleVisible = false;
+        fishVisualFrame.burstVisible = false;
+        fishVisualFrame.shadowVisible = false;
+
+        if (fishCtrl.phase === 'casting') {
+          const castDur = 0.46;
+          avatarPoseProgress = Math.min(1, fishCtrl.phaseElapsed / castDur);
+          const u = THREE.MathUtils.clamp((fishCtrl.phaseElapsed - 0.14) / 0.32, 0, 1);
+          fishVisualFrame.bobberX = THREE.MathUtils.lerp(fishCtrl.startX, fishCtrl.targetX, u);
+          fishVisualFrame.bobberZ = THREE.MathUtils.lerp(fishCtrl.startZ, fishCtrl.targetZ, u);
+          fishVisualFrame.bobberY =
+            THREE.MathUtils.lerp(fishCtrl.startY, fishCtrl.waterY, u) + Math.sin(u * Math.PI) * 1.15;
+          fishVisualFrame.bobberTiltX = (1 - u) * 0.45;
+          fishVisualFrame.bobberTiltZ = 0;
+
+          if (fishCtrl.phaseElapsed >= castDur) {
+            fishCtrl.phase = 'waiting';
+            fishCtrl.phaseElapsed = 0;
+            fishCtrl.landingSplashTimer = 0.52;
+            playerPos.pose = 'fish_wait';
+            setFishingState('waiting');
+            soundFX.splash();
+          }
+        } else if (fishCtrl.phase === 'waiting') {
+          playerPos.pose = 'fish_wait';
+          fishVisualFrame.bobberX = fishCtrl.targetX;
+          fishVisualFrame.bobberZ = fishCtrl.targetZ;
+          const splashDrop =
+            fishCtrl.landingSplashTimer > 0
+              ? -Math.sin((fishCtrl.landingSplashTimer / 0.52) * Math.PI) * 0.08
+              : 0;
+          fishVisualFrame.bobberY = fishCtrl.waterY + splashDrop + Math.sin(elapsed * 3.0) * 0.02;
+          fishVisualFrame.bobberTiltX = 0;
+          fishVisualFrame.bobberTiltZ = Math.sin(elapsed * 2.5) * 0.04;
+
+          fishVisualFrame.rippleVisible = true;
+          fishVisualFrame.rippleX = fishCtrl.targetX;
+          fishVisualFrame.rippleZ = fishCtrl.targetZ;
+          const rt = (elapsed * 0.72) % 1;
+          fishVisualFrame.rippleScale = 0.65 + rt * 1.35;
+          fishVisualFrame.rippleOpacity = (1 - rt) * 0.58;
+
+          if (fishCtrl.landingSplashTimer > 0) {
+            const bt = 1 - fishCtrl.landingSplashTimer / 0.52;
+            fishVisualFrame.burstVisible = true;
+            fishVisualFrame.burstX = fishCtrl.targetX;
+            fishVisualFrame.burstZ = fishCtrl.targetZ;
+            fishVisualFrame.burstScale = 0.6 + bt * 2.0;
+            fishVisualFrame.burstOpacity = (1 - bt) * 0.85;
+          }
+
+          // Fish shadow emerges & glides smoothly toward bobber
+          if (fishCtrl.phaseElapsed >= fishCtrl.waitDelaySec) {
+            const swimU = Math.min(
+              1,
+              (fishCtrl.phaseElapsed - fishCtrl.waitDelaySec) / fishCtrl.approachDurationSec,
+            );
+            const easeU = 1 - Math.pow(1 - swimU, 2.2);
+            const appDist = THREE.MathUtils.lerp(2.15, 0.44, easeU);
+            fishVisualFrame.shadowVisible = true;
+            fishVisualFrame.shadowX = fishCtrl.targetX - fishCtrl.dirToBobberX * appDist;
+            fishVisualFrame.shadowZ = fishCtrl.targetZ - fishCtrl.dirToBobberZ * appDist;
+            fishVisualFrame.shadowRotY = fishCtrl.approachRotY;
+            fishVisualFrame.shadowScale = fishCtrl.shadowScale;
+            fishVisualFrame.shadowOpacity = Math.min(0.48, swimU * 0.9);
+            fishVisualFrame.shadowTailSpeed = 9;
+
+            if (swimU >= 1) {
+              fishCtrl.phase = 'nibbling';
+              fishCtrl.phaseElapsed = 0;
+              fishCtrl.nibblesDone = 0;
+              fishCtrl.nextNibbleTimer = 0.25;
+              fishCtrl.nibbleAnimTimer = 0;
+              fishCtrl.inStrikeSuspense = false;
+              setFishingState('nibbling');
+            }
+          }
+        } else if (fishCtrl.phase === 'nibbling') {
+          playerPos.pose = 'fish_wait';
+          let lunge = 0;
+          let bobDip = 0;
+
+          if (fishCtrl.nibbleAnimTimer > 0) {
+            fishCtrl.nibbleAnimTimer = Math.max(0, fishCtrl.nibbleAnimTimer - delta);
+            const nu = 1 - fishCtrl.nibbleAnimTimer / 0.34;
+            const poke = Math.sin(nu * Math.PI);
+            lunge = poke * 0.22;
+            bobDip = -poke * 0.085;
+
+            fishVisualFrame.burstVisible = true;
+            fishVisualFrame.burstX = fishCtrl.targetX;
+            fishVisualFrame.burstZ = fishCtrl.targetZ;
+            fishVisualFrame.burstScale = 0.55 + nu * 1.45;
+            fishVisualFrame.burstOpacity = (1 - nu) * 0.72;
+          } else if (!fishCtrl.inStrikeSuspense) {
+            fishCtrl.nextNibbleTimer -= delta;
+            if (fishCtrl.nextNibbleTimer <= 0) {
+              fishCtrl.nibblesDone += 1;
+              fishCtrl.nibbleAnimTimer = 0.34;
+              soundFX.tap();
+              if (fishCtrl.nibblesDone >= fishCtrl.nibbleTarget) {
+                fishCtrl.inStrikeSuspense = true;
+              } else {
+                fishCtrl.nextNibbleTimer = 0.68 + Math.random() * 0.55;
+              }
+            }
+          } else {
+            fishCtrl.strikeSuspenseSec -= delta;
+            if (fishCtrl.strikeSuspenseSec <= 0) {
+              fishCtrl.phase = 'bite';
+              fishCtrl.phaseElapsed = 0;
+              setFishingState('bite');
+              soundFX.sparkle();
+            }
+          }
+
+          const standOff = 0.44 - lunge;
+          fishVisualFrame.bobberX = fishCtrl.targetX;
+          fishVisualFrame.bobberZ = fishCtrl.targetZ;
+          fishVisualFrame.bobberY = fishCtrl.waterY + bobDip + Math.sin(elapsed * 3.5) * 0.018;
+          fishVisualFrame.bobberTiltX = bobDip * 2.2;
+          fishVisualFrame.bobberTiltZ = Math.sin(elapsed * 12) * Math.abs(bobDip) * 2.0;
+
+          fishVisualFrame.rippleVisible = true;
+          fishVisualFrame.rippleX = fishCtrl.targetX;
+          fishVisualFrame.rippleZ = fishCtrl.targetZ;
+          const rt = (elapsed * 0.95) % 1;
+          fishVisualFrame.rippleScale = 0.65 + rt * 1.5;
+          fishVisualFrame.rippleOpacity = (1 - rt) * 0.64;
+
+          fishVisualFrame.shadowVisible = true;
+          fishVisualFrame.shadowX = fishCtrl.targetX - fishCtrl.dirToBobberX * standOff;
+          fishVisualFrame.shadowZ = fishCtrl.targetZ - fishCtrl.dirToBobberZ * standOff;
+          fishVisualFrame.shadowRotY = fishCtrl.approachRotY;
+          fishVisualFrame.shadowScale = fishCtrl.shadowScale;
+          fishVisualFrame.shadowOpacity = 0.48;
+          fishVisualFrame.shadowTailSpeed = fishCtrl.nibbleAnimTimer > 0 ? 18 : 10;
+        } else if (fishCtrl.phase === 'bite') {
+          playerPos.pose = 'fish_wait';
+          const shake = Math.sin(elapsed * 34);
+          fishVisualFrame.bobberX = fishCtrl.targetX + shake * 0.04;
+          fishVisualFrame.bobberZ = fishCtrl.targetZ + Math.cos(elapsed * 29) * 0.04;
+          fishVisualFrame.bobberY = fishCtrl.waterY - 0.14 + Math.sin(elapsed * 28) * 0.055;
+          fishVisualFrame.bobberTiltX = shake * 0.42;
+          fishVisualFrame.bobberTiltZ = Math.cos(elapsed * 26) * 0.42;
+
+          fishVisualFrame.rippleVisible = true;
+          fishVisualFrame.rippleX = fishCtrl.targetX;
+          fishVisualFrame.rippleZ = fishCtrl.targetZ;
+          const rt1 = (elapsed * 2.1) % 1;
+          fishVisualFrame.rippleScale = 0.6 + rt1 * 2.1;
+          fishVisualFrame.rippleOpacity = (1 - rt1) * 0.92;
+
+          fishVisualFrame.burstVisible = true;
+          fishVisualFrame.burstX = fishCtrl.targetX;
+          fishVisualFrame.burstZ = fishCtrl.targetZ;
+          const rt2 = (elapsed * 2.1 + 0.5) % 1;
+          fishVisualFrame.burstScale = 0.55 + rt2 * 1.85;
+          fishVisualFrame.burstOpacity = (1 - rt2) * 0.85;
+
+          fishVisualFrame.shadowVisible = true;
+          fishVisualFrame.shadowX = fishCtrl.targetX - fishCtrl.dirToBobberX * 0.14;
+          fishVisualFrame.shadowZ = fishCtrl.targetZ - fishCtrl.dirToBobberZ * 0.14;
+          fishVisualFrame.shadowRotY =
+            fishCtrl.approachRotY + Math.sin(elapsed * 24) * 0.18;
+          fishVisualFrame.shadowScale = fishCtrl.shadowScale;
+          fishVisualFrame.shadowOpacity = 0.54;
+          fishVisualFrame.shadowTailSpeed = 28;
+
+          // Reaction timeout: fish escapes and still reduces rod durability!
+          if (fishCtrl.phaseElapsed >= fishCtrl.biteWindowSec) {
+            const sx = fishCtrl.spotX;
+            const sz = fishCtrl.spotZ;
+            resetFishing(true);
+            soundFX.splash();
+            const durRes = callbacksRef.current.onLoseFishingDurability();
+            const brokeTag = durRes.durabilityLeft === 0 ? ' (Hỏng · Cần sửa)' : '';
+            showBubble(
+              `Cá kéo mạnh quá, chạy mất rồi! Độ bền ${durRes.durabilityLeft}/${durRes.maxDurability}${brokeTag}`,
+              sx,
+              2.35,
+              sz,
+            );
+          }
+        }
+      } else {
+        fishVisualFrame.active = fishCtrl.spookTimer > 0;
+        fishVisualFrame.bobberVisible = false;
+        fishVisualFrame.rippleVisible = false;
+        fishVisualFrame.burstVisible = false;
+        if (fishCtrl.spookTimer > 0) {
+          const su = 1 - fishCtrl.spookTimer / 0.6;
+          fishVisualFrame.shadowVisible = true;
+          fishVisualFrame.shadowX =
+            fishCtrl.spookX + Math.sin(fishCtrl.spookRotY) * (su * 2.4);
+          fishVisualFrame.shadowZ =
+            fishCtrl.spookZ + Math.cos(fishCtrl.spookRotY) * (su * 2.4);
+          fishVisualFrame.shadowRotY = fishCtrl.spookRotY;
+          fishVisualFrame.shadowScale = fishCtrl.spookScale;
+          fishVisualFrame.shadowOpacity = Math.max(0, (1 - su) * 0.45);
+          fishVisualFrame.shadowTailSpeed = 26;
+        } else {
+          fishVisualFrame.shadowVisible = false;
+        }
+      }
+
+      // Hide dangling mini bobber + line on held rod whenever bobber is cast out
+      const showHeldMiniBobber = fishCtrl.phase === 'idle';
+      if (playerRig.rodBobber) playerRig.rodBobber.visible = showHeldMiniBobber;
+      if (playerRig.rodLine) playerRig.rodLine.visible = showHeldMiniBobber;
+
       playerRig.root.position.set(playerPos.x, groundOffset, playerPos.z);
       playerRig.root.rotation.y = playerPos.rotY;
-      updateAvatarRigAnimation(playerRig, playerPos.pose, elapsed, av.eyeStyle === 'cozy');
-
-      activeTown?.update(elapsed, tod);
-      activeSubzone?.update(
+      updateAvatarRigAnimation(
+        playerRig,
+        playerPos.pose,
         elapsed,
-        tod,
-        z === 'home' ? {cameraPos: camera.position, playerPos} : undefined,
+        av.eyeStyle === 'cozy',
+        avatarPoseProgress,
       );
 
+      if (z === 'town') {
+        activeTown?.updateFishingVisuals?.(fishVisualFrame, elapsed);
+        activeTown?.update(elapsed, tod);
+      } else {
+        if (z === 'garden' || z === 'fishing') {
+          activeSubzone?.updateFishingVisuals?.(fishVisualFrame, elapsed);
+        }
+        activeSubzone?.update(
+          elapsed,
+          tod,
+          z === 'home' ? {cameraPos: camera.position, playerPos} : undefined,
+        );
+      }
+
       renderer.render(scene, camera);
+
+      // Instant project of '!' Bite Exclamation Alert over bobber every frame during bite (ultra-snappy)
+      if (fishCtrl.phase === 'bite') {
+        const cw = container?.clientWidth || window.innerWidth || 800;
+        const ch = container?.clientHeight || window.innerHeight || 600;
+        _projVec
+          .set(fishCtrl.targetX, fishCtrl.waterY + 0.72, fishCtrl.targetZ)
+          .project(camera);
+        if (_projVec.z <= 1) {
+          const bx = ((_projVec.x + 1) / 2) * cw;
+          const by = ((-_projVec.y + 1) / 2) * ch;
+          if (
+            !biteAlertShown ||
+            Math.abs(bx - lastBiteAlertX) >= 1 ||
+            Math.abs(by - lastBiteAlertY) >= 1
+          ) {
+            biteAlertShown = true;
+            lastBiteAlertX = bx;
+            lastBiteAlertY = by;
+            setBiteAlertPos({x: bx, y: by});
+          }
+        }
+      } else if (biteAlertShown) {
+        biteAlertShown = false;
+        lastBiteAlertX = -9999;
+        lastBiteAlertY = -9999;
+        setBiteAlertPos(null);
+      }
 
       if (elapsed - lastTagPush > 0.065) {
         lastTagPush = elapsed;
@@ -2155,6 +2639,22 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             {tag.label}
           </div>
         ))}
+
+        {biteAlertPos && (
+          <div
+            style={{
+              transform: `translate3d(${biteAlertPos.x}px, ${biteAlertPos.y}px, 0) translate(-50%, -100%)`,
+            }}
+            className="anim-pop absolute top-0 left-0 z-30 flex flex-col items-center"
+          >
+            <div className="flex h-11 w-11 animate-bounce items-center justify-center rounded-full border-3 border-white bg-[#EF476F] text-2xl font-black text-white shadow-[0_6px_18px_rgba(239,71,111,0.6)]">
+              !
+            </div>
+            <span className="mt-1 rounded-full bg-[#382414]/88 px-2.5 py-0.5 text-[10px] font-extrabold text-[#FFD166] shadow-sm whitespace-nowrap">
+              Giật Cần Ngay!
+            </span>
+          </div>
+        )}
 
         {speechBubble && (
           <div
@@ -2354,8 +2854,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             }}
             className={`anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 px-4 py-2 text-xs font-extrabold shadow-lg transition-transform active:scale-95 ${
               fishingState === 'bite'
-                ? 'border-[#C97B1C] bg-[#F4A236] text-white'
-                : fishingState === 'waiting'
+                ? 'border-[#C92A4C] bg-[#EF476F] text-white animate-pulse'
+                : fishingState !== 'idle'
                   ? 'border-[#2D6E82] bg-[#2D7E96] text-white'
                   : 'border-[#3C7C99] bg-[#FFF8EB] text-[#224457]'
             }`}
@@ -2364,9 +2864,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             <span>
               {fishingState === 'idle'
                 ? 'Câu Cá Sông'
-                : fishingState === 'waiting'
-                  ? 'Đang Chờ Cá... (Thu cần)'
-                  : 'Giật Cần Ngay!'}
+                : fishingState === 'bite'
+                  ? '! Giật Cần Ngay!'
+                  : fishingState === 'nibbling'
+                    ? 'Cá Đang Rỉa Phao...'
+                    : 'Đang Chờ Cá...'}
             </span>
           </button>
         </div>

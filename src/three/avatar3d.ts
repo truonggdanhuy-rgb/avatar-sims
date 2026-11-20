@@ -33,6 +33,8 @@ export interface AvatarRig {
   eyelids: THREE.Mesh[];
   shadowDisc?: THREE.Mesh;
   holdPose?: HoldPose;
+  rodBobber?: THREE.Object3D;
+  rodLine?: THREE.Object3D;
 }
 
 function shadeHex(hex: string, factor: number): THREE.Color {
@@ -1069,6 +1071,9 @@ export function buildAvatarRig(
 
   bodyPivot.add(leftArm, rightArm);
 
+  let rodBobberObj: THREE.Object3D | undefined;
+  let rodLineObj: THREE.Object3D | undefined;
+
   if (handheld || equippedTool) {
     const hColor = config.handheldColor || '#E8B84B';
     const poseCfg = HAND_POSES[holdPose];
@@ -1153,12 +1158,22 @@ export function buildAvatarRig(
       );
       lineDrop.position.set(0, 1.28, 0.21);
       lineDrop.rotation.x = -0.72;
+      rodLineObj = lineDrop;
 
+      const miniBobberGroup = new THREE.Group();
+      miniBobberGroup.position.set(0, 1.15, 0.33);
       const miniBobber = new THREE.Mesh(
-        new THREE.SphereGeometry(0.022, 8, 8),
-        glossyClayMat('#EA526F', 0.2),
+        new THREE.SphereGeometry(0.025, 10, 10),
+        glossyClayMat('#8B5228', 0.24),
       );
-      miniBobber.position.set(0, 1.15, 0.33);
+      const miniBobberBand = new THREE.Mesh(
+        new THREE.TorusGeometry(0.024, 0.0045, 6, 12),
+        glossyClayMat('#D6A168', 0.32),
+      );
+      miniBobberBand.rotation.x = Math.PI / 2;
+      miniBobberBand.position.y = -0.003;
+      miniBobberGroup.add(miniBobber, miniBobberBand);
+      rodBobberObj = miniBobberGroup;
 
       rodGroup.add(
         buttCap,
@@ -1169,7 +1184,7 @@ export function buildAvatarRig(
         shaftUpper,
         tipRing,
         lineDrop,
-        miniBobber,
+        miniBobberGroup,
       );
       handAnchor.add(rodGroup);
     } else if (handheld === 'milk_tea') {
@@ -2225,6 +2240,8 @@ export function buildAvatarRig(
     eyelids,
     shadowDisc,
     holdPose,
+    rodBobber: rodBobberObj,
+    rodLine: rodLineObj,
   };
 }
 
@@ -2233,6 +2250,7 @@ export function updateAvatarRigAnimation(
   pose: AvatarPose,
   elapsed: number,
   isCozyEyes = false,
+  poseProgress = 0,
 ): void {
   if (rig.eyelids.length > 0) {
     const eyesClosed = pose === 'sleep' || isCozyEyes;
@@ -2276,6 +2294,61 @@ export function updateAvatarRigAnimation(
     rig.bodyPivot.position.y = Math.abs(Math.cos(elapsed * 12)) * 0.075;
     rig.bodyPivot.rotation.x = 0.06;
     rig.headPivot.rotation.z = Math.sin(elapsed * 6) * 0.03;
+  } else if (pose === 'fish_cast') {
+    const u = THREE.MathUtils.clamp(poseProgress, 0, 1);
+    // Smooth two-beat cast: wind up back (0..0.38) then brisk forward throw (0.38..1)
+    let armX: number;
+    let elbowX: number;
+    let torsoLean: number;
+    if (u < 0.38) {
+      const t = u / 0.38;
+      armX = THREE.MathUtils.lerp(-0.42, -1.25, t);
+      elbowX = THREE.MathUtils.lerp(-0.98, -0.52, t);
+      torsoLean = THREE.MathUtils.lerp(0, -0.1, t);
+    } else {
+      const t = Math.sin(((u - 0.38) / 0.62) * (Math.PI * 0.5));
+      armX = THREE.MathUtils.lerp(-1.25, -0.18, t);
+      elbowX = THREE.MathUtils.lerp(-0.52, -0.45, t);
+      torsoLean = THREE.MathUtils.lerp(-0.1, 0.12, t);
+    }
+    rig.leftLeg.rotation.x = -0.08;
+    rig.rightLeg.rotation.x = 0.08;
+    rig.leftArm.rotation.x = -0.12;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.25;
+    rig.rightArm.rotation.x = armX;
+    if (rig.rightElbow) rig.rightElbow.rotation.x = elbowX;
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.bodyPivot.position.y = 0;
+    rig.bodyPivot.rotation.x = torsoLean;
+    rig.headPivot.rotation.z = 0;
+  } else if (pose === 'fish_wait') {
+    const breathe = Math.sin(elapsed * 2.2) * 0.018;
+    rig.leftLeg.rotation.x = 0;
+    rig.rightLeg.rotation.x = 0;
+    rig.leftArm.rotation.x = 0.04;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.18;
+    rig.rightArm.rotation.x = HAND_POSES.carry_front.armX - 0.06 + breathe;
+    if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX + 0.18;
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.bodyPivot.position.y = 0;
+    rig.bodyPivot.rotation.x = 0.03;
+    rig.headPivot.rotation.z = 0;
+  } else if (pose === 'fish_pull') {
+    const u = THREE.MathUtils.clamp(poseProgress, 0, 1);
+    const snap = Math.sin(Math.min(1, u * 1.45) * Math.PI);
+    rig.leftLeg.rotation.x = 0.12 * snap;
+    rig.rightLeg.rotation.x = -0.14 * snap;
+    rig.leftArm.rotation.x = -0.35 * snap;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.45 * snap;
+    rig.rightArm.rotation.x = THREE.MathUtils.lerp(-0.48, -1.32, snap);
+    if (rig.rightElbow) rig.rightElbow.rotation.x = THREE.MathUtils.lerp(-0.8, -0.58, snap);
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.bodyPivot.position.y = 0.02 * snap;
+    rig.bodyPivot.rotation.x = -0.14 * snap;
+    rig.headPivot.rotation.z = 0;
   } else if (pose === 'sit') {
     rig.leftLeg.rotation.x = -1.36;
     rig.rightLeg.rotation.x = -1.36;

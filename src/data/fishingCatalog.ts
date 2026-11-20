@@ -1,13 +1,56 @@
 import {
   FishDexRecord,
+  FishRarity,
   FishSpeciesDefinition,
   FishingRodState,
   RiverFishSpeciesId,
+  ToolId,
 } from '../types/game';
 
 export const WOODEN_ROD_PRICE = 100;
 export const WOODEN_ROD_MAX_DURABILITY = 25;
 export const WOODEN_ROD_FULL_REPAIR_COST = 25;
+
+export interface FishRarityBehavior {
+  label: string;
+  shadowScale: number;
+  biteWindowMs: number;
+  nibbleMin: number;
+  nibbleMax: number;
+}
+
+/**
+ * Play Together-style per-rarity fish shadow & bite reaction tuning.
+ * Structured by rarity tier so future tiers (e.g. super_rare) plug in directly.
+ */
+export const FISH_RARITY_CONFIG: Record<FishRarity, FishRarityBehavior> = {
+  common: {
+    label: 'Cá thường',
+    shadowScale: 0.68,
+    biteWindowMs: 1450,
+    nibbleMin: 1,
+    nibbleMax: 4,
+  },
+  rare: {
+    label: 'Cá hiếm',
+    shadowScale: 1.24,
+    biteWindowMs: 860,
+    nibbleMin: 1,
+    nibbleMax: 4,
+  },
+};
+
+export const ROD_BOBBER_SPECS: Record<
+  ToolId,
+  {shape: 'round'; primaryColor: string; bandColor: string; metalColor: string}
+> = {
+  wooden_rod: {
+    shape: 'round',
+    primaryColor: '#8B5228',
+    bandColor: '#D6A168',
+    metalColor: '#E0B450',
+  },
+};
 
 export function createInitialFishingRod(): FishingRodState {
   return {

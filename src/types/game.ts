@@ -68,7 +68,14 @@ export type HandheldStyle =
   | 'tote_bag'
   | 'mini_umbrella';
 
-export type AvatarPose = 'idle' | 'walk' | 'sit' | 'sleep';
+export type AvatarPose =
+  | 'idle'
+  | 'walk'
+  | 'sit'
+  | 'sleep'
+  | 'fish_cast'
+  | 'fish_wait'
+  | 'fish_pull';
 
 export interface AvatarConfig {
   name: string;
@@ -416,6 +423,8 @@ export interface FishingRodState {
 export type FishWaterType = 'river' | 'sea';
 
 export type FishRarity = 'common' | 'rare';
+
+export type FishingPhase = 'idle' | 'casting' | 'waiting' | 'nibbling' | 'bite';
 
 export type RiverFishSpeciesId =
   | 'tom_cang_xanh'

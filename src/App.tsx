@@ -1757,12 +1757,22 @@ export default function App() {
     }
   };
 
-  const handleCatchRiverFish = () => {
+  const handleCatchRiverFish = (preRolled?: {
+    speciesId: RiverFishSpeciesId;
+    weightKg: number;
+    sellPrice: number;
+  }) => {
     const rod = fishingRodRef.current;
     if (!rod.owned || !rod.equipped || rod.durability <= 0) return null;
 
     const nextDur = Math.max(0, rod.durability - 1);
-    const caught = rollRandomRiverFish();
+    const caught = preRolled
+      ? {
+          species: RIVER_FISH_CATALOG[preRolled.speciesId],
+          weightKg: preRolled.weightKg,
+          sellPrice: preRolled.sellPrice,
+        }
+      : rollRandomRiverFish();
     const spec = caught.species;
 
     const newItem: CaughtFishItem = {
@@ -1804,6 +1814,26 @@ export default function App() {
       name: spec.name,
       rarity: spec.rarity,
       weightKg: caught.weightKg,
+      durabilityLeft: nextDur,
+      maxDurability: rod.maxDurability,
+    };
+  };
+
+  const handleLoseFishingDurability = () => {
+    const rod = fishingRodRef.current;
+    if (!rod.owned) {
+      return {durabilityLeft: 0, maxDurability: WOODEN_ROD_MAX_DURABILITY};
+    }
+    const nextDur = Math.max(0, rod.durability - 1);
+    setFishingRod((prev) => ({
+      ...prev,
+      durability: Math.max(0, prev.durability - 1),
+    }));
+    setStats((prev) => ({
+      ...prev,
+      energy: Math.max(5, prev.energy - 1),
+    }));
+    return {
       durabilityLeft: nextDur,
       maxDurability: rod.maxDurability,
     };
@@ -2097,6 +2127,7 @@ export default function App() {
         onRotateFurniture={handleRotateFurniture}
         onStowFurniture={handleStowFurniture}
         onCatchRiverFish={handleCatchRiverFish}
+        onLoseFishingDurability={handleLoseFishingDurability}
         onRestoreEnergy={() => setStats((prev) => ({...prev, energy: 100}))}
         onBoostMood={() =>
           setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 10)}))
