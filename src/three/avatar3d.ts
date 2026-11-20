@@ -19,11 +19,18 @@ const HAND_POSES: Record<HoldPose, {armX: number; armZ: number; elbowX: number; 
   carry_bag: {armX: -0.06, armZ: 0.48, elbowX: -0.14, elbowZ: 0.06},
 };
 
+export interface SkirtDeformPair {
+  mesh: THREE.Mesh;
+  standGeo: THREE.BufferGeometry;
+  sitGeo: THREE.BufferGeometry;
+}
+
 export interface AvatarRig {
   root: THREE.Group;
   bodyPivot: THREE.Group;
   torsoGroup?: THREE.Group;
   skirtPivot?: THREE.Group;
+  skirtDeformMeshes?: SkirtDeformPair[];
   headPivot: THREE.Group;
   leftArm: THREE.Group;
   rightArm: THREE.Group;
@@ -388,6 +395,84 @@ function createPleatedSkirtGeometry(
   return geom;
 }
 
+/**
+ * Universal seated drape deformer for ANY skirt, dress hem, or trim geometry attached under skirtPivot.
+ * Automatically drapes front vertices smoothly over horizontal thighs & knees while tucking
+ * back/side hems cleanly atop the seat without poking under the bench or into the backrest.
+ */
+function createSeatedSkirtDrapeGeometry(
+  standGeo: THREE.BufferGeometry,
+  meshOffsetY: number,
+  meshRotX = 0,
+): THREE.BufferGeometry {
+  const sitGeo = standGeo.clone();
+  const posAttr = sitGeo.attributes.position as THREE.BufferAttribute;
+
+  // First find max drop below skirtPivot waist (y = 0) across this skirt piece
+  const cosR = Math.cos(meshRotX);
+  const sinR = Math.sin(meshRotX);
+  let maxDrop = 0.22;
+  for (let i = 0; i < posAttr.count; i++) {
+    const ly = posAttr.getY(i);
+    const lz = posAttr.getZ(i);
+    const sy = ly * cosR - lz * sinR + meshOffsetY;
+    if (-sy > maxDrop) maxDrop = -sy;
+  }
+
+  for (let i = 0; i < posAttr.count; i++) {
+    const lx = posAttr.getX(i);
+    const ly = posAttr.getY(i);
+    const lz = posAttr.getZ(i);
+
+    // Transform vertex from mesh-local into upright skirtPivot space (waist at y = 0)
+    const sx = lx;
+    const sy = ly * cosR - lz * sinR + meshOffsetY;
+    const sz = ly * sinR + lz * cosR;
+
+    const drop = Math.max(0, -sy);
+    const v = THREE.MathUtils.clamp(drop / maxDrop, 0, 1);
+    const radial = Math.hypot(sx, sz) || 0.001;
+    const frontAmt = THREE.MathUtils.clamp(sz / radial, 0, 1);
+    const frontCurve = Math.pow(frontAmt, 1.12);
+    const backAmt = THREE.MathUtils.clamp(-sz / radial, 0, 1);
+
+    // Subtle natural sideways hip relaxation when sitting
+    const nx = sx * (1 + 0.08 * v);
+
+    // Forward drape along seated lap (+Z) & slight forward tuck at lower back against backrest
+    const lapPush = frontCurve * (0.045 + 0.215 * Math.pow(v, 0.88));
+    const backNudge = backAmt * (0.045 * v);
+    const nz = sz + lapPush + backNudge;
+
+    // Vertical drape: front fabric rests gently atop horizontal thighs & folds softly down at knees;
+    // side/back fabric gathers cleanly just above the wooden bench surface (bench top ≈ -0.215)
+    const seatSurfaceY = -0.182;
+    const flatSideBackY = Math.max(seatSurfaceY, sy * (0.72 - 0.06 * backAmt));
+    // Longer skirts (drop > 0.25) drape gently downward past the knee edge
+    const kneeCascade = Math.max(0, drop - 0.24) * 0.65;
+    const frontLapY = Math.max(-0.115 - kneeCascade, -0.025 - 0.075 * v - kneeCascade);
+    let ny = THREE.MathUtils.lerp(flatSideBackY, frontLapY, frontCurve);
+    // Keep very top waistband row flush with torso waist
+    if (v < 0.08) {
+      ny = THREE.MathUtils.lerp(sy, ny, v / 0.08);
+    }
+
+    // Transform back from skirtPivot space into mesh-local space
+    const dy = ny - meshOffsetY;
+    const ddz = nz;
+    posAttr.setXYZ(
+      i,
+      nx,
+      dy * cosR + ddz * sinR,
+      -dy * sinR + ddz * cosR,
+    );
+  }
+
+  posAttr.needsUpdate = true;
+  sitGeo.computeVertexNormals();
+  return sitGeo;
+}
+
 function createTorsoProfilePoints(scaleOffset = 0, yMin = -0.195, yMax = 0.21): THREE.Vector2[] {
   const basePts: [number, number][] = [
     [0.01, yMin],
@@ -469,6 +554,11 @@ export function buildAvatarRig(
     legPivot.add(kneeCap);
 
     if (config.bottom === 'wide_trousers') {
+      const hipPantCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.1, 14, 12),
+        bottomMat,
+      );
+      hipPantCap.scale.set(1, 0.88, 1);
       const thighPant = new THREE.Mesh(
         new THREE.CylinderGeometry(0.094, 0.105, 0.22, 18),
         bottomMat,
@@ -480,14 +570,19 @@ export function buildAvatarRig(
       );
       kneeTrouserCap.scale.set(1, 0.92, 1);
       kneeTrouserCap.position.y = KNEE_Y;
-      legPivot.add(thighPant, kneeTrouserCap);
+      legPivot.add(hipPantCap, thighPant, kneeTrouserCap);
     } else if (config.bottom === 'denim_shorts') {
+      const hipShortCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 14, 12),
+        bottomMat,
+      );
+      hipShortCap.scale.set(1, 0.84, 1);
       const shortMesh = new THREE.Mesh(
         new THREE.CylinderGeometry(0.106, 0.102, 0.165, 16),
         bottomMat,
       );
       shortMesh.position.y = -0.08;
-      legPivot.add(shortMesh);
+      legPivot.add(hipShortCap, shortMesh);
 
       const hem = new THREE.Mesh(
         new THREE.CylinderGeometry(0.106, 0.107, 0.026, 16),
@@ -906,8 +1001,9 @@ export function buildAvatarRig(
     torsoGroup.add(neckTrim, waistSash);
   }
 
-  // Bottoms on Torso (clean radial hierarchy so skirts drape smoothly over seated lap without clipping)
+  // Bottoms on Torso (clean radial hierarchy so all skirts drape smoothly over seated lap via paired geometries)
   let skirtPivot: THREE.Group | undefined;
+  const skirtDeformMeshes: SkirtDeformPair[] = [];
   if (config.bottom === 'pleated_skirt' || config.bottom === 'midi_skirt') {
     const isMidi = config.bottom === 'midi_skirt';
     const waistband = new THREE.Mesh(
@@ -928,17 +1024,21 @@ export function buildAvatarRig(
       isMidi ? 12 : 16,
       isMidi ? 0.011 : 0.016,
     );
+    const skirtOffsetY = isMidi ? -0.182 : -0.13;
+    const skirtSitGeo = createSeatedSkirtDrapeGeometry(skirtGeo, skirtOffsetY, 0);
     const skirtMesh = new THREE.Mesh(skirtGeo, bottomMat);
-    skirtMesh.position.set(0, isMidi ? -0.182 : -0.13, 0);
+    skirtMesh.position.set(0, skirtOffsetY, 0);
     skirtPivot.add(skirtMesh);
+    skirtDeformMeshes.push({mesh: skirtMesh, standGeo: skirtGeo, sitGeo: skirtSitGeo});
 
-    const hemRing = new THREE.Mesh(
-      new THREE.TorusGeometry(isMidi ? 0.322 : 0.282, 0.012, 8, 32),
-      bottomLightMat,
-    );
+    const hemStandGeo = new THREE.TorusGeometry(isMidi ? 0.322 : 0.282, 0.012, 8, 32);
+    const hemOffsetY = isMidi ? -0.332 : -0.23;
+    const hemSitGeo = createSeatedSkirtDrapeGeometry(hemStandGeo, hemOffsetY, Math.PI / 2);
+    const hemRing = new THREE.Mesh(hemStandGeo, bottomLightMat);
     hemRing.rotation.x = Math.PI / 2;
-    hemRing.position.set(0, isMidi ? -0.332 : -0.23, 0);
+    hemRing.position.set(0, hemOffsetY, 0);
     skirtPivot.add(hemRing);
+    skirtDeformMeshes.push({mesh: hemRing, standGeo: hemStandGeo, sitGeo: hemSitGeo});
   } else {
     const waist = new THREE.Mesh(
       new THREE.CylinderGeometry(0.22, 0.224, 0.078, 26),
@@ -2275,6 +2375,7 @@ export function buildAvatarRig(
     bodyPivot,
     torsoGroup,
     skirtPivot,
+    skirtDeformMeshes,
     headPivot,
     leftArm,
     rightArm,
@@ -2322,6 +2423,14 @@ export function updateAvatarRigAnimation(
       rig.skirtPivot.rotation.x = 0;
       rig.skirtPivot.position.set(0, -0.158, 0);
       rig.skirtPivot.scale.set(1, 1, 1);
+    }
+    if (rig.skirtDeformMeshes) {
+      for (let i = 0; i < rig.skirtDeformMeshes.length; i++) {
+        const pair = rig.skirtDeformMeshes[i];
+        if (pair.mesh.geometry !== pair.standGeo) {
+          pair.mesh.geometry = pair.standGeo;
+        }
+      }
     }
   }
 
@@ -2461,20 +2570,29 @@ export function updateAvatarRigAnimation(
     const breath01 = 0.5 + 0.5 * sitBreath;
 
     // Unified natural sitting posture across all skirts, shorts, and trousers:
-    // shift hips slightly forward, drape skirt smoothly forward over lap, pitch thighs along bench & bend knees cleanly downward
-    rig.leftLeg.position.z = 0.052;
-    rig.rightLeg.position.z = 0.052;
-    rig.leftLeg.rotation.x = -1.24;
-    rig.rightLeg.rotation.x = -1.24;
-    rig.leftLeg.rotation.z = -0.025;
-    rig.rightLeg.rotation.z = 0.025;
-    if (rig.leftKnee) rig.leftKnee.rotation.x = 1.14;
-    if (rig.rightKnee) rig.rightKnee.rotation.x = 1.14;
+    // level horizontal thighs resting squarely on bench, knees bent cleanly downward,
+    // and skirt meshes swapped to seated-drape geometry instead of tilting a stiff cone
+    rig.leftLeg.position.z = 0.036;
+    rig.rightLeg.position.z = 0.036;
+    rig.leftLeg.rotation.x = -1.38;
+    rig.rightLeg.rotation.x = -1.38;
+    rig.leftLeg.rotation.z = -0.02;
+    rig.rightLeg.rotation.z = 0.02;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 1.32;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 1.32;
 
     if (rig.skirtPivot) {
-      rig.skirtPivot.rotation.x = -0.58;
-      rig.skirtPivot.position.set(0, -0.144, 0.036);
-      rig.skirtPivot.scale.set(1.06, 0.84, 1.28);
+      rig.skirtPivot.rotation.x = 0;
+      rig.skirtPivot.position.set(0, -0.158, 0);
+      rig.skirtPivot.scale.set(1, 1, 1);
+    }
+    if (rig.skirtDeformMeshes) {
+      for (let i = 0; i < rig.skirtDeformMeshes.length; i++) {
+        const pair = rig.skirtDeformMeshes[i];
+        if (pair.mesh.geometry !== pair.sitGeo) {
+          pair.mesh.geometry = pair.sitGeo;
+        }
+      }
     }
 
     rig.leftArm.rotation.x = -0.44 + sitBreath * 0.015;

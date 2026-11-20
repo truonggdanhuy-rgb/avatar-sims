@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import {BOB_AVATAR, TINA_AVATAR} from '../data/avatarCatalog';
+import {BOB_AVATAR, IVAN_AVATAR, TINA_AVATAR} from '../data/avatarCatalog';
 import {POND_FISH_SPECIES} from '../data/farmCatalog';
 import {FURNITURE_BY_ID, getHouseRoomAt, HouseRoomId} from '../data/furnitureCatalog';
 import {
@@ -29,6 +29,7 @@ import {
   createPaintPatternTexture,
   createWoodPlankTexture,
   glossyClayMat,
+  mergeStaticGroupByMaterial,
 } from './materials';
 import {createTreeGeometries, TownAnchor, WorldCollider} from './townBuilder';
 
@@ -120,6 +121,7 @@ function createExitDoorway(
   signBoard.position.set(0, 1.25, 0);
 
   doorGroup.add(mat, postL, postR, signBoard);
+  mergeStaticGroupByMaterial(doorGroup);
   addBoxProxy(
     doorGroup,
     [2.1, 1.5, 1.3],
@@ -3491,6 +3493,7 @@ export function buildSubzoneScene(
     );
     screen.position.set(0, 1.65, 0.65);
     cab.add(cabBody, screen);
+    mergeStaticGroupByMaterial(cab);
     addBoxProxy(cab, [1.9, 2.7, 1.6], [0, 1.3, 0], {kind: 'arcade_star', tx: -1.95, tz: -1.35}, clickTargets);
     colliders.push({type: 'box', x: -1.95, z: -2.8, hw: 0.9, hd: 0.72});
     labelAnchors.push({id: 'arcade_star', label: 'Máy Bắt Sao', worldPos: new THREE.Vector3(-1.95, 2.85, -2.8)});
@@ -3519,6 +3522,7 @@ export function buildSubzoneScene(
     const plush2 = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10), clayMat('#F7A8B8', 0.72));
     plush2.position.set(0.3, 1.32, 0.15);
     claw.add(clawBase, clawGlass, plush, plush2);
+    mergeStaticGroupByMaterial(claw);
     addBoxProxy(claw, [1.9, 2.7, 1.6], [0, 1.3, 0], {kind: 'arcade_claw', tx: 1.95, tz: -1.35}, clickTargets);
     colliders.push({type: 'box', x: 1.95, z: -2.8, hw: 0.9, hd: 0.72});
     labelAnchors.push({id: 'arcade_claw', label: 'Gắp Thú Bông', worldPos: new THREE.Vector3(1.95, 2.85, -2.8)});
@@ -3673,6 +3677,240 @@ export function buildSubzoneScene(
     });
 
     group.add(createExitDoorway('Cửa Ra Phố', [0, 0, 4.95], '#E58E9A', clickTargets, labelAnchors));
+    mergeStaticGroupByMaterial(group, new Set([tinaRig.root, bobRig.root]));
+  } else if (zone === 'petshop') {
+    // Warm cozy Pet Shop interior (9.6 x 9.2) featuring handsome NPC Ivan & static squirrel on his shoulder
+    const floorMat = clayMat('#F3E5D4', 0.74);
+    const wallCreamMat = clayMat('#FFF5E8', 0.76);
+    const mintTrimMat = clayMat('#9CD1C0', 0.68);
+    const oakMat = clayMat('#B98150', 0.68);
+    const oakDarkMat = clayMat('#875632', 0.72);
+    const coralMat = clayMat('#E57F5E', 0.64);
+    const mustardMat = clayMat('#F2C265', 0.62);
+    const cushionMat = clayMat('#F9EBD9', 0.8);
+
+    const floor = new THREE.Mesh(new RoundedBoxGeometry(9.6, 0.4, 9.2, 2, 0.08), floorMat);
+    floor.position.y = -0.2;
+    floor.userData = {kind: 'ground'};
+    groundMesh = floor;
+    group.add(floor);
+
+    // Back wall + cozy mint wainscot & paw emblem plaque
+    const backWall = new THREE.Mesh(new RoundedBoxGeometry(9.6, 1.75, 0.3, 2, 0.06), wallCreamMat);
+    backWall.position.set(0, 0.87, -4.48);
+    const wainscot = new THREE.Mesh(new RoundedBoxGeometry(9.64, 0.56, 0.34, 2, 0.04), mintTrimMat);
+    wainscot.position.set(0, 0.28, -4.46);
+    const sideWallL = new THREE.Mesh(new RoundedBoxGeometry(0.28, 1.5, 9.2, 2, 0.05), wallCreamMat);
+    sideWallL.position.set(-4.68, 0.75, 0);
+    const sideWallR = sideWallL.clone();
+    sideWallR.position.x = 4.68;
+    group.add(backWall, wainscot, sideWallL, sideWallR);
+
+    // Framed paw-print emblem centered on the back wall
+    const plaqueFrame = new THREE.Mesh(new RoundedBoxGeometry(1.32, 0.92, 0.08, 2, 0.04), oakDarkMat);
+    plaqueFrame.position.set(0, 1.24, -4.3);
+    const plaqueInner = new THREE.Mesh(new RoundedBoxGeometry(1.14, 0.74, 0.09, 2, 0.03), cushionMat);
+    plaqueInner.position.set(0, 1.24, -4.29);
+    const padMain = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), coralMat);
+    padMain.scale.set(1.2, 1.0, 0.35);
+    padMain.position.set(0, 1.18, -4.24);
+    group.add(plaqueFrame, plaqueInner, padMain);
+    [
+      [-0.14, 1.36],
+      [-0.05, 1.42],
+      [0.05, 1.42],
+      [0.14, 1.36],
+    ].forEach(([tx, ty]) => {
+      const toe = new THREE.Mesh(new THREE.SphereGeometry(0.052, 8, 6), coralMat);
+      toe.scale.set(1, 1.15, 0.45);
+      toe.position.set(tx, ty, -4.24);
+      group.add(toe);
+    });
+
+    // Warm round welcome rug in front of Ivan's counter
+    const centerRug = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.95, 2.0, 0.045, 26),
+      clayMat('#FAD6BE', 0.88),
+    );
+    centerRug.scale.set(1.18, 1, 0.85);
+    centerRug.position.set(0, 0.022, 0.45);
+    group.add(centerRug);
+
+    // Reception counter in front of Ivan
+    const petCounter = new THREE.Group();
+    petCounter.position.set(0, 0, -1.9);
+    const deskBody = new THREE.Mesh(new RoundedBoxGeometry(2.9, 0.94, 0.92, 3, 0.08), mintTrimMat);
+    deskBody.position.y = 0.47;
+    const deskTop = new THREE.Mesh(new RoundedBoxGeometry(3.08, 0.14, 1.08, 2, 0.05), oakMat);
+    deskTop.position.y = 0.97;
+    const treatJarBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.17, 0.18, 0.28, 12),
+      glossyClayMat('#FFE29A', 0.28),
+    );
+    treatJarBase.position.set(-0.92, 1.18, 0.06);
+    const treatJarLid = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.07, 12), coralMat);
+    treatJarLid.position.set(-0.92, 1.34, 0.06);
+    const ledger = new THREE.Mesh(new RoundedBoxGeometry(0.56, 0.08, 0.4, 2, 0.02), mustardMat);
+    ledger.position.set(0.68, 1.08, 0.1);
+    petCounter.add(deskBody, deskTop, treatJarBase, treatJarLid, ledger);
+    mergeStaticGroupByMaterial(petCounter);
+    addBoxProxy(
+      petCounter,
+      [3.05, 1.5, 1.3],
+      [0, 0.75, 0],
+      {kind: 'ivan_npc', tx: 0, tz: -0.55},
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: 0, z: -1.9, hw: 1.55, hd: 0.62});
+    group.add(petCounter);
+
+    // Left wall wooden pet accessory shelves (yarn balls, bowls, cute bone toys)
+    const shelfGroup = new THREE.Group();
+    shelfGroup.position.set(-3.75, 0, -1.7);
+    const shelfBack = new THREE.Mesh(new RoundedBoxGeometry(0.14, 2.05, 2.55, 2, 0.04), oakDarkMat);
+    shelfBack.position.set(-0.34, 1.02, 0);
+    const shelfSideF = new THREE.Mesh(new RoundedBoxGeometry(0.68, 2.05, 0.12, 2, 0.03), oakDarkMat);
+    shelfSideF.position.set(0, 1.02, 1.22);
+    const shelfSideB = shelfSideF.clone();
+    shelfSideB.position.z = -1.22;
+    shelfGroup.add(shelfBack, shelfSideF, shelfSideB);
+    [0.14, 0.78, 1.42, 2.0].forEach((sy) => {
+      const plank = new THREE.Mesh(new RoundedBoxGeometry(0.7, 0.09, 2.48, 2, 0.02), oakMat);
+      plank.position.set(0, sy, 0);
+      shelfGroup.add(plank);
+    });
+    // Yarn balls & bone toys on shelves
+    [
+      [-0.65, 0.96, coralMat],
+      [-0.1, 0.96, mustardMat],
+      [0.48, 0.96, mintTrimMat],
+      [-0.4, 1.6, mustardMat],
+      [0.35, 1.6, coralMat],
+    ].forEach(([sz, sy, ym]) => {
+      const yarn = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), ym as THREE.Material);
+      yarn.position.set(0.06, sy as number, sz as number);
+      shelfGroup.add(yarn);
+    });
+    mergeStaticGroupByMaterial(shelfGroup);
+    group.add(shelfGroup);
+    colliders.push({type: 'box', x: -3.75, z: -1.7, hw: 0.56, hd: 1.42});
+
+    // Right side cozy plush pet cushion beds
+    [
+      [3.45, -1.8, coralMat],
+      [3.45, 0.35, mintTrimMat],
+    ].forEach(([bx, bz, rimMat]) => {
+      const bedGroup = new THREE.Group();
+      bedGroup.position.set(bx as number, 0, bz as number);
+      const bedRim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.56, 0.14, 10, 20),
+        rimMat as THREE.Material,
+      );
+      bedRim.rotation.x = Math.PI / 2;
+      bedRim.position.y = 0.14;
+      const bedPad = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.5, 0.11, 18), cushionMat);
+      bedPad.position.y = 0.08;
+      bedGroup.add(bedRim, bedPad);
+      group.add(bedGroup);
+      colliders.push({type: 'circle', x: bx as number, z: bz as number, r: 0.72});
+    });
+
+    // Handsome NPC Ivan standing behind counter with a STATIC sculpted squirrel on his shoulder
+    const ivanRig = buildAvatarRig(IVAN_AVATAR);
+    ivanRig.root.position.set(0, 0, -2.95);
+    ivanRig.root.rotation.y = 0;
+    updateAvatarRigAnimation(ivanRig, 'idle', 0, false);
+
+    // Static sculpted squirrel perched on Ivan's right shoulder (world/local shoulder top: x=0.23, y=0.96, z=0.02)
+    const squirrel = new THREE.Group();
+    squirrel.position.set(0.24, 0.96, 0.02);
+    squirrel.rotation.y = -0.18;
+
+    const sqFurMat = clayMat('#C46A34', 0.76);
+    const sqDarkFurMat = clayMat('#9A4B22', 0.76);
+    const sqBellyMat = clayMat('#F9E4C8', 0.8);
+    const sqEyeMat = glossyClayMat('#1E1B18', 0.12);
+    const sqEyeShineMat = new THREE.MeshBasicMaterial({color: '#FFFFFF'});
+    const sqNoseMat = glossyClayMat('#592B1C', 0.25);
+    const sqAcornMat = clayMat('#A97546', 0.72);
+    const sqCapMat = clayMat('#643C20', 0.78);
+
+    const sqBody = new THREE.Mesh(new THREE.SphereGeometry(0.082, 10, 8), sqFurMat);
+    sqBody.scale.set(0.86, 1.18, 0.94);
+    sqBody.position.set(0, 0.095, 0);
+
+    const sqBelly = new THREE.Mesh(new THREE.SphereGeometry(0.056, 9, 7), sqBellyMat);
+    sqBelly.scale.set(0.82, 1.05, 0.55);
+    sqBelly.position.set(0, 0.09, 0.048);
+
+    const sqHead = new THREE.Mesh(new THREE.SphereGeometry(0.068, 10, 9), sqFurMat);
+    sqHead.scale.set(1.02, 0.96, 1.04);
+    sqHead.position.set(0, 0.205, 0.024);
+
+    // Cute puffy cheeks + nose + glossy eyes
+    [-1, 1].forEach((side) => {
+      const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 6), sqBellyMat);
+      cheek.position.set(side * 0.036, 0.188, 0.064);
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.058, 7), sqDarkFurMat);
+      ear.position.set(side * 0.04, 0.272, 0.014);
+      ear.rotation.z = -side * 0.22;
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.012, 7, 7), sqEyeMat);
+      eye.position.set(side * 0.03, 0.214, 0.081);
+      const glint = new THREE.Mesh(new THREE.SphereGeometry(0.0045, 5, 5), sqEyeShineMat);
+      glint.position.set(side * 0.032, 0.218, 0.091);
+      const paw = new THREE.Mesh(new THREE.SphereGeometry(0.02, 7, 6), sqFurMat);
+      paw.position.set(side * 0.036, 0.128, 0.072);
+      const foot = new THREE.Mesh(new THREE.SphereGeometry(0.026, 7, 6), sqFurMat);
+      foot.scale.set(0.8, 0.55, 1.35);
+      foot.position.set(side * 0.04, 0.015, 0.036);
+      squirrel.add(cheek, ear, eye, glint, paw, foot);
+    });
+
+    const sqNose = new THREE.Mesh(new THREE.SphereGeometry(0.011, 7, 6), sqNoseMat);
+    sqNose.position.set(0, 0.2, 0.094);
+
+    // Tiny acorn held in front paws
+    const acornBody = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 7), sqAcornMat);
+    acornBody.scale.set(0.88, 1.1, 0.88);
+    acornBody.position.set(0, 0.132, 0.088);
+    const acornCap = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.55), sqCapMat);
+    acornCap.position.set(0, 0.146, 0.088);
+
+    // Fluffy curled S-curve squirrel tail rising behind Ivan's shoulder
+    const tailLow = new THREE.Mesh(new THREE.SphereGeometry(0.058, 9, 8), sqFurMat);
+    tailLow.scale.set(0.82, 1.25, 0.95);
+    tailLow.position.set(0, 0.09, -0.085);
+    tailLow.rotation.x = 0.55;
+    const tailMid = new THREE.Mesh(new THREE.SphereGeometry(0.072, 10, 8), sqFurMat);
+    tailMid.scale.set(0.86, 1.45, 0.95);
+    tailMid.position.set(0, 0.195, -0.118);
+    tailMid.rotation.x = -0.18;
+    const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.064, 10, 8), sqDarkFurMat);
+    tailTip.scale.set(0.84, 1.28, 0.95);
+    tailTip.position.set(0, 0.295, -0.078);
+    tailTip.rotation.x = -0.78;
+
+    squirrel.add(sqBody, sqBelly, sqHead, sqNose, acornBody, acornCap, tailLow, tailMid, tailTip);
+    mergeStaticGroupByMaterial(squirrel);
+    ivanRig.root.add(squirrel);
+    group.add(ivanRig.root);
+
+    addBoxProxy(
+      group,
+      [1.2, 2.0, 1.2],
+      [0, 1.0, -2.95],
+      {kind: 'ivan_npc', tx: 0, tz: -0.55},
+      clickTargets,
+    );
+    colliders.push({type: 'circle', x: 0, z: -2.95, r: 0.45});
+    labelAnchors.push({
+      id: 'ivan_npc',
+      label: 'Ivan',
+      worldPos: new THREE.Vector3(0, 2.2, -2.95),
+    });
+
+    group.add(createExitDoorway('Cửa Ra Phố', [0, 0, 4.1], '#E57F5E', clickTargets, labelAnchors));
+    mergeStaticGroupByMaterial(group, new Set([ivanRig.root]));
   }
 
   return {

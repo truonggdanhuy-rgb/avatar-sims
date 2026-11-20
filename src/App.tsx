@@ -815,6 +815,21 @@ export default function App() {
     return false;
   });
 
+  const [redeemedCodes, setRedeemedCodes] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.redeemedCodes)) {
+          return parsed.redeemedCodes.filter((c: unknown): c is string => typeof c === 'string');
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return [];
+  });
+
   const [teleportToPlazaPulse, setTeleportToPlazaPulse] = useState(0);
   const [teleportCooldownEndAt, setTeleportCooldownEndAt] = useState(0);
   const [teleportClockNow, setTeleportClockNow] = useState(() => Date.now());
@@ -1088,6 +1103,7 @@ export default function App() {
           accountId,
           showJoystick,
           showJumpButton,
+          redeemedCodes,
         }),
       );
     } catch {
@@ -1118,6 +1134,7 @@ export default function App() {
     accountId,
     showJoystick,
     showJumpButton,
+    redeemedCodes,
   ]);
 
   const handleZoneChange = (next: ZoneId) => {
@@ -1146,6 +1163,28 @@ export default function App() {
       handleZoneChange('town');
     }
     setTeleportToPlazaPulse((p) => p + 1);
+  };
+
+  const handleRedeemGiftCode = (rawCode: string): {ok: boolean; message: string} => {
+    const code = rawCode.trim().toUpperCase();
+    if (code === 'HUYHUY03') {
+      if (redeemedCodes.includes('HUYHUY03')) {
+        return {
+          ok: false,
+          message: 'Mã "HUYHUY03" đã được quy đổi trên thiết bị này rồi.',
+        };
+      }
+      setRedeemedCodes((prev) => [...prev, 'HUYHUY03']);
+      setStats((prev) => ({...prev, coins: prev.coins + 10000}));
+      return {
+        ok: true,
+        message: 'Nhập mã HUYHUY03 thành công! Bạn nhận được +10.000 Xu.',
+      };
+    }
+    return {
+      ok: false,
+      message: `Mã "${code}" không hợp lệ hoặc đã hết hạn.`,
+    };
   };
 
   const markQuestDone = (key: keyof DailyQuestProgress['tasks']) => {
@@ -2461,6 +2500,7 @@ export default function App() {
           }}
           onChangeTimeOfDay={setTimeOfDay}
           onToggleSound={handleToggleSound}
+          onRedeemGiftCode={handleRedeemGiftCode}
           onClose={() => setPhoneOpen(false)}
         />
       )}

@@ -1,7 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   Armchair,
-  ArrowUp,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -39,6 +38,7 @@ import {
 import {
   buildTownScene,
   getTownGroundHeight,
+  isPointOnPlazaFlowerBed,
   TOWN_LAKE_WATER_Y,
   TOWN_ZONE_ENTRANCES,
   TownAnchor,
@@ -169,6 +169,7 @@ interface SeatTarget {
   standX: number;
   standZ: number;
   isBed?: boolean;
+  isSwing?: boolean;
 }
 
 interface NavPoint {
@@ -193,8 +194,8 @@ interface NavGrid {
 }
 
 const PLAYER_RADIUS = 0.34;
-const JUMP_VELOCITY = 9.8;
-const JUMP_GRAVITY = 28.0; // Peak ~1.71m: clears plaza flower bed rims (0.98m) & blooms (~1.30m)
+const JUMP_VELOCITY = 7.9;
+const JUMP_GRAVITY = 28.0; // Peak ~1.11m: just clears plaza flower bed rims (0.98m) smoothly
 
 // Reusable math objects (zero allocations in render loop)
 const _projVec = new THREE.Vector3();
@@ -205,6 +206,8 @@ const _sunColorTarget = new THREE.Color();
 const _hemiSkyTarget = new THREE.Color();
 const _hemiGroundTarget = new THREE.Color();
 const _rimColorTarget = new THREE.Color();
+const _frustum = new THREE.Frustum();
+const _projScreenMatrix = new THREE.Matrix4();
 
 function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
   const isPortrait = aspect < 0.82;
@@ -248,6 +251,13 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
     return {fov, pos: [0, 7.6, 11.4] as const, look: [0, 0.75, -0.45] as const};
   }
 
+  if (zone === 'petshop') {
+    if (isPortrait) {
+      return {fov, pos: [0, 7.6, 11.8] as const, look: [0, 0.75, -0.35] as const};
+    }
+    return {fov, pos: [0, 6.8, 10.4] as const, look: [0, 0.75, -0.35] as const};
+  }
+
   if (isPortrait) {
     return {fov, pos: [0, 6.8, 10.6] as const, look: [0, 0.75, -0.35] as const};
   }
@@ -266,6 +276,9 @@ function getZoneWalkBounds(zone: ZoneId) {
   }
   if (zone === 'boutique') {
     return {minX: -5.6, maxX: 5.6, minZ: -4.8, maxZ: 4.9};
+  }
+  if (zone === 'petshop') {
+    return {minX: -4.15, maxX: 4.15, minZ: -4.05, maxZ: 4.05};
   }
   return {minX: -3.45, maxX: 3.45, minZ: -4.05, maxZ: 4.05};
 }
@@ -331,6 +344,7 @@ function resolvePointAgainstColliders(
   pz: number,
   colliders: WorldCollider[],
   radius = PLAYER_RADIUS,
+  skipBedColliders = false,
 ): {x: number; z: number; collided: boolean} {
   let x = px;
   let z = pz;
@@ -338,6 +352,7 @@ function resolvePointAgainstColliders(
 
   for (let pass = 0; pass < 2; pass++) {
     for (const col of colliders) {
+      if (skipBedColliders && col.id?.startsWith('plaza_curved_bed_')) continue;
       if (col.type === 'circle') {
         const dx = x - col.x;
         const dz = z - col.z;
@@ -1266,11 +1281,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           activeSeat = null;
           jumpY = 0;
           jumpVel = 0;
+          let warpedToPlaza = false;
           if (pendingPlazaSpawnRef.current) {
             pendingPlazaSpawnRef.current = false;
             playerPos.x = 0;
             playerPos.z = 3.6;
             playerPos.rotY = 0;
+            warpedToPlaza = true;
           } else if (activeZoneLoaded !== null) {
             const exitSpawn = TOWN_ZONE_ENTRANCES[activeZoneLoaded];
             playerPos.x = exitSpawn.tx;
@@ -1287,6 +1304,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           playerRig.root.position.set(playerPos.x, spawnY, playerPos.z);
           playerRig.root.rotation.y = playerPos.rotY;
           cameraTransitionActive = true;
+          if (warpedToPlaza) {
+            showBubble('Đã di chuyển về Quảng Trường!', 0, spawnY + 2.05, 3.6);
+          }
         }
       } else {
         controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : 4.5;
@@ -1636,7 +1656,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
 
     teleportPlazaActionRef.current = () => {
-      if (stateRef.current.zone !== 'town') return;
+      if (activeZoneLoaded !== 'town') {
+        pendingPlazaSpawnRef.current = true;
+        return;
+      }
       pendingPlazaSpawnRef.current = false;
       activeTarget = null;
       activeSeat = null;
@@ -1827,6 +1850,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               rotY: (data.sitRotY as number) ?? 0,
               standX: data.tx as number,
               standZ: data.tz as number,
+              isSwing: true,
             };
             startWalkTo(data.tx as number, data.tz as number, 'sit', seatInfo, () => {
               soundFX.sparkle();
@@ -2221,6 +2245,20 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             });
             return;
           }
+
+          if (kind === 'ivan_npc') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              showBubble(
+                'Ivan: Chào mừng bạn đến Cửa Hàng Pets! Bé sóc nhỏ của mình cũng rất vui được gặp bạn đó~',
+                0,
+                2.25,
+                -2.6,
+              );
+            });
+            return;
+          }
         }
       }
 
@@ -2240,15 +2278,39 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           const b = getZoneWalkBounds(stateRef.current.zone);
           const clampedX = THREE.MathUtils.clamp(pt.x, b.minX, b.maxX);
           const clampedZ = THREE.MathUtils.clamp(pt.z, b.minZ, b.maxZ);
-          const safeTarget = resolvePointAgainstColliders(clampedX, clampedZ, currentColliders);
-          startWalkTo(safeTarget.x, safeTarget.z, 'idle');
+          const onBedNow = stateRef.current.zone === 'town' && prevGroundY + jumpY >= 0.86;
+          const safeTarget = resolvePointAgainstColliders(
+            clampedX,
+            clampedZ,
+            currentColliders,
+            PLAYER_RADIUS,
+            onBedNow,
+          );
+          if (onBedNow && isPointOnPlazaFlowerBed(safeTarget.x, safeTarget.z)) {
+            stallTimer = 0;
+            prevDistToTarget = Infinity;
+            activeTarget = {
+              x: safeTarget.x,
+              z: safeTarget.z,
+              waypoints: [{x: safeTarget.x, z: safeTarget.z}],
+              waypointIdx: 0,
+              arrivePose: 'idle',
+            };
+          } else {
+            startWalkTo(safeTarget.x, safeTarget.z, 'idle');
+          }
         }
       }
     };
 
+    const shouldAutoFullscreen =
+      typeof navigator !== 'undefined' &&
+      (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
     let fullscreenUnavailable = false;
     const tryEnterBrowserFullscreen = () => {
-      if (fullscreenUnavailable) return;
+      if (!shouldAutoFullscreen || fullscreenUnavailable) return;
       try {
         const doc = document as Document & {
           webkitFullscreenElement?: Element | null;
@@ -2284,7 +2346,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     const onPointerDown = (e: PointerEvent) => {
       downX = e.clientX;
       downY = e.clientY;
-      tryEnterBrowserFullscreen();
+      if (shouldAutoFullscreen) {
+        tryEnterBrowserFullscreen();
+      }
     };
     const onWindowGameTouch = () => {
       tryEnterBrowserFullscreen();
@@ -2297,7 +2361,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointerdown', onWindowGameTouch, {passive: true});
+    if (shouldAutoFullscreen) {
+      window.addEventListener('pointerdown', onWindowGameTouch, {passive: true});
+    }
 
     const handleResize = () => {
       if (!container) return;
@@ -2356,7 +2422,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const elapsed = clock.getElapsedTime();
       const {zone: z, timeOfDay: tod, avatar: av} = stateRef.current;
 
-      const isIndoor = z === 'home' || z === 'boutique' || z === 'arcade';
+      const isIndoor = z === 'home' || z === 'boutique' || z === 'arcade' || z === 'petshop';
       const targetBg =
         tod === 'night'
           ? isIndoor
@@ -2483,6 +2549,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
       const isAirborne = jumpY > 0.01;
 
+      const onFlowerBedLevel = z === 'town' && prevGroundY + jumpY >= 0.86;
+
       // Dynamic Virtual Joystick steering OR Smart Waypoint Walk Kinematics
       const joy = joystickInputRef.current;
       const joyMag = joy.active ? Math.hypot(joy.x, joy.y) : 0;
@@ -2516,7 +2584,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const stepLen = speed * delta;
         const rawX = playerPos.x + (moveDirX / moveLen) * stepLen;
         const rawZ = playerPos.z + (moveDirZ / moveLen) * stepLen;
-        const resolved = resolvePointAgainstColliders(rawX, rawZ, currentColliders);
+        const resolved = resolvePointAgainstColliders(
+          rawX,
+          rawZ,
+          currentColliders,
+          PLAYER_RADIUS,
+          onFlowerBedLevel,
+        );
         const b = getZoneWalkBounds(z);
         const nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
         const nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
@@ -2582,7 +2656,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const rawX = playerPos.x + dirX * stepLen;
             const rawZ = playerPos.z + dirZ * stepLen;
 
-            let resolved = resolvePointAgainstColliders(rawX, rawZ, currentColliders);
+            let resolved = resolvePointAgainstColliders(
+              rawX,
+              rawZ,
+              currentColliders,
+              PLAYER_RADIUS,
+              onFlowerBedLevel,
+            );
             // Secondary tangential slide around obstacle corners
             const progress = (resolved.x - playerPos.x) * dirX + (resolved.z - playerPos.z) * dirZ;
             if (resolved.collided && progress < stepLen * 0.35) {
@@ -2592,11 +2672,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 playerPos.x + perpX * stepLen * 0.9,
                 playerPos.z + perpZ * stepLen * 0.9,
                 currentColliders,
+                PLAYER_RADIUS,
+                onFlowerBedLevel,
               );
               const optB = resolvePointAgainstColliders(
                 playerPos.x - perpX * stepLen * 0.9,
                 playerPos.z - perpZ * stepLen * 0.9,
                 currentColliders,
+                PLAYER_RADIUS,
+                onFlowerBedLevel,
               );
               const distA = Math.hypot(wp.x - optA.x, wp.z - optA.z);
               const distB = Math.hypot(wp.x - optB.x, wp.z - optB.z);
@@ -2640,23 +2724,41 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         playerPos.pose = 'jump';
       }
 
+      if (z === 'town') {
+        activeTown?.setOutdoorSwingSeated?.(Boolean(playerPos.pose === 'sit' && activeSeat?.isSwing));
+      }
+
       let groundOffset = 0.02;
       if (playerPos.pose === 'sit' && activeSeat) {
         groundOffset = activeSeat.seatY - 0.245;
       } else if (playerPos.pose === 'sleep' && activeSeat?.isBed) {
         groundOffset = 0;
       } else if (z === 'town') {
-        groundOffset = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+        if (isPointOnPlazaFlowerBed(playerPos.x, playerPos.z) && prevGroundY + jumpY >= 0.82) {
+          groundOffset = 0.98;
+        } else {
+          groundOffset = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+        }
       } else if (z === 'garden' && playerPos.x > 9.35 && playerPos.x < 15.9 && Math.abs(playerPos.z - 3.0) < 0.98) {
         groundOffset = 0.36;
       }
+
+      // Preserve world elevation smoothly when landing onto or stepping off elevated flower beds
+      if (groundOffset < prevGroundY - 0.05) {
+        jumpY += prevGroundY - groundOffset;
+      } else if (groundOffset > prevGroundY + 0.05) {
+        jumpY = Math.max(0, prevGroundY + jumpY - groundOffset);
+      }
       prevGroundY = groundOffset;
+
+      const isSwingingNow = Boolean(z === 'town' && playerPos.pose === 'sit' && activeSeat?.isSwing);
+      const swingPose = isSwingingNow ? activeTown?.getOutdoorSwingSeatPose?.() : null;
 
       // Keep camera & OrbitControls always centered smoothly on the player character
       if (!cameraTransitionActive) {
-        const focusX = playerPos.x;
-        const focusY = groundOffset + 0.92;
-        const focusZ = playerPos.z;
+        const focusX = swingPose ? swingPose.x : playerPos.x;
+        const focusY = (swingPose ? swingPose.y - 0.245 : groundOffset) + 0.92;
+        const focusZ = swingPose ? swingPose.z : playerPos.z;
         const followAlpha = 1 - Math.exp(-16 * delta);
         const nextTx = THREE.MathUtils.lerp(controls.target.x, focusX, followAlpha);
         const nextTy = THREE.MathUtils.lerp(controls.target.y, focusY, followAlpha);
@@ -2671,6 +2773,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
 
       controls.update();
+      camera.updateMatrixWorld();
+      _projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      _frustum.setFromProjectionMatrix(_projScreenMatrix);
 
       if (z === 'home') {
         homeSpotRef.current.x = playerPos.x;
@@ -2941,8 +3046,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (playerRig.rodBobber) playerRig.rodBobber.visible = showHeldMiniBobber;
       if (playerRig.rodLine) playerRig.rodLine.visible = showHeldMiniBobber;
 
-      playerRig.root.position.set(playerPos.x, groundOffset + jumpY, playerPos.z);
-      playerRig.root.rotation.y = playerPos.rotY;
+      if (swingPose) {
+        playerRig.root.position.set(swingPose.x, swingPose.y - 0.245, swingPose.z);
+        playerRig.root.rotation.x = swingPose.pitch * 0.85;
+        playerRig.root.rotation.y = playerPos.rotY;
+      } else {
+        playerRig.root.position.set(playerPos.x, groundOffset + jumpY, playerPos.z);
+        playerRig.root.rotation.x = 0;
+        playerRig.root.rotation.y = playerPos.rotY;
+      }
       if (playerRig.shadowDisc) {
         playerRig.shadowDisc.position.y = 0.004 - jumpY;
         const shScale = Math.max(0.42, 1 - jumpY * 0.28);
@@ -2958,7 +3070,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       if (z === 'town') {
         activeTown?.updateFishingVisuals?.(fishVisualFrame, elapsed);
-        activeTown?.update(elapsed, tod);
+        activeTown?.update(elapsed, tod, _frustum);
       } else {
         if (z === 'garden' || z === 'fishing') {
           activeSubzone?.updateFishingVisuals?.(fishVisualFrame, elapsed);
@@ -3100,7 +3212,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointerdown', onWindowGameTouch);
+      if (shouldAutoFullscreen) {
+        window.removeEventListener('pointerdown', onWindowGameTouch);
+      }
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
       document.removeEventListener('fullscreenchange', handleResize);
@@ -3777,7 +3891,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {/* Right-Side Jump Button */}
+      {/* Right-Side FPS-Style Jump Button */}
       {showJumpButton && !miniActive && !(zone === 'home' && editFurnitureMode) && (
         <button
           type="button"
@@ -3786,9 +3900,25 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             jumpActionRef.current?.();
           }}
           aria-label="Nhảy lên"
-          className="phone-ui absolute right-5 bottom-6 z-30 flex h-14 w-14 flex-col items-center justify-center rounded-full border-[3px] border-[#3C95AD] bg-[#FFFDF8]/95 text-[#1F5E72] shadow-xl transition-transform active:scale-90"
+          className="phone-ui absolute right-5 bottom-6 z-30 flex h-[68px] w-[68px] items-center justify-center rounded-full border-[3px] border-[#3C95AD] bg-[#FFFDF8]/95 text-[#1F5E72] shadow-xl transition-transform active:scale-90"
         >
-          <ArrowUp className="h-6 w-6" strokeWidth={2.75} />
+          <svg
+            viewBox="0 0 24 24"
+            className="h-9 w-9"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.15"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12.5" cy="4.8" r="2.2" fill="currentColor" stroke="none" />
+            <path d="M6.5 10.2l3.8-1.9 3.9 0.4 3.4-2.1" />
+            <path d="M11.6 8.5l-0.6 5.2" />
+            <path d="M11 13.7l-3.4 2.4-1.5 3.3" />
+            <path d="M11 13.7l3.7 1.3 2.1 4.1" />
+            <path d="M4.8 21.2h14.4" strokeOpacity="0.35" strokeDasharray="2.5 2.5" />
+          </svg>
         </button>
       )}
     </div>

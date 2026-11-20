@@ -13,6 +13,7 @@ import {
   createGrassTexture,
   createStoneWalkwayTexture,
   glossyClayMat,
+  mergeStaticGroupByMaterial,
 } from './materials';
 
 export const TOWN_PLAZA_RADIUS = 7.2;
@@ -29,6 +30,7 @@ export const TOWN_ZONE_ENTRANCES: Record<
   boutique: {tx: -32.0, tz: 23.2, exitRotY: 0},
   arcade: {tx: 32.0, tz: 23.1, exitRotY: 0},
   fishing: {tx: -19.6, tz: 38.6, exitRotY: 0},
+  petshop: {tx: 11.8, tz: 43.2, exitRotY: 0},
 };
 
 export const LAKE_CENTER = {x: -23.0, z: 46.8};
@@ -68,6 +70,19 @@ export function getTownGroundHeight(
   return 0.02;
 }
 
+const PLAZA_BED_ARC_MID_R = 8.02;
+const PLAZA_BED_ARC_SPAN = THREE.MathUtils.degToRad(46);
+
+export function isPointOnPlazaFlowerBed(x: number, z: number): boolean {
+  const ax = Math.abs(x);
+  if (ax < 3.6 || ax > 9.3 || Math.abs(z) > 6.6) return false;
+  const ang = Math.atan2(z, ax);
+  const clampedAng = Math.max(-PLAZA_BED_ARC_SPAN, Math.min(PLAZA_BED_ARC_SPAN, ang));
+  const cx = Math.cos(clampedAng) * PLAZA_BED_ARC_MID_R;
+  const cz = Math.sin(clampedAng) * PLAZA_BED_ARC_MID_R;
+  return Math.hypot(ax - cx, z - cz) <= 0.50;
+}
+
 export interface TownAnchor {
   id: string;
   label: string;
@@ -88,7 +103,9 @@ export interface TownWorld {
   plazaRadius: number;
   setFishingState?: (state: 'idle' | 'waiting' | 'bite') => void;
   updateFishingVisuals?: (frame: FishingVisualFrame, elapsed: number) => void;
-  update: (elapsed: number, timeOfDay: TimeOfDay) => void;
+  setOutdoorSwingSeated?: (seated: boolean) => void;
+  getOutdoorSwingSeatPose?: () => {x: number; y: number; z: number; pitch: number} | null;
+  update: (elapsed: number, timeOfDay: TimeOfDay, frustum?: THREE.Frustum) => void;
   dispose: () => void;
 }
 
@@ -277,6 +294,59 @@ function createKoiStallSignTexture(): THREE.CanvasTexture {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('Tiệm của Koi', 256, 194);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+function createPetShopSideSignTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.fillStyle = '#FFF7EA';
+  ctx.fillRect(0, 0, 512, 256);
+
+  ctx.strokeStyle = '#E0825B';
+  ctx.lineWidth = 14;
+  ctx.strokeRect(12, 12, 488, 232);
+
+  ctx.strokeStyle = '#5BB7B0';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(26, 26, 460, 204);
+
+  const drawPaw = (cx: number, cy: number, s: number, col: string) => {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(s, s);
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.ellipse(0, 10, 18, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    [
+      [-18, -10],
+      [-6, -20],
+      [7, -20],
+      [18, -10],
+    ].forEach(([tx, ty]) => {
+      ctx.beginPath();
+      ctx.arc(tx, ty, 6.8, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  };
+
+  drawPaw(88, 130, 0.95, '#F09470');
+  drawPaw(424, 130, 0.95, '#5BB7B0');
+
+  ctx.fillStyle = '#4A3122';
+  ctx.font = '900 94px "Nunito", "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Pets', 256, 132);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -628,6 +698,7 @@ export function buildTownScene(): TownWorld {
   const plazaStoneTex = createStoneWalkwayTexture(4, 4);
   const signTex = createDailyQuestSignTexture();
   const koiSignTex = createKoiStallSignTexture();
+  const petShopSignTex = createPetShopSideSignTexture();
   const warmGlowTex = createRadialGlowTexture('rgba(255, 214, 130, 0.92)', 'rgba(255, 192, 95, 0.35)');
   let koiRig: AvatarRig | null = null;
 
@@ -930,6 +1001,7 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'box', id, x: bx, z: bz, hw: 0.75, hd: 0.3, rotY: rot});
+    mergeStaticGroupByMaterial(bench);
     group.add(bench);
   });
 
@@ -959,6 +1031,7 @@ export function buildTownScene(): TownWorld {
     const cap = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.18, 8), lampPostMat);
     cap.position.y = 2.42;
     lamp.add(postBase, post, head, cap);
+    mergeStaticGroupByMaterial(lamp);
     group.add(lamp);
     colliders.push({type: 'circle', x: lx, z: lz, r: 0.3});
   });
@@ -1230,6 +1303,7 @@ export function buildTownScene(): TownWorld {
     colliders.push({type: 'box', id: 'home', x: -32, z: -22.5, hw: 4.8, hd: 4.0, rotY: 0});
     const mailWorld = new THREE.Vector3(1.55, 0, 3.08).applyMatrix4(home.matrixWorld);
     colliders.push({type: 'circle', id: 'home_mailbox', x: mailWorld.x, z: mailWorld.z, r: 0.54});
+    mergeStaticGroupByMaterial(home);
     group.add(home);
 
     // Lightweight 1-draw-call InstancedMesh chimney smoke
@@ -1293,6 +1367,7 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'circle', id: 'daily_quests', x: -22.6, z: -17.8, r: 0.74});
+    mergeStaticGroupByMaterial(signBoardGroup);
     group.add(signBoardGroup);
   }
 
@@ -1643,6 +1718,7 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'box', id: 'garden', x: 32, z: -22.5, hw: 4.6, hd: 4.0, rotY: 0});
+    mergeStaticGroupByMaterial(garden);
     group.add(garden);
 
     // === CỐI XAY GIÓ BÊN CẠNH NHÀ KÍNH ===
@@ -1738,6 +1814,7 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'circle', id: 'garden_windmill', x: 42.8, z: -23.2, r: 2.5});
+    mergeStaticGroupByMaterial(windmill, new Set([sailHub]));
     group.add(windmill);
   }
 
@@ -1892,6 +1969,7 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'box', id: 'boutique', x: -32, z: 18.0, hw: 4.55, hd: 3.85, rotY: 0});
+    mergeStaticGroupByMaterial(shop);
     group.add(shop);
   }
 
@@ -2385,6 +2463,7 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'box', id: 'arcade', x: 32, z: 17.5, hw: 5.1, hd: 3.95, rotY: 0});
+    mergeStaticGroupByMaterial(arcade);
     group.add(arcade);
   }
 
@@ -3228,6 +3307,7 @@ export function buildTownScene(): TownWorld {
       rotY: STALL_ROT_Y,
     });
 
+    mergeStaticGroupByMaterial(stall, koiRig ? new Set([koiRig.root]) : undefined);
     group.add(stall);
   }
 
@@ -3334,7 +3414,322 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'box', id: 'settings', x: 24, z: 39.5, hw: 2.8, hd: 2.48, rotY: 0});
+    mergeStaticGroupByMaterial(kiosk);
     group.add(kiosk);
+  }
+
+  // ========== DISTRICT 6B: CỬA HÀNG THÚ CƯNG ("Pets" Hanging Side Sign + Large Puppy on Roof) ==========
+  {
+    const PET_X = 11.8;
+    const PET_Z = 38.6;
+    const petShop = new THREE.Group();
+    petShop.position.set(PET_X, 0, PET_Z);
+    petShop.scale.setScalar(1.42);
+
+    const pPlinthMat = getMat('#E5D6C3', 0.78);
+    const pWallMat = getMat('#FFF5E4', 0.7);
+    const pTrimMat = getMat('#8C5A37', 0.72);
+    const pRoofMat = getMat('#E57F5E', 0.56);
+    const pRoofEdgeMat = getMat('#C35D3F', 0.58);
+    const pTealMat = getMat('#5BB7B0', 0.54);
+    const pCreamMat = getMat('#FFFBF2', 0.58);
+    const pIronMat = getMat('#363940', 0.45, 0.45);
+    const pGoldMat = glossyClayMat('#F4C95D', 0.24);
+
+    // Base plinth & step
+    const plinth = new THREE.Mesh(
+      new RoundedBoxGeometry(3.9, 0.3, 3.2, 2, 0.06),
+      pPlinthMat,
+    );
+    plinth.position.y = 0.15;
+    const frontStep = new THREE.Mesh(
+      new RoundedBoxGeometry(1.45, 0.16, 0.52, 2, 0.04),
+      pPlinthMat,
+    );
+    frontStep.position.set(0.74, 0.08, 1.72);
+
+    // Main store body + wainscot + wooden corner posts
+    const body = new THREE.Mesh(
+      new RoundedBoxGeometry(3.55, 2.25, 2.8, 3, 0.1),
+      pWallMat,
+    );
+    body.position.y = 1.42;
+
+    const wainscot = new THREE.Mesh(
+      new RoundedBoxGeometry(3.64, 0.54, 2.9, 2, 0.05),
+      pTealMat,
+    );
+    wainscot.position.y = 0.57;
+
+    [
+      [-1.72, 1.35],
+      [1.72, 1.35],
+      [-1.72, -1.35],
+      [1.72, -1.35],
+    ].forEach(([cx, cz]) => {
+      const post = new THREE.Mesh(
+        new RoundedBoxGeometry(0.2, 2.28, 0.2, 2, 0.04),
+        pTrimMat,
+      );
+      post.position.set(cx, 1.42, cz);
+      petShop.add(post);
+    });
+
+    // Pitched cozy roof + dormer platform pedestal for the big puppy sculpture
+    const roof = createExtrudedRoof(4.3, 1.55, 3.38, pRoofMat);
+    roof.position.y = 3.25;
+    const ridgeBeam = new THREE.Mesh(
+      new RoundedBoxGeometry(0.2, 0.18, 3.52, 2, 0.04),
+      pRoofEdgeMat,
+    );
+    ridgeBeam.position.y = 4.02;
+
+    const puppyDeck = new THREE.Mesh(
+      new RoundedBoxGeometry(1.85, 0.26, 1.75, 2, 0.05),
+      pCreamMat,
+    );
+    puppyDeck.position.set(0, 3.85, 0.15);
+
+    // ===== CHÚ CÚN CON TO TRÊN MÁI NHÀ (Large Sculpted Puppy on the Roof) =====
+    const pupGroup = new THREE.Group();
+    pupGroup.position.set(0, 4.0, 0.15);
+    const pupFurMat = glossyClayMat('#F4C37A', 0.42);
+    const pupBellyMat = glossyClayMat('#FFF6E3', 0.48);
+    const pupEarMat = glossyClayMat('#A66135', 0.48);
+    const pupNoseMat = glossyClayMat('#2D2522', 0.16);
+    const pupCollarMat = glossyClayMat('#E45C65', 0.34);
+
+    // Plump puppy tummy & chest lying contentedly on the roof terrace
+    const pupBody = new THREE.Mesh(new THREE.SphereGeometry(0.56, 14, 12), pupFurMat);
+    pupBody.scale.set(0.95, 0.78, 1.24);
+    pupBody.position.set(0, 0.44, -0.05);
+
+    const pupChest = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10), pupBellyMat);
+    pupChest.scale.set(0.92, 0.9, 0.85);
+    pupChest.position.set(0, 0.56, 0.46);
+
+    // Front chubby paws stretched forward + rear haunches
+    [-0.28, 0.28].forEach((px) => {
+      const fPaw = new THREE.Mesh(new THREE.SphereGeometry(0.18, 9, 8), pupBellyMat);
+      fPaw.scale.set(0.86, 0.65, 1.35);
+      fPaw.position.set(px, 0.15, 0.72);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.13, 0.42, 9), pupFurMat);
+      leg.position.set(px, 0.32, 0.48);
+      const hip = new THREE.Mesh(new THREE.SphereGeometry(0.24, 9, 8), pupFurMat);
+      hip.scale.set(0.9, 0.8, 1.15);
+      hip.position.set(px * 1.25, 0.24, -0.46);
+      pupGroup.add(fPaw, leg, hip);
+    });
+
+    // Red collar + cute golden bell
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.068, 8, 18), pupCollarMat);
+    collar.rotation.x = Math.PI / 2 - 0.18;
+    collar.position.set(0, 0.82, 0.36);
+    const collarBell = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), pGoldMat);
+    collarBell.position.set(0, 0.73, 0.72);
+
+    // Big adorable round puppy head
+    const pupHead = new THREE.Mesh(new THREE.SphereGeometry(0.58, 14, 12), pupFurMat);
+    pupHead.scale.set(1.06, 0.96, 1.0);
+    pupHead.position.set(0, 1.18, 0.48);
+
+    // Soft cream muzzle + shiny dark nose + happy cheeks
+    const pupMuzzle = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 9), pupBellyMat);
+    pupMuzzle.scale.set(1.18, 0.82, 0.92);
+    pupMuzzle.position.set(0, 1.04, 0.96);
+
+    const pupNose = new THREE.Mesh(new THREE.SphereGeometry(0.095, 9, 8), pupNoseMat);
+    pupNose.scale.set(1.22, 0.85, 0.9);
+    pupNose.position.set(0, 1.13, 1.19);
+
+    const pupTongue = new THREE.Mesh(new THREE.SphereGeometry(0.075, 7, 6), pupCollarMat);
+    pupTongue.scale.set(0.9, 1.25, 0.6);
+    pupTongue.position.set(0, 0.91, 1.12);
+
+    // Floppy ears + expressive glossy dark eyes + rosy blush
+    [-1, 1].forEach((side) => {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), pupEarMat);
+      ear.scale.set(0.58, 1.5, 0.85);
+      ear.position.set(side * 0.56, 1.16, 0.42);
+      ear.rotation.z = side * -0.34;
+      ear.rotation.x = 0.16;
+
+      const eyePatch = new THREE.Mesh(new THREE.SphereGeometry(0.135, 8, 7), pupEarMat);
+      eyePatch.scale.set(1.1, 1.0, 0.4);
+      if (side < 0) {
+        eyePatch.position.set(side * 0.24, 1.25, 0.96);
+        pupGroup.add(eyePatch);
+      }
+
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.072, 8, 8), pupNoseMat);
+      eye.position.set(side * 0.23, 1.25, 1.01);
+      const glint = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 6), pCreamMat);
+      glint.position.set(side * 0.21, 1.28, 1.07);
+
+      const cheek = new THREE.Mesh(
+        new THREE.SphereGeometry(0.085, 7, 6),
+        glossyClayMat('#FF9EAA', 0.45),
+      );
+      cheek.scale.set(1.1, 0.75, 0.45);
+      cheek.position.set(side * 0.36, 1.08, 0.92);
+
+      pupGroup.add(ear, eye, glint, cheek);
+    });
+
+    // Curved puppy tail at the back
+    const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.34, 6, 8), pupEarMat);
+    tail.position.set(0, 0.72, -0.74);
+    tail.rotation.x = -0.68;
+    tail.rotation.z = 0.25;
+
+    pupGroup.add(pupBody, pupChest, collar, collarBell, pupHead, pupMuzzle, pupNose, pupTongue, tail);
+    petShop.add(puppyDeck, pupGroup);
+
+    // ===== BIỂN HIỆU TREO BÊN HÔNG CỬA HÀNG ("Pets") =====
+    const sideSignGroup = new THREE.Group();
+    sideSignGroup.position.set(-1.78, 2.02, 0.18);
+
+    const wallPlate = new THREE.Mesh(
+      new RoundedBoxGeometry(0.12, 0.42, 0.24, 2, 0.03),
+      pIronMat,
+    );
+    const bracketBar = new THREE.Mesh(
+      new RoundedBoxGeometry(1.18, 0.08, 0.08, 2, 0.02),
+      pIronMat,
+    );
+    bracketBar.position.set(-0.58, 0.12, 0);
+    const bracketBrace = new THREE.Mesh(
+      new RoundedBoxGeometry(0.66, 0.055, 0.055, 2, 0.015),
+      pIronMat,
+    );
+    bracketBrace.position.set(-0.26, -0.05, 0);
+    bracketBrace.rotation.z = 0.62;
+
+    [-0.95, -0.32].forEach((cx) => {
+      const chain = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.02, 0.2, 6),
+        pIronMat,
+      );
+      chain.position.set(cx, 0.0, 0);
+      sideSignGroup.add(chain);
+    });
+
+    const signFrame = new THREE.Mesh(
+      new RoundedBoxGeometry(1.06, 0.56, 0.1, 2, 0.03),
+      pTrimMat,
+    );
+    signFrame.position.set(-0.64, -0.34, 0);
+
+    const signMat = new THREE.MeshStandardMaterial({map: petShopSignTex, roughness: 0.45});
+    const signFaceF = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.48), signMat);
+    signFaceF.position.set(-0.64, -0.34, 0.055);
+    const signFaceB = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.48), signMat);
+    signFaceB.rotation.y = Math.PI;
+    signFaceB.position.set(-0.64, -0.34, -0.055);
+
+    const signLantern = new THREE.Mesh(
+      new THREE.SphereGeometry(0.085, 8, 8),
+      new THREE.MeshStandardMaterial({
+        color: '#FFF4C2',
+        emissive: '#FFCC66',
+        emissiveIntensity: 0.3,
+        roughness: 0.25,
+      }),
+    );
+    lampBulbs.push(signLantern.material as THREE.MeshStandardMaterial);
+    signLantern.position.set(-1.12, 0.02, 0);
+
+    sideSignGroup.add(wallPlate, bracketBar, bracketBrace, signFrame, signFaceF, signFaceB, signLantern);
+    petShop.add(sideSignGroup);
+
+    // Striped front awning (6 stripes)
+    for (let i = 0; i < 6; i++) {
+      const stripe = new THREE.Mesh(
+        new RoundedBoxGeometry(0.56, 0.18, 0.94, 2, 0.04),
+        getMat(i % 2 === 0 ? '#5BB7B0' : '#FFFDF7', 0.55),
+      );
+      stripe.position.set(-1.4 + i * 0.56, 2.02, 1.72);
+      stripe.rotation.x = 0.36;
+      petShop.add(stripe);
+    }
+
+    // Display Window (Left) + Pet cushions & balls inside
+    const dispFrame = new THREE.Mesh(
+      new RoundedBoxGeometry(1.56, 1.18, 0.14, 2, 0.04),
+      pCreamMat,
+    );
+    dispFrame.position.set(-0.74, 1.16, 1.42);
+    const dispGlass = new THREE.Mesh(new THREE.BoxGeometry(1.36, 0.98, 0.16), makeWinMat());
+    dispGlass.position.set(-0.74, 1.16, 1.44);
+
+    const miniBed = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.32, 0.14, 12),
+      getMat('#F08A92', 0.7),
+    );
+    miniBed.position.set(-0.98, 0.78, 1.24);
+    const toyBall = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), pGoldMat);
+    toyBall.position.set(-0.46, 0.8, 1.26);
+
+    // Front Entry Door (Right) + Brass Handle
+    const doorFrame = new THREE.Mesh(
+      new RoundedBoxGeometry(1.06, 1.56, 0.16, 2, 0.04),
+      pCreamMat,
+    );
+    doorFrame.position.set(0.74, 1.04, 1.42);
+    const doorLeaf = new THREE.Mesh(
+      new RoundedBoxGeometry(0.88, 1.42, 0.18, 2, 0.04),
+      pTrimMat,
+    );
+    doorLeaf.position.set(0.74, 1.0, 1.44);
+    const doorKnob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), pGoldMat);
+    doorKnob.position.set(0.46, 0.98, 1.55);
+
+    // Side & Back framed windows
+    const sideWinR = buildFramedWindow(0.86, 0.76, pTrimMat, makeWinMat());
+    sideWinR.rotation.y = Math.PI / 2;
+    sideWinR.position.set(1.79, 1.42, 0);
+    const backWin = buildFramedWindow(1.12, 0.76, pTrimMat, makeWinMat());
+    backWin.rotation.y = Math.PI;
+    backWin.position.set(0, 1.42, -1.41);
+
+    petShop.add(
+      plinth,
+      frontStep,
+      body,
+      wainscot,
+      roof,
+      ridgeBeam,
+      dispFrame,
+      dispGlass,
+      miniBed,
+      toyBall,
+      doorFrame,
+      doorLeaf,
+      doorKnob,
+      sideWinR,
+      backWin,
+    );
+
+    addInteractionProxy(
+      petShop,
+      [4.5, 5.2, 3.8],
+      2.3,
+      {
+        kind: 'zone',
+        zone: 'petshop' as ZoneId,
+        tx: TOWN_ZONE_ENTRANCES.petshop.tx,
+        tz: TOWN_ZONE_ENTRANCES.petshop.tz,
+      },
+      clickTargets,
+    );
+    colliders.push({type: 'box', id: 'petshop', x: PET_X, z: PET_Z, hw: 2.85, hd: 2.45, rotY: 0});
+    labelAnchors.push({
+      id: 'petshop',
+      label: 'Cửa Hàng Pets',
+      worldPos: new THREE.Vector3(PET_X, 6.2, PET_Z),
+    });
+    mergeStaticGroupByMaterial(petShop);
+    group.add(petShop);
   }
 
   // ========== SPARSE FARM-STYLE PALE STEPPING STONES (STOPPING SHORT BEFORE BUILDINGS) ==========
@@ -3397,9 +3792,10 @@ export function buildTownScene(): TownWorld {
     addSteppingTrail(-32.0, 25.3, -32.0, 25.0);
     addSteppingTrail(32.0, 25.3, 32.0, 25.0);
 
-    // Far-South Spurs stopping cleanly ~1.8m BEFORE the Fishing Bridge & Post Office
+    // Far-South Spurs stopping cleanly ~1.8m BEFORE the Fishing Bridge, Pet Shop & Post Office
     addSteppingTrail(-22.5, 34.8, -1.6, 34.8);
     addSteppingTrail(1.6, 46.2, 24.0, 46.2);
+    addSteppingTrail(11.8, 46.2, 11.8, 44.2);
     addSteppingTrail(24.0, 44.8, 24.0, 44.5);
 
     const stoneGeo = new THREE.CylinderGeometry(0.42, 0.48, 0.055, 9);
@@ -3706,6 +4102,7 @@ export function buildTownScene(): TownWorld {
     patioNightLight.position.set(0, 3.2, 0);
     patio.add(patioNightLight);
 
+    mergeStaticGroupByMaterial(patio);
     group.add(patio);
   }
 
@@ -4093,7 +4490,7 @@ export function buildTownScene(): TownWorld {
   const pineCoords: [number, number, number][] = [
     // Explorable Outer Meadows (showing players the world extends far!)
     [-8.5, 44.5, 1.32],
-    [9.8, 44.5, 1.34],
+    [6.2, 44.5, 1.34],
     [-31.5, 60.5, 1.42],
     [28.5, 55.0, 1.4],
     [-5.2, 64.5, 1.48],
@@ -4374,6 +4771,9 @@ export function buildTownScene(): TownWorld {
 
   // 5B. Interactive Outdoor Activity Area directly on the Natural Lawn (Khu ngoài trời: Xích đu gỗ, Lửa trại & Kính thiên văn — giữ nguyên nền cỏ tự nhiên!)
   let outdoorSwingPivot: THREE.Group | null = null;
+  let swingSeated = false;
+  let swingPhase = 0;
+  let swingAmp = 0.065;
   let campfireFlameA: THREE.Mesh | null = null;
   let campfireFlameB: THREE.Mesh | null = null;
   let campfireGlowMat: THREE.MeshBasicMaterial | null = null;
@@ -4381,8 +4781,6 @@ export function buildTownScene(): TownWorld {
     const woodPostMat = getMat('#8C5A34', 0.76);
     const woodSeatMat = getMat('#C8925A', 0.64);
     const ropeMat = getMat('#DEC395', 0.84);
-    const vineLeafMat = getMat('#56A85C', 0.72);
-    const vineFlowerMat = glossyClayMat('#FF9EB5', 0.42);
 
     // (1) Interactive Wooden Swing (Xích đu gỗ) at (12.4, -21.6)
     const swingGroup = new THREE.Group();
@@ -4402,15 +4800,6 @@ export function buildTownScene(): TownWorld {
     topCrossbar.position.y = 2.38;
     swingGroup.add(topCrossbar);
 
-    // Floral vine accent climbing up one swing post
-    [0.65, 1.2, 1.75, 2.18].forEach((vy, idx) => {
-      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.11, 7, 6), vineLeafMat);
-      leaf.position.set(-1.14 + idx * 0.06, vy, 0.16 - idx * 0.04);
-      const blossom = new THREE.Mesh(new THREE.SphereGeometry(0.065, 6, 5), vineFlowerMat);
-      blossom.position.set(-1.1 + idx * 0.06, vy + 0.06, 0.21 - idx * 0.04);
-      swingGroup.add(leaf, blossom);
-    });
-
     outdoorSwingPivot = new THREE.Group();
     outdoorSwingPivot.position.set(0, 2.36, 0);
     [-0.56, 0.56].forEach((rx) => {
@@ -4421,6 +4810,7 @@ export function buildTownScene(): TownWorld {
     const swingPlank = new THREE.Mesh(new RoundedBoxGeometry(1.28, 0.09, 0.48, 2, 0.03), woodSeatMat);
     swingPlank.position.y = -1.78;
     outdoorSwingPivot.add(swingPlank);
+    mergeStaticGroupByMaterial(outdoorSwingPivot);
     swingGroup.add(outdoorSwingPivot);
 
     addInteractionProxy(
@@ -4439,6 +4829,7 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'box', id: 'outdoor_swing', x: 12.4, z: -21.6, hw: 1.35, hd: 0.72});
+    mergeStaticGroupByMaterial(swingGroup, new Set([outdoorSwingPivot]));
     group.add(swingGroup);
 
     // (2) Interactive Campfire Ring & Rustic Log Bench (Lửa trại ngoài trời) at (16.6, -22.2)
@@ -4524,6 +4915,7 @@ export function buildTownScene(): TownWorld {
     );
     colliders.push({type: 'circle', id: 'outdoor_campfire', x: 16.6, z: -22.2, r: 0.85});
     colliders.push({type: 'box', id: 'outdoor_log_bench', x: 16.6, z: -20.65, hw: 0.72, hd: 0.3});
+    mergeStaticGroupByMaterial(campGroup, new Set([campfireFlameA, campfireFlameB, campGlowPool]));
     group.add(campGroup);
 
     // (3) Interactive Stargazing Telescope (Kính thiên văn ngắm cảnh/trăng sao) at (14.6, -18.2)
@@ -4566,6 +4958,7 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'circle', id: 'outdoor_telescope', x: 14.6, z: -18.2, r: 0.55});
+    mergeStaticGroupByMaterial(teleGroup);
     group.add(teleGroup);
   }
 
@@ -4742,7 +5135,7 @@ export function buildTownScene(): TownWorld {
     [-15.2, 9.6, '#F9C74F', 0.8],
     [15.6, 9.8, '#F28482', 0.78],
     [-20.5, 32.5, '#F7A8B8', 0.76],
-    [14.2, 41.5, '#A8D8EA', 0.82],
+    [16.6, 41.0, '#A8D8EA', 0.82],
     [9.4, 15.8, '#F7A8B8', 0.86],
     [18.2, 16.4, '#A8D8EA', 0.88],
     [-29.5, 7.5, '#F9C74F', 0.9],
@@ -4885,6 +5278,7 @@ export function buildTownScene(): TownWorld {
     if (Math.hypot(px + 32, pz - 18.0) < 6.2) return true;
     if (Math.hypot(px - 32, pz - 17.5) < 6.6) return true;
     if (Math.hypot(px - 24, pz - 39.5) < 4.5) return true;
+    if (Math.hypot(px - 11.8, pz - 38.6) < 4.4) return true;
     if (Math.hypot(px + 16.8, pz - 37.2) < 3.4) return true;
     return false;
   };
@@ -5015,7 +5409,7 @@ export function buildTownScene(): TownWorld {
     [-19.5, 11.5, 0.46],
     [19.2, 11.2, 0.48],
     [-14.0, 31.8, 0.52],
-    [12.8, 34.2, 0.48],
+    [16.4, 34.8, 0.48],
     [-38.0, 29.8, 0.54],
     [38.2, 29.2, 0.52],
     [-22.0, 56.0, 0.58],
@@ -5097,7 +5491,20 @@ export function buildTownScene(): TownWorld {
   const _swayEuler = new THREE.Euler();
   const _swayRotQ = new THREE.Quaternion();
 
+  // Precomputed bounding spheres for fast zero-allocation frustum culling
+  const _fountainSphere = new THREE.Sphere(new THREE.Vector3(0, 1.5, 0), 3.6);
+  const _smokeSphere = new THREE.Sphere(smokeOriginWorld.clone().add(new THREE.Vector3(0, 1.4, 0)), 3.8);
+  const _windmillSphere = new THREE.Sphere(new THREE.Vector3(42.8, 5.8, -23.2), 5.2);
+  const _petalsSphere = new THREE.Sphere(new THREE.Vector3(patioCenter.x - 1.6, 2.5, patioCenter.z - 1.1), 5.4);
+  const _reedsSphere = new THREE.Sphere(new THREE.Vector3(LAKE_CENTER.x, 0.5, LAKE_CENTER.z), 12.5);
+  const _fireflySphere = new THREE.Sphere(new THREE.Vector3(LAKE_CENTER.x, 1.0, LAKE_CENTER.z), 12.0);
+  const _campfireSphere = new THREE.Sphere(new THREE.Vector3(16.6, 0.6, -22.2), 2.8);
+  const _koiSphere = new THREE.Sphere(new THREE.Vector3(-16.8, 1.2, 37.2), 3.2);
+  const _lightSphere = new THREE.Sphere();
+  const _patioLightPos = new THREE.Vector3(patioCenter.x, 3.2, patioCenter.z);
+
   let useExternalFishingFrame = false;
+  let prevTownElapsed = 0;
 
   const setFishingState = (state: 'idle' | 'waiting' | 'bite') => {
     useExternalFishingFrame = false;
@@ -5109,7 +5516,26 @@ export function buildTownScene(): TownWorld {
     lakeFishingVisuals?.applyFrame(frame, elapsed);
   };
 
-  const update = (elapsed: number, timeOfDay: TimeOfDay) => {
+  const setOutdoorSwingSeated = (seated: boolean) => {
+    swingSeated = seated;
+  };
+
+  const getOutdoorSwingSeatPose = () => {
+    if (!outdoorSwingPivot) return null;
+    const a = outdoorSwingPivot.rotation.x;
+    const L = 1.78;
+    return {
+      x: 12.4,
+      y: 0.02 + 2.36 - L * Math.cos(a),
+      z: -21.6 - L * Math.sin(a),
+      pitch: a,
+    };
+  };
+
+  const update = (elapsed: number, timeOfDay: TimeOfDay, frustum?: THREE.Frustum) => {
+    const dt = prevTownElapsed > 0 ? Math.min(0.05, elapsed - prevTownElapsed) : 0.016;
+    prevTownElapsed = elapsed;
+
     if (timeOfDay !== lastAppliedTod) {
       lastAppliedTod = timeOfDay;
       currentTod = timeOfDay;
@@ -5174,31 +5600,55 @@ export function buildTownScene(): TownWorld {
       }
     }
 
-    // 1. Fountain spray (1 draw call, zero allocations)
-    for (let i = 0; i < DROP_COUNT; i++) {
-      if (i < 6) {
-        const a = (i / 6) * Math.PI * 2;
-        const t = (elapsed * 1.45 + i * 0.16) % 1;
-        const r = 0.06 + t * 0.68;
-        const y = 2.6 + Math.sin(t * Math.PI) * 0.56 - t * 0.98;
-        _dropDummy.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
-        _dropDummy.scale.setScalar(0.88 - t * 0.25);
-      } else {
-        const idx = i - 6;
-        const a = (idx / 12) * Math.PI * 2 + 0.25;
-        const t = (elapsed * 1.35 + (idx % 4) * 0.25) % 1;
-        const r = 0.94 + t * 0.58;
-        const y = 1.62 + Math.sin(t * Math.PI) * 0.18 - t * 1.14;
-        _dropDummy.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
-        _dropDummy.scale.setScalar(0.95 - t * 0.3);
+    // Dynamic PointLight frustum culling at Sunset/Night to save fragment shader CPU/GPU work
+    const nightOrSunset = currentTod === 'night' || currentTod === 'sunset';
+    if (nightOrSunset && frustum) {
+      for (let i = 0; i < ambientLanternLights.length; i++) {
+        const pl = ambientLanternLights[i];
+        _lightSphere.set(pl.position, pl.distance);
+        pl.visible = frustum.intersectsSphere(_lightSphere);
       }
-      _dropDummy.updateMatrix();
-      fountainDropsMesh.setMatrixAt(i, _dropDummy.matrix);
+      if (patioNightLight) {
+        _lightSphere.set(_patioLightPos, patioNightLight.distance);
+        patioNightLight.visible = frustum.intersectsSphere(_lightSphere);
+      }
+      _lightSphere.set(plazaNightLight.position, plazaNightLight.distance);
+      plazaNightLight.visible = frustum.intersectsSphere(_lightSphere);
+      if (lakePierNightLight) {
+        _lightSphere.set(lakePierNightLight.position, lakePierNightLight.distance);
+        lakePierNightLight.visible = frustum.intersectsSphere(_lightSphere);
+      }
+      _lightSphere.set(homePorchNightLight.position, homePorchNightLight.distance);
+      homePorchNightLight.visible = frustum.intersectsSphere(_lightSphere);
     }
-    fountainDropsMesh.instanceMatrix.needsUpdate = true;
 
-    // 2. Gentle chimney smoke (1 draw call, zero allocations)
-    if (chimneySmokeMesh) {
+    // 1. Fountain spray (frustum-culled, zero allocations)
+    if (!frustum || frustum.intersectsSphere(_fountainSphere)) {
+      for (let i = 0; i < DROP_COUNT; i++) {
+        if (i < 6) {
+          const a = (i / 6) * Math.PI * 2;
+          const t = (elapsed * 1.45 + i * 0.16) % 1;
+          const r = 0.06 + t * 0.68;
+          const y = 2.6 + Math.sin(t * Math.PI) * 0.56 - t * 0.98;
+          _dropDummy.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
+          _dropDummy.scale.setScalar(0.88 - t * 0.25);
+        } else {
+          const idx = i - 6;
+          const a = (idx / 12) * Math.PI * 2 + 0.25;
+          const t = (elapsed * 1.35 + (idx % 4) * 0.25) % 1;
+          const r = 0.94 + t * 0.58;
+          const y = 1.62 + Math.sin(t * Math.PI) * 0.18 - t * 1.14;
+          _dropDummy.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
+          _dropDummy.scale.setScalar(0.95 - t * 0.3);
+        }
+        _dropDummy.updateMatrix();
+        fountainDropsMesh.setMatrixAt(i, _dropDummy.matrix);
+      }
+      fountainDropsMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // 2. Gentle chimney smoke (frustum-culled, zero allocations)
+    if (chimneySmokeMesh && (!frustum || frustum.intersectsSphere(_smokeSphere))) {
       for (let i = 0; i < SMOKE_COUNT; i++) {
         const t = (elapsed * 0.28 + i / SMOKE_COUNT) % 1;
         const sx = smokeOriginWorld.x + Math.sin(t * Math.PI * 2 + i) * 0.28 + t * 0.42;
@@ -5214,12 +5664,12 @@ export function buildTownScene(): TownWorld {
     }
 
     // 3. Spin Windmill Sails beside the Conservatory Greenhouse
-    if (windmillSailHub) {
+    if (windmillSailHub && (!frustum || frustum.intersectsSphere(_windmillSphere))) {
       windmillSailHub.rotation.z = -elapsed * 0.55;
     }
 
-    // 4. Drifting Sakura Petals over Tea Patio (1 draw call, zero allocations)
-    if (fallingPetalIM) {
+    // 4. Drifting Sakura Petals over Tea Patio (frustum-culled, zero allocations)
+    if (fallingPetalIM && (!frustum || frustum.intersectsSphere(_petalsSphere))) {
       for (let i = 0; i < FALL_PETAL_COUNT; i++) {
         const s = fallingPetalSeeds[i];
         const t = (elapsed * s.speed + s.phase) % 1;
@@ -5240,8 +5690,8 @@ export function buildTownScene(): TownWorld {
       fallingPetalIM.instanceMatrix.needsUpdate = true;
     }
 
-    // 5. Gentle Wind Sway on Lake Aquatic Grass / Reeds (zero matrix decompositions!)
-    if (reedClumpIM && reedClumpBaseTfs.length > 0) {
+    // 5. Gentle Wind Sway on Lake Aquatic Grass / Reeds (frustum-culled, zero matrix decompositions!)
+    if (reedClumpIM && reedClumpBaseTfs.length > 0 && (!frustum || frustum.intersectsSphere(_reedsSphere))) {
       for (let i = 0; i < reedClumpBaseTfs.length; i++) {
         const tf = reedClumpBaseTfs[i];
         _swayEuler.set(
@@ -5260,7 +5710,12 @@ export function buildTownScene(): TownWorld {
     }
 
     // 6. Nighttime Fireflies (Đom Đóm) over the Sunken Lotus Lake
-    if (fireflyCoreIM && fireflyHaloIM && (currentTod === 'night' || currentTod === 'sunset')) {
+    if (
+      fireflyCoreIM &&
+      fireflyHaloIM &&
+      nightOrSunset &&
+      (!frustum || frustum.intersectsSphere(_fireflySphere))
+    ) {
       const todFactor = currentTod === 'night' ? 1.0 : 0.45;
       for (let i = 0; i < FIREFLY_COUNT; i++) {
         const s = fireflySeeds[i];
@@ -5282,11 +5737,15 @@ export function buildTownScene(): TownWorld {
       fireflyHaloIM.instanceMatrix.needsUpdate = true;
     }
 
-    // 7. Outdoor Zone Swing Gentle Breeze Sway + Campfire Flicker
+    // 7. Outdoor Zone Swing Smooth Pendulum (actively swings when seated!) + Campfire Flicker
+    const targetAmp = swingSeated ? 0.5 : 0.065;
+    const swingFreq = swingSeated ? 2.45 : 1.35;
+    swingAmp = THREE.MathUtils.lerp(swingAmp, targetAmp, 1 - Math.exp(-3.6 * dt));
+    swingPhase += dt * swingFreq;
     if (outdoorSwingPivot) {
-      outdoorSwingPivot.rotation.x = Math.sin(elapsed * 1.35) * 0.065;
+      outdoorSwingPivot.rotation.x = Math.sin(swingPhase) * swingAmp;
     }
-    if (campfireFlameA && campfireFlameB && campfireGlowMat) {
+    if (campfireFlameA && campfireFlameB && campfireGlowMat && (!frustum || frustum.intersectsSphere(_campfireSphere))) {
       const fPulse = 0.9 + Math.sin(elapsed * 11) * 0.12 + Math.cos(elapsed * 17) * 0.06;
       campfireFlameA.scale.set(1, fPulse, 1);
       campfireFlameB.scale.set(1, 1.05 - (fPulse - 0.9) * 0.8, 1);
@@ -5297,8 +5756,8 @@ export function buildTownScene(): TownWorld {
     if (lakeFishingVisuals && !useExternalFishingFrame) {
       lakeFishingVisuals.updateLegacy(elapsed);
     }
-    // 9. Koi NPC gentle idle animation
-    if (koiRig) {
+    // 9. Koi NPC gentle idle animation (frustum-culled)
+    if (koiRig && (!frustum || frustum.intersectsSphere(_koiSphere))) {
       updateAvatarRigAnimation(koiRig, 'idle', elapsed, false);
     }
   };
@@ -5309,6 +5768,7 @@ export function buildTownScene(): TownWorld {
     plazaStoneTex.dispose();
     signTex.dispose();
     koiSignTex.dispose();
+    petShopSignTex.dispose();
     warmGlowTex.dispose();
     lakeFishingVisuals?.dispose();
     group.traverse((obj) => {
@@ -5333,6 +5793,8 @@ export function buildTownScene(): TownWorld {
     plazaRadius: TOWN_PLAZA_RADIUS,
     setFishingState,
     updateFishingVisuals,
+    setOutdoorSwingSeated,
+    getOutdoorSwingSeatPose,
     update,
     dispose,
   };

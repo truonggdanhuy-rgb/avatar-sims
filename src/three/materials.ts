@@ -1,5 +1,6 @@
 import {PaintPattern} from '../types/game';
 import * as THREE from 'three';
+import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export function createCobblestoneTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -387,4 +388,132 @@ export function makeShadowed(obj: THREE.Object3D, cast = true, receive = true): 
       child.receiveShadow = receive;
     }
   });
+}
+
+/**
+ * Merges static leaf THREE.Mesh children under `root` sharing the exact same Material
+ * and vertex attribute layout into single batched meshes for lower CPU traversal and
+ * fewer WebGL draw calls. Skips invisible collider proxies, InstancedMeshes,
+ * multi-material meshes, and anything inside `skipSet`.
+ */
+export function mergeStaticGroupByMaterial(
+  root: THREE.Object3D,
+  skipSet?: Set<THREE.Object3D>,
+): void {
+  root.updateMatrixWorld(true);
+  const invRoot = root.matrixWorld.clone().invert();
+
+  const shouldSkip = (obj: THREE.Object3D): boolean => {
+    let cur: THREE.Object3D | null = obj;
+    while (cur) {
+      if (skipSet?.has(cur)) return true;
+      if (cur === root) break;
+      cur = cur.parent;
+    }
+    return false;
+  };
+
+  interface BatchItem {
+    mesh: THREE.Mesh;
+    material: THREE.Material;
+    hasNormal: boolean;
+    hasUv: boolean;
+    hasColor: boolean;
+    castShadow: boolean;
+    receiveShadow: boolean;
+  }
+
+  const buckets = new Map<string, BatchItem[]>();
+
+  root.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    if (!mesh.isMesh || (obj as THREE.InstancedMesh).isInstancedMesh) return;
+    if (!mesh.visible || shouldSkip(mesh)) return;
+    if (mesh.userData?.kind === 'ground') return;
+    const mat = mesh.material;
+    if (!mat || Array.isArray(mat) || mat.visible === false) return;
+
+    const geo = mesh.geometry;
+    if (!geo || !geo.attributes.position) return;
+
+    const hasNormal = Boolean(geo.attributes.normal);
+    const hasUv = Boolean(geo.attributes.uv);
+    const hasColor = Boolean(geo.attributes.color);
+    const key = `${mat.uuid}|n:${hasNormal ? 1 : 0}|u:${hasUv ? 1 : 0}|c:${hasColor ? 1 : 0}|cs:${mesh.castShadow ? 1 : 0}|rs:${mesh.receiveShadow ? 1 : 0}`;
+    let list = buckets.get(key);
+    if (!list) {
+      list = [];
+      buckets.set(key, list);
+    }
+    list.push({
+      mesh,
+      material: mat,
+      hasNormal,
+      hasUv,
+      hasColor,
+      castShadow: mesh.castShadow,
+      receiveShadow: mesh.receiveShadow,
+    });
+  });
+
+  const relMat = new THREE.Matrix4();
+  const toMergeReplace: {
+    merged: THREE.Mesh;
+    sources: THREE.Mesh[];
+  }[] = [];
+
+  buckets.forEach((items) => {
+    if (items.length < 2) {
+      if (items.length === 1) {
+        items[0].mesh.geometry.computeBoundingSphere();
+      }
+      return;
+    }
+    const prepared: THREE.BufferGeometry[] = [];
+    let failed = false;
+    for (const item of items) {
+      const raw = item.mesh.geometry;
+      const g = raw.index ? raw.toNonIndexed() : raw.clone();
+      if (g.attributes.tangent) g.deleteAttribute('tangent');
+      // Keep only standard attributes so mergeGeometries never rejects mismatched extra attrs
+      for (const attrName of Object.keys(g.attributes)) {
+        if (
+          attrName !== 'position' &&
+          attrName !== 'normal' &&
+          attrName !== 'uv' &&
+          attrName !== 'color'
+        ) {
+          g.deleteAttribute(attrName);
+        }
+      }
+      relMat.multiplyMatrices(invRoot, item.mesh.matrixWorld);
+      g.applyMatrix4(relMat);
+      prepared.push(g);
+    }
+    const mergedGeo = mergeGeometries(prepared, false);
+    prepared.forEach((g) => g.dispose());
+    if (!mergedGeo) {
+      failed = true;
+    }
+    if (!failed && mergedGeo) {
+      mergedGeo.computeBoundingSphere();
+      const first = items[0];
+      const mergedMesh = new THREE.Mesh(mergedGeo, first.material);
+      mergedMesh.castShadow = first.castShadow;
+      mergedMesh.receiveShadow = first.receiveShadow;
+      mergedMesh.frustumCulled = true;
+      toMergeReplace.push({
+        merged: mergedMesh,
+        sources: items.map((it) => it.mesh),
+      });
+    }
+  });
+
+  for (const entry of toMergeReplace) {
+    for (const src of entry.sources) {
+      src.parent?.remove(src);
+      src.geometry.dispose();
+    }
+    root.add(entry.merged);
+  }
 }

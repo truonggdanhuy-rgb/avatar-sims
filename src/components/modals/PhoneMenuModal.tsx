@@ -80,6 +80,7 @@ interface PhoneMenuModalProps {
   onOpenStorage: () => void;
   onChangeTimeOfDay: (time: TimeOfDay) => void;
   onToggleSound: () => void;
+  onRedeemGiftCode: (code: string) => {ok: boolean; message: string};
   onClose: () => void;
 }
 
@@ -93,6 +94,7 @@ const ZONE_LABELS: Record<ZoneId, string> = {
   boutique: 'Thời Trang',
   arcade: 'Tiệm Game',
   fishing: 'Hồ Câu Cá',
+  petshop: 'Cửa Hàng Pets',
 };
 
 function formatDeviceTime(): string {
@@ -129,6 +131,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   onOpenStorage,
   onChangeTimeOfDay,
   onToggleSound,
+  onRedeemGiftCode,
   onClose,
 }) => {
   const [tab, setTab] = useState<PhoneTab>(initialTab);
@@ -136,7 +139,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   const [fishDexWater, setFishDexWater] = useState<FishWaterType>('river');
   const [deviceTime, setDeviceTime] = useState<string>(() => formatDeviceTime());
   const [giftCodeInput, setGiftCodeInput] = useState('');
-  const [giftCodeMessage, setGiftCodeMessage] = useState<string | null>(null);
+  const [giftCodeMessage, setGiftCodeMessage] = useState<{ok: boolean; text: string} | null>(null);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -577,12 +580,18 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                     soundFX.tap();
                     const cleaned = giftCodeInput.trim();
                     if (!cleaned) {
-                      setGiftCodeMessage('Vui lòng nhập mã code trước khi xác nhận.');
+                      setGiftCodeMessage({
+                        ok: false,
+                        text: 'Vui lòng nhập mã code trước khi xác nhận.',
+                      });
                       return;
                     }
-                    setGiftCodeMessage(
-                      `Mã "${cleaned}" chưa thể quy đổi do máy chủ Gift Code Supabase đang chờ liên kết.`,
-                    );
+                    const res = onRedeemGiftCode(cleaned);
+                    setGiftCodeMessage({ok: res.ok, text: res.message});
+                    if (res.ok) {
+                      soundFX.sparkle();
+                      setGiftCodeInput('');
+                    }
                   }}
                   className="flex items-center gap-2"
                 >
@@ -605,8 +614,14 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </button>
                 </form>
                 {giftCodeMessage && (
-                  <p className="rounded-xl bg-[#FBF2E4] px-2.5 py-2 text-[11px] font-semibold leading-relaxed text-[#7B5939]">
-                    {giftCodeMessage}
+                  <p
+                    className={`rounded-xl px-2.5 py-2 text-[11px] font-semibold leading-relaxed ${
+                      giftCodeMessage.ok
+                        ? 'bg-[#EAF8EE] text-[#2A6E40]'
+                        : 'bg-[#FBF2E4] text-[#7B5939]'
+                    }`}
+                  >
+                    {giftCodeMessage.text}
                   </p>
                 )}
               </div>
