@@ -104,13 +104,14 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
 
   return (
     <div
-      className="phone-ui absolute inset-0 z-50 flex items-center justify-center bg-stone-950/65 p-3 sm:p-4"
+      className="phone-ui fixed inset-0 z-50 overflow-auto bg-stone-950/65 p-3 sm:p-4"
       onClick={onClose}
     >
-      <div
-        className="anim-pop flex h-[min(91dvh,630px)] w-full max-w-[372px] flex-col overflow-hidden rounded-[36px] border-[5px] border-[#4A3628] bg-[#FAF3E8] shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="flex min-h-full min-w-full items-center justify-center">
+        <div
+          className="anim-pop flex h-[600px] w-[348px] shrink-0 flex-col overflow-hidden rounded-[36px] border-[5px] border-[#4A3628] bg-[#FAF3E8] shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Top Phone Hardware Status Bar (Temp · Device Clock · Static Battery · Close) */}
         <div className="shrink-0 border-b border-[#E5D5BE] bg-[#F2E5D2] px-4 pt-2 pb-2.5">
           <div className="mb-2 flex items-center justify-between text-[11px] font-bold text-[#4A3525]">
@@ -483,6 +484,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
             </button>
           </div>
           <div className="mx-auto mt-2 h-1 w-20 rounded-full bg-[#B99C7B]" />
+        </div>
         </div>
       </div>
     </div>

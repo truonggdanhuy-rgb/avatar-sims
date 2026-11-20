@@ -24,11 +24,30 @@ export const TOWN_ZONE_ENTRANCES: Record<
   fishing: {tx: -19.6, tz: 38.6, exitRotY: 0},
 };
 
+export const LAKE_CENTER = {x: -23.0, z: 46.8};
+
+export function getLakeShoreRadius(theta: number): number {
+  return (
+    9.2 +
+    0.85 * Math.cos(theta * 2 - 0.5) +
+    0.55 * Math.sin(theta * 3 + 0.4) +
+    0.3 * Math.cos(theta * 4 + 1.1)
+  );
+}
+
 export function getTownGroundHeight(
   x: number,
   z: number,
   plazaRadius = TOWN_PLAZA_RADIUS,
 ): number {
+  // Walkable wooden fishing bridge over the sunken lake (x: -23.45..-21.55, z: 36.65..44.55)
+  if (x >= -23.45 && x <= -21.55 && z >= 36.65 && z <= 44.55) {
+    if (z < 37.35) {
+      const u = THREE.MathUtils.clamp((z - 36.65) / 0.7, 0, 1);
+      return THREE.MathUtils.lerp(0.02, 0.24, u);
+    }
+    return 0.24;
+  }
   const dh = Math.hypot(x - HILL_CENTER.x, z - HILL_CENTER.z);
   if (dh < HILL_RADIUS) {
     const t = dh / HILL_RADIUS;
@@ -59,6 +78,7 @@ export interface TownWorld {
   labelAnchors: TownAnchor[];
   colliders: WorldCollider[];
   plazaRadius: number;
+  setFishingState?: (state: 'idle' | 'waiting' | 'bite') => void;
   update: (elapsed: number, timeOfDay: TimeOfDay) => void;
   dispose: () => void;
 }
@@ -170,6 +190,7 @@ function addInteractionProxy(
   proxy.userData = userData;
   parent.add(proxy);
   targets.push(proxy);
+  return proxy;
 }
 
 // Build reusable merged geometries for tall Broadleaf Oak trees with broad spreading canopy & real branches
@@ -477,12 +498,28 @@ export function buildTownScene(): TownWorld {
 
   const getMat = createMatPool();
   const grassTex = createGrassTexture();
-  grassTex.repeat.set(110, 110);
+  // ShapeGeometry UVs are in world meters (110/600m ≈ 0.185 repeats/m)
+  grassTex.repeat.set(0.185, 0.185);
   const plazaStoneTex = createStoneWalkwayTexture(4, 4);
   const signTex = createDailyQuestSignTexture();
 
-  // ========== 1. EXPANDED TERRAIN + GENTLE WALKABLE SCENIC SAKURA HILL (NO FENCE, NO PATH) ==========
-  const terrainGeo = new THREE.CircleGeometry(300, 64);
+  // ========== 1. EXPANDED TERRAIN (WITH PUNCHED LAKE BASIN) + GENTLE SCENIC HILL ==========
+  const terrainShape = new THREE.Shape();
+  terrainShape.absarc(0, 0, 300, 0, Math.PI * 2, false);
+  const LAKE_HOLE_SEGMENTS = 64;
+  const lakeHolePath = new THREE.Path();
+  for (let i = 0; i <= LAKE_HOLE_SEGMENTS; i++) {
+    // CW winding in shape 2D space; after rotateX(-PI/2), shape (x, y) maps to world (x, -y)
+    const theta = -(i / LAKE_HOLE_SEGMENTS) * Math.PI * 2;
+    const r = getLakeShoreRadius(theta);
+    const sx = LAKE_CENTER.x + Math.cos(theta) * r;
+    const sy = -(LAKE_CENTER.z + Math.sin(theta) * r);
+    if (i === 0) lakeHolePath.moveTo(sx, sy);
+    else lakeHolePath.lineTo(sx, sy);
+  }
+  terrainShape.holes.push(lakeHolePath);
+
+  const terrainGeo = new THREE.ShapeGeometry(terrainShape, 48);
   terrainGeo.rotateX(-Math.PI / 2);
   const terrainMat = new THREE.MeshStandardMaterial({
     map: grassTex,
@@ -750,6 +787,11 @@ export function buildTownScene(): TownWorld {
     group.add(lamp);
     colliders.push({type: 'circle', x: lx, z: lz, r: 0.3});
   });
+
+  // Warm central plaza illumination at Sunset / Night
+  const plazaNightLight = new THREE.PointLight('#FFB960', 0, 22, 1.35);
+  plazaNightLight.position.set(0, 3.0, 0);
+  group.add(plazaNightLight);
 
   const makeWinMat = () => {
     const m = new THREE.MeshStandardMaterial({
@@ -1028,6 +1070,11 @@ export function buildTownScene(): TownWorld {
     chimneySmokeMesh.frustumCulled = false;
     group.add(chimneySmokeMesh);
   }
+
+  // Warm cottage porch light for Sunset / Night
+  const homePorchNightLight = new THREE.PointLight('#FFB35C', 0, 16, 1.45);
+  homePorchNightLight.position.set(-32, 3.5, -18.2);
+  group.add(homePorchNightLight);
 
   // ========== BIỂN "NHIỆM VỤ NGÀY" TRƯỚC SÂN NHÀ ==========
   {
@@ -2156,54 +2203,245 @@ export function buildTownScene(): TownWorld {
     group.add(arcade);
   }
 
-  // ========== DISTRICT 5: HỒ CÂU CÁ (Scenic Lakeside + Orthogonal Wooden Pier) ==========
+  // ========== DISTRICT 5: HỒ CÂU CÁ TƯƠNG TÁC (Large Sunken Lotus Lake, Walkable Bridge, Aquatic Flora & Fireflies) ==========
+  const pierWalkableMeshes: THREE.Object3D[] = [];
+  let lakeWaterMat: THREE.MeshPhysicalMaterial | null = null;
+  let lakePierNightLight: THREE.PointLight | null = null;
+  let lakeBobber: THREE.Mesh | null = null;
+  let lakeRippleRing: THREE.Mesh | null = null;
+  let lakeFishingState: 'idle' | 'waiting' | 'bite' = 'idle';
+  let reedClumpIM: THREE.InstancedMesh | null = null;
+  const reedClumpBaseMats: THREE.Matrix4[] = [];
+  const FIREFLY_COUNT = 38;
+  let fireflyCoreIM: THREE.InstancedMesh | null = null;
+  let fireflyHaloIM: THREE.InstancedMesh | null = null;
+  const fireflySeeds: {
+    x: number;
+    y: number;
+    z: number;
+    rx: number;
+    rz: number;
+    speed: number;
+    phase: number;
+    blinkSpeed: number;
+  }[] = [];
+
   {
     const lake = new THREE.Group();
-    lake.position.set(-23, 0, 44.5);
-    lake.scale.setScalar(1.35);
+    const LAKE_WATER_Y = -0.26;
+    const PIER_X = -22.5;
 
-    const shoreMat = getMat('#E5D1B0', 0.84);
-    const waterMat = glossyClayMat('#4AB4DB', 0.12);
-    const deepWaterMat = glossyClayMat('#3298C4', 0.1);
+    // 1. Sculpted Sunken Embankment & Lakebed matching exact Terrain Hole Outline
+    const BANK_SEGS = 64;
+    const bankVerts: number[] = [];
+    const bankCols: number[] = [];
+    const bankIndices: number[] = [];
 
-    const shoreMain = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.14, 22), shoreMat);
-    shoreMain.position.set(-0.5, 0.03, 0.35);
-    const shoreCove = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.55, 0.14, 18), shoreMat);
-    shoreCove.position.set(1.85, 0.03, -0.65);
+    const ringSpecs: [number, number, string][] = [
+      [1.025, 0.015, '#68AE55'], // Outer grassy lip slightly tucked under ground rim
+      [0.95, -0.19, '#C7AF89'], // Sandy-clay bank above waterline
+      [0.85, -0.58, '#5E8E7E'], // Shallow submerged shelf
+      [0.45, -0.9, '#31626C'], // Deeper turquoise bed
+    ];
+    const tmpC = new THREE.Color();
 
-    const waterMain = new THREE.Mesh(new THREE.CylinderGeometry(2.85, 2.85, 0.16, 22), waterMat);
-    waterMain.position.set(-0.5, 0.05, 0.35);
-    const waterDeep = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.75, 0.17, 18), deepWaterMat);
-    waterDeep.position.set(-0.6, 0.055, 0.45);
-    const waterCove = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.16, 18), waterMat);
-    waterCove.position.set(1.85, 0.05, -0.65);
+    for (let rIdx = 0; rIdx < ringSpecs.length; rIdx++) {
+      const [scale, ry, hex] = ringSpecs[rIdx];
+      tmpC.set(hex);
+      for (let s = 0; s <= BANK_SEGS; s++) {
+        const theta = (s / BANK_SEGS) * Math.PI * 2;
+        const rad = getLakeShoreRadius(theta) * scale;
+        bankVerts.push(
+          LAKE_CENTER.x + Math.cos(theta) * rad,
+          ry,
+          LAKE_CENTER.z + Math.sin(theta) * rad,
+        );
+        bankCols.push(tmpC.r, tmpC.g, tmpC.b);
+      }
+    }
+    const stride = BANK_SEGS + 1;
+    for (let rIdx = 0; rIdx < ringSpecs.length - 1; rIdx++) {
+      for (let s = 0; s < BANK_SEGS; s++) {
+        const a = rIdx * stride + s;
+        const b = a + 1;
+        const c = (rIdx + 1) * stride + s;
+        const d = c + 1;
+        bankIndices.push(a, c, b);
+        bankIndices.push(b, c, d);
+      }
+    }
+    // Center lakebed cap vertex
+    const centerVertIdx = bankVerts.length / 3;
+    bankVerts.push(LAKE_CENTER.x, -0.94, LAKE_CENTER.z);
+    tmpC.set('#27525C');
+    bankCols.push(tmpC.r, tmpC.g, tmpC.b);
+    const innerRingStart = (ringSpecs.length - 1) * stride;
+    for (let s = 0; s < BANK_SEGS; s++) {
+      bankIndices.push(innerRingStart + s, centerVertIdx, innerRingStart + s + 1);
+    }
 
-    // Orthogonal Timber Pier connecting straight to the South Stone Promenade
-    const woodPierMat = getMat('#C59160', 0.72);
-    const woodDarkMat = getMat('#7A5230', 0.76);
-    const pier = new THREE.Mesh(
-      new RoundedBoxGeometry(1.65, 0.18, 3.1, 2, 0.04),
+    const basinGeo = new THREE.BufferGeometry();
+    basinGeo.setAttribute('position', new THREE.Float32BufferAttribute(bankVerts, 3));
+    basinGeo.setAttribute('color', new THREE.Float32BufferAttribute(bankCols, 3));
+    basinGeo.setIndex(bankIndices);
+    basinGeo.computeVertexNormals();
+    const basinMesh = new THREE.Mesh(
+      basinGeo,
+      new THREE.MeshStandardMaterial({vertexColors: true, roughness: 0.88}),
+    );
+    lake.add(basinMesh);
+
+    // 2. Recessed Translucent Glossy Water Surface (sits at y = -0.26, visibly below y = 0 ground)
+    const waterShape = new THREE.Shape();
+    for (let s = 0; s <= BANK_SEGS; s++) {
+      const theta = (s / BANK_SEGS) * Math.PI * 2;
+      const rad = getLakeShoreRadius(theta) * 0.955;
+      const wx = LAKE_CENTER.x + Math.cos(theta) * rad;
+      const wy = -(LAKE_CENTER.z + Math.sin(theta) * rad);
+      if (s === 0) waterShape.moveTo(wx, wy);
+      else waterShape.lineTo(wx, wy);
+    }
+    const waterGeo = new THREE.ShapeGeometry(waterShape, 32);
+    waterGeo.rotateX(-Math.PI / 2);
+    lakeWaterMat = new THREE.MeshPhysicalMaterial({
+      color: '#3BB0D8',
+      roughness: 0.08,
+      metalness: 0.06,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.1,
+      transparent: true,
+      opacity: 0.78,
+    });
+    const waterMesh = new THREE.Mesh(waterGeo, lakeWaterMat);
+    waterMesh.position.y = LAKE_WATER_Y;
+    waterMesh.userData = {
+      kind: 'town_lake_fish',
+      tx: PIER_X,
+      tz: 43.4,
+    };
+    lake.add(waterMesh);
+    clickTargets.push(waterMesh);
+
+    // Subtle deep-water inner shimmer lens
+    const deepShape = new THREE.Shape();
+    for (let s = 0; s <= 40; s++) {
+      const theta = (s / 40) * Math.PI * 2;
+      const rad = getLakeShoreRadius(theta) * 0.56;
+      const wx = LAKE_CENTER.x + Math.cos(theta) * rad;
+      const wy = -(LAKE_CENTER.z + Math.sin(theta) * rad);
+      if (s === 0) deepShape.moveTo(wx, wy);
+      else deepShape.lineTo(wx, wy);
+    }
+    const deepGeo = new THREE.ShapeGeometry(deepShape, 24);
+    deepGeo.rotateX(-Math.PI / 2);
+    const deepMesh = new THREE.Mesh(
+      deepGeo,
+      new THREE.MeshStandardMaterial({
+        color: '#217BA1',
+        roughness: 0.14,
+        transparent: true,
+        opacity: 0.45,
+      }),
+    );
+    deepMesh.position.y = LAKE_WATER_Y - 0.18;
+    lake.add(deepMesh);
+
+    // 3. Walkable Timber Bridge / Fishing Pier extending out over the recessed water
+    const woodPierMat = getMat('#C89462', 0.7);
+    const woodPlankAltMat = getMat('#B88352', 0.72);
+    const woodDarkMat = getMat('#754C2C', 0.78);
+    const pierRopeMat = getMat('#DFC79E', 0.84);
+
+    // Main walkable deck surface (registered in groundMeshes so tapping bridge walks right onto it!)
+    const pierDeck = new THREE.Mesh(
+      new RoundedBoxGeometry(1.9, 0.18, 7.2, 2, 0.04),
       woodPierMat,
     );
-    pier.position.set(2.5, 0.24, -2.05);
-    pier.rotation.y = 0;
+    pierDeck.position.set(PIER_X, 0.16, 40.95);
+    pierDeck.userData = {kind: 'ground'};
+    pierWalkableMeshes.push(pierDeck);
+    lake.add(pierDeck);
 
-    [
-      [1.82, -3.2],
-      [3.18, -3.2],
-      [1.82, -1.05],
-      [3.18, -1.05],
-    ].forEach(([px, pz]) => {
-      const piling = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.095, 0.52, 8), woodDarkMat);
-      piling.position.set(px, 0.26, pz);
-      lake.add(piling);
+    // Sloped entry ramp connecting north grass shoreline (z=36.65) to pier deck (z=37.35)
+    const pierRamp = new THREE.Mesh(
+      new RoundedBoxGeometry(1.92, 0.16, 0.86, 2, 0.03),
+      woodPlankAltMat,
+    );
+    pierRamp.position.set(PIER_X, 0.08, 37.02);
+    pierRamp.rotation.x = 0.28;
+    pierRamp.userData = {kind: 'ground'};
+    pierWalkableMeshes.push(pierRamp);
+    lake.add(pierRamp);
+
+    // Cross-plank wood slats along the bridge surface
+    for (let pz = 37.55; pz <= 44.35; pz += 0.46) {
+      const plank = new THREE.Mesh(
+        new RoundedBoxGeometry(1.86, 0.035, 0.36, 1, 0.01),
+        Math.round(pz * 2) % 2 === 0 ? woodPierMat : woodPlankAltMat,
+      );
+      plank.position.set(PIER_X, 0.252, pz);
+      lake.add(plank);
+    }
+
+    // Two heavy structural beams under bridge
+    [-0.72, 0.72].forEach((ox) => {
+      const stringer = new THREE.Mesh(
+        new RoundedBoxGeometry(0.18, 0.22, 7.1, 2, 0.02),
+        woodDarkMat,
+      );
+      stringer.position.set(PIER_X + ox, 0.04, 40.95);
+      lake.add(stringer);
     });
 
+    // Timber pilings anchored into the sunken lakebed + low rustic side rope posts
+    const pilingZs = [37.5, 39.7, 41.9, 44.3];
+    pilingZs.forEach((pz, pIdx) => {
+      [-0.9, 0.9].forEach((ox) => {
+        const piling = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.095, 0.11, 1.75, 8),
+          woodDarkMat,
+        );
+        piling.position.set(PIER_X + ox, -0.02, pz);
+        const cap = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.115, 0.115, 0.08, 8),
+          woodPierMat,
+        );
+        cap.position.set(PIER_X + ox, 0.87, pz);
+        lake.add(piling, cap);
+      });
+      if (pIdx < pilingZs.length - 1) {
+        const nextZ = pilingZs[pIdx + 1];
+        const midZ = (pz + nextZ) / 2;
+        [-0.9, 0.9].forEach((ox) => {
+          const topRail = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.032, 0.032, nextZ - pz, 6),
+            pierRopeMat,
+          );
+          topRail.rotation.x = Math.PI / 2;
+          topRail.position.set(PIER_X + ox, 0.68, midZ);
+          lake.add(topRail);
+        });
+      }
+    });
+
+    // Warm Hanging Pier Lantern + Fishing Crate + Leaning Bamboo Rod at Bridge Tip
     const lanternPost = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.07, 0.09, 1.6, 8),
+      new THREE.CylinderGeometry(0.075, 0.095, 2.15, 8),
       woodDarkMat,
     );
-    lanternPost.position.set(3.18, 0.94, -1.22);
+    lanternPost.position.set(PIER_X + 0.9, 1.25, 44.3);
+    const lanternArm = new THREE.Mesh(
+      new RoundedBoxGeometry(0.55, 0.07, 0.07, 2, 0.02),
+      woodDarkMat,
+    );
+    lanternArm.position.set(PIER_X + 1.12, 2.24, 44.3);
+    const lanternCord = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6),
+      getMat('#2B2623', 0.6),
+    );
+    lanternCord.position.set(PIER_X + 1.32, 2.1, 44.3);
+    const lanternCap = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.12, 8), woodDarkMat);
+    lanternCap.position.set(PIER_X + 1.32, 1.98, 44.3);
     const pierLampMat = new THREE.MeshStandardMaterial({
       color: '#FFF4C2',
       emissive: '#FFCC66',
@@ -2211,68 +2449,378 @@ export function buildTownScene(): TownWorld {
       roughness: 0.25,
     });
     lampBulbs.push(pierLampMat);
-    const pierLamp = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), pierLampMat);
-    pierLamp.position.set(3.18, 1.78, -1.22);
+    const pierLamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 9, 9), pierLampMat);
+    pierLamp.position.set(PIER_X + 1.32, 1.84, 44.3);
 
+    lakePierNightLight = new THREE.PointLight('#FFB960', 0, 18, 1.35);
+    lakePierNightLight.position.set(PIER_X + 1.32, 2.0, 44.3);
+    lake.add(lanternPost, lanternArm, lanternCord, lanternCap, pierLamp, lakePierNightLight);
+
+    // Wooden tackle barrel + leaning fishing rod on bridge corner
     const barrel = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.28, 0.25, 0.52, 10),
-      getMat('#A06B3E', 0.76),
+      new THREE.CylinderGeometry(0.24, 0.22, 0.48, 10),
+      getMat('#9E6A3E', 0.76),
     );
-    barrel.position.set(1.86, 0.56, -2.6);
-
-    // Lily pads & lotus blooms
-    const padMat = getMat('#5DB86A', 0.68);
-    const lotusMat = getMat('#F79EB0', 0.52);
-    [
-      [-1.6, 1.0],
-      [-0.75, 1.85],
-      [2.05, 0.35],
-    ].forEach(([lx, lz]) => {
-      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.04, 12), padMat);
-      pad.position.set(lx, 0.15, lz);
-      const lotus = new THREE.Mesh(new THREE.SphereGeometry(0.15, 7, 7), lotusMat);
-      lotus.position.set(lx, 0.24, lz);
-      lake.add(pad, lotus);
-    });
-
-    // Shore boulders
-    const rockMat = getMat('#9DA7B2', 0.8);
-    [
-      [-3.55, 0.5, 0.5],
-      [-2.85, 2.4, 0.42],
-      [3.8, -0.45, 0.46],
-    ].forEach(([rx, rz, rs]) => {
-      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(rs, 0), rockMat);
-      rock.scale.set(1.2, 0.75, 1.0);
-      rock.position.set(rx, 0.22, rz);
-      lake.add(rock);
-    });
-
-    lake.add(
-      shoreMain,
-      shoreCove,
-      waterMain,
-      waterDeep,
-      waterCove,
-      pier,
-      lanternPost,
-      pierLamp,
-      barrel,
+    barrel.position.set(PIER_X - 0.62, 0.49, 43.45);
+    const barrelRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.23, 0.025, 6, 12),
+      getMat('#4B525A', 0.5, 0.4),
     );
+    barrelRim.rotation.x = Math.PI / 2;
+    barrelRim.position.set(PIER_X - 0.62, 0.66, 43.45);
+    const rodPole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.036, 2.1, 7),
+      getMat('#B58952', 0.62),
+    );
+    rodPole.position.set(PIER_X - 0.68, 1.15, 43.82);
+    rodPole.rotation.x = 0.42;
+    rodPole.rotation.z = -0.18;
+    lake.add(barrel, barrelRim, rodPole);
+
+    // Interactive Fishing Spot Box at Pier Tip & Center Lake
     addInteractionProxy(
       lake,
-      [7.0, 2.2, 6.2],
-      0.95,
-      {
-        kind: 'zone',
-        zone: 'fishing' as ZoneId,
-        tx: TOWN_ZONE_ENTRANCES.fishing.tx,
-        tz: TOWN_ZONE_ENTRANCES.fishing.tz,
-      },
+      [2.2, 1.8, 1.8],
+      0.9,
+      {kind: 'town_lake_fish', tx: PIER_X, tz: 43.35},
       clickTargets,
+    ).position.set(PIER_X, 0.9, 44.0);
+
+    // Floating Bobber & Ripple Ring for Main-Map Lake Fishing Interaction
+    const bobberGeo = new THREE.SphereGeometry(0.18, 12, 10);
+    const bobberMat = glossyClayMat('#EA526F', 0.2);
+    lakeBobber = new THREE.Mesh(bobberGeo, bobberMat);
+    lakeBobber.position.set(PIER_X, LAKE_WATER_Y + 0.04, 46.6);
+    lakeBobber.visible = false;
+    lake.add(lakeBobber);
+
+    const rippleGeo = new THREE.RingGeometry(0.28, 0.42, 24);
+    rippleGeo.rotateX(-Math.PI / 2);
+    const rippleMat = new THREE.MeshBasicMaterial({
+      color: '#EAF8FF',
+      transparent: true,
+      opacity: 0.7,
+      side: THREE.DoubleSide,
+    });
+    lakeRippleRing = new THREE.Mesh(rippleGeo, rippleMat);
+    lakeRippleRing.position.set(PIER_X, LAKE_WATER_Y + 0.015, 46.6);
+    lakeRippleRing.visible = false;
+    lake.add(lakeRippleRing);
+
+    // 4. Sculpted Notched Lily Pads (Lá Sen) + Multi-Petal Lotus Flowers (Hoa Sen)
+    const padShape = new THREE.Shape();
+    padShape.moveTo(0, 0);
+    padShape.absarc(0, 0, 0.5, 0.2, Math.PI * 2 - 0.2, false);
+    padShape.lineTo(0, 0);
+    const lilyPadGeo = new THREE.ShapeGeometry(padShape, 18);
+    lilyPadGeo.rotateX(-Math.PI / 2);
+    const lilyPadMat = new THREE.MeshStandardMaterial({
+      color: '#FFFFFF',
+      roughness: 0.56,
+      side: THREE.DoubleSide,
+    });
+
+    const lilyPadSpots: [number, number, number, number][] = [
+      // West lotus cove
+      [LAKE_CENTER.x - 4.8, LAKE_CENTER.z - 2.2, 1.15, 0.3],
+      [LAKE_CENTER.x - 5.9, LAKE_CENTER.z - 1.1, 0.92, 1.8],
+      [LAKE_CENTER.x - 4.2, LAKE_CENTER.z - 0.8, 1.05, 3.1],
+      [LAKE_CENTER.x - 5.6, LAKE_CENTER.z + 0.6, 0.88, 4.4],
+      [LAKE_CENTER.x - 4.6, LAKE_CENTER.z + 2.4, 1.18, 2.2],
+      [LAKE_CENTER.x - 3.3, LAKE_CENTER.z + 3.6, 0.95, 5.1],
+      // South lotus garden
+      [LAKE_CENTER.x - 1.4, LAKE_CENTER.z + 5.6, 1.2, 0.8],
+      [LAKE_CENTER.x - 0.2, LAKE_CENTER.z + 6.3, 0.98, 2.6],
+      [LAKE_CENTER.x + 1.2, LAKE_CENTER.z + 5.8, 1.12, 4.0],
+      [LAKE_CENTER.x + 0.4, LAKE_CENTER.z + 4.5, 0.86, 1.4],
+      [LAKE_CENTER.x - 2.8, LAKE_CENTER.z + 5.3, 1.04, 3.7],
+      // East & Northeast lotus cove
+      [LAKE_CENTER.x + 4.5, LAKE_CENTER.z - 2.4, 1.16, 1.1],
+      [LAKE_CENTER.x + 5.7, LAKE_CENTER.z - 1.4, 0.94, 2.9],
+      [LAKE_CENTER.x + 4.9, LAKE_CENTER.z + 0.4, 1.1, 4.6],
+      [LAKE_CENTER.x + 6.1, LAKE_CENTER.z + 1.6, 0.9, 0.5],
+      [LAKE_CENTER.x + 4.2, LAKE_CENTER.z + 2.8, 1.18, 3.3],
+      [LAKE_CENTER.x + 5.5, LAKE_CENTER.z + 3.5, 0.96, 5.5],
+      [LAKE_CENTER.x + 3.2, LAKE_CENTER.z + 4.2, 0.88, 2.1],
+      // Northwest cove near bridge flank
+      [LAKE_CENTER.x - 4.4, LAKE_CENTER.z - 4.8, 1.06, 1.9],
+      [LAKE_CENTER.x - 5.5, LAKE_CENTER.z - 4.1, 0.86, 4.8],
+      [LAKE_CENTER.x - 3.2, LAKE_CENTER.z - 5.5, 0.92, 0.7],
+      [LAKE_CENTER.x + 4.0, LAKE_CENTER.z - 4.9, 1.08, 3.8],
+      [LAKE_CENTER.x + 5.1, LAKE_CENTER.z - 4.0, 0.88, 5.7],
+      [LAKE_CENTER.x + 2.9, LAKE_CENTER.z - 5.8, 0.95, 2.4],
+    ];
+
+    const lilyPadIM = new THREE.InstancedMesh(lilyPadGeo, lilyPadMat, lilyPadSpots.length);
+    const padGreens = ['#4EA858', '#62BD6B', '#43964D', '#6DC474'];
+    lilyPadSpots.forEach(([lx, lz, ls, rot], i) => {
+      _instDummy.position.set(lx, LAKE_WATER_Y + 0.016, lz);
+      _instDummy.rotation.set(0, rot, 0);
+      _instDummy.scale.setScalar(ls);
+      _instDummy.updateMatrix();
+      lilyPadIM.setMatrixAt(i, _instDummy.matrix);
+      _instColor.set(padGreens[i % padGreens.length]);
+      lilyPadIM.setColorAt(i, _instColor);
+    });
+    lilyPadIM.instanceMatrix.needsUpdate = true;
+    if (lilyPadIM.instanceColor) lilyPadIM.instanceColor.needsUpdate = true;
+    lilyPadIM.computeBoundingSphere();
+    lake.add(lilyPadIM);
+
+    // Sculpted Open Lotus Flowers (Hoa Sen) & Stems (merged geometry -> InstancedMesh)
+    const lotusOuterPetals: THREE.BufferGeometry[] = [];
+    for (let p = 0; p < 7; p++) {
+      const ang = (p / 7) * Math.PI * 2;
+      const pet = new THREE.SphereGeometry(0.11, 7, 6);
+      pet.scale(0.68, 1.45, 0.34);
+      pet.rotateX(0.86);
+      pet.rotateY(ang);
+      pet.translate(Math.sin(ang) * 0.14, 0.08, Math.cos(ang) * 0.14);
+      lotusOuterPetals.push(pet);
+    }
+    for (let p = 0; p < 5; p++) {
+      const ang = (p / 5) * Math.PI * 2 + 0.3;
+      const inner = new THREE.SphereGeometry(0.085, 6, 5);
+      inner.scale(0.62, 1.35, 0.3);
+      inner.rotateX(0.45);
+      inner.rotateY(ang);
+      inner.translate(Math.sin(ang) * 0.075, 0.13, Math.cos(ang) * 0.075);
+      lotusOuterPetals.push(inner);
+    }
+    const lotusPetalGeo = mergeParts(lotusOuterPetals);
+    const lotusPetalMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.45});
+    const lotusCenterGeo = new THREE.CylinderGeometry(0.065, 0.04, 0.09, 8);
+    lotusCenterGeo.translate(0, 0.14, 0);
+    const lotusCenterMat = glossyClayMat('#FAD048', 0.35);
+
+    const lotusBloomSpots: [number, number, number, string][] = [
+      [LAKE_CENTER.x - 4.7, LAKE_CENTER.z - 2.15, 1.15, '#FF9AB8'],
+      [LAKE_CENTER.x - 4.3, LAKE_CENTER.z - 0.7, 0.95, '#FFB8CE'],
+      [LAKE_CENTER.x - 4.55, LAKE_CENTER.z + 2.45, 1.2, '#FFEAF1'],
+      [LAKE_CENTER.x - 1.35, LAKE_CENTER.z + 5.65, 1.12, '#FF9AB8'],
+      [LAKE_CENTER.x + 1.25, LAKE_CENTER.z + 5.75, 1.05, '#FFB5CD'],
+      [LAKE_CENTER.x + 4.55, LAKE_CENTER.z - 2.35, 1.18, '#FF9AB8'],
+      [LAKE_CENTER.x + 4.95, LAKE_CENTER.z + 0.45, 1.04, '#FFEAF1'],
+      [LAKE_CENTER.x + 4.25, LAKE_CENTER.z + 2.85, 1.16, '#FFA7C2'],
+      [LAKE_CENTER.x - 4.35, LAKE_CENTER.z - 4.75, 1.0, '#FFB8CE'],
+      [LAKE_CENTER.x + 4.05, LAKE_CENTER.z - 4.85, 1.08, '#FF9AB8'],
+    ];
+    const lotusPetalIM = new THREE.InstancedMesh(
+      lotusPetalGeo,
+      lotusPetalMat,
+      lotusBloomSpots.length,
     );
-    colliders.push({type: 'circle', id: 'fishing_a', x: -23.68, z: 44.97, r: 4.25});
-    colliders.push({type: 'circle', id: 'fishing_b', x: -20.5, z: 43.62, r: 3.44});
+    const lotusCenterIM = new THREE.InstancedMesh(
+      lotusCenterGeo,
+      lotusCenterMat,
+      lotusBloomSpots.length,
+    );
+    lotusBloomSpots.forEach(([fx, fz, fs, col], i) => {
+      _instDummy.position.set(fx, LAKE_WATER_Y + 0.01, fz);
+      _instDummy.rotation.set(0, i * 0.9, 0);
+      _instDummy.scale.setScalar(fs);
+      _instDummy.updateMatrix();
+      lotusPetalIM.setMatrixAt(i, _instDummy.matrix);
+      lotusCenterIM.setMatrixAt(i, _instDummy.matrix);
+      _instColor.set(col);
+      lotusPetalIM.setColorAt(i, _instColor);
+    });
+    lotusPetalIM.instanceMatrix.needsUpdate = true;
+    lotusCenterIM.instanceMatrix.needsUpdate = true;
+    if (lotusPetalIM.instanceColor) lotusPetalIM.instanceColor.needsUpdate = true;
+    lotusPetalIM.computeBoundingSphere();
+    lotusCenterIM.computeBoundingSphere();
+    lake.add(lotusPetalIM, lotusCenterIM);
+
+    // Tall Lotus Buds on Stalks
+    const budStemGeo = new THREE.CylinderGeometry(0.022, 0.028, 0.56, 6);
+    budStemGeo.translate(0, 0.25, 0);
+    const budHeadGeo = new THREE.SphereGeometry(0.095, 8, 7);
+    budHeadGeo.scale(0.75, 1.48, 0.75);
+    budHeadGeo.translate(0, 0.55, 0);
+    const budSpots: [number, number][] = [
+      [LAKE_CENTER.x - 5.4, LAKE_CENTER.z - 1.5],
+      [LAKE_CENTER.x - 3.6, LAKE_CENTER.z + 3.1],
+      [LAKE_CENTER.x - 0.1, LAKE_CENTER.z + 6.1],
+      [LAKE_CENTER.x + 5.4, LAKE_CENTER.z - 1.6],
+      [LAKE_CENTER.x + 5.2, LAKE_CENTER.z + 3.3],
+      [LAKE_CENTER.x + 3.3, LAKE_CENTER.z - 5.3],
+    ];
+    const budStemIM = new THREE.InstancedMesh(
+      budStemGeo,
+      getMat('#4E9A54', 0.72),
+      budSpots.length,
+    );
+    const budHeadIM = new THREE.InstancedMesh(
+      budHeadGeo,
+      getMat('#FF9EC0', 0.5),
+      budSpots.length,
+    );
+    budSpots.forEach(([bx, bz], i) => {
+      _instDummy.position.set(bx, LAKE_WATER_Y - 0.04, bz);
+      _instDummy.rotation.set(0.08 * (i % 2 === 0 ? 1 : -1), i, 0.06);
+      _instDummy.scale.setScalar(0.95 + (i % 3) * 0.12);
+      _instDummy.updateMatrix();
+      budStemIM.setMatrixAt(i, _instDummy.matrix);
+      budHeadIM.setMatrixAt(i, _instDummy.matrix);
+    });
+    budStemIM.instanceMatrix.needsUpdate = true;
+    budHeadIM.instanceMatrix.needsUpdate = true;
+    budStemIM.computeBoundingSphere();
+    budHeadIM.computeBoundingSphere();
+    lake.add(budStemIM, budHeadIM);
+
+    // 5. Lush Aquatic Grass / Reeds & Cattails (Cỏ Thủy Sinh) in shallow water perimeter
+    const bladeParts: THREE.BufferGeometry[] = [];
+    for (let b = 0; b < 7; b++) {
+      const ang = (b / 7) * Math.PI * 2;
+      const h = 0.65 + (b % 3) * 0.22;
+      const blade = new THREE.ConeGeometry(0.052, h, 4);
+      blade.translate(0, h / 2, 0);
+      blade.rotateZ(0.24 + (b % 2) * 0.12);
+      blade.rotateY(ang);
+      blade.translate(Math.cos(ang) * 0.08, 0, Math.sin(ang) * 0.08);
+      bladeParts.push(blade);
+    }
+    const reedClumpGeo = mergeParts(bladeParts);
+    const reedClumpMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.72});
+
+    const reedThetaList = [
+      0.15, 0.32, 0.5, 0.72, 0.92, 1.18, 1.38, 1.62, 1.85, 2.08, 2.35, 2.58, 2.82, 3.05,
+      3.32, 3.55, 3.82, 4.08, 4.32, 5.15, 5.38, 5.62, 5.88, 6.08,
+    ];
+    reedClumpIM = new THREE.InstancedMesh(reedClumpGeo, reedClumpMat, reedThetaList.length);
+    const reedColors = ['#489F57', '#5AB364', '#3E8C4F', '#67BF6F'];
+    reedThetaList.forEach((theta, i) => {
+      const r = getLakeShoreRadius(theta) * (0.83 + (i % 3) * 0.035);
+      const rx = LAKE_CENTER.x + Math.cos(theta) * r;
+      const rz = LAKE_CENTER.z + Math.sin(theta) * r;
+      _instDummy.position.set(rx, LAKE_WATER_Y - 0.2, rz);
+      _instDummy.rotation.set(0, theta + i, 0);
+      _instDummy.scale.setScalar(1.0 + (i % 4) * 0.18);
+      _instDummy.updateMatrix();
+      reedClumpIM!.setMatrixAt(i, _instDummy.matrix);
+      reedClumpBaseMats.push(_instDummy.matrix.clone());
+      _instColor.set(reedColors[i % reedColors.length]);
+      reedClumpIM!.setColorAt(i, _instColor);
+    });
+    reedClumpIM.instanceMatrix.needsUpdate = true;
+    if (reedClumpIM.instanceColor) reedClumpIM.instanceColor.needsUpdate = true;
+    reedClumpIM.computeBoundingSphere();
+    lake.add(reedClumpIM);
+
+    // Sculpted Cattails (Cỏ Nến) interspersed along lush aquatic reed banks
+    const cattailThetas = [0.22, 0.78, 1.48, 2.25, 2.95, 3.68, 5.45, 5.95];
+    const ctStalkGeo = new THREE.CylinderGeometry(0.018, 0.024, 1.15, 6);
+    ctStalkGeo.translate(0, 0.57, 0);
+    const ctHeadGeo = new THREE.CapsuleGeometry(0.045, 0.22, 4, 7);
+    ctHeadGeo.translate(0, 1.02, 0);
+    const ctStalkIM = new THREE.InstancedMesh(
+      ctStalkGeo,
+      getMat('#488B4E', 0.76),
+      cattailThetas.length * 2,
+    );
+    const ctHeadIM = new THREE.InstancedMesh(
+      ctHeadGeo,
+      getMat('#6D4327', 0.85),
+      cattailThetas.length * 2,
+    );
+    let ctIdx = 0;
+    cattailThetas.forEach((theta, k) => {
+      const r = getLakeShoreRadius(theta) * 0.87;
+      for (let sub = 0; sub < 2; sub++) {
+        const cx = LAKE_CENTER.x + Math.cos(theta) * r + (sub === 0 ? -0.14 : 0.16);
+        const cz = LAKE_CENTER.z + Math.sin(theta) * r + (sub === 0 ? 0.1 : -0.12);
+        _instDummy.position.set(cx, LAKE_WATER_Y - 0.18, cz);
+        _instDummy.rotation.set(sub === 0 ? 0.06 : -0.05, k + sub, sub === 0 ? -0.05 : 0.07);
+        _instDummy.scale.setScalar(0.9 + (sub + k) % 3 * 0.14);
+        _instDummy.updateMatrix();
+        ctStalkIM.setMatrixAt(ctIdx, _instDummy.matrix);
+        ctHeadIM.setMatrixAt(ctIdx, _instDummy.matrix);
+        ctIdx++;
+      }
+    });
+    ctStalkIM.instanceMatrix.needsUpdate = true;
+    ctHeadIM.instanceMatrix.needsUpdate = true;
+    ctStalkIM.computeBoundingSphere();
+    ctHeadIM.computeBoundingSphere();
+    lake.add(ctStalkIM, ctHeadIM);
+
+    // 6. Natural Riverside Boulders tucked around the earthen bank rim
+    const shoreRockGeo = new THREE.DodecahedronGeometry(0.62, 0);
+    shoreRockGeo.scale(1.25, 0.72, 1.05);
+    const shoreRockMat = getMat('#99A3AD', 0.82);
+    const rockThetas = [0.05, 0.62, 1.1, 1.75, 2.45, 3.15, 3.85, 4.45, 5.2, 5.85];
+    const shoreRockIM = new THREE.InstancedMesh(shoreRockGeo, shoreRockMat, rockThetas.length);
+    rockThetas.forEach((theta, i) => {
+      const r = getLakeShoreRadius(theta) * 0.99;
+      const rx = LAKE_CENTER.x + Math.cos(theta) * r;
+      const rz = LAKE_CENTER.z + Math.sin(theta) * r;
+      const rs = 0.72 + (i % 3) * 0.24;
+      _instDummy.position.set(rx, 0.06, rz);
+      _instDummy.rotation.set(0, theta + i, 0);
+      _instDummy.scale.setScalar(rs);
+      _instDummy.updateMatrix();
+      shoreRockIM.setMatrixAt(i, _instDummy.matrix);
+    });
+    shoreRockIM.instanceMatrix.needsUpdate = true;
+    shoreRockIM.computeBoundingSphere();
+    lake.add(shoreRockIM);
+
+    // 7. Nighttime Fireflies (Đom Đóm) hovering above the water, lotus blooms & reeds
+    const ffCoreGeo = new THREE.SphereGeometry(0.052, 6, 5);
+    const ffCoreMat = new THREE.MeshBasicMaterial({color: '#F4FF85'});
+    fireflyCoreIM = new THREE.InstancedMesh(ffCoreGeo, ffCoreMat, FIREFLY_COUNT);
+    fireflyCoreIM.frustumCulled = false;
+    fireflyCoreIM.visible = false;
+
+    const ffHaloGeo = new THREE.SphereGeometry(0.145, 6, 5);
+    const ffHaloMat = new THREE.MeshBasicMaterial({
+      color: '#D8FF4E',
+      transparent: true,
+      opacity: 0.32,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    fireflyHaloIM = new THREE.InstancedMesh(ffHaloGeo, ffHaloMat, FIREFLY_COUNT);
+    fireflyHaloIM.frustumCulled = false;
+    fireflyHaloIM.visible = false;
+
+    for (let i = 0; i < FIREFLY_COUNT; i++) {
+      const a = i * 2.39996;
+      const dist = 1.6 + ((i * 0.67) % 7.2);
+      fireflySeeds.push({
+        x: LAKE_CENTER.x + Math.cos(a) * dist,
+        y: LAKE_WATER_Y + 0.28 + ((i * 0.19) % 1.35),
+        z: LAKE_CENTER.z + Math.sin(a) * dist,
+        rx: 0.45 + (i % 4) * 0.22,
+        rz: 0.42 + (i % 3) * 0.24,
+        speed: 0.55 + (i % 5) * 0.14,
+        phase: i * 0.87,
+        blinkSpeed: 1.9 + (i % 4) * 0.55,
+      });
+    }
+    lake.add(fireflyCoreIM, fireflyHaloIM);
+
+    // 8. Colliders: keep player out of the water basin while keeping the bridge corridor walkable!
+    const COL_RING = 28;
+    for (let i = 0; i < COL_RING; i++) {
+      const theta = (i / COL_RING) * Math.PI * 2;
+      const r = getLakeShoreRadius(theta) - 0.65;
+      const cx = LAKE_CENTER.x + Math.cos(theta) * r;
+      const cz = LAKE_CENTER.z + Math.sin(theta) * r;
+      // Leave the north bridge entrance corridor clear so player walks seamlessly onto the pier
+      if (Math.abs(cx - PIER_X) < 1.35 && cz < 45.1) continue;
+      colliders.push({type: 'circle', id: `lake_rim_${i}`, x: cx, z: cz, r: 1.05});
+    }
+    // Inner lake water blocker well past the pier tip
+    colliders.push({type: 'circle', id: 'lake_center_a', x: LAKE_CENTER.x - 1.8, z: 48.2, r: 3.4});
+    colliders.push({type: 'circle', id: 'lake_center_b', x: LAKE_CENTER.x + 2.2, z: 48.0, r: 3.4});
+    // Left, right & far-tip guard rails on the wooden pier so player stays on the planks
+    colliders.push({type: 'box', id: 'pier_rail_l', x: PIER_X - 1.18, z: 40.95, hw: 0.22, hd: 3.6});
+    colliders.push({type: 'box', id: 'pier_rail_r', x: PIER_X + 1.18, z: 40.95, hw: 0.22, hd: 3.6});
+    colliders.push({type: 'box', id: 'pier_tip_stop', x: PIER_X, z: 44.82, hw: 1.15, hd: 0.3});
+
     group.add(lake);
   }
 
@@ -2442,8 +2990,8 @@ export function buildTownScene(): TownWorld {
     addSteppingTrail(-32.0, 25.3, -32.0, 25.0);
     addSteppingTrail(32.0, 25.3, 32.0, 25.0);
 
-    // Far-South Spurs stopping cleanly ~3-4.5m BEFORE Fishing Pier & Post Office
-    addSteppingTrail(-19.6, 35.2, -1.6, 35.2);
+    // Far-South Spurs stopping cleanly ~1.8m BEFORE the Fishing Bridge & Post Office
+    addSteppingTrail(-22.5, 34.8, -1.6, 34.8);
     addSteppingTrail(1.6, 46.2, 24.0, 46.2);
     addSteppingTrail(24.0, 44.8, 24.0, 44.5);
 
@@ -2773,15 +3321,15 @@ export function buildTownScene(): TownWorld {
     [51.5, -18.5, 1.24],
     [-44.5, 16.5, 1.22],
     [45.0, 16.5, 1.24],
-    [-35.5, 36.0, 1.2],
+    [-37.5, 36.0, 1.2],
     [36.5, 35.5, 1.22],
-    [-12.5, 53.5, 1.24],
+    [-8.8, 56.5, 1.24],
     [12.8, 53.5, 1.24],
     [-56.0, -4.5, 1.28],
     [56.5, -4.8, 1.26],
     [-55.0, 29.5, 1.26],
     [55.5, 29.0, 1.28],
-    [-40.0, 56.0, 1.26],
+    [-40.5, 59.5, 1.26],
     [40.5, 55.5, 1.26],
   ];
 
@@ -2967,9 +3515,9 @@ export function buildTownScene(): TownWorld {
 
   const pineCoords: [number, number, number][] = [
     // Explorable Outer Meadows (showing players the world extends far!)
-    [-9.5, 45.0, 1.32],
+    [-8.5, 44.5, 1.32],
     [9.8, 44.5, 1.34],
-    [-28.0, 56.0, 1.42],
+    [-31.5, 60.5, 1.42],
     [28.5, 55.0, 1.4],
     [-5.2, 64.5, 1.48],
     [5.8, 65.0, 1.46],
@@ -3139,8 +3687,8 @@ export function buildTownScene(): TownWorld {
     [-25.5, 22.2, '#F7A8B8'],
     [38.5, 12.8, '#F28482'],
     [25.5, 21.8, '#F9C74F'],
-    [-28.5, 39.5, '#A8D8EA'],
-    [-16.2, 48.2, '#F7A8B8'],
+    [-35.0, 40.5, '#A8D8EA'],
+    [-11.8, 50.5, '#F7A8B8'],
     [19.2, 37.5, '#F9C74F'],
     [28.5, 37.2, '#F28482'],
     [-8.4, -27.2, '#F7A8B8'],
@@ -3214,7 +3762,7 @@ export function buildTownScene(): TownWorld {
     if (Math.abs(px + 23.5) < 1.6 && pz > -13 && pz < 27) return true;
     if (Math.abs(px - 23.5) < 1.6 && pz > -13 && pz < 27) return true;
     if (Math.hypot(px - patioCenter.x, pz - patioCenter.z) < 5.0) return true;
-    if (Math.hypot(px + 23, pz - 44.5) < 6.4) return true;
+    if (Math.hypot(px - LAKE_CENTER.x, pz - LAKE_CENTER.z) < 12.2) return true;
     if (Math.hypot(px + 32, pz + 22.5) < 6.5) return true;
     if (Math.hypot(px - 32, pz + 22.5) < 6.5) return true;
     if (Math.hypot(px - 42.8, pz + 23.2) < 3.6) return true;
@@ -3324,14 +3872,34 @@ export function buildTownScene(): TownWorld {
 
   // Track last applied timeOfDay so emissive updates only run when changed
   let lastAppliedTod: TimeOfDay | null = null;
+  let currentTod: TimeOfDay = 'morning';
+  const _swayPos = new THREE.Vector3();
+  const _swayQuat = new THREE.Quaternion();
+  const _swayScale = new THREE.Vector3();
+  const _swayEuler = new THREE.Euler();
+  const _swayRotQ = new THREE.Quaternion();
+
+  const setFishingState = (state: 'idle' | 'waiting' | 'bite') => {
+    lakeFishingState = state;
+    if (lakeBobber) {
+      lakeBobber.visible = state !== 'idle';
+      (lakeBobber.material as THREE.MeshPhysicalMaterial).color.set(
+        state === 'bite' ? '#F9C74F' : '#EA526F',
+      );
+    }
+    if (lakeRippleRing) {
+      lakeRippleRing.visible = state !== 'idle';
+    }
+  };
 
   const update = (elapsed: number, timeOfDay: TimeOfDay) => {
     if (timeOfDay !== lastAppliedTod) {
       lastAppliedTod = timeOfDay;
+      currentTod = timeOfDay;
       const isNight = timeOfDay === 'night';
       const isSunset = timeOfDay === 'sunset';
-      const winEmissive = isNight ? 1.15 : isSunset ? 0.65 : 0.08;
-      const bulbEmissive = isNight ? 1.9 : isSunset ? 0.92 : 0.14;
+      const winEmissive = isNight ? 1.55 : isSunset ? 0.72 : 0.08;
+      const bulbEmissive = isNight ? 2.4 : isSunset ? 1.05 : 0.14;
 
       windowMeshes.forEach((m) => {
         m.emissiveIntensity = winEmissive;
@@ -3340,10 +3908,27 @@ export function buildTownScene(): TownWorld {
         m.emissiveIntensity = bulbEmissive;
       });
       if (stringBulbMat) {
-        stringBulbMat.emissiveIntensity = isNight ? 2.6 : isSunset ? 1.35 : 0.16;
+        stringBulbMat.emissiveIntensity = isNight ? 3.2 : isSunset ? 1.5 : 0.16;
       }
       if (patioNightLight) {
-        patioNightLight.intensity = isNight ? 4.2 : isSunset ? 2.1 : 0;
+        patioNightLight.intensity = isNight ? 5.8 : isSunset ? 2.4 : 0;
+      }
+      if (plazaNightLight) {
+        plazaNightLight.intensity = isNight ? 4.2 : isSunset ? 1.8 : 0;
+      }
+      if (lakePierNightLight) {
+        lakePierNightLight.intensity = isNight ? 3.8 : isSunset ? 1.6 : 0;
+      }
+      if (homePorchNightLight) {
+        homePorchNightLight.intensity = isNight ? 2.8 : isSunset ? 1.2 : 0;
+      }
+      if (lakeWaterMat) {
+        lakeWaterMat.color.set(isNight ? '#163D59' : isSunset ? '#2F87AC' : '#3BB0D8');
+      }
+      if (fireflyCoreIM && fireflyHaloIM) {
+        const showFireflies = isNight || isSunset;
+        fireflyCoreIM.visible = showFireflies;
+        fireflyHaloIM.visible = showFireflies;
       }
     }
 
@@ -3412,6 +3997,63 @@ export function buildTownScene(): TownWorld {
       }
       fallingPetalIM.instanceMatrix.needsUpdate = true;
     }
+
+    // 5. Gentle Wind Sway on Lake Aquatic Grass / Reeds
+    if (reedClumpIM && reedClumpBaseMats.length > 0) {
+      for (let i = 0; i < reedClumpBaseMats.length; i++) {
+        reedClumpBaseMats[i].decompose(_swayPos, _swayQuat, _swayScale);
+        _swayEuler.set(
+          Math.sin(elapsed * 1.6 + i * 0.7) * 0.06,
+          0,
+          Math.cos(elapsed * 1.3 + i * 0.5) * 0.06,
+        );
+        _swayRotQ.setFromEuler(_swayEuler);
+        _swayQuat.multiply(_swayRotQ);
+        _instDummy.position.copy(_swayPos);
+        _instDummy.quaternion.copy(_swayQuat);
+        _instDummy.scale.copy(_swayScale);
+        _instDummy.updateMatrix();
+        reedClumpIM.setMatrixAt(i, _instDummy.matrix);
+      }
+      reedClumpIM.instanceMatrix.needsUpdate = true;
+    }
+
+    // 6. Nighttime Fireflies (Đom Đóm) over the Sunken Lotus Lake
+    if (fireflyCoreIM && fireflyHaloIM && (currentTod === 'night' || currentTod === 'sunset')) {
+      const todFactor = currentTod === 'night' ? 1.0 : 0.45;
+      for (let i = 0; i < FIREFLY_COUNT; i++) {
+        const s = fireflySeeds[i];
+        const t = elapsed * s.speed + s.phase;
+        const fx = s.x + Math.sin(t) * s.rx;
+        const fy = s.y + Math.sin(t * 1.35 + 1.2) * 0.24;
+        const fz = s.z + Math.cos(t * 0.85) * s.rz;
+        const pulse = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(elapsed * s.blinkSpeed + s.phase))) * todFactor;
+        _instDummy.position.set(fx, fy, fz);
+        _instDummy.rotation.set(0, 0, 0);
+        _instDummy.scale.setScalar(Math.max(0.05, pulse));
+        _instDummy.updateMatrix();
+        fireflyCoreIM.setMatrixAt(i, _instDummy.matrix);
+        _instDummy.scale.setScalar(Math.max(0.05, pulse * 1.15));
+        _instDummy.updateMatrix();
+        fireflyHaloIM.setMatrixAt(i, _instDummy.matrix);
+      }
+      fireflyCoreIM.instanceMatrix.needsUpdate = true;
+      fireflyHaloIM.instanceMatrix.needsUpdate = true;
+    }
+
+    // 7. Interactive Fishing Bobber & Water Ripple on Main-Map Lake
+    if (lakeBobber && lakeBobber.visible) {
+      lakeBobber.position.y =
+        lakeFishingState === 'bite'
+          ? -0.2 + Math.sin(elapsed * 18) * 0.12
+          : -0.23 + Math.sin(elapsed * 3.2) * 0.035;
+      if (lakeRippleRing) {
+        const rt = (elapsed * (lakeFishingState === 'bite' ? 1.8 : 0.75)) % 1;
+        const sc = 0.65 + rt * 1.6;
+        lakeRippleRing.scale.set(sc, sc, 1);
+        (lakeRippleRing.material as THREE.MeshBasicMaterial).opacity = (1 - rt) * 0.68;
+      }
+    }
   };
 
   const dispose = () => {
@@ -3432,11 +4074,12 @@ export function buildTownScene(): TownWorld {
   return {
     group,
     groundMesh,
-    groundMeshes: [groundMesh, hillMesh],
+    groundMeshes: [groundMesh, hillMesh, ...pierWalkableMeshes],
     clickTargets,
     labelAnchors,
     colliders,
     plazaRadius: TOWN_PLAZA_RADIUS,
+    setFishingState,
     update,
     dispose,
   };

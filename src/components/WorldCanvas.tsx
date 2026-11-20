@@ -131,9 +131,9 @@ interface SeatTarget {
 }
 
 const FISH_LIST = [
+  {name: 'Cá Chép Hồ Sen', coins: 12},
   {name: 'Cá Bảy Màu', coins: 10},
-  {name: 'Cá Chép Vàng', coins: 14},
-  {name: 'Cá Ngựa Sao', coins: 20},
+  {name: 'Cá Vàng Đuôi Lụa', coins: 16},
   {name: 'Cá Rồng Nhí', coins: 26},
 ];
 
@@ -145,6 +145,9 @@ const _camPosTarget = new THREE.Vector3();
 const _camLookTarget = new THREE.Vector3();
 const _bgColorTarget = new THREE.Color();
 const _sunColorTarget = new THREE.Color();
+const _hemiSkyTarget = new THREE.Color();
+const _hemiGroundTarget = new THREE.Color();
+const _rimColorTarget = new THREE.Color();
 
 function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
   const isPortrait = aspect < 0.82;
@@ -505,6 +508,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
   const rebuildSceneTriggerRef = useRef<(() => void) | null>(null);
   const rebuildAvatarTriggerRef = useRef<((cfg: AvatarConfig) => void) | null>(null);
+  const activeTownRef = useRef<TownWorld | null>(null);
   const activeSubzoneRef = useRef<SubzoneWorld | null>(null);
   const playerBubbleRef = useRef<BubbleState | null>(null);
   const bubbleTimerRef = useRef<number | null>(null);
@@ -527,6 +531,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
   useEffect(() => {
     homeExitTriggeredRef.current = false;
+    if (zone !== 'town' && zone !== 'fishing') {
+      if (fishTimerRef.current) {
+        clearTimeout(fishTimerRef.current);
+        fishTimerRef.current = null;
+      }
+      setFishingState('idle');
+    }
     if (zone !== 'home') {
       openDoorsRef.current = {};
       activeDoorsRef.current = [];
@@ -577,10 +588,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     livestockVisualKey,
     troughsVisualKey,
     pondFishVisualKey,
-    fishingState,
     placedFurniture,
     editFurnitureMode,
   ]);
+
+  useEffect(() => {
+    if (zone === 'town') {
+      activeTownRef.current?.setFishingState?.(fishingState);
+    } else if (zone === 'fishing') {
+      rebuildSceneTriggerRef.current?.();
+    }
+  }, [zone, fishingState]);
 
   useEffect(() => {
     rebuildAvatarTriggerRef.current?.(avatar);
@@ -736,6 +754,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         scene.remove(activeTown.group);
         activeTown.dispose();
         activeTown = null;
+        activeTownRef.current = null;
       }
       if (activeSubzone) {
         scene.remove(activeSubzone.group);
@@ -746,6 +765,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       if (z === 'town') {
         activeTown = buildTownScene();
+        activeTownRef.current = activeTown;
+        activeTown.setFishingState?.(fs);
         scene.add(activeTown.group);
         currentAnchors = activeTown.labelAnchors;
         currentClickTargets = [...activeTown.clickTargets, playerProxy];
@@ -1314,6 +1335,44 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
+          if (kind === 'town_lake_fish') {
+            soundFX.tap();
+            const spotX = data.tx as number;
+            const spotZ = data.tz as number;
+            activeTarget = {
+              x: spotX,
+              z: spotZ,
+              arrivePose: 'idle',
+              onArrive: () => {
+                playerPos.rotY = 0;
+                const curFs = stateRef.current.fishingState;
+                if (curFs === 'idle') {
+                  setFishingState('waiting');
+                  soundFX.splash();
+                  showBubble('Thả phao... chờ cá hồ sen cắn câu!', spotX, 2.25, spotZ);
+                  if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
+                  fishTimerRef.current = window.setTimeout(() => {
+                    setFishingState('bite');
+                    soundFX.sparkle();
+                    showBubble('Cá cắn câu rồi! Chạm hồ để giật cần!', spotX, 2.25, spotZ);
+                  }, 2600);
+                } else if (curFs === 'bite') {
+                  const fish = FISH_LIST[Math.floor(Math.random() * FISH_LIST.length)];
+                  setFishingState('idle');
+                  soundFX.sparkle();
+                  callbacksRef.current.onAddCoins(fish.coins);
+                  callbacksRef.current.onFishCaught();
+                  showBubble(`Câu được ${fish.name}! +${fish.coins} Xu`, spotX, 2.25, spotZ);
+                } else {
+                  if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
+                  setFishingState('idle');
+                  showBubble('Thu cần câu lại.', spotX, 2.25, spotZ);
+                }
+              },
+            };
+            return;
+          }
+
           if (kind === 'fish_cast') {
             soundFX.tap();
             activeTarget = {
@@ -1531,9 +1590,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const elapsed = clock.getElapsedTime();
       const {zone: z, timeOfDay: tod, avatar: av} = stateRef.current;
 
+      const isIndoor = z === 'home' || z === 'boutique' || z === 'arcade';
       const targetBg =
         tod === 'night'
-          ? 0x1e284b
+          ? isIndoor
+            ? 0x161c30
+            : 0x050914
           : tod === 'sunset'
             ? 0xeb9c76
             : 0xb2ddf2;
@@ -1541,21 +1603,77 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       (scene.background as THREE.Color).lerp(_bgColorTarget, 0.08);
       if (scene.fog instanceof THREE.FogExp2) {
         scene.fog.color.copy(scene.background as THREE.Color);
+        scene.fog.density = THREE.MathUtils.damp(
+          scene.fog.density,
+          tod === 'night' && !isIndoor ? 0.0046 : 0.0021,
+          5,
+          delta,
+        );
       }
-      sunLight.intensity = THREE.MathUtils.damp(
-        sunLight.intensity,
-        tod === 'night' ? 0.52 : tod === 'sunset' ? 1.04 : 1.22,
+      scene.environmentIntensity = THREE.MathUtils.damp(
+        scene.environmentIntensity,
+        tod === 'night' ? (isIndoor ? 0.28 : 0.045) : tod === 'sunset' ? 0.34 : 0.42,
         5,
         delta,
       );
-      _sunColorTarget.set(tod === 'night' ? '#A3C4FF' : tod === 'sunset' ? '#FFAE70' : '#FFF2D8');
+      renderer.toneMappingExposure = THREE.MathUtils.damp(
+        renderer.toneMappingExposure,
+        tod === 'night' ? (isIndoor ? 0.88 : 0.62) : 0.96,
+        5,
+        delta,
+      );
+      sunLight.intensity = THREE.MathUtils.damp(
+        sunLight.intensity,
+        tod === 'night' ? (isIndoor ? 0.65 : 0.14) : tod === 'sunset' ? 1.04 : 1.22,
+        5,
+        delta,
+      );
+      _sunColorTarget.set(
+        tod === 'night'
+          ? isIndoor
+            ? '#CBD8F5'
+            : '#597BB8'
+          : tod === 'sunset'
+            ? '#FFAE70'
+            : '#FFF2D8',
+      );
       sunLight.color.lerp(_sunColorTarget, 0.08);
       hemiLight.intensity = THREE.MathUtils.damp(
         hemiLight.intensity,
-        tod === 'night' ? 0.34 : 0.58,
+        tod === 'night' ? (isIndoor ? 0.38 : 0.12) : tod === 'sunset' ? 0.48 : 0.58,
         5,
         delta,
       );
+      _hemiSkyTarget.set(
+        tod === 'night'
+          ? isIndoor
+            ? '#7A90BF'
+            : '#122042'
+          : tod === 'sunset'
+            ? '#FFD6BA'
+            : '#DCEFFF',
+      );
+      _hemiGroundTarget.set(
+        tod === 'night'
+          ? isIndoor
+            ? '#3F3A36'
+            : '#050B0A'
+          : tod === 'sunset'
+            ? '#6D6854'
+            : '#6A8C58',
+      );
+      hemiLight.color.lerp(_hemiSkyTarget, 0.08);
+      hemiLight.groundColor.lerp(_hemiGroundTarget, 0.08);
+      rimLight.intensity = THREE.MathUtils.damp(
+        rimLight.intensity,
+        tod === 'night' ? (isIndoor ? 0.26 : 0.07) : tod === 'sunset' ? 0.34 : 0.42,
+        5,
+        delta,
+      );
+      _rimColorTarget.set(
+        tod === 'night' ? '#33508A' : tod === 'sunset' ? '#FFB585' : '#A8D2FF',
+      );
+      rimLight.color.lerp(_rimColorTarget, 0.08);
 
       if (cameraTransitionActive) {
         const w = container?.clientWidth || window.innerWidth || 800;
