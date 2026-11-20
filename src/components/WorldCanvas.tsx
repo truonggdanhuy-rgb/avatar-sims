@@ -6,6 +6,7 @@ import {
   ChevronRight,
   DoorClosed,
   DoorOpen,
+  Fish,
   Move,
   PackageMinus,
   RotateCw,
@@ -37,12 +38,15 @@ import {
   CoopKind,
   CoopTroughs,
   CropType,
+  FishingRodState,
+  FishRarity,
   GameStats,
   GardenPlotState,
   LivestockAnimalState,
   PlacedFurniture,
   PondFishState,
   TimeOfDay,
+  ToolId,
   WellWaterState,
   ZoneId,
 } from '../types/game';
@@ -60,6 +64,8 @@ interface WorldCanvasProps {
   pondFish: PondFishState[];
   fishFeedCount: number;
   pondFeedPulse: number;
+  farmPondFishPulse: number;
+  fishingRod: FishingRodState;
   seeds: Partial<Record<CropType, number>>;
   bugSprayCount: number;
   waterCount: number;
@@ -71,6 +77,7 @@ interface WorldCanvasProps {
   onChangeZone: (next: ZoneId) => void;
   onOpenWardrobe: () => void;
   onOpenShop: () => void;
+  onOpenKoiShop: () => void;
   onOpenFurnitureShop: () => void;
   onOpenSettings: () => void;
   onOpenDailyQuests: () => void;
@@ -81,7 +88,13 @@ interface WorldCanvasProps {
   onMoveFurniture: (id: string, x: number, z: number, rotY?: number) => void;
   onRotateFurniture: (id: string) => void;
   onStowFurniture: (id: string) => void;
-  onFishCaught: () => void;
+  onCatchRiverFish: () => {
+    name: string;
+    rarity: FishRarity;
+    weightKg: number;
+    durabilityLeft: number;
+    maxDurability: number;
+  } | null;
   onRestoreEnergy: () => void;
   onBoostMood: () => void;
   onCollectWellWater: () => {
@@ -129,13 +142,6 @@ interface SeatTarget {
   standZ: number;
   isBed?: boolean;
 }
-
-const FISH_LIST = [
-  {name: 'Cá Chép Hồ Sen', coins: 12},
-  {name: 'Cá Bảy Màu', coins: 10},
-  {name: 'Cá Vàng Đuôi Lụa', coins: 16},
-  {name: 'Cá Rồng Nhí', coins: 26},
-];
 
 const PLAYER_RADIUS = 0.34;
 
@@ -358,6 +364,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   pondFish,
   fishFeedCount,
   pondFeedPulse,
+  farmPondFishPulse,
+  fishingRod,
   seeds,
   bugSprayCount,
   waterCount,
@@ -369,6 +377,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onChangeZone,
   onOpenWardrobe,
   onOpenShop,
+  onOpenKoiShop,
   onOpenFurnitureShop,
   onOpenSettings,
   onOpenDailyQuests,
@@ -378,7 +387,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onMoveFurniture,
   onRotateFurniture,
   onStowFurniture,
-  onFishCaught,
+  onCatchRiverFish,
   onRestoreEnergy,
   onBoostMood,
   onCollectWellWater,
@@ -429,6 +438,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     pondFish,
     wellWater,
     fishingState,
+    fishingRod,
     placedFurniture,
     editFurnitureMode,
     selectedFurnitureId,
@@ -444,6 +454,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     pondFish,
     wellWater,
     fishingState,
+    fishingRod,
     placedFurniture,
     editFurnitureMode,
     selectedFurnitureId,
@@ -453,6 +464,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onChangeZone,
     onOpenWardrobe,
     onOpenShop,
+    onOpenKoiShop,
     onOpenFurnitureShop,
     onOpenSettings,
     onOpenDailyQuests,
@@ -462,10 +474,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onMoveFurniture,
     onRotateFurniture,
     onStowFurniture,
-    onFishCaught,
+    onCatchRiverFish,
     onRestoreEnergy,
     onBoostMood,
     onCollectWellWater,
+    onPlantPlot,
+    onWaterPlot,
+    onSprayPestPlot,
+    onWeedPlot,
+    onCancelCropPlot,
     onHarvestPlot,
     onOpenWorkshop,
     onOpenOrders,
@@ -481,6 +498,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onChangeZone,
     onOpenWardrobe,
     onOpenShop,
+    onOpenKoiShop,
     onOpenFurnitureShop,
     onOpenSettings,
     onOpenDailyQuests,
@@ -490,10 +508,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onMoveFurniture,
     onRotateFurniture,
     onStowFurniture,
-    onFishCaught,
+    onCatchRiverFish,
     onRestoreEnergy,
     onBoostMood,
     onCollectWellWater,
+    onPlantPlot,
+    onWaterPlot,
+    onSprayPestPlot,
+    onWeedPlot,
+    onCancelCropPlot,
     onHarvestPlot,
     onOpenWorkshop,
     onOpenOrders,
@@ -507,7 +530,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   };
 
   const rebuildSceneTriggerRef = useRef<(() => void) | null>(null);
-  const rebuildAvatarTriggerRef = useRef<((cfg: AvatarConfig) => void) | null>(null);
+  const rebuildAvatarTriggerRef = useRef<((cfg: AvatarConfig, equippedTool: ToolId | null) => void) | null>(null);
+  const farmPondFishActionRef = useRef<(() => void) | null>(null);
   const activeTownRef = useRef<TownWorld | null>(null);
   const activeSubzoneRef = useRef<SubzoneWorld | null>(null);
   const playerBubbleRef = useRef<BubbleState | null>(null);
@@ -531,7 +555,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
   useEffect(() => {
     homeExitTriggeredRef.current = false;
-    if (zone !== 'town' && zone !== 'fishing') {
+    if (zone !== 'town' && zone !== 'fishing' && zone !== 'garden') {
       if (fishTimerRef.current) {
         clearTimeout(fishTimerRef.current);
         fishTimerRef.current = null;
@@ -562,6 +586,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     activeSubzoneRef.current?.triggerPondFeed?.();
     showBubble('Rải 1 túi thức ăn thủy sinh!', 14.2, 2.0, 3.0);
   }, [pondFeedPulse]);
+
+  useEffect(() => {
+    if (farmPondFishPulse <= 0) return;
+    farmPondFishActionRef.current?.();
+  }, [farmPondFishPulse]);
 
   const plotVisualKey = plots
     .map(
@@ -595,14 +624,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   useEffect(() => {
     if (zone === 'town') {
       activeTownRef.current?.setFishingState?.(fishingState);
-    } else if (zone === 'fishing') {
-      rebuildSceneTriggerRef.current?.();
+    } else if (zone === 'garden' || zone === 'fishing') {
+      activeSubzoneRef.current?.setFishingState?.(fishingState);
     }
   }, [zone, fishingState]);
 
   useEffect(() => {
-    rebuildAvatarTriggerRef.current?.(avatar);
-  }, [avatar]);
+    rebuildAvatarTriggerRef.current?.(
+      avatar,
+      fishingRod.equipped ? 'wooden_rod' : null,
+    );
+  }, [avatar, fishingRod.equipped]);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -710,7 +742,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let stallTimer = 0;
     let prevDistToTarget = Infinity;
 
-    let playerRig: AvatarRig = buildAvatarRig(stateRef.current.avatar);
+    let playerRig: AvatarRig = buildAvatarRig(stateRef.current.avatar, {
+      equippedTool: stateRef.current.fishingRod.equipped ? 'wooden_rod' : null,
+    });
     playerRig.root.position.set(playerPos.x, 0.14, playerPos.z);
     scene.add(playerRig.root);
 
@@ -842,7 +876,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
 
     rebuildSceneTriggerRef.current = loadCurrentWorld;
-    rebuildAvatarTriggerRef.current = (cfg: AvatarConfig) => {
+    rebuildAvatarTriggerRef.current = (cfg: AvatarConfig, equippedTool: ToolId | null) => {
       scene.remove(playerRig.root);
       playerRig.root.traverse((obj) => {
         if ((obj as THREE.Mesh).isMesh) {
@@ -852,7 +886,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           else m.material.dispose();
         }
       });
-      playerRig = buildAvatarRig(cfg);
+      playerRig = buildAvatarRig(cfg, {equippedTool});
       const curY =
         stateRef.current.zone === 'town'
           ? getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius)
@@ -861,6 +895,89 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       playerRig.root.rotation.y = playerPos.rotY;
       playerRig.root.add(playerProxy);
       scene.add(playerRig.root);
+    };
+
+    const handleSpotFishing = (spotX: number, spotZ: number, facingRotY: number) => {
+      const rod = stateRef.current.fishingRod;
+      if (!rod.owned) {
+        soundFX.tap();
+        showBubble(
+          'Cần mua Cần Câu Gỗ (100 Xu) ở sạp anh Koi gần hồ!',
+          spotX,
+          2.25,
+          spotZ,
+        );
+        return;
+      }
+      if (!rod.equipped) {
+        soundFX.tap();
+        showBubble(
+          'Mở Điện Thoại > Túi Đồ > Cần & Vợt để cầm cần câu!',
+          spotX,
+          2.25,
+          spotZ,
+        );
+        return;
+      }
+      if (rod.durability <= 0) {
+        soundFX.tap();
+        showBubble(
+          `Cần câu đã hỏng (0/${rod.maxDurability})! Ghé sạp anh Koi để sửa cần.`,
+          spotX,
+          2.25,
+          spotZ,
+        );
+        return;
+      }
+
+      playerPos.rotY = facingRotY;
+      const curFs = stateRef.current.fishingState;
+      if (curFs === 'idle') {
+        setFishingState('waiting');
+        soundFX.splash();
+        showBubble('Thả phao... chờ cá sông cắn câu!', spotX, 2.25, spotZ);
+        if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
+        fishTimerRef.current = window.setTimeout(() => {
+          setFishingState('bite');
+          soundFX.sparkle();
+          showBubble('Cá cắn câu rồi! Chạm hồ hoặc bấm Giật Cần!', spotX, 2.25, spotZ);
+        }, 2600);
+      } else if (curFs === 'bite') {
+        setFishingState('idle');
+        const res = callbacksRef.current.onCatchRiverFish();
+        if (res) {
+          soundFX.sparkle();
+          const rareTag = res.rarity === 'rare' ? ' ★ Hiếm!' : '';
+          const brokeTag = res.durabilityLeft === 0 ? ' (Hỏng · Cần sửa)' : '';
+          showBubble(
+            `Câu được ${res.name} (${res.weightKg.toFixed(2)} kg)${rareTag}! Độ bền ${res.durabilityLeft}/${res.maxDurability}${brokeTag}`,
+            spotX,
+            2.35,
+            spotZ,
+          );
+        }
+      } else {
+        if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
+        setFishingState('idle');
+        showBubble('Thu cần câu lại.', spotX, 2.25, spotZ);
+      }
+    };
+
+    farmPondFishActionRef.current = () => {
+      if (stateRef.current.zone !== 'garden') return;
+      const spotX = 15.2;
+      const spotZ = 3.0;
+      const dist = Math.hypot(playerPos.x - spotX, playerPos.z - spotZ);
+      if (dist < 1.35) {
+        handleSpotFishing(spotX, spotZ, Math.PI / 2);
+      } else {
+        activeTarget = {
+          x: spotX,
+          z: spotZ,
+          arrivePose: 'idle',
+          onArrive: () => handleSpotFishing(spotX, spotZ, Math.PI / 2),
+        };
+      }
     };
 
     loadCurrentWorld();
@@ -1309,6 +1426,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'pond_spot') {
             soundFX.tap();
+            if (stateRef.current.fishingState !== 'idle') {
+              handleSpotFishing(15.2, 3.0, Math.PI / 2);
+              return;
+            }
             activeTarget = {
               x: data.tx as number,
               z: data.tz as number,
@@ -1344,30 +1465,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               z: spotZ,
               arrivePose: 'idle',
               onArrive: () => {
-                playerPos.rotY = 0;
-                const curFs = stateRef.current.fishingState;
-                if (curFs === 'idle') {
-                  setFishingState('waiting');
-                  soundFX.splash();
-                  showBubble('Thả phao... chờ cá hồ sen cắn câu!', spotX, 2.25, spotZ);
-                  if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
-                  fishTimerRef.current = window.setTimeout(() => {
-                    setFishingState('bite');
-                    soundFX.sparkle();
-                    showBubble('Cá cắn câu rồi! Chạm hồ để giật cần!', spotX, 2.25, spotZ);
-                  }, 2600);
-                } else if (curFs === 'bite') {
-                  const fish = FISH_LIST[Math.floor(Math.random() * FISH_LIST.length)];
-                  setFishingState('idle');
-                  soundFX.sparkle();
-                  callbacksRef.current.onAddCoins(fish.coins);
-                  callbacksRef.current.onFishCaught();
-                  showBubble(`Câu được ${fish.name}! +${fish.coins} Xu`, spotX, 2.25, spotZ);
-                } else {
-                  if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
-                  setFishingState('idle');
-                  showBubble('Thu cần câu lại.', spotX, 2.25, spotZ);
-                }
+                handleSpotFishing(spotX, spotZ, 0);
               },
             };
             return;
@@ -1375,32 +1473,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'fish_cast') {
             soundFX.tap();
+            const spotX = data.tx as number;
+            const spotZ = data.tz as number;
             activeTarget = {
-              x: data.tx as number,
-              z: data.tz as number,
+              x: spotX,
+              z: spotZ,
               arrivePose: 'idle',
               onArrive: () => {
-                const curFs = stateRef.current.fishingState;
-                if (curFs === 'idle') {
-                  setFishingState('waiting');
-                  soundFX.splash();
-                  showBubble('Thả phao... chờ cá cắn câu!', 0, 2.1, -1.4);
-                  if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
-                  fishTimerRef.current = window.setTimeout(() => {
-                    setFishingState('bite');
-                    soundFX.sparkle();
-                  }, 2600);
-                } else if (curFs === 'bite') {
-                  const fish = FISH_LIST[Math.floor(Math.random() * FISH_LIST.length)];
-                  setFishingState('idle');
-                  soundFX.sparkle();
-                  callbacksRef.current.onAddCoins(fish.coins);
-                  callbacksRef.current.onFishCaught();
-                  showBubble(`Câu được ${fish.name}! +${fish.coins} Xu`, 0, 2.1, -1.4);
-                } else {
-                  if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
-                  setFishingState('idle');
-                }
+                handleSpotFishing(spotX, spotZ, Math.PI);
               },
             };
             return;
@@ -1499,6 +1579,20 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               onArrive: () => {
                 soundFX.sparkle();
                 callbacksRef.current.onOpenFurnitureShop();
+              },
+            };
+            return;
+          }
+
+          if (kind === 'koi_shop') {
+            soundFX.tap();
+            activeTarget = {
+              x: data.tx as number,
+              z: data.tz as number,
+              arrivePose: 'idle',
+              onArrive: () => {
+                soundFX.sparkle();
+                callbacksRef.current.onOpenKoiShop();
               },
             };
             return;
@@ -2204,12 +2298,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {/* Proximity Scatter Feed Button beside Pond in Garden */}
-      {zone === 'garden' &&
-        nearPond &&
-        pondFish.some((f) => f.stage === 'growing' && f.hunger < 95) && (
-          <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
-            {confirmPondFeed && fishFeedCount > 0 ? (
+      {/* Proximity Actions beside Pond in Garden (Scatter Feed + River Fishing) */}
+      {zone === 'garden' && nearPond && (
+        <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
+          {pondFish.some((f) => f.stage === 'growing' && f.hunger < 95) &&
+            (confirmPondFeed && fishFeedCount > 0 ? (
               <div className="anim-pop flex items-center gap-2 rounded-2xl border-2 border-[#3C7C99] bg-[#E8F6FC] px-3 py-2 text-xs font-bold text-[#224457] shadow-lg">
                 <span>Xác nhận rải 1 túi? (còn {fishFeedCount})</span>
                 <button
@@ -2251,9 +2344,33 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                     : 'Hết thức ăn thủy sinh · Ghé Xe Bus Shop'}
                 </span>
               </button>
-            )}
-          </div>
-        )}
+            ))}
+
+          <button
+            type="button"
+            onClick={() => {
+              soundFX.tap();
+              farmPondFishActionRef.current?.();
+            }}
+            className={`anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 px-4 py-2 text-xs font-extrabold shadow-lg transition-transform active:scale-95 ${
+              fishingState === 'bite'
+                ? 'border-[#C97B1C] bg-[#F4A236] text-white'
+                : fishingState === 'waiting'
+                  ? 'border-[#2D6E82] bg-[#2D7E96] text-white'
+                  : 'border-[#3C7C99] bg-[#FFF8EB] text-[#224457]'
+            }`}
+          >
+            <Fish className="h-4 w-4" />
+            <span>
+              {fishingState === 'idle'
+                ? 'Câu Cá Sông'
+                : fishingState === 'waiting'
+                  ? 'Đang Chờ Cá... (Thu cần)'
+                  : 'Giật Cần Ngay!'}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Bottom Action Bar in Furniture Move Mode */}
       {zone === 'home' && editFurnitureMode && (

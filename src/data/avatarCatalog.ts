@@ -74,6 +74,30 @@ export const BOB_AVATAR: AvatarConfig = {
   handheldColor: '#E8B84B',
 };
 
+export const KOI_AVATAR: AvatarConfig = {
+  name: 'Koi',
+  skinTone: '#F5C9A6',
+  hairBack: 'boy_2',
+  hairFront: 'curtain',
+  hairColor: '#27232C',
+  eyeStyle: 'almond',
+  eyeColor: '#2D728F',
+  expression: 'smile',
+  blush: false,
+  top: 'knit_sweater',
+  topColor: '#3E7B8C',
+  bottom: 'wide_trousers',
+  bottomColor: '#2D3846',
+  shoes: 'loafers',
+  shoeColor: '#5E3F2E',
+  headItem: 'none',
+  headItemColor: '#3E7B8C',
+  accessory: 'none',
+  accessoryColor: '#4A3628',
+  handheld: 'none',
+  handheldColor: '#E8B84B',
+};
+
 export const FASHION_CATEGORIES: {key: ShopCategory; label: string}[] = [
   {key: 'tops', label: 'Áo'},
   {key: 'bottoms', label: 'Quần'},

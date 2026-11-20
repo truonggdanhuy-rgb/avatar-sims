@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {TimeOfDay, ZoneId} from '../types/game';
+import {KOI_AVATAR} from '../data/avatarCatalog';
+import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from './avatar3d';
 import {
   createGrassTexture,
   createStoneWalkwayTexture,
@@ -168,6 +170,106 @@ function createDailyQuestSignTexture(): THREE.CanvasTexture {
     ctx.arc(cx, 186, 12, 0, Math.PI * 2);
     ctx.fill();
   });
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+function createKoiStallSignTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.fillStyle = '#FDF6E6';
+  ctx.fillRect(0, 0, 512, 256);
+
+  ctx.strokeStyle = '#7A4E2D';
+  ctx.lineWidth = 12;
+  ctx.strokeRect(12, 12, 488, 232);
+
+  ctx.strokeStyle = '#3B9AB2';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(24, 24, 464, 208);
+
+  // Decorative fish illustration on the left
+  ctx.save();
+  ctx.translate(152, 108);
+  ctx.fillStyle = '#43A3B8';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 52, 26, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Fish tail
+  ctx.beginPath();
+  ctx.moveTo(46, 0);
+  ctx.lineTo(76, -22);
+  ctx.lineTo(68, 0);
+  ctx.lineTo(76, 22);
+  ctx.closePath();
+  ctx.fillStyle = '#2F7D92';
+  ctx.fill();
+  // Dorsal fin
+  ctx.beginPath();
+  ctx.moveTo(-12, -24);
+  ctx.lineTo(6, -38);
+  ctx.lineTo(22, -20);
+  ctx.closePath();
+  ctx.fillStyle = '#E87A54';
+  ctx.fill();
+  // Eye & smile
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(-28, -5, 6.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1E2A32';
+  ctx.beginPath();
+  ctx.arc(-29, -5, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Woven bamboo fish basket illustration on the right
+  ctx.save();
+  ctx.translate(358, 114);
+  ctx.fillStyle = '#D99E57';
+  ctx.beginPath();
+  ctx.moveTo(-36, -18);
+  ctx.lineTo(36, -18);
+  ctx.quadraticCurveTo(46, 28, 22, 36);
+  ctx.lineTo(-22, 36);
+  ctx.quadraticCurveTo(-46, 28, -36, -18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#8F5A29';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  // Basket rim & weave lines
+  ctx.fillStyle = '#B87638';
+  ctx.fillRect(-40, -24, 80, 10);
+  ctx.strokeStyle = '#A66931';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-34, 4);
+  ctx.lineTo(34, 4);
+  ctx.moveTo(-30, 18);
+  ctx.lineTo(30, 18);
+  ctx.stroke();
+  // Little tail peeking out of basket
+  ctx.fillStyle = '#FF9C6E';
+  ctx.beginPath();
+  ctx.moveTo(10, -24);
+  ctx.lineTo(26, -42);
+  ctx.lineTo(2, -38);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = '#382414';
+  ctx.font = 'bold 42px "Nunito", "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Sạp Câu Cá · Koi', 256, 194);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -502,6 +604,8 @@ export function buildTownScene(): TownWorld {
   grassTex.repeat.set(0.185, 0.185);
   const plazaStoneTex = createStoneWalkwayTexture(4, 4);
   const signTex = createDailyQuestSignTexture();
+  const koiSignTex = createKoiStallSignTexture();
+  let koiRig: AvatarRig | null = null;
 
   // ========== 1. EXPANDED TERRAIN (WITH PUNCHED LAKE BASIN) + GENTLE SCENIC HILL ==========
   const terrainShape = new THREE.Shape();
@@ -2824,6 +2928,265 @@ export function buildTownScene(): TownWorld {
     group.add(lake);
   }
 
+  // ========== DISTRICT 5B: SẠP CÂU CÁ CỦA ANH KOI (Gần Hồ Câu) ==========
+  {
+    const STALL_X = -16.8;
+    const STALL_Z = 37.2;
+    const STALL_ROT_Y = Math.PI + 0.35;
+    const stall = new THREE.Group();
+    stall.position.set(STALL_X, 0.02, STALL_Z);
+    stall.rotation.y = STALL_ROT_Y;
+
+    const timberDark = getMat('#7B4E2B', 0.74);
+    const timberWarm = getMat('#B8804C', 0.68);
+    const counterTopMat = getMat('#E8C59B', 0.56);
+    const awningAqua = getMat('#4AA7B8', 0.58);
+    const awningCream = getMat('#FFF6E3', 0.62);
+
+    // Timber platform floor deck
+    const deck = new THREE.Mesh(
+      new RoundedBoxGeometry(3.4, 0.14, 2.35, 2, 0.04),
+      getMat('#C89968', 0.76),
+    );
+    deck.position.y = 0.07;
+    stall.add(deck);
+
+    // 4 Corner Canopy Posts
+    [
+      [-1.48, -0.95],
+      [1.48, -0.95],
+      [-1.48, 0.95],
+      [1.48, 0.95],
+    ].forEach(([px, pz]) => {
+      const post = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.068, 0.08, 2.45, 8),
+        timberDark,
+      );
+      post.position.set(px, 1.32, pz);
+      stall.add(post);
+    });
+
+    // Crossbeams
+    const beamF = new THREE.Mesh(new RoundedBoxGeometry(3.15, 0.1, 0.1, 2, 0.02), timberDark);
+    beamF.position.set(0, 2.45, 0.95);
+    const beamB = beamF.clone();
+    beamB.position.z = -0.95;
+    stall.add(beamF, beamB);
+
+    // Sloped Striped Roof Canopy (Mái che)
+    const canopyGroup = new THREE.Group();
+    canopyGroup.position.set(0, 2.58, 0.02);
+    canopyGroup.rotation.x = 0.16;
+    const roofTimberFrame = new THREE.Mesh(
+      new RoundedBoxGeometry(3.55, 0.08, 2.52, 2, 0.03),
+      timberWarm,
+    );
+    roofTimberFrame.position.y = -0.04;
+    canopyGroup.add(roofTimberFrame);
+    const stripeCount = 7;
+    const stripeW = 3.44 / stripeCount;
+    for (let i = 0; i < stripeCount; i++) {
+      const stripe = new THREE.Mesh(
+        new RoundedBoxGeometry(stripeW - 0.015, 0.11, 2.48, 2, 0.03),
+        i % 2 === 0 ? awningAqua : awningCream,
+      );
+      stripe.position.set(-3.44 / 2 + stripeW * (i + 0.5), 0.03, 0);
+      canopyGroup.add(stripe);
+      // Scalloped front valance drop
+      const scallop = new THREE.Mesh(
+        new THREE.CylinderGeometry(stripeW * 0.48, stripeW * 0.48, 0.06, 10),
+        i % 2 === 0 ? awningAqua : awningCream,
+      );
+      scallop.rotation.x = Math.PI / 2;
+      scallop.position.set(-3.44 / 2 + stripeW * (i + 0.5), -0.04, 1.24);
+      canopyGroup.add(scallop);
+    }
+    stall.add(canopyGroup);
+
+    // Front Wooden Counter
+    const counterBody = new THREE.Mesh(
+      new RoundedBoxGeometry(2.55, 0.84, 0.72, 2, 0.05),
+      timberWarm,
+    );
+    counterBody.position.set(0.15, 0.54, 0.42);
+    const counterTop = new THREE.Mesh(
+      new RoundedBoxGeometry(2.72, 0.1, 0.86, 2, 0.03),
+      counterTopMat,
+    );
+    counterTop.position.set(0.15, 0.99, 0.42);
+    stall.add(counterBody, counterTop);
+
+    // Signboard on front roof gable showing fish & fish basket illustration
+    const signBoard = new THREE.Mesh(
+      new RoundedBoxGeometry(1.56, 0.78, 0.09, 2, 0.03),
+      timberDark,
+    );
+    signBoard.position.set(0, 2.74, 1.28);
+    const signFace = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.42, 0.68),
+      new THREE.MeshStandardMaterial({map: koiSignTex, roughness: 0.45}),
+    );
+    signFace.position.set(0, 2.74, 1.33);
+    stall.add(signBoard, signFace);
+
+    // Small pouches / bags for sale (Các túi nhỏ) displayed on the counter
+    const bagColors = ['#E07A5F', '#81B29A', '#F2CC8F', '#6FA8DC'];
+    bagColors.forEach((col, bi) => {
+      const bx = -0.82 + bi * 0.34;
+      const pouch = new THREE.Group();
+      pouch.position.set(bx, 1.12, 0.46 + (bi % 2 === 0 ? 0.06 : -0.05));
+      pouch.rotation.y = (bi - 1.5) * 0.25;
+      const sack = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 10, 8),
+        getMat(col, 0.76),
+      );
+      sack.scale.set(1, 1.2, 0.9);
+      const collar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.065, 0.045, 0.07, 8),
+        getMat(col, 0.76),
+      );
+      collar.position.y = 0.11;
+      const tieCord = new THREE.Mesh(
+        new THREE.TorusGeometry(0.052, 0.012, 6, 10),
+        getMat('#784A24', 0.7),
+      );
+      tieCord.rotation.x = Math.PI / 2;
+      tieCord.position.y = 0.09;
+      pouch.add(sack, collar, tieCord);
+      stall.add(pouch);
+    });
+
+    // Small Succulent Pot (Chậu sen đá nhỏ) on the right side of counter
+    const sucPotGroup = new THREE.Group();
+    sucPotGroup.position.set(1.12, 1.04, 0.46);
+    const clayPot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.125, 0.09, 0.16, 12),
+      getMat('#D97D54', 0.72),
+    );
+    clayPot.position.y = 0.08;
+    const potRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.122, 0.018, 6, 14),
+      getMat('#C86B43', 0.7),
+    );
+    potRim.rotation.x = Math.PI / 2;
+    potRim.position.y = 0.16;
+    const soilDisk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.11, 0.02, 10),
+      getMat('#5B4030', 0.9),
+    );
+    soilDisk.position.y = 0.155;
+    sucPotGroup.add(clayPot, potRim, soilDisk);
+
+    const succulentMat = glossyClayMat('#78C299', 0.42);
+    const succulentTipMat = glossyClayMat('#9BE0B6', 0.38);
+    // Outer ring of succulent rosette petals
+    for (let p = 0; p < 7; p++) {
+      const ang = (p / 7) * Math.PI * 2;
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.042, 7, 6), succulentMat);
+      leaf.scale.set(0.78, 0.48, 1.38);
+      leaf.position.set(Math.sin(ang) * 0.068, 0.18, Math.cos(ang) * 0.068);
+      leaf.rotation.y = ang;
+      leaf.rotation.x = -0.35;
+      sucPotGroup.add(leaf);
+    }
+    // Inner succulent rosette petals
+    for (let p = 0; p < 5; p++) {
+      const ang = (p / 5) * Math.PI * 2 + 0.35;
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.032, 6, 5), succulentTipMat);
+      leaf.scale.set(0.75, 0.55, 1.28);
+      leaf.position.set(Math.sin(ang) * 0.032, 0.21, Math.cos(ang) * 0.032);
+      leaf.rotation.y = ang;
+      leaf.rotation.x = -0.62;
+      sucPotGroup.add(leaf);
+    }
+    stall.add(sucPotGroup);
+
+    // Fishing Rod Rack (Kệ đựng cần câu) on the left side of the stall
+    const rackGroup = new THREE.Group();
+    rackGroup.position.set(-1.38, 0.14, 0.08);
+    const rackBase = new THREE.Mesh(
+      new RoundedBoxGeometry(0.42, 0.08, 1.05, 2, 0.02),
+      timberDark,
+    );
+    rackBase.position.y = 0.04;
+    const rackBackL = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1.25, 7), timberDark);
+    rackBackL.position.set(-0.14, 0.65, -0.44);
+    const rackBackR = rackBackL.clone();
+    rackBackR.position.z = 0.44;
+    const rackBar = new THREE.Mesh(
+      new RoundedBoxGeometry(0.12, 0.06, 1.02, 2, 0.02),
+      timberWarm,
+    );
+    rackBar.position.set(-0.08, 1.15, 0);
+    rackGroup.add(rackBase, rackBackL, rackBackR, rackBar);
+
+    // 3 Wooden Fishing Rods leaning on the rack
+    ['#BA8246', '#9E6837', '#D09B5A'].forEach((rodCol, ri) => {
+      const rz = -0.32 + ri * 0.32;
+      const rodStick = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.026, 1.95, 7),
+        getMat(rodCol, 0.58),
+      );
+      rodStick.position.set(0.04, 0.98, rz);
+      rodStick.rotation.z = 0.14;
+      const reelWheel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10),
+        glossyClayMat('#D6A24C', 0.25),
+      );
+      reelWheel.rotation.x = Math.PI / 2;
+      reelWheel.position.set(0.1, 0.44, rz);
+      rackGroup.add(rodStick, reelWheel);
+    });
+    stall.add(rackGroup);
+
+    // Decorative woven fish basket sitting beside counter
+    const sideBasket = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.24, 0.18, 0.36, 12),
+      getMat('#C88D4B', 0.8),
+    );
+    sideBasket.position.set(1.22, 0.32, 0.96);
+    const sideBasketRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.23, 0.028, 6, 14),
+      getMat('#8F5A29', 0.76),
+    );
+    sideBasketRim.rotation.x = Math.PI / 2;
+    sideBasketRim.position.set(1.22, 0.5, 0.96);
+    stall.add(sideBasket, sideBasketRim);
+
+    // Handsome NPC Koi standing behind the counter facing customers (+Z local)
+    koiRig = buildAvatarRig(KOI_AVATAR);
+    koiRig.root.position.set(0.12, 0.14, -0.45);
+    koiRig.root.rotation.y = 0;
+    updateAvatarRigAnimation(koiRig, 'idle', 0, false);
+    stall.add(koiRig.root);
+
+    // Click proxy for stall & Koi -> opens Koi's Fishing Shop Modal
+    addInteractionProxy(
+      stall,
+      [3.65, 3.0, 2.55],
+      1.45,
+      {kind: 'koi_shop', tx: -17.6, tz: 35.15},
+      clickTargets,
+    );
+
+    colliders.push({
+      type: 'box',
+      id: 'koi_stall',
+      x: STALL_X,
+      z: STALL_Z,
+      hw: 1.85,
+      hd: 1.25,
+      rotY: STALL_ROT_Y,
+    });
+    labelAnchors.push({
+      id: 'koi_shop',
+      label: 'Sạp Câu Cá · Koi',
+      worldPos: new THREE.Vector3(STALL_X, 3.4, STALL_Z),
+    });
+
+    group.add(stall);
+  }
+
   // ========== DISTRICT 6: TRẠM BƯU ĐIỆN & ĐỒNG HỒ (Orthogonal Clock Tower & Post Office) ==========
   {
     const kiosk = new THREE.Group();
@@ -3769,6 +4132,7 @@ export function buildTownScene(): TownWorld {
     if (Math.hypot(px + 32, pz - 18.0) < 6.2) return true;
     if (Math.hypot(px - 32, pz - 17.5) < 6.6) return true;
     if (Math.hypot(px - 24, pz - 39.5) < 4.5) return true;
+    if (Math.hypot(px + 16.8, pz - 37.2) < 3.4) return true;
     return false;
   };
 
@@ -4054,6 +4418,10 @@ export function buildTownScene(): TownWorld {
         (lakeRippleRing.material as THREE.MeshBasicMaterial).opacity = (1 - rt) * 0.68;
       }
     }
+    // 8. Koi NPC gentle idle animation
+    if (koiRig) {
+      updateAvatarRigAnimation(koiRig, 'idle', elapsed, false);
+    }
   };
 
   const dispose = () => {
@@ -4061,6 +4429,7 @@ export function buildTownScene(): TownWorld {
     hillTex.dispose();
     plazaStoneTex.dispose();
     signTex.dispose();
+    koiSignTex.dispose();
     group.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
         const m = obj as THREE.Mesh;

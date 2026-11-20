@@ -61,6 +61,7 @@ export interface SubzoneWorld {
   doors?: HouseDoorHandle[];
   wallSurfaces?: HouseWallSurface[];
   triggerPondFeed?: () => void;
+  setFishingState?: (state: 'idle' | 'waiting' | 'bite') => void;
   update: (elapsed: number, timeOfDay: TimeOfDay, context?: SubzoneUpdateContext) => void;
   dispose: () => void;
 }
@@ -150,6 +151,18 @@ export function buildSubzoneScene(
   let doors: HouseDoorHandle[] | undefined;
   let wallSurfaces: HouseWallSurface[] | undefined;
   let triggerPondFeedFn: (() => void) | undefined;
+  let currentFishingState: 'idle' | 'waiting' | 'bite' = options.fishingState ?? 'idle';
+  let fishingBobberMesh: THREE.Mesh | null = null;
+  let fishingRippleMesh: THREE.Mesh | null = null;
+  const setFishingStateFn = (state: 'idle' | 'waiting' | 'bite') => {
+    currentFishingState = state;
+    if (fishingBobberMesh) {
+      fishingBobberMesh.visible = state !== 'idle';
+    }
+    if (fishingRippleMesh) {
+      fishingRippleMesh.visible = state !== 'idle';
+    }
+  };
   let updateFn: (elapsed: number, timeOfDay: TimeOfDay, context?: SubzoneUpdateContext) => void =
     () => {};
 
@@ -3151,6 +3164,32 @@ export function buildSubzoneScene(
       });
     };
 
+    // Floating Fishing Bobber & Ripple Ring for Farm Pond Fishing
+    const pondBobber = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 10, 8),
+      glossyClayMat('#EA526F', 0.2),
+    );
+    pondBobber.position.set(16.85, 0.08, 3.0);
+    pondBobber.visible = currentFishingState !== 'idle';
+    group.add(pondBobber);
+    fishingBobberMesh = pondBobber;
+
+    const pondRippleGeo = new THREE.RingGeometry(0.22, 0.34, 20);
+    pondRippleGeo.rotateX(-Math.PI / 2);
+    const pondRipple = new THREE.Mesh(
+      pondRippleGeo,
+      new THREE.MeshBasicMaterial({
+        color: '#EAF8FF',
+        transparent: true,
+        opacity: 0.72,
+        side: THREE.DoubleSide,
+      }),
+    );
+    pondRipple.position.set(16.85, 0.068, 3.0);
+    pondRipple.visible = currentFishingState !== 'idle';
+    group.add(pondRipple);
+    fishingRippleMesh = pondRipple;
+
     addBoxProxy(
       group,
       [10.0, 1.4, 11.8],
@@ -3338,6 +3377,19 @@ export function buildSubzoneScene(
           f.tail.rotation.y = Math.sin(elapsed * 10 + f.phase) * 0.35;
         }
       }
+
+      if (fishingBobberMesh && fishingBobberMesh.visible) {
+        fishingBobberMesh.position.y =
+          currentFishingState === 'bite'
+            ? 0.09 + Math.sin(elapsed * 18) * 0.09
+            : 0.075 + Math.sin(elapsed * 3.2) * 0.025;
+        if (fishingRippleMesh) {
+          const rt = (elapsed * (currentFishingState === 'bite' ? 1.8 : 0.75)) % 1;
+          const sc = 0.65 + rt * 1.5;
+          fishingRippleMesh.scale.set(sc, sc, 1);
+          (fishingRippleMesh.material as THREE.MeshBasicMaterial).opacity = (1 - rt) * 0.68;
+        }
+      }
     };
   } else if (zone === 'fishing') {
     const bank = new THREE.Mesh(
@@ -3368,11 +3420,12 @@ export function buildSubzoneScene(
 
     const bobber = new THREE.Mesh(
       new THREE.SphereGeometry(0.22, 12, 12),
-      glossyClayMat(options.fishingState === 'bite' ? '#F9C74F' : '#E84A5F', 0.2),
+      glossyClayMat('#E84A5F', 0.2),
     );
     bobber.position.set(0, -0.08, -3.15);
-    bobber.visible = options.fishingState !== 'idle';
+    bobber.visible = currentFishingState !== 'idle';
     group.add(bobber);
+    fishingBobberMesh = bobber;
 
     addBoxProxy(
       group,
@@ -3383,19 +3436,14 @@ export function buildSubzoneScene(
     );
     labelAnchors.push({
       id: 'fish_cast',
-      label:
-        options.fishingState === 'idle'
-          ? 'Chạm Thả Cần'
-          : options.fishingState === 'waiting'
-            ? 'Đang Chờ Cá...'
-            : 'Giật Cần Ngay!',
+      label: 'Hồ Câu Cá',
       worldPos: new THREE.Vector3(0, 1.15, -2.8),
     });
 
     updateFn = (elapsed) => {
       if (bobber.visible) {
         bobber.position.y =
-          options.fishingState === 'bite'
+          currentFishingState === 'bite'
             ? -0.02 + Math.sin(elapsed * 18) * 0.16
             : -0.08 + Math.sin(elapsed * 3) * 0.05;
       }
@@ -3631,6 +3679,7 @@ export function buildSubzoneScene(
     doors,
     wallSurfaces,
     triggerPondFeed: triggerPondFeedFn,
+    setFishingState: setFishingStateFn,
     update: updateFn,
     dispose: () => {
       disposables.forEach((t) => t.dispose());

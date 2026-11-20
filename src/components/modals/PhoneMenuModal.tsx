@@ -20,9 +20,33 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import {AvatarConfig, DailyQuestProgress, GameStats, TimeOfDay, ZoneId} from '../../types/game';
+import {
+  AvatarConfig,
+  CaughtFishItem,
+  DailyQuestProgress,
+  FishDexRecord,
+  FishingRodState,
+  FishWaterType,
+  GameStats,
+  RiverFishSpeciesId,
+  TimeOfDay,
+  ZoneId,
+} from '../../types/game';
+import {
+  RIVER_FISH_LIST,
+  WOODEN_ROD_MAX_DURABILITY,
+  WOODEN_ROD_PRICE,
+  getRodRepairCost,
+} from '../../data/fishingCatalog';
 import {soundFX} from '../../utils/sound';
 import {AvatarPreview3D} from '../AvatarPreview3D';
+import {FishBasketPanel} from '../FishBasketPanel';
+import {
+  FishBasketIcon,
+  FishIllustration,
+  RodAndNetIcon,
+  WoodenRodIcon,
+} from '../FishingIcons';
 
 interface PhoneMenuModalProps {
   zone: ZoneId;
@@ -33,6 +57,15 @@ interface PhoneMenuModalProps {
   dailyQuests: DailyQuestProgress;
   storageUsed: number;
   storageCapacity: number;
+  fishingRod: FishingRodState;
+  fishBasket: CaughtFishItem[];
+  fishDex: Partial<Record<RiverFishSpeciesId, FishDexRecord>>;
+  initialTab?: 'menu' | 'guide' | 'bag' | 'fishdex';
+  initialBagSubTab?: 'list' | 'tools' | 'basket';
+  onToggleEquipRod: () => void;
+  onToggleFishLock: (fishId: string) => void;
+  onSellFish: (fishId: string) => void;
+  onSellAllUnlocked: () => void;
   onOpenWardrobe: () => void;
   onOpenDailyQuests: () => void;
   onOpenSettings: () => void;
@@ -43,6 +76,7 @@ interface PhoneMenuModalProps {
 }
 
 type PhoneTab = 'menu' | 'guide' | 'bag' | 'fishdex';
+type BagSubTab = 'list' | 'tools' | 'basket';
 
 const ZONE_LABELS: Record<ZoneId, string> = {
   town: 'Thị Trấn',
@@ -69,6 +103,15 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   dailyQuests,
   storageUsed,
   storageCapacity,
+  fishingRod,
+  fishBasket,
+  fishDex,
+  initialTab = 'menu',
+  initialBagSubTab = 'list',
+  onToggleEquipRod,
+  onToggleFishLock,
+  onSellFish,
+  onSellAllUnlocked,
   onOpenWardrobe,
   onOpenDailyQuests,
   onOpenSettings,
@@ -77,7 +120,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   onToggleSound,
   onClose,
 }) => {
-  const [tab, setTab] = useState<PhoneTab>('menu');
+  const [tab, setTab] = useState<PhoneTab>(initialTab);
+  const [bagSubTab, setBagSubTab] = useState<BagSubTab>(initialBagSubTab);
+  const [fishDexWater, setFishDexWater] = useState<FishWaterType>('river');
   const [deviceTime, setDeviceTime] = useState<string>(() => formatDeviceTime());
 
   useEffect(() => {
@@ -235,15 +280,21 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </span>
                 </button>
 
-                {/* 2. Túi Đồ (Bag Icon - Empty placeholder for future items) */}
+                {/* 2. Túi Đồ (Bag Icon - Cần & Vợt + Giỏ Cá) */}
                 <button
                   type="button"
                   onClick={() => {
                     soundFX.tap();
+                    setBagSubTab('list');
                     setTab('bag');
                   }}
-                  className="group flex flex-col items-center gap-1.5 transition-transform active:scale-95"
+                  className="group relative flex flex-col items-center gap-1.5 transition-transform active:scale-95"
                 >
+                  {fishBasket.length > 0 && (
+                    <span className="absolute -top-1 right-2.5 z-10 rounded-md bg-[#3C95AD] px-1.5 py-0.5 text-[9px] font-extrabold text-white shadow-xs">
+                      {fishBasket.length}
+                    </span>
+                  )}
                   <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#E5C9A8] bg-gradient-to-br from-[#FFF4E3] to-[#F2D8B6] text-[#9A5B25] shadow-sm transition-transform group-hover:-translate-y-0.5">
                     <Backpack className="h-7 w-7" strokeWidth={2.1} />
                   </div>
@@ -366,37 +417,220 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
           )}
 
           {tab === 'bag' && (
-            <div className="flex h-full flex-col justify-between space-y-3">
+            <div className="flex h-full flex-col space-y-3">
               <div className="flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => {
                     soundFX.tap();
-                    setTab('menu');
+                    if (bagSubTab !== 'list') {
+                      setBagSubTab('list');
+                    } else {
+                      setTab('menu');
+                    }
                   }}
                   className="flex min-h-[36px] items-center gap-1 rounded-xl bg-[#EFE0C9] px-2.5 py-1 text-xs font-bold text-[#5B422E] active:scale-95"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  <span>Quay lại</span>
+                  <span>{bagSubTab === 'list' ? 'Quay lại' : 'Túi Đồ'}</span>
                 </button>
-                <span className="text-xs font-extrabold text-[#4A3525]">Túi Đồ</span>
+                <span className="text-xs font-extrabold text-[#4A3525]">
+                  {bagSubTab === 'list'
+                    ? 'Túi Đồ'
+                    : bagSubTab === 'tools'
+                      ? 'Cần & Vợt'
+                      : 'Giỏ Cá'}
+                </span>
                 <span className="w-16" />
               </div>
 
-              <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-[#E0CEB6] bg-white p-6 text-center">
-                <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FFF4E3] text-[#9A5B25]">
-                  <Backpack className="h-7 w-7" />
+              {bagSubTab === 'list' && (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-[#E5D4BA] bg-white p-3.5">
+                    <div className="mb-3 text-[11px] font-bold text-[#7B6247]">
+                      Chọn mục trong túi bằng biểu tượng bên dưới:
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* Icon 1: Combined Fishing Rod + Bug Net icon */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFX.tap();
+                          setBagSubTab('tools');
+                        }}
+                        className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#3C95AD] active:scale-95"
+                      >
+                        {fishingRod.equipped && (
+                          <span className="absolute -top-1.5 right-1 rounded-full bg-[#45A168] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
+                            Đang cầm
+                          </span>
+                        )}
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
+                          <RodAndNetIcon className="h-11 w-11" />
+                        </div>
+                        <span className="text-[11px] font-extrabold text-[#4A3525]">
+                          Cần &amp; Vợt
+                        </span>
+                      </button>
+
+                      {/* Icon 2: Fish Basket */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFX.tap();
+                          setBagSubTab('basket');
+                        }}
+                        className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#3C95AD] active:scale-95"
+                      >
+                        {fishBasket.length > 0 && (
+                          <span className="absolute -top-1.5 right-1 rounded-full bg-[#3C95AD] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
+                            {fishBasket.length}
+                          </span>
+                        )}
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
+                          <FishBasketIcon className="h-11 w-11" />
+                        </div>
+                        <span className="text-[11px] font-extrabold text-[#4A3525]">
+                          Giỏ Cá
+                        </span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-sm font-extrabold text-[#4A3525]">Túi đồ đang trống</div>
-                <p className="mt-1.5 max-w-[230px] text-xs leading-relaxed text-[#7A6048]">
-                  Danh sách vật phẩm cá nhân và đạo cụ thu thập sẽ hiển thị tại đây trong bản cập nhật tới.
-                </p>
-              </div>
+              )}
+
+              {bagSubTab === 'tools' && (
+                <div className="space-y-2.5">
+                  {/* Wooden Rod Item */}
+                  <div className="rounded-2xl border-2 border-[#E3D1B2] bg-white p-3.5 space-y-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#C7E4EE] bg-[#EAF6FA]">
+                        <WoodenRodIcon className="h-10 w-10" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-black text-[#3B2A1A]">
+                            Cần Câu Gỗ
+                          </span>
+                          {fishingRod.owned ? (
+                            <span
+                              className={`text-[11px] font-black ${
+                                fishingRod.durability <= 0
+                                  ? 'text-[#D64545]'
+                                  : 'text-[#3C8863]'
+                              }`}
+                            >
+                              Độ bền {fishingRod.durability}/{fishingRod.maxDurability}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-[#9C7D5A]">
+                              Chưa có
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] font-semibold text-[#7A6048]">
+                          {fishingRod.owned
+                            ? `Bấm để trang bị. Độ bền tối đa ${WOODEN_ROD_MAX_DURABILITY} lần câu.`
+                            : `Mua tại Sạp Câu Cá của anh Koi gần Hồ Câu (${WOODEN_ROD_PRICE} Xu).`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {fishingRod.owned && (
+                      <>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFE4D1]">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              fishingRod.durability <= 0
+                                ? 'bg-[#E15252]'
+                                : fishingRod.durability <= 7
+                                  ? 'bg-[#E89B35]'
+                                  : 'bg-[#48A878]'
+                            }`}
+                            style={{
+                              width: `${Math.round(
+                                (fishingRod.durability /
+                                  Math.max(1, fishingRod.maxDurability)) *
+                                  100,
+                              )}%`,
+                            }}
+                          />
+                        </div>
+
+                        {fishingRod.durability <= 0 && (
+                          <div className="rounded-xl border border-[#F3C1C1] bg-[#FDECEC] px-2.5 py-2 text-[11px] font-bold text-[#B63535]">
+                            Độ bền đã về 0! Hãy ghé sạp anh Koi để sửa cần giá{' '}
+                            <span className="font-black">
+                              {getRodRepairCost(
+                                fishingRod.durability,
+                                fishingRod.maxDurability,
+                              )}{' '}
+                              Xu
+                            </span>
+                            .
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFX.tap();
+                            onToggleEquipRod();
+                          }}
+                          className={`w-full rounded-xl py-2.5 text-xs font-black transition active:scale-98 ${
+                            fishingRod.equipped
+                              ? 'bg-[#D67C3A] text-white hover:bg-[#BE692B]'
+                              : 'bg-[#3C95AD] text-white hover:bg-[#2F7D93]'
+                          }`}
+                        >
+                          {fishingRod.equipped
+                            ? 'Cất Cần Câu (Tháo trang bị)'
+                            : 'Trang Bị Cần Câu'}
+                        </button>
+
+                        <div className="text-center text-[10px] font-semibold text-[#8A7257]">
+                          Lưu ý: Khi cầm cần câu/vợt, món đồ cầm tay thời trang sẽ tự cất vào Tủ Đồ.
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Future Bug Net Slot */}
+                  <div className="flex items-center gap-3 rounded-2xl border border-dashed border-[#D7C6AA] bg-[#FBF4E7] p-3 opacity-80">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EAF6EE]">
+                      <RodAndNetIcon className="h-8 w-8" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-black text-[#4A3525]">
+                          Vợt Bắt Côn Trùng
+                        </span>
+                        <span className="rounded-full bg-[#DCEFE3] px-1.5 py-0.5 text-[9px] font-extrabold text-[#3B7C59]">
+                          Sắp ra mắt
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-semibold text-[#7A6048]">
+                        Sau này vợt bắt côn trùng cũng sẽ nằm trong mục Cần &amp; Vợt này.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {bagSubTab === 'basket' && (
+                <FishBasketPanel
+                  fishBasket={fishBasket}
+                  onToggleLock={onToggleFishLock}
+                  onSellFish={onSellFish}
+                  onSellAllUnlocked={onSellAllUnlocked}
+                  compact
+                />
+              )}
             </div>
           )}
 
           {tab === 'fishdex' && (
-            <div className="flex h-full flex-col justify-between space-y-3">
+            <div className="flex h-full flex-col space-y-2.5">
               <div className="flex items-center justify-between">
                 <button
                   type="button"
@@ -410,18 +644,134 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   <span>Quay lại</span>
                 </button>
                 <span className="text-xs font-extrabold text-[#4A3525]">Sổ Cá</span>
-                <span className="w-16" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setTab('bag');
+                    setBagSubTab('basket');
+                  }}
+                  className="rounded-xl bg-[#3C95AD] px-2.5 py-1.5 text-[11px] font-extrabold text-white active:scale-95"
+                >
+                  Giỏ ({fishBasket.length})
+                </button>
               </div>
 
-              <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-[#E0CEB6] bg-white p-6 text-center">
-                <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EAF6FE] text-[#286B94]">
-                  <Fish className="h-7 w-7" />
-                </div>
-                <div className="text-sm font-extrabold text-[#4A3525]">Sổ Cá Đang Trống</div>
-                <p className="mt-1.5 max-w-[230px] text-xs leading-relaxed text-[#7A6048]">
-                  Các loài cá bạn câu được ở Hồ Câu Cá sẽ được lưu lại kích thước và độ hiếm tại sổ cá này.
-                </p>
+              {/* River vs Sea Tabs */}
+              <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-[#DACAA9] bg-[#E9DEC8] p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setFishDexWater('river');
+                  }}
+                  className={`rounded-xl py-1.5 text-xs font-extrabold transition ${
+                    fishDexWater === 'river'
+                      ? 'bg-[#3C95AD] text-white shadow-xs'
+                      : 'text-[#6A5138]'
+                  }`}
+                >
+                  Cá Sông ({RIVER_FISH_LIST.filter((s) => (fishDex[s.id]?.caughtCount ?? 0) > 0).length}/{RIVER_FISH_LIST.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setFishDexWater('sea');
+                  }}
+                  className={`rounded-xl py-1.5 text-xs font-extrabold transition ${
+                    fishDexWater === 'sea'
+                      ? 'bg-[#466C9C] text-white shadow-xs'
+                      : 'text-[#6A5138]'
+                  }`}
+                >
+                  Cá Biển (Sắp ra mắt)
+                </button>
               </div>
+
+              {fishDexWater === 'sea' ? (
+                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#A8CBE0] bg-[#EDF5FA] p-5 text-center">
+                  <div className="text-sm font-black text-[#2E5573]">
+                    Bộ Sưu Tập Cá Biển · Coming Soon
+                  </div>
+                  <p className="mt-1.5 text-xs font-semibold leading-relaxed text-[#567996]">
+                    Các loài cá biển sẽ được mở rộng trong bản cập nhật tới. Hiện tại hãy sưu tầm đủ 8 loài Cá Sông nhé!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 pb-1">
+                  {RIVER_FISH_LIST.map((species) => {
+                    const ownedCount = fishBasket.filter(
+                      (f) => f.speciesId === species.id,
+                    ).length;
+                    const dex = fishDex[species.id];
+                    const totalCaught = dex?.caughtCount ?? 0;
+                    const maxWeight = dex?.maxWeightKg ?? 0;
+                    const isRare = species.rarity === 'rare';
+
+                    return (
+                      <div
+                        key={species.id}
+                        className={`flex items-center justify-between gap-2.5 rounded-2xl border p-2.5 ${
+                          totalCaught > 0
+                            ? isRare
+                              ? 'border-[#D7B8F2] bg-[#FAF2FF]'
+                              : 'border-[#D8E7EE] bg-white'
+                            : 'border-[#E6DAC5] bg-[#F7F0E3] opacity-75'
+                        }`}
+                      >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <div
+                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${
+                              isRare
+                                ? 'border-[#D8B4F6] bg-[#F1DEFF]'
+                                : 'border-[#C7E4EE] bg-[#EAF6FA]'
+                            }`}
+                          >
+                            <FishIllustration
+                              speciesId={species.id}
+                              className="h-9 w-9"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-xs font-black text-[#3B2A1A]">
+                                {species.name}
+                              </span>
+                              <span
+                                className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-black ${
+                                  isRare
+                                    ? 'bg-[#8E44AD] text-white'
+                                    : 'bg-[#DCEFE3] text-[#2F6F49]'
+                                }`}
+                              >
+                                {isRare ? 'Hiếm' : 'Thường'}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 text-[10px] font-bold text-[#7A6048]">
+                              {totalCaught > 0
+                                ? `Đã câu: ${totalCaught} · Kỷ lục: ${maxWeight.toFixed(2)} kg`
+                                : `Chưa câu được (${species.minKg}–${species.maxKg} kg)`}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          <span
+                            className={`inline-block rounded-xl px-2.5 py-1 text-xs font-black ${
+                              ownedCount > 0
+                                ? 'bg-[#3C95AD] text-white'
+                                : 'bg-[#E9DEC8] text-[#856C4F]'
+                            }`}
+                          >
+                            x{ownedCount}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

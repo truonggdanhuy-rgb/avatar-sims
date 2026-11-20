@@ -404,4 +404,56 @@ export interface PlacedFurniture {
   rotY: number;
 }
 
+export type ToolId = 'wooden_rod';
+
+export interface FishingRodState {
+  owned: boolean;
+  equipped: boolean;
+  durability: number;
+  maxDurability: number;
+}
+
+export type FishWaterType = 'river' | 'sea';
+
+export type FishRarity = 'common' | 'rare';
+
+export type RiverFishSpeciesId =
+  | 'tom_cang_xanh'
+  | 'ca_loc'
+  | 'ca_chep'
+  | 'ca_com'
+  | 'ca_chinh'
+  | 'ca_la_han'
+  | 'ca_lia_thia_3_duoi'
+  | 'ca_heo_nuoc_ngot';
+
+export interface FishSpeciesDefinition {
+  id: RiverFishSpeciesId;
+  name: string;
+  waterType: FishWaterType;
+  rarity: FishRarity;
+  minKg: number;
+  maxKg: number;
+  basePrice: number;
+  pricePerKg: number;
+  dropWeight: number;
+  description: string;
+}
+
+export interface CaughtFishItem {
+  id: string;
+  speciesId: RiverFishSpeciesId;
+  waterType: FishWaterType;
+  weightKg: number;
+  sellPrice: number;
+  locked: boolean;
+  caughtAt: number;
+}
+
+export interface FishDexRecord {
+  caughtCount: number;
+  maxWeightKg: number;
+}
+
+
 

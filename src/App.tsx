@@ -12,8 +12,19 @@ import {PhoneMenuModal} from './components/modals/PhoneMenuModal';
 import {PondModal} from './components/modals/PondModal';
 import {SettingsModal} from './components/modals/SettingsModal';
 import {WardrobeModal} from './components/modals/WardrobeModal';
+import {KoiShopModal} from './components/modals/KoiShopModal';
 import {WorldCanvas} from './components/WorldCanvas';
 import {DEFAULT_AVATAR, SHOP_ITEMS, STARTER_OWNED_IDS} from './data/avatarCatalog';
+import {
+  computeFishSellPrice,
+  createInitialFishDex,
+  createInitialFishingRod,
+  getRodRepairCost,
+  RIVER_FISH_CATALOG,
+  rollRandomRiverFish,
+  WOODEN_ROD_MAX_DURABILITY,
+  WOODEN_ROD_PRICE,
+} from './data/fishingCatalog';
 import {
   ANIMALS,
   createAnimalInstance,
@@ -61,6 +72,7 @@ import {
   AnimalProduceId,
   AnimalType,
   AvatarConfig,
+  CaughtFishItem,
   CookingJob,
   CoopKind,
   CoopTroughs,
@@ -70,6 +82,8 @@ import {
   FarmItemKind,
   FarmOrder,
   FarmSupplies,
+  FishDexRecord,
+  FishingRodState,
   FurnitureCatalogItem,
   GameStats,
   GardenPlotState,
@@ -82,6 +96,7 @@ import {
   PondFishState,
   ProcessedId,
   RecipeId,
+  RiverFishSpeciesId,
   ShopItem,
   TimeOfDay,
   WellWaterState,
@@ -271,8 +286,12 @@ export default function App() {
   const [pastureCoop, setPastureCoop] = useState<CoopKind | null>(null);
   const [pondOpen, setPondOpen] = useState(false);
   const [farmShopOpen, setFarmShopOpen] = useState(false);
+  const [koiShopOpen, setKoiShopOpen] = useState(false);
+  const [phoneInitialTab, setPhoneInitialTab] = useState<'menu' | 'guide' | 'bag' | 'fishdex'>('menu');
+  const [phoneBagSubTab, setPhoneBagSubTab] = useState<'list' | 'tools' | 'basket'>('list');
   const [nearPond, setNearPond] = useState(false);
   const [pondFeedPulse, setPondFeedPulse] = useState(0);
+  const [farmPondFishPulse, setFarmPondFishPulse] = useState(0);
   const [editFurnitureMode, setEditFurnitureMode] = useState(false);
   const [selectedFurnitureId, setSelectedFurnitureId] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -672,6 +691,85 @@ export default function App() {
     return STARTER_FURNITURE_INVENTORY;
   });
 
+  const [fishingRod, setFishingRod] = useState<FishingRodState>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.fishingRod && typeof parsed.fishingRod === 'object') {
+          const r = parsed.fishingRod;
+          const maxDur =
+            typeof r.maxDurability === 'number' && r.maxDurability > 0
+              ? r.maxDurability
+              : WOODEN_ROD_MAX_DURABILITY;
+          return {
+            owned: Boolean(r.owned),
+            equipped: Boolean(r.owned && r.equipped),
+            durability:
+              typeof r.durability === 'number'
+                ? Math.max(0, Math.min(maxDur, Math.floor(r.durability)))
+                : maxDur,
+            maxDurability: maxDur,
+          };
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return createInitialFishingRod();
+  });
+  const fishingRodRef = useRef(fishingRod);
+  fishingRodRef.current = fishingRod;
+
+  const [fishBasket, setFishBasket] = useState<CaughtFishItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.fishBasket)) {
+          return parsed.fishBasket.filter(
+            (f: Partial<CaughtFishItem>): f is CaughtFishItem =>
+              Boolean(
+                f &&
+                  typeof f.id === 'string' &&
+                  typeof f.speciesId === 'string' &&
+                  f.speciesId in RIVER_FISH_CATALOG &&
+                  typeof f.weightKg === 'number' &&
+                  f.weightKg > 0,
+              ),
+          );
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return [];
+  });
+
+  const [fishDex, setFishDex] = useState<Partial<Record<RiverFishSpeciesId, FishDexRecord>>>(() => {
+    const base = createInitialFishDex();
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.fishDex && typeof parsed.fishDex === 'object') {
+          for (const key of Object.keys(RIVER_FISH_CATALOG) as RiverFishSpeciesId[]) {
+            const rec = parsed.fishDex[key];
+            if (rec && typeof rec === 'object') {
+              base[key] = {
+                caughtCount: Math.max(0, Number(rec.caughtCount ?? rec.totalCaught) || 0),
+                maxWeightKg: Math.max(0, Number(rec.maxWeightKg) || 0),
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return base;
+  });
+
   // Ensure plots count stays synced to PLOT_COUNT
   useEffect(() => {
     if (plots.length !== PLOT_COUNT) {
@@ -917,6 +1015,9 @@ export default function App() {
           dailyQuests,
           placedFurniture,
           furnitureInventory,
+          fishingRod,
+          fishBasket,
+          fishDex,
         }),
       );
     } catch {
@@ -941,6 +1042,9 @@ export default function App() {
     dailyQuests,
     placedFurniture,
     furnitureInventory,
+    fishingRod,
+    fishBasket,
+    fishDex,
   ]);
 
   const handleZoneChange = (next: ZoneId) => {
@@ -1611,9 +1715,141 @@ export default function App() {
     markQuestDone('garden');
   };
 
+  // === FISHING SYSTEM (KOI STALL, BAG ROD/NET, BASKET & FISHDEX) ===
+  const handleBuyFishingRod = () => {
+    if (fishingRod.owned || stats.coins < WOODEN_ROD_PRICE) return;
+    soundFX.sparkle();
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - WOODEN_ROD_PRICE,
+      mood: Math.min(100, prev.mood + 5),
+    }));
+    setFishingRod({
+      owned: true,
+      equipped: false,
+      durability: WOODEN_ROD_MAX_DURABILITY,
+      maxDurability: WOODEN_ROD_MAX_DURABILITY,
+    });
+  };
+
+  const handleRepairFishingRod = () => {
+    if (!fishingRod.owned || fishingRod.durability >= fishingRod.maxDurability) return;
+    const cost = getRodRepairCost(fishingRod.durability, fishingRod.maxDurability);
+    if (stats.coins < cost) return;
+    soundFX.sparkle();
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - cost,
+    }));
+    setFishingRod((prev) => ({
+      ...prev,
+      durability: prev.maxDurability,
+    }));
+  };
+
+  const handleToggleEquipRod = () => {
+    if (!fishingRod.owned) return;
+    const nextEquipped = !fishingRod.equipped;
+    setFishingRod((prev) => ({...prev, equipped: nextEquipped}));
+    // Stowing handheld item back to wardrobe when equipping fishing rod / net
+    if (nextEquipped) {
+      setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
+    }
+  };
+
+  const handleCatchRiverFish = () => {
+    const rod = fishingRodRef.current;
+    if (!rod.owned || !rod.equipped || rod.durability <= 0) return null;
+
+    const nextDur = Math.max(0, rod.durability - 1);
+    const caught = rollRandomRiverFish();
+    const spec = caught.species;
+
+    const newItem: CaughtFishItem = {
+      id: `fish_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      speciesId: spec.id,
+      waterType: 'river',
+      weightKg: caught.weightKg,
+      sellPrice: caught.sellPrice,
+      caughtAt: Date.now(),
+      locked: false,
+    };
+
+    setFishingRod((prev) => ({
+      ...prev,
+      durability: Math.max(0, prev.durability - 1),
+    }));
+    setFishBasket((prev) => [newItem, ...prev]);
+    setFishDex((prev) => {
+      const existing = prev[spec.id] ?? {
+        caughtCount: 0,
+        maxWeightKg: 0,
+      };
+      return {
+        ...prev,
+        [spec.id]: {
+          caughtCount: existing.caughtCount + 1,
+          maxWeightKg: Math.max(existing.maxWeightKg, caught.weightKg),
+        },
+      };
+    });
+    setStats((prev) => ({
+      ...prev,
+      energy: Math.max(5, prev.energy - 2),
+      mood: Math.min(100, prev.mood + 2),
+    }));
+    markQuestDone('fishing');
+
+    return {
+      name: spec.name,
+      rarity: spec.rarity,
+      weightKg: caught.weightKg,
+      durabilityLeft: nextDur,
+      maxDurability: rod.maxDurability,
+    };
+  };
+
+  const handleToggleFishLock = (fishId: string) => {
+    setFishBasket((prev) =>
+      prev.map((f) => (f.id === fishId ? {...f, locked: !f.locked} : f)),
+    );
+  };
+
+  const handleSellFish = (fishId: string) => {
+    const target = fishBasket.find((f) => f.id === fishId);
+    if (!target || target.locked) return;
+    const gain = computeFishSellPrice(target.speciesId, target.weightKg);
+    soundFX.sparkle();
+    setFishBasket((prev) => prev.filter((f) => f.id !== fishId));
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins + gain,
+      mood: Math.min(100, prev.mood + 1),
+    }));
+  };
+
+  const handleSellAllUnlockedFish = () => {
+    const unlocked = fishBasket.filter((f) => !f.locked && f.waterType === 'river');
+    if (unlocked.length === 0) return;
+    const totalGain = unlocked.reduce(
+      (sum, f) => sum + computeFishSellPrice(f.speciesId, f.weightKg),
+      0,
+    );
+    soundFX.sparkle();
+    setFishBasket((prev) => prev.filter((f) => f.locked || f.waterType !== 'river'));
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins + totalGain,
+      mood: Math.min(100, prev.mood + Math.min(8, unlocked.length)),
+    }));
+  };
+
   // === AVATAR, SHOPS & HOUSE FURNITURE ===
   const handleEquipAvatar = (next: AvatarConfig) => {
     setAvatar(next);
+    if (next.handheld !== 'none') {
+      setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    }
     markQuestDone('dressup');
   };
 
@@ -1626,6 +1862,9 @@ export default function App() {
     }));
     setOwnedIds((prev) => [...prev, item.id]);
     setAvatar((prev) => ({...prev, ...item.patch}));
+    if (item.patch.handheld && item.patch.handheld !== 'none') {
+      setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    }
     markQuestDone('dressup');
   };
 
@@ -1825,6 +2064,8 @@ export default function App() {
         pondFish={pondFish}
         fishFeedCount={farmInventory.supplies.fishFeed}
         pondFeedPulse={pondFeedPulse}
+        farmPondFishPulse={farmPondFishPulse}
+        fishingRod={fishingRod}
         seeds={farmInventory.seeds}
         bugSprayCount={farmInventory.supplies.bugSpray}
         waterCount={waterCan}
@@ -1836,10 +2077,15 @@ export default function App() {
         onChangeZone={handleZoneChange}
         onOpenWardrobe={() => setWardrobeOpen(true)}
         onOpenShop={() => setBoutiqueOpen(true)}
+        onOpenKoiShop={() => setKoiShopOpen(true)}
         onOpenFurnitureShop={() => setFurnitureShopOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenDailyQuests={() => setDailyQuestsOpen(true)}
-        onOpenPhone={() => setPhoneOpen(true)}
+        onOpenPhone={() => {
+          setPhoneInitialTab('menu');
+          setPhoneBagSubTab('list');
+          setPhoneOpen(true);
+        }}
         onOpenFurniture={() => {
           setEditFurnitureMode(false);
           setSelectedFurnitureId(null);
@@ -1850,7 +2096,7 @@ export default function App() {
         onMoveFurniture={handleMoveFurniture}
         onRotateFurniture={handleRotateFurniture}
         onStowFurniture={handleStowFurniture}
-        onFishCaught={() => markQuestDone('fishing')}
+        onCatchRiverFish={handleCatchRiverFish}
         onRestoreEnergy={() => setStats((prev) => ({...prev, energy: 100}))}
         onBoostMood={() =>
           setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 10)}))
@@ -1980,7 +2226,28 @@ export default function App() {
           onScatterFeed={handleScatterPondFeed}
           onCureFish={handleCureFish}
           onHarvestFish={handleHarvestFish}
+          onStartFishing={() => setFarmPondFishPulse((p) => p + 1)}
           onClose={() => setPondOpen(false)}
+        />
+      )}
+
+      {koiShopOpen && (
+        <KoiShopModal
+          coins={stats.coins}
+          fishingRod={fishingRod}
+          fishBasket={fishBasket}
+          onBuyRod={handleBuyFishingRod}
+          onRepairRod={handleRepairFishingRod}
+          onToggleFishLock={handleToggleFishLock}
+          onSellFish={handleSellFish}
+          onSellAllUnlocked={handleSellAllUnlockedFish}
+          onOpenBagTools={() => {
+            setKoiShopOpen(false);
+            setPhoneInitialTab('bag');
+            setPhoneBagSubTab('tools');
+            setPhoneOpen(true);
+          }}
+          onClose={() => setKoiShopOpen(false)}
         />
       )}
 
@@ -2023,6 +2290,15 @@ export default function App() {
           dailyQuests={dailyQuests}
           storageUsed={storageUsed}
           storageCapacity={storageCapacity}
+          fishingRod={fishingRod}
+          fishBasket={fishBasket}
+          fishDex={fishDex}
+          initialTab={phoneInitialTab}
+          initialBagSubTab={phoneBagSubTab}
+          onToggleEquipRod={handleToggleEquipRod}
+          onToggleFishLock={handleToggleFishLock}
+          onSellFish={handleSellFish}
+          onSellAllUnlocked={handleSellAllUnlockedFish}
           onOpenWardrobe={() => {
             setPhoneOpen(false);
             setWardrobeOpen(true);

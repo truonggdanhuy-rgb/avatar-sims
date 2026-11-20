@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import {AvatarConfig, AvatarPose} from '../types/game';
+import {AvatarConfig, AvatarPose, ToolId} from '../types/game';
 import {
   buildCharacterHair,
   createHairClayMaterial,
@@ -400,7 +400,10 @@ function createTorsoProfilePoints(scaleOffset = 0, yMin = -0.195, yMax = 0.21): 
 
 
 
-export function buildAvatarRig(config: AvatarConfig): AvatarRig {
+export function buildAvatarRig(
+  config: AvatarConfig,
+  options?: {equippedTool?: ToolId | null},
+): AvatarRig {
   const root = new THREE.Group();
   const bodyPivot = new THREE.Group();
   root.add(bodyPivot);
@@ -910,14 +913,20 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
   // ========== SEAMLESS ARTICULATED ARMS + REAL HANDHELD GRIP ==========
   const isShortSleeve = config.top === 'sailor_blouse';
   const isSleeveless = config.top === 'sundress';
-  const handheld = config.handheld && config.handheld !== 'none' ? config.handheld : null;
-  const holdPose: HoldPose = !handheld
-    ? 'none'
-    : handheld === 'tote_bag'
-      ? 'carry_bag'
-      : handheld === 'mini_umbrella'
-        ? 'carry_umbrella'
-        : 'carry_front';
+  const equippedTool = options?.equippedTool ?? null;
+  const handheld =
+    !equippedTool && config.handheld && config.handheld !== 'none'
+      ? config.handheld
+      : null;
+  const holdPose: HoldPose = equippedTool
+    ? 'carry_front'
+    : !handheld
+      ? 'none'
+      : handheld === 'tote_bag'
+        ? 'carry_bag'
+        : handheld === 'mini_umbrella'
+          ? 'carry_umbrella'
+          : 'carry_front';
 
   const makeArm = (side: -1 | 1) => {
     // Relaxed natural A-pose seated flush on shoulder corner with breathing room beside waist/hips
@@ -1013,7 +1022,7 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     handGroup.position.set(0, -0.16, 0);
     elbowPivot.add(handGroup);
 
-    const isGripping = side === 1 && Boolean(handheld);
+    const isGripping = side === 1 && (Boolean(handheld) || Boolean(equippedTool));
     const palm = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 12), skinMat);
     palm.scale.set(0.92, 1.06, isGripping ? 0.86 : 0.88);
     if (isGripping) palm.position.set(0, 0, -0.004);
@@ -1060,7 +1069,7 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
 
   bodyPivot.add(leftArm, rightArm);
 
-  if (handheld) {
+  if (handheld || equippedTool) {
     const hColor = config.handheldColor || '#E8B84B';
     const poseCfg = HAND_POSES[holdPose];
     const hoodieClearZ = isHoodie ? 0.06 : 0;
@@ -1086,7 +1095,84 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     );
     handAnchor.quaternion.copy(handWorldQuat).invert().multiply(desiredWorldQuat);
 
-    if (handheld === 'milk_tea') {
+    if (equippedTool === 'wooden_rod') {
+      const rodGroup = new THREE.Group();
+      // Tilt rod forward and slightly upward (~48 deg) from the hand grip
+      rodGroup.rotation.x = 0.72;
+      rodGroup.rotation.z = -0.08;
+
+      const corkMat = clayMat('#B88450', 0.78);
+      const darkWoodMat = clayMat('#7D502E', 0.68);
+      const bambooMat = clayMat('#D2A466', 0.56);
+      const brassMat = glossyClayMat('#DDA844', 0.25);
+
+      const buttCap = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), darkWoodMat);
+      buttCap.position.set(0, -0.14, 0);
+
+      const handle = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.021, 0.023, 0.28, 12),
+        corkMat,
+      );
+      handle.position.set(0, 0.0, 0);
+
+      const reelBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.036, 0.036, 0.045, 12),
+        brassMat,
+      );
+      reelBody.rotation.z = Math.PI / 2;
+      reelBody.position.set(0.026, 0.095, 0.022);
+
+      const reelCrank = new THREE.Mesh(
+        new RoundedBoxGeometry(0.038, 0.012, 0.012, 2, 0.004),
+        darkWoodMat,
+      );
+      reelCrank.position.set(0.052, 0.095, 0.034);
+
+      const shaftLower = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.013, 0.018, 0.62, 10),
+        darkWoodMat,
+      );
+      shaftLower.position.set(0, 0.44, 0);
+
+      const shaftUpper = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.006, 0.013, 0.72, 10),
+        bambooMat,
+      );
+      shaftUpper.position.set(0, 1.09, 0.025);
+      shaftUpper.rotation.x = 0.07;
+
+      const tipRing = new THREE.Mesh(
+        new THREE.TorusGeometry(0.015, 0.004, 6, 12),
+        brassMat,
+      );
+      tipRing.position.set(0, 1.445, 0.052);
+
+      const lineDrop = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.002, 0.002, 0.34, 4),
+        clayMat('#F5FAFF', 0.3),
+      );
+      lineDrop.position.set(0, 1.28, 0.21);
+      lineDrop.rotation.x = -0.72;
+
+      const miniBobber = new THREE.Mesh(
+        new THREE.SphereGeometry(0.022, 8, 8),
+        glossyClayMat('#EA526F', 0.2),
+      );
+      miniBobber.position.set(0, 1.15, 0.33);
+
+      rodGroup.add(
+        buttCap,
+        handle,
+        reelBody,
+        reelCrank,
+        shaftLower,
+        shaftUpper,
+        tipRing,
+        lineDrop,
+        miniBobber,
+      );
+      handAnchor.add(rodGroup);
+    } else if (handheld === 'milk_tea') {
       const cup = new THREE.Mesh(
         new THREE.CylinderGeometry(0.074, 0.052, 0.185, 16),
         clayMat(hColor, 0.35),

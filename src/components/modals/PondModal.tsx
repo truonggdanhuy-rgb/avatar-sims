@@ -22,6 +22,7 @@ interface PondModalProps {
   onScatterFeed: () => void;
   onCureFish: (fishId: string) => void;
   onHarvestFish: (fishId: string) => void;
+  onStartFishing?: () => void;
   onClose: () => void;
 }
 
@@ -45,6 +46,7 @@ export const PondModal: React.FC<PondModalProps> = ({
   onScatterFeed,
   onCureFish,
   onHarvestFish,
+  onStartFishing,
   onClose,
 }) => {
   const [confirmScatterFeed, setConfirmScatterFeed] = useState(false);
@@ -135,18 +137,34 @@ export const PondModal: React.FC<PondModalProps> = ({
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                disabled={!canScatterFeed}
-                onClick={() => {
-                  soundFX.tap();
-                  setConfirmScatterFeed(true);
-                }}
-                className="flex min-h-[28px] shrink-0 items-center gap-1 rounded-lg bg-[#E09B3D] px-2.5 text-[11px] font-bold text-white shadow-xs transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E8E2D9] disabled:text-[#968A7C]"
-              >
-                <Utensils className="h-3 w-3" />
-                <span>Rải cám</span>
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {onStartFishing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFX.tap();
+                      onClose();
+                      onStartFishing();
+                    }}
+                    className="flex min-h-[28px] shrink-0 items-center gap-1 rounded-lg bg-[#3C95AD] px-2.5 text-[11px] font-bold text-white shadow-xs transition-transform active:scale-95"
+                  >
+                    <Fish className="h-3 w-3" />
+                    <span>Câu Cá Sông</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={!canScatterFeed}
+                  onClick={() => {
+                    soundFX.tap();
+                    setConfirmScatterFeed(true);
+                  }}
+                  className="flex min-h-[28px] shrink-0 items-center gap-1 rounded-lg bg-[#E09B3D] px-2.5 text-[11px] font-bold text-white shadow-xs transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E8E2D9] disabled:text-[#968A7C]"
+                >
+                  <Utensils className="h-3 w-3" />
+                  <span>Rải cám</span>
+                </button>
+              </div>
             )}
           </div>
 
