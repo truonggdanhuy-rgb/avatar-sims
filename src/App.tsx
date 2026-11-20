@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import {BoutiqueModal} from './components/modals/BoutiqueModal';
 import {DailyQuestsModal} from './components/modals/DailyQuestsModal';
 import {FarmShopModal} from './components/modals/FarmShopModal';
+import {FarmStorageModal} from './components/modals/FarmStorageModal';
 import {FarmWorkshopModal} from './components/modals/FarmWorkshopModal';
 import {FurnitureModal} from './components/modals/FurnitureModal';
 import {FurnitureShopModal} from './components/modals/FurnitureShopModal';
@@ -26,16 +27,22 @@ import {
   CROPS,
   getFarmItemCount,
   getFarmItemDirectSellPrice,
+  getFarmSeedSellPrice,
+  getFarmStorageCapacity,
+  getFarmStorageUsed,
+  getWarehouseUpgradeCost,
   INITIAL_WATER_CAN,
   INITIAL_WELL_STORED,
   KITCHEN_LEVELS,
   KITCHEN_RECIPES,
   MAX_COOP_ANIMALS,
   MAX_POND_FISH,
+  MAX_WAREHOUSE_LEVEL,
   PLOT_COUNT,
   PLOT_LEVELS,
   POND_FISH_SPECIES,
   PROCESSED_ITEMS,
+  SUPPLY_META,
   SUPPLY_PRICES,
   WATER_CAN_MAX,
   WELL_WATER_INTERVAL_MS,
@@ -255,7 +262,8 @@ export default function App() {
   const [dailyQuestsOpen, setDailyQuestsOpen] = useState(false);
   const [furnitureModalOpen, setFurnitureModalOpen] = useState(false);
   const [workshopTab, setWorkshopTab] = useState<'mill' | 'kitchen' | null>(null);
-  const [orderBoardTab, setOrderBoardTab] = useState<'orders' | 'storage' | null>(null);
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const [storageOpen, setStorageOpen] = useState(false);
   const [pastureCoop, setPastureCoop] = useState<CoopKind | null>(null);
   const [pondOpen, setPondOpen] = useState(false);
   const [farmShopOpen, setFarmShopOpen] = useState(false);
@@ -368,6 +376,21 @@ export default function App() {
         const parsed = JSON.parse(saved);
         if (parsed.kitchenLevel === 2 || parsed.kitchenLevel === 3) {
           return parsed.kitchenLevel;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return 1;
+  });
+
+  const [warehouseLevel, setWarehouseLevel] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.warehouseLevel === 'number') {
+          return Math.max(1, Math.min(MAX_WAREHOUSE_LEVEL, Math.floor(parsed.warehouseLevel)));
         }
       }
     } catch {
@@ -849,6 +872,7 @@ export default function App() {
           plots,
           farmInventory,
           kitchenLevel,
+          warehouseLevel,
           cookingQueue,
           livestock,
           troughs,
@@ -871,6 +895,7 @@ export default function App() {
     plots,
     farmInventory,
     kitchenLevel,
+    warehouseLevel,
     cookingQueue,
     livestock,
     troughs,
@@ -893,7 +918,8 @@ export default function App() {
     }
     if (next !== 'garden') {
       setWorkshopTab(null);
-      setOrderBoardTab(null);
+      setOrdersOpen(false);
+      setStorageOpen(false);
       setPastureCoop(null);
       setPondOpen(false);
       setFarmShopOpen(false);
@@ -1083,9 +1109,16 @@ export default function App() {
     );
   };
 
-  const handleHarvestPlot = (plotId: number) => {
+  const storageUsed = getFarmStorageUsed(farmInventory);
+  const storageCapacity = getFarmStorageCapacity(warehouseLevel);
+  const storageFull = storageUsed >= storageCapacity;
+
+  const handleHarvestPlot = (plotId: number): boolean => {
     const target = plots.find((p) => p.id === plotId);
-    if (!target || target.stage !== 'ready' || !target.crop) return;
+    if (!target || target.stage !== 'ready' || !target.crop) return false;
+    if (getFarmStorageUsed(farmInventory) >= getFarmStorageCapacity(warehouseLevel)) {
+      return false;
+    }
 
     const yieldQty = target.hasPest ? 1 : 2;
     const harvestedCrop = target.crop;
@@ -1117,6 +1150,7 @@ export default function App() {
       mood: Math.min(100, prev.mood + 2),
     }));
     markQuestDone('garden');
+    return true;
   };
 
   const handleUpgradePlot = (plotId: number) => {
@@ -1189,6 +1223,7 @@ export default function App() {
   const handleCollectDish = (jobId: string) => {
     const job = cookingQueue.find((j) => j.id === jobId);
     if (!job || Date.now() < job.readyAt) return;
+    if (getFarmStorageUsed(farmInventory) >= getFarmStorageCapacity(warehouseLevel)) return;
     setCookingQueue((prev) => prev.filter((j) => j.id !== jobId));
     setFarmInventory((prev) =>
       adjustFarmInventory(prev, [{kind: 'dish', id: job.recipeId, delta: 1}]),
@@ -1214,6 +1249,7 @@ export default function App() {
   const handleBuySeedBag = (crop: CropType, qty = 1) => {
     const cost = CROPS[crop].seedPrice * qty;
     if (stats.coins < cost) return;
+    if (getFarmStorageUsed(farmInventory) + qty > getFarmStorageCapacity(warehouseLevel)) return;
     setStats((prev) => ({...prev, coins: prev.coins - cost}));
     setFarmInventory((prev) => ({
       ...prev,
@@ -1227,6 +1263,7 @@ export default function App() {
   const handleBuyFarmSupply = (supply: keyof FarmSupplies, qty = 1) => {
     const cost = SUPPLY_PRICES[supply] * qty;
     if (stats.coins < cost) return;
+    if (getFarmStorageUsed(farmInventory) + qty > getFarmStorageCapacity(warehouseLevel)) return;
     setStats((prev) => ({...prev, coins: prev.coins - cost}));
     setFarmInventory((prev) => ({
       ...prev,
@@ -1277,6 +1314,49 @@ export default function App() {
     const earn = getFarmItemDirectSellPrice(kind, id) * sellQty;
     setFarmInventory((prev) => adjustFarmInventory(prev, [{kind, id, delta: -sellQty}]));
     setStats((prev) => ({...prev, coins: prev.coins + earn}));
+  };
+
+  const handleSellSeed = (crop: CropType, qty: number) => {
+    const have = farmInventory.seeds[crop] || 0;
+    const sellQty = Math.min(have, qty);
+    if (sellQty <= 0) return;
+
+    const earn = getFarmSeedSellPrice(crop) * sellQty;
+    setFarmInventory((prev) => ({
+      ...prev,
+      seeds: {
+        ...prev.seeds,
+        [crop]: Math.max(0, (prev.seeds[crop] || 0) - sellQty),
+      },
+    }));
+    setStats((prev) => ({...prev, coins: prev.coins + earn}));
+  };
+
+  const handleSellSupply = (supply: keyof FarmSupplies, qty: number) => {
+    const have = farmInventory.supplies[supply] || 0;
+    const sellQty = Math.min(have, qty);
+    if (sellQty <= 0) return;
+
+    const earn = SUPPLY_META[supply].sellPrice * sellQty;
+    setFarmInventory((prev) => ({
+      ...prev,
+      supplies: {
+        ...prev.supplies,
+        [supply]: Math.max(0, prev.supplies[supply] - sellQty),
+      },
+    }));
+    setStats((prev) => ({...prev, coins: prev.coins + earn}));
+  };
+
+  const handleUpgradeWarehouse = () => {
+    const cost = getWarehouseUpgradeCost(warehouseLevel);
+    if (cost === null || stats.coins < cost) return;
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - cost,
+      mood: Math.min(100, prev.mood + 4),
+    }));
+    setWarehouseLevel((prev) => Math.min(MAX_WAREHOUSE_LEVEL, prev + 1));
   };
 
   // === LIVESTOCK (2 COOPS: POULTRY & CATTLE) HANDLERS ===
@@ -1361,6 +1441,7 @@ export default function App() {
   const handleCollectProduce = (animalId: string) => {
     const ani = livestock.find((a) => a.id === animalId);
     if (!ani || !ani.hasProduce) return;
+    if (getFarmStorageUsed(farmInventory) >= getFarmStorageCapacity(warehouseLevel)) return;
     const def = ANIMALS[ani.type];
     const yieldQty = ani.sick ? 1 : 2;
 
@@ -1663,7 +1744,8 @@ export default function App() {
         onHarvestPlot={handleHarvestPlot}
         onUpgradePlot={handleUpgradePlot}
         onOpenWorkshop={(tab) => setWorkshopTab(tab)}
-        onOpenOrders={(tab) => setOrderBoardTab(tab ?? 'orders')}
+        onOpenOrders={() => setOrdersOpen(true)}
+        onOpenStorage={() => setStorageOpen(true)}
         onOpenPasture={(coop) => setPastureCoop(coop ?? 'poultry')}
         onOpenPond={() => setPondOpen(true)}
         onOpenFarmShop={() => setFarmShopOpen(true)}
@@ -1697,6 +1779,7 @@ export default function App() {
           kitchenLevel={kitchenLevel}
           cookingQueue={cookingQueue}
           inventory={farmInventory}
+          storageFull={storageFull}
           onProcessItem={handleProcessItem}
           onStartCook={handleStartCook}
           onCollectDish={handleCollectDish}
@@ -1709,6 +1792,8 @@ export default function App() {
         <FarmShopModal
           coins={stats.coins}
           inventory={farmInventory}
+          storageUsed={storageUsed}
+          storageCapacity={storageCapacity}
           poultryCount={livestock.filter((a) => a.coop === 'poultry').length}
           cattleCount={livestock.filter((a) => a.coop === 'cattle').length}
           pondCount={pondFish.length}
@@ -1720,17 +1805,27 @@ export default function App() {
         />
       )}
 
-      {zone === 'garden' && orderBoardTab && (
+      {zone === 'garden' && ordersOpen && (
         <OrderBoardModal
-          key={orderBoardTab}
-          initialTab={orderBoardTab}
           coins={stats.coins}
           orders={farmOrders}
           inventory={farmInventory}
           onFulfillOrder={handleFulfillOrder}
           onRefreshOrder={handleRefreshOrder}
+          onClose={() => setOrdersOpen(false)}
+        />
+      )}
+
+      {zone === 'garden' && storageOpen && (
+        <FarmStorageModal
+          coins={stats.coins}
+          warehouseLevel={warehouseLevel}
+          inventory={farmInventory}
           onDirectSell={handleDirectSell}
-          onClose={() => setOrderBoardTab(null)}
+          onSellSeed={handleSellSeed}
+          onSellSupply={handleSellSupply}
+          onUpgradeWarehouse={handleUpgradeWarehouse}
+          onClose={() => setStorageOpen(false)}
         />
       )}
 
@@ -1742,6 +1837,7 @@ export default function App() {
           animals={livestock}
           troughs={troughs}
           inventory={farmInventory}
+          storageFull={storageFull}
           onFeedAnimal={handleFeedAnimal}
           onFillTrough={handleFillCoopTrough}
           onCureAnimal={handleCureAnimal}

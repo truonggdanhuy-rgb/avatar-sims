@@ -973,20 +973,6 @@ export function buildSubzoneScene(
       const scale = 0.86 + ((i + 1) % 3) * 0.12;
       stepStoneSpots.push([px, sz, scale, (i * 0.72) % (Math.PI * 2)]);
     }
-    // Branches to Poultry Coop, Cattle Barn & Fish Pond Bridge
-    for (const [bx, bz, s, rot] of [
-      [-6.8, -0.6, 0.94, 0.3],
-      [-7.9, -0.9, 1.05, 1.1],
-      [-9.0, -0.5, 0.9, 2.0],
-      [-6.8, 6.8, 1.0, 0.6],
-      [-7.9, 6.4, 0.92, 1.4],
-      [-9.0, 6.8, 1.04, 2.5],
-      [6.8, 2.75, 0.95, 0.4],
-      [7.85, 3.2, 1.06, 1.3],
-      [8.8, 2.95, 0.98, 2.1],
-    ] as [number, number, number, number][]) {
-      stepStoneSpots.push([bx, bz, s, rot]);
-    }
 
     const stepStoneGeo = new THREE.CylinderGeometry(0.42, 0.48, 0.055, 9);
     const stepStoneMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.84});
@@ -1274,11 +1260,6 @@ export function buildSubzoneScene(
       clickTargets,
     );
     colliders.push({type: 'box', x: 0, z: -8.8, hw: 2.45, hd: 1.85});
-    labelAnchors.push({
-      id: 'farm_kitchen',
-      label: 'Bếp Nông Trại',
-      worldPos: new THREE.Vector3(0, 4.25, -8.8),
-    });
     group.add(kitchenCottage);
 
     // === 2. MÁY ÉP & XAY CÓ MÁI CHE (Back Left: X = -6.6, Z = -8.6) ===
@@ -1339,11 +1320,6 @@ export function buildSubzoneScene(
       clickTargets,
     );
     colliders.push({type: 'box', x: -6.6, z: -8.6, hw: 1.65, hd: 1.3});
-    labelAnchors.push({
-      id: 'farm_mill',
-      label: 'Máy Ép & Xay',
-      worldPos: new THREE.Vector3(-6.6, 2.75, -8.6),
-    });
     group.add(millShed);
 
     // === 3. GIẾNG NƯỚC ĐÁ XẾP MÁI NGÓI CỔ TÍCH (Back Far Left: X = -12.6, Z = -8.2) ===
@@ -1470,7 +1446,6 @@ export function buildSubzoneScene(
     );
     addBoxProxy(well, [2.1, 2.6, 2.1], [0, 1.2, 0], {kind: 'well', tx: -11.0, tz: -5.6}, clickTargets);
     colliders.push({type: 'circle', x: -12.6, z: -8.2, r: 1.05});
-    labelAnchors.push({id: 'well', label: 'Giếng Nước', worldPos: new THREE.Vector3(-12.6, 2.95, -8.2)});
     group.add(well);
 
     // === 4A. BẢNG ĐƠN HÀNG (Back Right: X = 5.2, Z = -8.4) ===
@@ -1511,11 +1486,6 @@ export function buildSubzoneScene(
       clickTargets,
     );
     colliders.push({type: 'box', x: 5.2, z: -8.4, hw: 1.3, hd: 0.75});
-    labelAnchors.push({
-      id: 'order_board',
-      label: 'Bảng Đơn Hàng',
-      worldPos: new THREE.Vector3(5.2, 2.65, -8.4),
-    });
     group.add(board);
 
     // === 4B. NHÀ KHO BÉ BÊN CẠNH BẢNG ĐƠN HÀNG (X = 9.0, Z = -8.5) ===
@@ -1581,11 +1551,6 @@ export function buildSubzoneScene(
       clickTargets,
     );
     colliders.push({type: 'box', x: 9.0, z: -8.5, hw: 1.25, hd: 1.05});
-    labelAnchors.push({
-      id: 'farm_storage',
-      label: 'Nhà Kho',
-      worldPos: new THREE.Vector3(9.0, 2.65, -8.5),
-    });
     group.add(storageShed);
 
     // === 4C. XE BUS SHOP NÔNG TRẠI LƯU ĐỘNG (Back Far Right: X = 14.8, Z = -8.4) ===
@@ -1711,11 +1676,6 @@ export function buildSubzoneScene(
       clickTargets,
     );
     colliders.push({type: 'box', x: 14.8, z: -8.4, hw: 2.45, hd: 1.15});
-    labelAnchors.push({
-      id: 'farm_shop',
-      label: 'Xe Bus Shop',
-      worldPos: new THREE.Vector3(14.8, 2.95, -8.4),
-    });
     group.add(shopBus);
 
     // === 5. HAI CHUỒNG NUÔI THÚ RỘNG RÃI VỚI ĐẤT CHUỒNG PHỦ ĐẦY & ĐỒ VẬT CÂN ĐỐI ===
@@ -1782,11 +1742,6 @@ export function buildSubzoneScene(
       {kind: 'pasture_spot', coop: 'poultry' as CoopKind, tx: -9.2, tz: -0.7},
       clickTargets,
     );
-    labelAnchors.push({
-      id: 'pasture_poultry',
-      label: poultryTroughCount > 0 ? 'Chuồng Gia Cầm' : 'Gia Cầm (Hết cám)',
-      worldPos: new THREE.Vector3(-15.8, 2.25, -1.8),
-    });
 
     // 5B. CHUỒNG GIA SÚC (LỢN & BÒ SỮA: X -21.2..-10.4, Z +3.2..+10.2, cổng tại Z +5.65..+7.75)
     buildRanchFenceZ(-21.2, 3.2, 10.2);
@@ -1863,11 +1818,6 @@ export function buildSubzoneScene(
       {kind: 'pasture_spot', coop: 'cattle' as CoopKind, tx: -9.2, tz: 6.7},
       clickTargets,
     );
-    labelAnchors.push({
-      id: 'pasture_cattle',
-      label: cattleTroughCount > 0 ? 'Chuồng Gia Súc' : 'Gia Súc (Hết cám)',
-      worldPos: new THREE.Vector3(-15.8, 2.35, 5.2),
-    });
 
     // === 5C. ĐÀN VẬT NUÔI THẢ TỰ DO (GÀ, VỊT, LỢN, BÒ SỮA) · CON BỊ BỆNH SẼ CHUYỂN MÀU XANH LÁ ===
     interface RoamingAnimalCtrl {
@@ -2547,12 +2497,6 @@ export function buildSubzoneScene(
       {kind: 'pond_spot', tx: 14.5, tz: 3.0},
       clickTargets,
     );
-    const readyPondCount = fishListToSpawn.filter((f) => f.stage === 'ready').length;
-    labelAnchors.push({
-      id: 'pond_spot',
-      label: readyPondCount > 0 ? `Hồ Thủy Sinh (${readyPondCount} sẵn sàng!)` : 'Hồ Thủy Sinh',
-      worldPos: new THREE.Vector3(15.5, 1.35, 3.0),
-    });
 
     // === 7. 20 Ô ĐẤT TRỒNG TRỌT (10 Ô MỖI BÊN, MÀU ĐỒNG BỘ MỌI CẤP) ===
     buildPicketRunX(-6.5, -1.9, 7.95);

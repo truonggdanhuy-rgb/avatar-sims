@@ -24,6 +24,7 @@ interface FarmWorkshopModalProps {
   kitchenLevel: KitchenLevel;
   cookingQueue: CookingJob[];
   inventory: FarmInventory;
+  storageFull?: boolean;
   onProcessItem: (id: ProcessedId) => void;
   onStartCook: (id: RecipeId) => void;
   onCollectDish: (jobId: string) => void;
@@ -55,6 +56,7 @@ export const FarmWorkshopModal: React.FC<FarmWorkshopModalProps> = ({
   kitchenLevel,
   cookingQueue,
   inventory,
+  storageFull = false,
   onProcessItem,
   onStartCook,
   onCollectDish,
@@ -343,14 +345,15 @@ export const FarmWorkshopModal: React.FC<FarmWorkshopModalProps> = ({
                         {isDone && (
                           <button
                             type="button"
+                            disabled={storageFull}
                             onClick={() => {
                               soundFX.sparkle();
                               onCollectDish(job.id);
                             }}
-                            className="flex min-h-[22px] w-full items-center justify-center gap-1 rounded bg-[#5FA86B] px-1.5 text-[10px] font-bold text-white active:scale-95"
+                            className="flex min-h-[22px] w-full items-center justify-center gap-1 rounded bg-[#5FA86B] px-1.5 text-[10px] font-bold text-white active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
                           >
                             <PackageCheck className="h-3 w-3" />
-                            <span>Nhận +1</span>
+                            <span>{storageFull ? 'Kho đầy' : 'Nhận +1'}</span>
                           </button>
                         )}
                       </div>

@@ -1015,6 +1015,53 @@ export const WELL_WATER_INTERVAL_MS = 3 * 60 * 1000; // 3 phút sinh 1 nước (
 export const INITIAL_WATER_CAN = 10;
 export const INITIAL_WELL_STORED = 8;
 
+export const FARM_STORAGE_BASE_CAPACITY = 80;
+export const FARM_STORAGE_STEP = 10;
+export const MAX_WAREHOUSE_LEVEL = 13; // 80 -> 200 đơn vị lưu trữ
+
+export function getFarmStorageCapacity(level: number): number {
+  const safeLevel = Math.max(1, Math.min(MAX_WAREHOUSE_LEVEL, Math.floor(level || 1)));
+  return FARM_STORAGE_BASE_CAPACITY + (safeLevel - 1) * FARM_STORAGE_STEP;
+}
+
+export function getWarehouseUpgradeCost(level: number): number | null {
+  if (level >= MAX_WAREHOUSE_LEVEL) return null;
+  const safeLevel = Math.max(1, Math.floor(level || 1));
+  return 120 + (safeLevel - 1) * 70;
+}
+
+export const SUPPLY_META: Record<
+  keyof FarmSupplies,
+  {name: string; color: string; sellPrice: number}
+> = {
+  bugSpray: {name: 'Bình Xịt Sâu', color: '#D95970', sellPrice: 1},
+  animalFeed: {name: 'Cám Vật Nuôi', color: '#E09B3D', sellPrice: 1},
+  animalMedicine: {name: 'Thuốc Thú Y', color: '#C95168', sellPrice: 4},
+  fishFeed: {name: 'Cám Thủy Sinh', color: '#2F789B', sellPrice: 3},
+  fishMedicine: {name: 'Thuốc Thủy Sinh', color: '#4B8A5B', sellPrice: 6},
+};
+
+export function getFarmSeedSellPrice(crop: CropType): number {
+  const seedPrice = CROPS[crop]?.seedPrice ?? 6;
+  return Math.max(2, Math.floor(seedPrice * 0.6));
+}
+
+export function getFarmStorageUsed(inv: FarmInventory): number {
+  let total = 0;
+  for (const qty of Object.values(inv.seeds)) total += qty || 0;
+  for (const qty of Object.values(inv.crops)) total += qty || 0;
+  for (const qty of Object.values(inv.animalProducts)) total += qty || 0;
+  for (const qty of Object.values(inv.processed)) total += qty || 0;
+  for (const qty of Object.values(inv.dishes)) total += qty || 0;
+  total +=
+    (inv.supplies.bugSpray || 0) +
+    (inv.supplies.animalFeed || 0) +
+    (inv.supplies.animalMedicine || 0) +
+    (inv.supplies.fishFeed || 0) +
+    (inv.supplies.fishMedicine || 0);
+  return total;
+}
+
 export function createInitialSupplies(): FarmSupplies {
   return {
     bugSpray: 2,

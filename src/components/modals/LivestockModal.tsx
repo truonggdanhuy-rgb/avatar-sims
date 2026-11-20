@@ -26,6 +26,7 @@ interface LivestockModalProps {
   animals: LivestockAnimalState[];
   troughs: CoopTroughs;
   inventory: FarmInventory;
+  storageFull?: boolean;
   onFeedAnimal: (animalId: string) => void;
   onFillTrough: (coop: CoopKind) => void;
   onCureAnimal: (animalId: string) => void;
@@ -52,6 +53,7 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
   animals,
   troughs,
   inventory,
+  storageFull = false,
   onFeedAnimal,
   onFillTrough,
   onCureAnimal,
@@ -319,14 +321,17 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                       {ani.hasProduce && (
                         <button
                           type="button"
+                          disabled={storageFull}
                           onClick={() => {
                             soundFX.sparkle();
                             onCollectProduce(ani.id);
                           }}
-                          className="flex min-h-[28px] w-full items-center justify-center gap-1 rounded-lg bg-[#5FA86B] px-2 text-[11px] font-bold text-white transition-transform active:scale-95"
+                          className="flex min-h-[28px] w-full items-center justify-center gap-1 rounded-lg bg-[#5FA86B] px-2 text-[11px] font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
                         >
                           <PackageCheck className="h-3.5 w-3.5" />
-                          <span>Thu +{ani.sick ? 1 : 2} {prod.name}</span>
+                          <span>
+                            {storageFull ? 'Kho đầy!' : `Thu +${ani.sick ? 1 : 2} ${prod.name}`}
+                          </span>
                         </button>
                       )}
 

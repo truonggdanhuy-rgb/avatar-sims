@@ -151,35 +151,52 @@ export function createCheckerFloorTexture(a = '#5B4D84', b = '#453969'): THREE.C
 }
 
 export function createGrassTexture(): THREE.CanvasTexture {
+  const size = 256;
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
+  canvas.width = size;
+  canvas.height = size;
   const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = '#6EB856';
-  ctx.fillRect(0, 0, 256, 256);
+  ctx.fillStyle = '#70BA58';
+  ctx.fillRect(0, 0, size, size);
 
-  // Rich meadow color variation patches
-  for (let i = 0; i < 180; i++) {
-    const x = (i * 73) % 256;
-    const y = (i * 137) % 256;
-    ctx.fillStyle =
-      i % 4 === 0
-        ? 'rgba(245, 240, 175, 0.1)'
-        : i % 2 === 0
-          ? 'rgba(54, 118, 42, 0.13)'
-          : 'rgba(134, 202, 94, 0.12)';
-    ctx.beginPath();
-    ctx.arc(x, y, (i % 6) + 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Seeded PRNG (mulberry32) so tiling has no linear-congruence diagonal bands
+  let seed = 0x51a9c3d7;
+  const rand = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 
-  // Subtle static clover / blade speckles
-  for (let i = 0; i < 90; i++) {
-    const x = (i * 97 + 19) % 256;
-    const y = (i * 53 + 41) % 256;
-    ctx.fillStyle = i % 3 === 0 ? 'rgba(255,246,178,0.24)' : 'rgba(44,98,34,0.22)';
-    ctx.fillRect(x, y, 2, 4);
+  // Soft toroidally-wrapped meadow tonal variations (seamless & non-banded)
+  const palette = [
+    'rgba(140, 206, 98, 0.08)',
+    'rgba(66, 134, 50, 0.065)',
+    'rgba(222, 232, 152, 0.055)',
+  ];
+  for (let i = 0; i < 64; i++) {
+    const cx = rand() * size;
+    const cy = rand() * size;
+    const radius = 14 + rand() * 24;
+    const color = palette[i % palette.length];
+
+    for (const ox of [-size, 0, size]) {
+      for (const oy of [-size, 0, size]) {
+        const px = cx + ox;
+        const py = cy + oy;
+        if (px + radius < 0 || px - radius > size || py + radius < 0 || py - radius > size) {
+          continue;
+        }
+        const grad = ctx.createRadialGradient(px, py, 0, px, py, radius);
+        grad.addColorStop(0, color);
+        grad.addColorStop(1, 'rgba(112, 186, 88, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(px, py, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 
   const tex = new THREE.CanvasTexture(canvas);

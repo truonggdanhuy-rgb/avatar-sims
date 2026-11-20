@@ -30,6 +30,8 @@ import {soundFX} from '../../utils/sound';
 interface FarmShopModalProps {
   coins: number;
   inventory: FarmInventory;
+  storageUsed: number;
+  storageCapacity: number;
   poultryCount: number;
   cattleCount: number;
   pondCount: number;
@@ -50,6 +52,8 @@ function formatGrowShort(seconds: number): string {
 export const FarmShopModal: React.FC<FarmShopModalProps> = ({
   coins,
   inventory,
+  storageUsed,
+  storageCapacity,
   poultryCount,
   cattleCount,
   pondCount,
@@ -60,6 +64,7 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
   onClose,
 }) => {
   const [tab, setTab] = useState<'seeds' | 'supplies' | 'animals'>('seeds');
+  const freeStorage = Math.max(0, storageCapacity - storageUsed);
 
   const supplyCards: {
     key: keyof FarmSupplies;
@@ -150,6 +155,16 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
+            <div
+              className={`rounded-lg border px-2 py-0.5 text-[11px] font-bold tabular-nums ${
+                freeStorage <= 0
+                  ? 'border-[#E6A3AD] bg-[#FFF1F3] text-[#B84356]'
+                  : 'border-[#CFE0D5] bg-white text-[#3B6B4D]'
+              }`}
+              title="Sức chứa Nhà Kho"
+            >
+              Kho {storageUsed}/{storageCapacity}
+            </div>
             <div className="flex items-center gap-1 rounded-lg border border-[#DFC7A5] bg-[#FFF8EB] px-2 py-0.5 text-xs font-bold tabular-nums text-[#6F4E37]">
               <Coins className="h-3 w-3 text-amber-500" />
               <span>{coins}</span>
@@ -221,8 +236,8 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
             <div className="grid grid-cols-2 gap-1.5">
               {CROP_LIST.map((crop) => {
                 const owned = inventory.seeds[crop.id] || 0;
-                const canBuy1 = coins >= crop.seedPrice;
-                const canBuy5 = coins >= crop.seedPrice * 5;
+                const canBuy1 = coins >= crop.seedPrice && freeStorage >= 1;
+                const canBuy5 = coins >= crop.seedPrice * 5 && freeStorage >= 5;
                 return (
                   <div
                     key={crop.id}
@@ -258,7 +273,7 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
                         }}
                         className="flex min-h-[26px] flex-1 items-center justify-center rounded-lg bg-[#55946B] px-2 text-[11px] font-bold text-white tabular-nums transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E5E0D7] disabled:text-[#968D82]"
                       >
-                        {crop.seedPrice} Xu
+                        {freeStorage < 1 ? 'Đầy kho' : `${crop.seedPrice} Xu`}
                       </button>
                       <button
                         type="button"
@@ -301,18 +316,18 @@ export const FarmShopModal: React.FC<FarmShopModalProps> = ({
                   <div className="flex gap-1">
                     <button
                       type="button"
-                      disabled={coins < sup.price}
+                      disabled={coins < sup.price || freeStorage < 1}
                       onClick={() => {
                         soundFX.sparkle();
                         onBuySupply(sup.key, 1);
                       }}
                       className={`flex min-h-[28px] flex-1 items-center justify-center rounded-lg px-2 text-[11px] font-bold text-white tabular-nums transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E5E0D7] disabled:text-[#968D82] ${sup.btnClass}`}
                     >
-                      Mua 1 ({sup.price} Xu)
+                      {freeStorage < 1 ? 'Đầy kho' : `Mua 1 (${sup.price} Xu)`}
                     </button>
                     <button
                       type="button"
-                      disabled={coins < sup.price * sup.bulkQty}
+                      disabled={coins < sup.price * sup.bulkQty || freeStorage < sup.bulkQty}
                       onClick={() => {
                         soundFX.sparkle();
                         onBuySupply(sup.key, sup.bulkQty);

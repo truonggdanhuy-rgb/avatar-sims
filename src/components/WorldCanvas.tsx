@@ -92,10 +92,11 @@ interface WorldCanvasProps {
   onSprayPestPlot: (plotId: number) => void;
   onWeedPlot: (plotId: number) => void;
   onCancelCropPlot: (plotId: number) => void;
-  onHarvestPlot: (plotId: number) => void;
+  onHarvestPlot: (plotId: number) => boolean;
   onUpgradePlot: (plotId: number) => void;
   onOpenWorkshop: (tab: 'mill' | 'kitchen') => void;
-  onOpenOrders: (tab?: 'orders' | 'storage') => void;
+  onOpenOrders: () => void;
+  onOpenStorage: () => void;
   onOpenPasture: (coop?: CoopKind) => void;
   onOpenPond: () => void;
   onOpenFarmShop: () => void;
@@ -384,6 +385,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onUpgradePlot,
   onOpenWorkshop,
   onOpenOrders,
+  onOpenStorage,
   onOpenPasture,
   onOpenPond,
   onOpenFarmShop,
@@ -459,6 +461,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onHarvestPlot,
     onOpenWorkshop,
     onOpenOrders,
+    onOpenStorage,
     onOpenPasture,
     onOpenPond,
     onOpenFarmShop,
@@ -486,6 +489,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onHarvestPlot,
     onOpenWorkshop,
     onOpenOrders,
+    onOpenStorage,
     onOpenPasture,
     onOpenPond,
     onOpenFarmShop,
@@ -1115,21 +1119,25 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             if (targetPlot && targetPlot.stage === 'ready' && !targetPlot.hasPest) {
               selectedPlotRef.current = null;
               setArcMenuPos(null);
+              const doHarvest = () => {
+                const harvested = callbacksRef.current.onHarvestPlot(plotId);
+                if (harvested) {
+                  soundFX.sparkle();
+                  showBubble('Thu hoạch +2 nông sản!', tx, 2.0, tz);
+                } else {
+                  soundFX.tap();
+                  showBubble('Nhà kho đã đầy! Bán bớt hoặc nâng cấp kho', tx, 2.0, tz);
+                }
+              };
               const distNow = Math.hypot(playerPos.x - tx, playerPos.z - tz);
               if (distNow < 0.85) {
-                soundFX.sparkle();
-                callbacksRef.current.onHarvestPlot(plotId);
-                showBubble('Thu hoạch +2 nông sản!', tx, 2.0, tz);
+                doHarvest();
               } else {
                 activeTarget = {
                   x: tx,
                   z: tz,
                   arrivePose: 'idle',
-                  onArrive: () => {
-                    soundFX.sparkle();
-                    callbacksRef.current.onHarvestPlot(plotId);
-                    showBubble('Thu hoạch +2 nông sản!', tx, 2.0, tz);
-                  },
+                  onArrive: doHarvest,
                 };
               }
               return;
@@ -1196,7 +1204,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               arrivePose: 'idle',
               onArrive: () => {
                 soundFX.sparkle();
-                callbacksRef.current.onOpenOrders('orders');
+                callbacksRef.current.onOpenOrders();
               },
             };
             return;
@@ -1210,7 +1218,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               arrivePose: 'idle',
               onArrive: () => {
                 soundFX.sparkle();
-                callbacksRef.current.onOpenOrders('storage');
+                callbacksRef.current.onOpenStorage();
               },
             };
             return;
@@ -1701,19 +1709,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
         if (currentAnchors.length > 0) {
           const nextTags: ProjectedTag[] = [];
-          const storedWell = stateRef.current.wellWater.stored;
           for (const a of currentAnchors) {
             _projVec.copy(a.worldPos).project(camera);
             if (_projVec.z <= 1) {
-              const label =
-                a.id === 'well'
-                  ? storedWell >= WELL_WATER_MAX
-                    ? `Giếng Nước (Đầy ${WELL_WATER_MAX}/${WELL_WATER_MAX})`
-                    : `Giếng Nước (${storedWell}/${WELL_WATER_MAX})`
-                  : a.label;
               nextTags.push({
                 id: a.id,
-                label,
+                label: a.label,
                 x: ((_projVec.x + 1) / 2) * cw,
                 y: ((-_projVec.y + 1) / 2) * ch,
               });
