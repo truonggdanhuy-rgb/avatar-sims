@@ -12,7 +12,7 @@ export const HEAD_RX = 0.312;
 export const HEAD_RY = 0.296;
 export const HEAD_RZ = 0.288;
 
-export type HatFitMode = 'none' | 'crown_cap' | 'headband';
+export type HatFitMode = 'none' | 'on_hair' | 'snug_cap';
 
 export interface HatAttachmentPoints {
   crownTop: {position: THREE.Vector3; rotation: THREE.Euler; radius: number};
@@ -56,20 +56,17 @@ export function headSurfacePoint(
   const sinLat = Math.sin(lat);
   const cosLat = Math.cos(lat);
 
-  // Soft anime/Nendoroid front face plane
   const frontMask =
     Math.max(0, Math.cos(lon)) *
     smoothstep01(40, 92, latDeg) *
     (1 - smoothstep01(128, 168, latDeg));
   const frontFlatten = 1 - 0.062 * frontMask;
 
-  // Plump Nendoroid baby-cheeks below eye line before tapering smoothly into V-chin
   const cheekFull =
     0.022 *
     Math.exp(-Math.pow((latDeg - 112) / 14, 2)) *
     Math.exp(-Math.pow((absLon - 46) / 21, 2));
 
-  // Graceful jawline taper creating the soft Nendoroid V-chin instead of a round ball
   const jawTaper = 1 - 0.27 * smoothstep01(108, 168, latDeg);
   const chinDepthTaper = 1 - 0.14 * smoothstep01(126, 174, latDeg);
   const chinShapeY =
@@ -101,38 +98,28 @@ function headOutwardNormal(latDeg: number, lonDeg: number): THREE.Vector3 {
 }
 
 /**
- * Smooth matte-satin stylized 3D polymer-clay / Nendoroid hair material:
- * soft light rolloff, subtle clay sheen, zero plastic glare, zero strand textures.
+ * Soft matte polymer-clay / Nendoroid hair material (no harsh specular glare).
  */
 export function createHairClayMaterial(color: string | number): THREE.MeshPhysicalMaterial {
   const base = new THREE.Color(color);
   return new THREE.MeshPhysicalMaterial({
     color: base,
-    roughness: 0.68,
+    roughness: 0.72,
     metalness: 0.0,
-    sheen: 0.34,
-    sheenRoughness: 0.78,
-    sheenColor: base.clone().lerp(new THREE.Color('#ffffff'), 0.24),
+    sheen: 0.28,
+    sheenRoughness: 0.82,
+    sheenColor: base.clone().lerp(new THREE.Color('#ffffff'), 0.2),
     clearcoat: 0.0,
-    envMapIntensity: 0.46,
+    envMapIntensity: 0.42,
   });
 }
 
 export function resolveHatFitMode(headItem?: HeadItemStyle): HatFitMode {
-  if (
-    headItem === 'beret' ||
-    headItem === 'sunhat' ||
-    headItem === 'cap' ||
-    headItem === 'beanie'
-  ) {
-    return 'crown_cap';
+  if (headItem === 'cap' || headItem === 'beanie') {
+    return 'snug_cap';
   }
-  if (
-    headItem === 'cat_ears' ||
-    headItem === 'flower_crown' ||
-    headItem === 'ribbon_bow'
-  ) {
-    return 'headband';
+  if (headItem === 'beret' || headItem === 'sunhat') {
+    return 'on_hair';
   }
   return 'none';
 }
@@ -147,384 +134,319 @@ function isMaleStyle(hairBack: HairBackStyle): boolean {
   );
 }
 
-interface LockStep {
-  lat: number;
-  lon: number;
-  offset: number;
+interface PetalDef {
+  c: number; // center lon (deg)
+  hw: number; // half width (deg)
+  drop: number; // downward lat extent above browBaseLat
 }
 
-function sampleHeadSteps(
-  steps: LockStep[],
-  samples = 16,
-): [number, number, number][] {
-  if (samples <= 1 || steps.length < 2) {
-    return steps.map((s) => headSurfacePoint(s.lat, s.lon, s.offset));
-  }
-  const paramPts = steps.map((s) => new THREE.Vector3(s.lat, s.lon, s.offset));
-  const curve = new THREE.CatmullRomCurve3(paramPts, false, 'centripetal', 0.5);
-  const out: [number, number, number][] = [];
-  for (let i = 0; i <= samples; i++) {
-    const p = curve.getPointAt(i / samples);
-    out.push(headSurfacePoint(p.x, p.y, p.z));
-  }
-  return out;
-}
+function getFrontPetals(
+  hairBack: HairBackStyle,
+  hairFront: HairFrontStyle,
+): {browBaseLat: number; partLon: number | null; petals: PetalDef[]} {
+  const male = isMaleStyle(hairBack);
 
-interface ClayLockOptions {
-  width: number;
-  depth: number;
-  innerFlatten?: number;
-  ridgeBoost?: number;
-  edgePinch?: number;
-  profile?: 'blade' | 'tuft' | 'bangs' | 'lock' | 'wave' | 'bob' | 'quiff';
-  outwardMode?: 'spherical' | 'drape';
-  tipLift?: number;
-  tubularSegs?: number;
-  radialSegs?: number;
-  roundTipScale?: number;
-}
-
-const _headCenter = new THREE.Vector3(0, HEAD_CY, 0);
-const _fallbackUp = new THREE.Vector3(0, 1, 0);
-
-/**
- * Builds a Nendoroid-grade sculpted clay hair lock:
- * - Lenticular / almond-blade cross-section (tapered soft beveled edges, flat inner hug, plump outer curve)
- *   so locks shingle cleanly without looking like floating cylindrical worms
- * - Seamless buried root flare that emerges naturally out of the plush HairBase dome
- * - Smooth tapered rounded-almond tip
- */
-function createClayLockGeometry(
-  points: [number, number, number][],
-  opts: ClayLockOptions,
-): THREE.BufferGeometry {
-  const {
-    width,
-    depth,
-    innerFlatten = 0.3,
-    ridgeBoost = 0.14,
-    edgePinch = 0.28,
-    profile = 'blade',
-    outwardMode = 'spherical',
-    tipLift = 0.0,
-    tubularSegs = 16,
-    radialSegs = 12,
-    roundTipScale = 0.16,
-  } = opts;
-
-  const vecs = points.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
-  const curve = new THREE.CatmullRomCurve3(vecs, false, 'centripetal', 0.5);
-
-  const evalProfileScale = (t: number): {wScale: number; dScale: number} => {
-    if (profile === 'blade') {
-      // Broad buried root -> smooth full mid-blade -> crisp soft-almond tapered tip
-      const rootW = 0.78 + 0.22 * smoothstep01(0.0, 0.25, t);
-      const rootD = 0.45 + 0.55 * smoothstep01(0.0, 0.28, t);
-      const u = smoothstep01(0.36, 1.0, t);
-      const tipW = 1 - (1 - roundTipScale) * Math.pow(u, 1.15);
-      const tipD = 1 - (1 - Math.max(0.18, roundTipScale)) * Math.pow(u, 1.25);
-      return {
-        wScale: Math.max(0.12, rootW * tipW),
-        dScale: Math.max(0.14, rootD * tipD),
-      };
-    }
-    if (profile === 'tuft') {
-      // Fluffy sculpted anime clay petal: fuller mid-belly sweeping to a soft almond point
-      const rootW = 0.72 + 0.36 * Math.sin(Math.pow(t, 0.75) * Math.PI * 0.65);
-      const rootD = 0.48 + 0.52 * smoothstep01(0.0, 0.26, t);
-      const u = smoothstep01(0.42, 1.0, t);
-      const tip = 1 - (1 - roundTipScale) * Math.pow(u, 1.1);
-      return {
-        wScale: Math.max(0.12, rootW * tip),
-        dScale: Math.max(0.14, rootD * tip),
-      };
-    }
-    if (profile === 'bangs') {
-      const rootEase = smoothstep01(0.0, 0.22, t);
-      const tipEase = 1 - (1 - roundTipScale) * Math.pow(smoothstep01(0.42, 1.0, t), 1.2);
-      return {
-        wScale: Math.max(0.16, (0.72 + 0.28 * rootEase) * tipEase),
-        dScale: Math.max(0.16, (0.45 + 0.55 * rootEase) * tipEase),
-      };
-    }
-    if (profile === 'quiff') {
-      const rootEase = smoothstep01(0.0, 0.24, t);
-      const swell = 0.88 + 0.26 * Math.sin(Math.pow(t, 0.8) * Math.PI);
-      const tipEase = 1 - 0.72 * Math.pow(smoothstep01(0.48, 1.0, t), 1.2);
-      return {
-        wScale: Math.max(0.18, (0.68 + 0.32 * rootEase) * swell * tipEase),
-        dScale: Math.max(0.16, (0.48 + 0.52 * rootEase) * swell * tipEase),
-      };
-    }
-    if (profile === 'wave') {
-      const rootEase = smoothstep01(0.0, 0.22, t);
-      const swell = 0.88 + 0.2 * Math.sin(smoothstep01(0.05, 0.82, t) * Math.PI);
-      const tipTaper = 1 - (1 - Math.max(0.24, roundTipScale)) * Math.pow(smoothstep01(0.58, 1.0, t), 1.3);
-      return {
-        wScale: Math.max(0.22, (0.72 + 0.28 * rootEase) * swell * tipTaper),
-        dScale: Math.max(0.2, (0.52 + 0.48 * rootEase) * swell * tipTaper),
-      };
-    }
-    if (profile === 'bob') {
-      const rootEase = smoothstep01(0.0, 0.22, t);
-      const swell = 0.9 + 0.16 * Math.sin(t * Math.PI);
-      const tipTaper = 1 - 0.58 * Math.pow(smoothstep01(0.62, 1.0, t), 1.35);
-      return {
-        wScale: Math.max(0.28, (0.72 + 0.28 * rootEase) * swell * tipTaper),
-        dScale: Math.max(0.22, (0.5 + 0.5 * rootEase) * swell * tipTaper),
-      };
-    }
-    const belly = Math.pow(Math.sin(t * Math.PI), 0.42);
-    const skew = 0.85 + 0.15 * (1 - t);
+  if (hairBack === 'boy_1') {
     return {
-      wScale: Math.max(0.2, belly * skew),
-      dScale: Math.max(0.2, belly * skew),
+      browBaseLat: 63,
+      partLon: 14,
+      petals: [
+        {c: -48, hw: 16, drop: 26},
+        {c: -26, hw: 15, drop: 18},
+        {c: -4, hw: 15, drop: 19},
+        {c: 20, hw: 15, drop: 18},
+        {c: 46, hw: 16, drop: 26},
+      ],
     };
+  }
+
+  if (hairBack === 'boy_2' || (!male && hairFront === 'curtain')) {
+    return {
+      browBaseLat: 56,
+      partLon: 0,
+      petals: [
+        {c: -52, hw: 17, drop: 34},
+        {c: -32, hw: 15, drop: 27},
+        {c: -14, hw: 12, drop: 18},
+        {c: 14, hw: 12, drop: 18},
+        {c: 32, hw: 15, drop: 27},
+        {c: 52, hw: 17, drop: 34},
+      ],
+    };
+  }
+
+  if (hairBack === 'boy_3') {
+    return {
+      browBaseLat: 62,
+      partLon: null,
+      petals: [
+        {c: -50, hw: 16, drop: 28},
+        {c: -28, hw: 14, drop: 20},
+        {c: -6, hw: 14, drop: 22},
+        {c: 16, hw: 14, drop: 20},
+        {c: 40, hw: 15, drop: 24},
+        {c: 54, hw: 14, drop: 28},
+      ],
+    };
+  }
+
+  if (hairBack === 'boy_4') {
+    return {
+      browBaseLat: 62,
+      partLon: null,
+      petals: [
+        {c: -52, hw: 15, drop: 32},
+        {c: -33, hw: 13, drop: 20},
+        {c: -15, hw: 12, drop: 19},
+        {c: 4, hw: 12, drop: 22},
+        {c: 22, hw: 13, drop: 19},
+        {c: 44, hw: 15, drop: 29},
+      ],
+    };
+  }
+
+  if (hairBack === 'short_crop') {
+    return {
+      browBaseLat: 64,
+      partLon: null,
+      petals: [
+        {c: -48, hw: 16, drop: 24},
+        {c: -22, hw: 15, drop: 12},
+        {c: 4, hw: 15, drop: 11},
+        {c: 28, hw: 15, drop: 13},
+        {c: 50, hw: 16, drop: 25},
+      ],
+    };
+  }
+
+  if (hairFront === 'neat_fringe') {
+    return {
+      browBaseLat: 67,
+      partLon: null,
+      petals: [
+        {c: -46, hw: 16, drop: 17},
+        {c: -23, hw: 15, drop: 13},
+        {c: 0, hw: 15, drop: 13},
+        {c: 23, hw: 15, drop: 13},
+        {c: 46, hw: 16, drop: 17},
+      ],
+    };
+  }
+
+  if (hairFront === 'side_sweep') {
+    return {
+      browBaseLat: 61,
+      partLon: -20,
+      petals: [
+        {c: -48, hw: 16, drop: 25},
+        {c: -26, hw: 14, drop: 16},
+        {c: -4, hw: 16, drop: 18},
+        {c: 20, hw: 16, drop: 21},
+        {c: 46, hw: 17, drop: 27},
+      ],
+    };
+  }
+
+  // Default: sculpted chunky clay bangs matching Nendoroid/Animal-Crossing look (5 soft wide petals)
+  return {
+    browBaseLat: 65,
+    partLon: null,
+    petals: [
+      {c: -48, hw: 18, drop: 24},
+      {c: -24, hw: 16, drop: 18},
+      {c: -2, hw: 15, drop: 19},
+      {c: 21, hw: 16, drop: 18},
+      {c: 47, hw: 18, drop: 24},
+    ],
   };
-
-  const positions: number[] = [];
-  const indices: number[] = [];
-
-  for (let i = 0; i <= tubularSegs; i++) {
-    const t = i / tubularSegs;
-    const center = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t).normalize();
-
-    let radial: THREE.Vector3;
-    if (outwardMode === 'drape') {
-      const horiz = new THREE.Vector3(center.x, 0.06, center.z - 0.03);
-      const sph = center.clone().sub(_headCenter);
-      const mix = smoothstep01(0.3, 0.0, center.y);
-      radial = sph.normalize().lerp(horiz.normalize(), mix).normalize();
-    } else {
-      radial = center.clone().sub(_headCenter);
-      if (radial.lengthSq() < 1e-5) radial.set(0, 0, 1);
-      radial.normalize();
-    }
-
-    const outDir = radial.clone().addScaledVector(tan, -radial.dot(tan));
-    if (outDir.lengthSq() < 1e-4) {
-      outDir.copy(_fallbackUp).addScaledVector(tan, -_fallbackUp.dot(tan));
-      if (outDir.lengthSq() < 1e-4) outDir.set(0, 0, 1);
-    }
-    outDir.normalize();
-
-    const sideDir = tan.clone().cross(outDir).normalize();
-    const {wScale, dScale} = evalProfileScale(t);
-    const endRound = i === 0 ? 0.65 : i === tubularSegs ? 0.55 : 1.0;
-    const w = width * wScale * endRound;
-    const h = depth * dScale * endRound;
-    const curlOut = tipLift * Math.pow(smoothstep01(0.55, 1.0, t), 1.8);
-
-    for (let j = 0; j < radialSegs; j++) {
-      const theta = (j / radialSegs) * Math.PI * 2;
-      const cos = Math.cos(theta);
-      const sin = Math.sin(theta);
-
-      // Sculpted clay almond-blade cross-section (sleek beveled edges, smooth convex ridge)
-      const sx = Math.sign(cos) * Math.pow(Math.abs(cos), 0.78);
-      const absSin = Math.abs(sin);
-      const edgeTaper = edgePinch + (1 - edgePinch) * Math.pow(absSin, 0.62);
-      const sy = Math.sign(sin) * Math.pow(absSin, 0.74) * edgeTaper;
-      const lateral = sx * w;
-      const ridge = sy > 0 ? 1 + ridgeBoost * Math.pow(absSin, 1.6) : innerFlatten;
-      const out = sy * h * ridge + curlOut;
-
-      positions.push(
-        center.x + sideDir.x * lateral + outDir.x * out,
-        center.y + sideDir.y * lateral + outDir.y * out,
-        center.z + sideDir.z * lateral + outDir.z * out,
-      );
-    }
-  }
-
-  for (let i = 0; i < tubularSegs; i++) {
-    const rowA = i * radialSegs;
-    const rowB = (i + 1) * radialSegs;
-    for (let j = 0; j < radialSegs; j++) {
-      const nextJ = (j + 1) % radialSegs;
-      const a = rowA + j;
-      const b = rowB + j;
-      const c = rowB + nextJ;
-      const d = rowA + nextJ;
-      indices.push(a, b, d);
-      indices.push(b, c, d);
-    }
-  }
-
-  // Smooth rounded end-caps
-  const startCenterIdx = positions.length / 3;
-  const p0 = curve.getPointAt(0);
-  const t0 = curve.getTangentAt(0).normalize();
-  positions.push(p0.x - t0.x * 0.006, p0.y - t0.y * 0.006, p0.z - t0.z * 0.006);
-  for (let j = 0; j < radialSegs; j++) {
-    const nextJ = (j + 1) % radialSegs;
-    indices.push(startCenterIdx, j, nextJ);
-  }
-
-  const endCenterIdx = positions.length / 3;
-  const p1 = curve.getPointAt(1);
-  const t1 = curve.getTangentAt(1).normalize();
-  positions.push(p1.x + t1.x * 0.009, p1.y + t1.y * 0.009, p1.z + t1.z * 0.009);
-  const lastRow = tubularSegs * radialSegs;
-  for (let j = 0; j < radialSegs; j++) {
-    const nextJ = (j + 1) % radialSegs;
-    indices.push(endCenterIdx, lastRow + nextJ, lastRow + j);
-  }
-
-  const geom = new THREE.BufferGeometry();
-  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geom.setIndex(indices);
-  geom.computeVertexNormals();
-  return geom;
 }
 
 /**
- * 1. HAIR BASE:
- * Plush Nendoroid-style unified sculpted crown dome:
- * - Generous plush silhouette (0.048-0.052 loft) so locks blend cleanly out of the dome
- * - Zero exposed temple gaps; cleanly arches above ears & wraps snugly down to nape
- * - Adapts seamlessly into a lower hat-seat contour when wearing crown hats
+ * Evaluates smooth chunky clay petal bump & valley groove intensity at `lonDeg`.
  */
-function createHairBaseGeometry(
+function evalFrontPetalShape(lonDeg: number, petals: PetalDef[]): {drop: number; groove: number} {
+  let maxDrop = 0;
+  let groove = 0;
+  for (const p of petals) {
+    const u = Math.abs(lonDeg - p.c) / p.hw;
+    if (u < 1.35) {
+      // Raised cosine-bell petal lobe: smooth full overlap, rounded tip, zero high spiky wedges!
+      const bell = Math.exp(-Math.pow(u, 2.0) * 1.28);
+      const val = p.drop * bell;
+      if (val > maxDrop) maxDrop = val;
+      // Soft valley groove between adjacent clay petals
+      const edgeGroove = Math.exp(-Math.pow((u - 0.9) / 0.25, 2));
+      groove = Math.max(groove, edgeGroove);
+    }
+  }
+  return {drop: maxDrop, groove};
+}
+
+/**
+ * 1. UNIFIED SCULPTED CLAY HOOD (`HairBase`):
+ * Single continuous manifold geometry covering the crown, sculpted chunky bangs seamlessly on the forehead,
+ * smooth arch over ears, and clean nape lobes on short/male/tied hairstyles.
+ * Zero overlapping tube seams, zero frizzy strips, completely smooth polymer-clay feel!
+ */
+function createUnifiedClayCapGeometry(
   hairBack: HairBackStyle,
   hairFront: HairFrontStyle,
   hatMode: HatFitMode,
 ): {geom: THREE.BufferGeometry; crownOuterOffset: number} {
-  const lonSegs = 64;
-  const outerSegs = 22;
-  const lipSegs = 3;
-  const innerSegs = 5;
+  const lonSegs = 128;
+  const outerSegs = 26;
+  const lipSegs = 4;
+  const innerSegs = 4;
 
   const male = isMaleStyle(hairBack);
-  const isHatCap = hatMode === 'crown_cap';
+  const hasBackCurtain = hairBack === 'long_wave' || hairBack === 'bob_cut';
+  const isSnugCap = hatMode === 'snug_cap';
+  const isOnHairHat = hatMode === 'on_hair';
 
-  const partLon =
-    hairBack === 'boy_1'
-      ? 14
-      : hairBack === 'boy_2' || (!male && hairFront === 'curtain')
-        ? 0
-        : !male && hairFront === 'side_sweep'
-          ? -20
-          : null;
+  const {browBaseLat, partLon, petals} = getFrontPetals(hairBack, hairFront);
 
-  // Plush fluffy Nendoroid dome loft (compacted cleanly under crown hats)
-  const baseCrownLoft = isHatCap
-    ? 0.016
-    : hairBack === 'boy_4'
-      ? 0.098
+  // Full plush Nendoroid volume across crown & brow (never crushed flat!)
+  const baseCrownLoft =
+    hairBack === 'boy_4'
+      ? 0.088
       : hairBack === 'boy_3'
-        ? 0.096
+        ? 0.086
         : male
-          ? 0.092
-          : 0.088;
+          ? 0.082
+          : 0.08;
 
   const getPerimeterLat = (lonDeg: number): number => {
     const a = Math.abs(lonDeg);
+    const {drop} = evalFrontPetalShape(lonDeg, petals);
+    const frontHairline = browBaseLat + drop;
 
-    // Forehead hairline sweeps down behind FrontHair blades so zero bald scalp peeks between bangs
-    const browLat =
-      hairBack === 'boy_2' || (!male && hairFront === 'curtain')
-        ? 57 - 6 * Math.exp(-Math.pow(lonDeg / 12, 2))
-        : 63;
+    // Gentle center/side part dip if applicable
+    const partLift =
+      partLon !== null ? 5.0 * Math.exp(-Math.pow((lonDeg - partLon) / 8.5, 2)) : 0;
 
-    // Wraps generously across upper temples (lon ~38..70°) eliminating side-forehead gaps
-    const toTemple = smoothstep01(30, 56, a);
-    const sideburnDrop = (male ? 22 : 19) * Math.exp(-Math.pow((a - 56) / 10, 2));
+    // Front region smoothly covers outer temples around lon ~54..72° down past brow corners
+    const toSideZone = smoothstep01(50, 70, a);
 
-    // Arches cleanly ABOVE the ears (lat ~74°)
-    const earArch = smoothstep01(70, 84, a) * (1 - smoothstep01(95, 110, a));
+    // Sideburn & Over-ear contour:
+    // - Male styles form clean sideburn in front of ear (a~60°) then hug above/behind ear
+    // - Long/Bob & tied styles dip smoothly at temple (a~62°) then arch snugly just above ear (lat ~78°)
+    const sideburnLobe = male
+      ? (hairBack === 'boy_2' ? 24 : 20) * Math.exp(-Math.pow((a - 60) / 9, 2))
+      : 10 * Math.exp(-Math.pow((a - 62) / 9, 2));
+    const earArchZone = Math.exp(-Math.pow((a - 82) / 11, 2));
+    const overEarLat = hasBackCurtain ? 78 : male ? 79 : 80;
 
-    let endLat = browLat + toTemple * (80 - browLat) + sideburnDrop;
-    endLat = endLat * (1 - earArch * 0.14) + 74 * earArch * 0.14;
+    let sideLat = 84 * (1 - earArchZone * 0.22) + overEarLat * (earArchZone * 0.22) + sideburnLobe;
 
-    // Nape contour behind ears
-    const centerBackNape =
-      hairBack === 'boy_2'
-        ? 128
-        : hairBack === 'boy_4'
-          ? 126
-          : hairBack === 'boy_1'
-            ? 124
-            : hairBack === 'boy_3'
-              ? 126
-              : hairBack === 'short_crop'
-                ? 122
-                : hairBack === 'long_wave' || hairBack === 'bob_cut'
-                  ? 120
-                  : 122;
+    //Behind-ear & nape contour (wraps snugly right down behind the ear to the collar/neck!)
+    const backNapeLat =
+      hasBackCurtain
+        ? 120
+        : hairBack === 'boy_2'
+          ? 135
+          : hairBack === 'boy_4' || hairBack === 'boy_3'
+            ? 133
+            : hairBack === 'boy_1' || hairBack === 'short_crop'
+              ? 131
+              : 128;
+    const napeScallop =
+      !hasBackCurtain && male
+        ? 1.6 * (0.5 + 0.5 * Math.cos(((a - 180) * Math.PI) / 34)) * smoothstep01(116, 175, a)
+        : 0;
 
-    const toNape = smoothstep01(96, 128, a);
-    const napeWave = 3.0 * Math.cos(((a - 180) * Math.PI) / 36) * smoothstep01(135, 180, a);
-    endLat = endLat + toNape * (centerBackNape + napeWave - endLat);
-    return endLat;
+    const toBack = smoothstep01(86, 106, a);
+    sideLat = sideLat + toBack * (backNapeLat + napeScallop - sideLat);
+
+    return (frontHairline - partLift) * (1 - toSideZone) + sideLat * toSideZone;
   };
 
   const evalCapVertex = (lonDeg: number, s: number): [number, number, number] => {
     const a = Math.abs(lonDeg);
     const endLat = getPerimeterLat(lonDeg);
+    const {groove: frontGroove} = evalFrontPetalShape(lonDeg, petals);
 
-    const evalAlongSurface = (vSurf: number, wallBias: number): [number, number, number] => {
+    const evalAlongSurface = (vSurf: number, wallBias: number, sealDeep = 0): [number, number, number] => {
       const latDeg = vSurf * endLat;
 
-      // Preserve plush rounded upper-forehead & temple pillow; taper only right at hairline edge
-      const frontTapering =
-        Math.max(0, Math.cos((lonDeg * Math.PI) / 180)) *
-        smoothstep01(0.78, 1.0, vSurf);
-      const napeTapering =
-        smoothstep01(0.72, 1.0, vSurf) * smoothstep01(96, 132, a);
+      // Keep upper/mid crown super plump & rounded (0..0.68), then taper perimeter smoothly down onto skin
+      // so bang tips never dangle in mid-air and temples/ears/nape stay tightly hugged with zero gaps!
+      const frontWeight = smoothstep01(72, 24, a);
+      const sideWeight = smoothstep01(48, 72, a) * (1 - smoothstep01(86, 110, a));
+      const napeWeight = smoothstep01(86, 116, a);
 
-      // Soft Nendoroid outer cloud cushion swelling gracefully over top & upper sides
-      const puffSwell = 1 + 0.18 * Math.sin(Math.pow(vSurf, 0.72) * Math.PI * 0.88);
+      const frontTipTaper = frontWeight * smoothstep01(0.66, 1.0, vSurf);
+      const sideTipTaper = sideWeight * smoothstep01(0.56, 1.0, vSurf);
+      const napeTipTaper = napeWeight * smoothstep01(0.54, 1.0, vSurf);
+
+      const puffSwell = 1 + 0.14 * Math.sin(Math.pow(vSurf, 0.72) * Math.PI * 0.9);
       let crownShape =
         baseCrownLoft *
         puffSwell *
-        (1 - 0.36 * frontTapering) *
-        (1 - 0.54 * napeTapering);
+        (1 - 0.84 * frontTipTaper) *
+        (1 - 0.9 * sideTipTaper) *
+        (1 - 0.9 * napeTipTaper);
 
-      if (isHatCap && vSurf < 0.74) {
-        const seatFade = 1 - vSurf / 0.74;
-        crownShape = THREE.MathUtils.lerp(crownShape, 0.008, seatFade * seatFade);
+      // Gentle crown flattening ONLY right under beret/sunhat top seat (~top 28°) so hair stays plump everywhere visible!
+      if (isOnHairHat) {
+        const seatFade = 1 - smoothstep01(0.0, 0.38, vSurf);
+        crownShape = THREE.MathUtils.lerp(crownShape, baseCrownLoft * 0.78, seatFade);
+      }
+
+      // Snug cap (baseball cap / beanie) tucks upper dome inside hat (~0.026m) and blooms below hat rim!
+      if (isSnugCap) {
+        const capArea = 1 - smoothstep01(0.52, 0.84, vSurf);
+        crownShape = THREE.MathUtils.lerp(crownShape, 0.026, capArea * 0.92);
       }
 
       const partContour =
         partLon !== null
-          ? (-0.007 * Math.exp(-Math.pow((lonDeg - partLon) / 7, 2)) +
-              0.008 * Math.exp(-Math.pow((Math.abs(lonDeg - partLon) - 18) / 12, 2))) *
-            smoothstep01(0.08, 0.42, vSurf) *
-            (1 - 0.7 * smoothstep01(0.72, 1.0, vSurf)) *
-            (isHatCap ? 0.22 : 1.0)
+          ? (-0.007 * Math.exp(-Math.pow((lonDeg - partLon) / 8, 2)) +
+              0.008 * Math.exp(-Math.pow((Math.abs(lonDeg - partLon) - 18) / 11, 2))) *
+            smoothstep01(0.1, 0.45, vSurf) *
+            (1 - 0.65 * smoothstep01(0.72, 1.0, vSurf)) *
+            (isSnugCap ? 0.35 : 1.0)
           : 0;
 
-      const occiputShape =
-        a > 102
-          ? 0.018 *
-            Math.exp(-Math.pow((vSurf - 0.56) / 0.28, 2)) *
-            smoothstep01(102, 145, a)
+      const frontMask = smoothstep01(68, 42, a);
+      const bangValleyDip =
+        -0.011 * frontGroove * frontMask * smoothstep01(0.42, 0.9, vSurf);
+
+      const backMask = smoothstep01(90, 120, a);
+      const backGrooves =
+        !hasBackCurtain
+          ? -0.006 *
+            Math.pow(Math.abs(Math.sin(((lonDeg - 180) * Math.PI) / 36)), 1.6) *
+            backMask *
+            smoothstep01(0.42, 0.8, vSurf) *
+            (1 - smoothstep01(0.76, 0.96, vSurf))
           : 0;
 
-      const tipPinch = 1 - 0.48 * smoothstep01(0.84, 1.0, vSurf);
-      const thickness = (isHatCap ? 0.009 : 0.016) * tipPinch;
+      // Plump clay lip at forehead bangs (0.014m), snug flush taper at sides & nape (0.007m)
+      const rimThick = (0.014 * frontWeight + 0.007 * (1 - frontWeight)) * (1 - 0.3 * smoothstep01(0.84, 1.0, vSurf));
+      const thickness = isSnugCap ? 0.01 : rimThick;
 
-      const offset = Math.max(
-        0.003,
-        crownShape + partContour + occiputShape + wallBias * thickness,
-      );
+      // Seal inner rim deeply inward into head/neck geometry so no hollow underside ever leaks background!
+      const rawOffset =
+        crownShape + partContour + bangValleyDip + backGrooves + wallBias * thickness;
+      const offset =
+        sealDeep > 0
+          ? THREE.MathUtils.lerp(Math.max(0.002, rawOffset), -0.026, sealDeep)
+          : Math.max(0.006, rawOffset);
       return headSurfacePoint(latDeg, lonDeg, offset);
     };
 
-    if (s <= 1.0) return evalAlongSurface(s, 0.5);
+    if (s <= 1.0) return evalAlongSurface(s, 0.5, 0);
     if (s <= 2.0) {
       const ang = (s - 1.0) * Math.PI;
-      const [ox, oy, oz] = evalAlongSurface(1.0, 0.5);
-      const [ix, iy, iz] = evalAlongSurface(1.0, -0.5);
+      const [ox, oy, oz] = evalAlongSurface(1.0, 0.5, 0);
+      const [ix, iy, iz] = evalAlongSurface(1.0, -0.5, 0);
       const cx = (ox + ix) * 0.5;
       const cy = (oy + iy) * 0.5;
       const cz = (oz + iz) * 0.5;
       const hx = (ox - ix) * 0.5;
       const hy = (oy - iy) * 0.5;
       const hz = (oz - iz) * 0.5;
-      const lip = Math.hypot(hx, hz) * 0.75;
+      const lip = Math.hypot(hx, hz) * 0.65;
       return [
         cx + hx * Math.cos(ang),
         cy + hy * Math.cos(ang) - lip * Math.sin(ang),
@@ -532,7 +454,7 @@ function createHairBaseGeometry(
       ];
     }
     const inU = s - 2.0;
-    return evalAlongSurface(1.0 - inU * 0.25, -0.5);
+    return evalAlongSurface(1.0 - inU * 0.24, -0.5, inU);
   };
 
   const sValues: number[] = [];
@@ -579,539 +501,502 @@ function createHairBaseGeometry(
   geom.setIndex(indices);
   geom.computeVertexNormals();
 
-  return {geom, crownOuterOffset: baseCrownLoft + (isHatCap ? 0.006 : 0.012)};
+  const crownOuterOffset = isSnugCap ? 0.038 : baseCrownLoft + 0.008;
+  return {geom, crownOuterOffset};
 }
 
 /**
- * 2. FRONT HAIR:
- * Sculpted Nendoroid-style overlapping almond-blade clay locks whose roots emerge
- * seamlessly from inside the plush HairBase dome (zero worms, zero temple gaps!).
+ * 2. UNIFIED SCULPTED BACK CLAY BELL (`long_wave` & `bob_cut`):
+ * Matches the reference turnaround image cleanly:
+ * - ONE continuous thick sculpted polymer-clay curtain wrapping seamlessly from behind left ear
+ *   around the back to behind right ear (`lon +96° .. +180° / -180° .. -96°`),
+ *   closed cleanly with rounded side-edges and a rounded C-curved scalloped bottom hem!
+ * - Zero intersecting ribbon meshes or jagged hanging strips from side or rear angles!
  */
-function buildFrontHairLocks(
+function createBackClayBellGeometry(
+  style: 'long_wave' | 'bob_cut',
+  crownOffset: number,
+): THREE.BufferGeometry {
+  const isLong = style === 'long_wave';
+  const lonMin = 80; // Tucked smoothly right behind the ears to eliminate side air gap!
+  const lonMax = 280; // Wraps across 180° back to -80° (= 280°)
+  const uSegs = 56;
+  const vSegs = 24;
+
+  const hemBaseY = isLong ? -0.095 : 0.032;
+  const bellRadius = isLong ? 0.364 : 0.354;
+  const outerHalfThick = 0.026;
+
+  const evalBellPoint = (
+    uNorm: number, // 0..1 around back arc (84° -> 276°)
+    v: number, // 0 (crown root) -> 1 (bottom hem)
+    thicknessSign: number, // +1 outer clay surface, -1 solid inner neck-hugging core
+  ): [number, number, number] => {
+    const lonDeg = lonMin + uNorm * (lonMax - lonMin);
+    const rad = (lonDeg * Math.PI) / 180;
+
+    // Gentle rounded scallop & edge tuck toward behind-ear border (uNorm -> 0 or 1)
+    const sideTaper = Math.sin(Math.min(1, Math.max(0, uNorm)) * Math.PI);
+    const edgePinch = 0.25 + 0.75 * Math.pow(sideTaper, 0.36);
+
+    // 5 wide pillowy clay scallops across back (matching the reference back view!)
+    const lobeAngle = (uNorm - 0.5) * Math.PI * 5;
+    const scallopWave = Math.cos(lobeAngle);
+    const lobeCrease = Math.max(0, -scallopWave);
+
+    const hemArch =
+      (isLong ? -0.022 : -0.012) * sideTaper +
+      0.014 * lobeCrease * smoothstep01(0.65, 1.0, v);
+
+    // Top anchor merges inside HairBase dome; behind-ear side edges stay tucked closer to skull/jaw
+    const sidePullIn = 1 - 0.14 * (1 - sideTaper);
+    const rootPt = headSurfacePoint(26, lonDeg, crownOffset * 0.88);
+    const midPt = headSurfacePoint(78, lonDeg, (crownOffset + 0.01) * sidePullIn);
+
+    const midFlare = Math.sin(v * Math.PI);
+    const bottomCurl = smoothstep01(0.62, 1.0, v);
+    const targetR = bellRadius * sidePullIn * (1 + 0.055 * midFlare - 0.08 * bottomCurl);
+
+    const p0 = new THREE.Vector3(...rootPt);
+    const p1 = new THREE.Vector3(...midPt);
+    const p2 = new THREE.Vector3(
+      Math.sin(rad) * targetR * 1.03,
+      HEAD_CY * 0.42 + hemBaseY * 0.32,
+      Math.cos(rad) * targetR * 1.02 - 0.016,
+    );
+    const p3 = new THREE.Vector3(
+      Math.sin(rad) * (targetR - (isLong ? 0.018 : 0.044)),
+      hemBaseY + hemArch,
+      Math.cos(rad) * (targetR - (isLong ? 0.014 : 0.038)) - 0.012,
+    );
+
+    const o = 1 - v;
+    const center = new THREE.Vector3()
+      .addScaledVector(p0, o * o * o)
+      .addScaledVector(p1, 3 * o * o * v)
+      .addScaledVector(p2, 3 * o * v * v)
+      .addScaledVector(p3, v * v * v);
+
+    const radialXZ = new THREE.Vector3(Math.sin(rad), 0.14 * (1 - v), Math.cos(rad)).normalize();
+
+    const fluteDepth =
+      -0.015 *
+      Math.pow(lobeCrease, 1.35) *
+      smoothstep01(0.28, 0.85, v) *
+      (1 - 0.2 * smoothstep01(0.92, 1.0, v));
+
+    if (thicknessSign >= 0) {
+      const vThickEnv =
+        (0.4 + 0.6 * smoothstep01(0.0, 0.25, v)) *
+        (1 - 0.35 * smoothstep01(0.86, 1.0, v));
+      center.addScaledVector(
+        radialXZ,
+        thicknessSign * outerHalfThick * edgePinch * vThickEnv + fluteDepth,
+      );
+    } else {
+      // Inner wall hugs all the way into the neck/skull core (R ~ 0.19-0.24) so NO behind-ear gap can ever appear!
+      const corePull = 0.125 + 0.035 * Math.sin(v * Math.PI);
+      center.addScaledVector(radialXZ, -corePull * edgePinch);
+    }
+    return [center.x, center.y, center.z];
+  };
+
+  // Closed solid shell: outer surface (v=0..1) -> rounded bottom pillow lip -> inner skull/neck core (v=1..0)
+  const outerSteps = vSegs;
+  const lipSteps = 4;
+  const innerSteps = vSegs;
+  const loopPts: {v: number; sign: number}[] = [];
+
+  for (let i = 0; i <= outerSteps; i++) {
+    loopPts.push({v: i / outerSteps, sign: 1});
+  }
+  for (let i = 1; i < lipSteps; i++) {
+    const ang = (i / lipSteps) * Math.PI;
+    loopPts.push({v: 1.0 + 0.028 * Math.sin(ang), sign: Math.cos(ang)});
+  }
+  for (let i = innerSteps; i >= 0; i--) {
+    loopPts.push({v: i / innerSteps, sign: -1});
+  }
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const stride = uSegs + 1;
+
+  for (let iv = 0; iv < loopPts.length; iv++) {
+    const lp = loopPts[iv];
+    const vClamped = Math.min(1, Math.max(0, lp.v));
+    const hemDropExtra = lp.v > 1 ? -(lp.v - 1) * 0.42 : 0;
+    for (let iu = 0; iu <= uSegs; iu++) {
+      const uNorm = iu / uSegs;
+      const pt = evalBellPoint(uNorm, vClamped, lp.sign);
+      positions.push(pt[0], pt[1] + hemDropExtra, pt[2]);
+    }
+  }
+
+  for (let iv = 0; iv < loopPts.length - 1; iv++) {
+    for (let iu = 0; iu < uSegs; iu++) {
+      const a = iv * stride + iu;
+      const b = (iv + 1) * stride + iu;
+      const c = (iv + 1) * stride + (iu + 1);
+      const d = iv * stride + (iu + 1);
+      indices.push(a, b, d);
+      indices.push(b, c, d);
+    }
+  }
+
+  const nLoop = loopPts.length;
+  for (let i = 0; i < outerSteps; i++) {
+    const opp = nLoop - 1 - i;
+    const oppNext = nLoop - 2 - i;
+    indices.push(i * stride, opp * stride, (i + 1) * stride);
+    indices.push((i + 1) * stride, opp * stride, oppNext * stride);
+    const r = uSegs;
+    indices.push(i * stride + r, (i + 1) * stride + r, opp * stride + r);
+    indices.push((i + 1) * stride + r, oppNext * stride + r, opp * stride + r);
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+interface LockStep {
+  lat: number;
+  lon: number;
+  offset: number;
+}
+
+function sampleHeadSteps(
+  steps: LockStep[],
+  samples = 16,
+): [number, number, number][] {
+  if (samples <= 1 || steps.length < 2) {
+    return steps.map((s) => headSurfacePoint(s.lat, s.lon, s.offset));
+  }
+  const paramPts = steps.map((s) => new THREE.Vector3(s.lat, s.lon, s.offset));
+  const curve = new THREE.CatmullRomCurve3(paramPts, false, 'centripetal', 0.5);
+  const out: [number, number, number][] = [];
+  for (let i = 0; i <= samples; i++) {
+    const p = curve.getPointAt(i / samples);
+    out.push(headSurfacePoint(p.x, p.y, p.z));
+  }
+  return out;
+}
+
+interface ClayLockOptions {
+  width: number;
+  depth: number;
+  innerFlatten?: number;
+  ridgeBoost?: number;
+  edgePinch?: number;
+  profile?: 'blade' | 'tuft' | 'quiff' | 'drape' | 'bob' | 'bell';
+  outwardMode?: 'spherical' | 'drape';
+  tubularSegs?: number;
+  radialSegs?: number;
+  roundTipScale?: number;
+}
+
+const _headCenter = new THREE.Vector3(0, HEAD_CY, 0);
+const _fallbackUp = new THREE.Vector3(0, 1, 0);
+
+/**
+ * Clean plush clay lock geometry (reserved ONLY for cheek drapes, tied tails, quiff, and boy_4 ahoge/tips).
+ */
+function createClayLockGeometry(
+  points: [number, number, number][],
+  opts: ClayLockOptions,
+): THREE.BufferGeometry {
+  const {
+    width,
+    depth,
+    innerFlatten = 0.42,
+    ridgeBoost = 0.1,
+    edgePinch = 0.34,
+    profile = 'drape',
+    outwardMode = 'spherical',
+    tubularSegs = 18,
+    radialSegs = 14,
+    roundTipScale = 0.42,
+  } = opts;
+
+  const vecs = points.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+  const curve = new THREE.CatmullRomCurve3(vecs, false, 'centripetal', 0.5);
+
+  const evalProfileScale = (t: number): {wScale: number; dScale: number} => {
+    if (profile === 'blade' || profile === 'tuft') {
+      const rootEase = smoothstep01(0.0, 0.24, t);
+      const swell = 0.84 + 0.24 * Math.sin(Math.pow(t, 0.78) * Math.PI * 0.75);
+      const u = smoothstep01(0.42, 1.0, t);
+      const tip = 1 - (1 - roundTipScale) * Math.pow(u, 1.15);
+      return {
+        wScale: Math.max(0.14, (0.72 + 0.28 * rootEase) * swell * tip),
+        dScale: Math.max(0.14, (0.5 + 0.5 * rootEase) * swell * tip),
+      };
+    }
+    if (profile === 'quiff') {
+      const rootEase = smoothstep01(0.0, 0.24, t);
+      const swell = 0.9 + 0.25 * Math.sin(Math.pow(t, 0.8) * Math.PI);
+      const tipEase = 1 - 0.65 * Math.pow(smoothstep01(0.55, 1.0, t), 1.25);
+      return {
+        wScale: Math.max(0.24, (0.7 + 0.3 * rootEase) * swell * tipEase),
+        dScale: Math.max(0.2, (0.5 + 0.5 * rootEase) * swell * tipEase),
+      };
+    }
+    if (profile === 'bell') {
+      // Smooth plush teardrop ponytail/twin-tail bell shape
+      const rootFlare = 0.42 + 0.72 * Math.sin(Math.pow(t, 0.65) * Math.PI * 0.88);
+      const tipRound = 1 - 0.52 * Math.pow(smoothstep01(0.68, 1.0, t), 1.45);
+      return {
+        wScale: Math.max(0.28, rootFlare * tipRound),
+        dScale: Math.max(0.28, rootFlare * tipRound),
+      };
+    }
+    // 'drape' / 'bob': broad cheek curtain with smooth pillowy mid & gentle rounded tip
+    const rootEase = smoothstep01(0.0, 0.24, t);
+    const swell = 0.9 + 0.18 * Math.sin(smoothstep01(0.1, 0.85, t) * Math.PI);
+    const tipTaper =
+      1 - (1 - Math.max(0.32, roundTipScale)) * Math.pow(smoothstep01(0.66, 1.0, t), 1.35);
+    return {
+      wScale: Math.max(0.3, (0.74 + 0.26 * rootEase) * swell * tipTaper),
+      dScale: Math.max(0.26, (0.56 + 0.44 * rootEase) * swell * tipTaper),
+    };
+  };
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let i = 0; i <= tubularSegs; i++) {
+    const t = i / tubularSegs;
+    const center = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t).normalize();
+
+    let radial: THREE.Vector3;
+    if (outwardMode === 'drape') {
+      const horiz = new THREE.Vector3(center.x, 0.05, center.z - 0.02);
+      const sph = center.clone().sub(_headCenter);
+      const mix = smoothstep01(0.32, 0.0, center.y);
+      radial = sph.normalize().lerp(horiz.normalize(), mix).normalize();
+    } else {
+      radial = center.clone().sub(_headCenter);
+      if (radial.lengthSq() < 1e-5) radial.set(0, 0, 1);
+      radial.normalize();
+    }
+
+    const outDir = radial.clone().addScaledVector(tan, -radial.dot(tan));
+    if (outDir.lengthSq() < 1e-4) {
+      outDir.copy(_fallbackUp).addScaledVector(tan, -_fallbackUp.dot(tan));
+      if (outDir.lengthSq() < 1e-4) outDir.set(0, 0, 1);
+    }
+    outDir.normalize();
+
+    const sideDir = tan.clone().cross(outDir).normalize();
+    const {wScale, dScale} = evalProfileScale(t);
+    const endRound = i === 0 ? 0.68 : i === tubularSegs ? 0.56 : 1.0;
+    const w = width * wScale * endRound;
+    const h = depth * dScale * endRound;
+
+    for (let j = 0; j < radialSegs; j++) {
+      const theta = (j / radialSegs) * Math.PI * 2;
+      const cos = Math.cos(theta);
+      const sin = Math.sin(theta);
+
+      const sx = Math.sign(cos) * Math.pow(Math.abs(cos), 0.78);
+      const absSin = Math.abs(sin);
+      const edgeTaper = edgePinch + (1 - edgePinch) * Math.pow(absSin, 0.6);
+      const sy = Math.sign(sin) * Math.pow(absSin, 0.76) * edgeTaper;
+      const lateral = sx * w;
+      const ridge = sy > 0 ? 1 + ridgeBoost * Math.pow(absSin, 1.5) : innerFlatten;
+      const out = sy * h * ridge;
+
+      positions.push(
+        center.x + sideDir.x * lateral + outDir.x * out,
+        center.y + sideDir.y * lateral + outDir.y * out,
+        center.z + sideDir.z * lateral + outDir.z * out,
+      );
+    }
+  }
+
+  for (let i = 0; i < tubularSegs; i++) {
+    const rowA = i * radialSegs;
+    const rowB = (i + 1) * radialSegs;
+    for (let j = 0; j < radialSegs; j++) {
+      const nextJ = (j + 1) % radialSegs;
+      const a = rowA + j;
+      const b = rowB + j;
+      const c = rowB + nextJ;
+      const d = rowA + nextJ;
+      indices.push(a, b, d);
+      indices.push(b, c, d);
+    }
+  }
+
+  const startCenterIdx = positions.length / 3;
+  const p0 = curve.getPointAt(0);
+  const t0 = curve.getTangentAt(0).normalize();
+  positions.push(p0.x - t0.x * 0.005, p0.y - t0.y * 0.005, p0.z - t0.z * 0.005);
+  for (let j = 0; j < radialSegs; j++) {
+    indices.push(startCenterIdx, j, (j + 1) % radialSegs);
+  }
+
+  const endCenterIdx = positions.length / 3;
+  const p1 = curve.getPointAt(1);
+  const t1 = curve.getTangentAt(1).normalize();
+  positions.push(p1.x + t1.x * 0.01, p1.y + t1.y * 0.01, p1.z + t1.z * 0.01);
+  const lastRow = tubularSegs * radialSegs;
+  for (let j = 0; j < radialSegs; j++) {
+    indices.push(endCenterIdx, lastRow + ((j + 1) % radialSegs), lastRow + j);
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+/**
+ * Minimal sculpted front accents (ONLY for signature styles that raise volume above the smooth hood:
+ * `short_crop` plush quiff, `boy_3` upper anime petals, `boy_4` left-side tips & ahoge).
+ * Standard bangs are now sculpted DIRECTLY into `HairBase` for a 100% seamless clay silhouette!
+ */
+function buildFrontSignatureAccents(
   hairBack: HairBackStyle,
-  hairFront: HairFrontStyle,
   hairMat: THREE.Material,
   hatMode: HatFitMode,
+  crownOuterOffset: number,
 ): THREE.Group {
   const grp = new THREE.Group();
   grp.name = 'FrontHair';
-  const male = isMaleStyle(hairBack);
-  const isHatCap = hatMode === 'crown_cap';
-  // Emerge organically from inside the plush volumetric crown (~0.082-0.098m loft!)
-  const rootOff = isHatCap ? 0.015 : 0.082;
-  const midOffLift = isHatCap ? -0.056 : 0.042;
-  const endOffBase = isHatCap ? 0.02 : 0.032;
+  const isSnugCap = hatMode === 'snug_cap';
 
-  const addBlade = (
-    steps: LockStep[],
-    width: number,
-    depth: number,
-    opts?: Partial<ClayLockOptions>,
-  ) => {
-    const adjusted = steps.map((s, idx) => {
-      const lat = isHatCap && idx === 0 ? Math.max(s.lat, 36) : s.lat;
-      let offset = s.offset;
-      if (idx === 0) {
-        offset = isHatCap ? Math.min(s.offset, 0.015) : Math.max(s.offset, rootOff);
-      } else if (idx === 1) {
-        offset = isHatCap ? Math.max(0.02, s.offset - 0.034) : Math.max(s.offset + midOffLift, 0.09);
-      } else {
-        offset = isHatCap ? Math.max(0.018, s.offset - 0.005) : Math.max(s.offset, endOffBase);
-      }
-      return {lat, lon: s.lon, offset};
-    });
-
-    grp.add(
-      new THREE.Mesh(
-        createClayLockGeometry(sampleHeadSteps(adjusted, 16), {
-          width,
-          depth,
-          innerFlatten: 0.3,
-          ridgeBoost: 0.16,
-          edgePinch: 0.24,
-          profile: 'blade',
-          tubularSegs: 16,
-          radialSegs: 12,
-          roundTipScale: 0.14,
-          ...opts,
-        }),
-        hairMat,
-      ),
-    );
-  };
-
-  // ---- MALE 1: Fluffy Nendoroid Layered Chibi Crop ----
-  if (hairBack === 'boy_1') {
-    const cropBlades: Array<{
-      l0: number;
-      lMid: number;
-      lEnd: number;
-      latEnd: number;
-      midOff: number;
-      w: number;
-      d: number;
-    }> = [
-      {l0: 12, lMid: 2, lEnd: -4, latEnd: 79, midOff: 0.06, w: 0.076, d: 0.033},
-      {l0: 4, lMid: -10, lEnd: -16, latEnd: 81, midOff: 0.06, w: 0.072, d: 0.032},
-      {l0: -6, lMid: -23, lEnd: -30, latEnd: 78, midOff: 0.058, w: 0.07, d: 0.031},
-      {l0: -18, lMid: -36, lEnd: -44, latEnd: 81, midOff: 0.056, w: 0.068, d: 0.03},
-      {l0: -28, lMid: -48, lEnd: -57, latEnd: 92, midOff: 0.054, w: 0.066, d: 0.029},
-      {l0: -38, lMid: -56, lEnd: -64, latEnd: 98, midOff: 0.05, w: 0.062, d: 0.027},
-      {l0: 16, lMid: 18, lEnd: 17, latEnd: 80, midOff: 0.06, w: 0.074, d: 0.032},
-      {l0: 22, lMid: 30, lEnd: 33, latEnd: 78, midOff: 0.058, w: 0.07, d: 0.031},
-      {l0: 28, lMid: 42, lEnd: 46, latEnd: 82, midOff: 0.056, w: 0.068, d: 0.03},
-      {l0: 34, lMid: 52, lEnd: 59, latEnd: 92, midOff: 0.054, w: 0.066, d: 0.029},
-      {l0: 40, lMid: 58, lEnd: 64, latEnd: 98, midOff: 0.05, w: 0.062, d: 0.027},
-    ];
-    cropBlades.forEach((b) =>
-      addBlade(
-        [
-          {lat: 12, lon: b.l0, offset: 0.084},
-          {lat: 46, lon: b.lMid, offset: b.midOff},
-          {lat: b.latEnd, lon: b.lEnd, offset: 0.034},
+  if (hairBack === 'short_crop' && !isSnugCap) {
+    const quiffWaves: {steps: LockStep[]; w: number; d: number}[] = [
+      {
+        steps: [
+          {lat: 64, lon: -4, offset: 0.068},
+          {lat: 36, lon: -14, offset: crownOuterOffset + 0.024},
+          {lat: 16, lon: -26, offset: crownOuterOffset + 0.012},
         ],
-        b.w,
-        b.d,
-      ),
-    );
-    return grp;
-  }
-
-  // ---- MALE 2: Fluffy Korean 6:4 Curtain Part (Rich crown loft, ZERO temple gaps) ----
-  if (hairBack === 'boy_2') {
-    [-1, 1].forEach((side) => {
-      const curtainBlades: Array<{
-        l0: number;
-        lMid: number;
-        lEnd: number;
-        latEnd: number;
-        midOff: number;
-        endOff: number;
-        w: number;
-      }> = [
-        {
-          l0: side * 2,
-          lMid: side * 16,
-          lEnd: side * 23,
-          latEnd: 80,
-          midOff: 0.066,
-          endOff: 0.036,
-          w: 0.076,
-        },
-        {
-          l0: side * 8,
-          lMid: side * 27,
-          lEnd: side * 36,
-          latEnd: 82,
-          midOff: 0.064,
-          endOff: 0.035,
-          w: 0.074,
-        },
-        {
-          l0: side * 15,
-          lMid: side * 39,
-          lEnd: side * 48,
-          latEnd: 85,
-          midOff: 0.06,
-          endOff: 0.032,
-          w: 0.072,
-        },
-        {
-          l0: side * 24,
-          lMid: side * 49,
-          lEnd: side * 57,
-          latEnd: 92,
-          midOff: 0.056,
-          endOff: 0.028,
-          w: 0.068,
-        },
-        {
-          l0: side * 34,
-          lMid: side * 57,
-          lEnd: side * 63,
-          latEnd: 98,
-          midOff: 0.052,
-          endOff: 0.026,
-          w: 0.064,
-        },
-      ];
-      curtainBlades.forEach((b) =>
-        addBlade(
-          [
-            {lat: 12, lon: b.l0, offset: 0.084},
-            {lat: 46, lon: b.lMid, offset: b.midOff},
-            {lat: b.latEnd, lon: b.lEnd, offset: b.endOff},
-          ],
-          b.w,
-          0.032,
-          {roundTipScale: 0.16},
+        w: 0.095,
+        d: 0.04,
+      },
+      {
+        steps: [
+          {lat: 64, lon: 18, offset: 0.066},
+          {lat: 38, lon: 6, offset: crownOuterOffset + 0.02},
+          {lat: 18, lon: -6, offset: crownOuterOffset + 0.01},
+        ],
+        w: 0.088,
+        d: 0.036,
+      },
+    ];
+    quiffWaves.forEach((q) =>
+      grp.add(
+        new THREE.Mesh(
+          createClayLockGeometry(sampleHeadSteps(q.steps, 14), {
+            width: q.w,
+            depth: q.d,
+            profile: 'quiff',
+            roundTipScale: 0.28,
+          }),
+          hairMat,
         ),
-      );
-    });
-    return grp;
-  }
-
-  // ---- MALE 3: Extra-Fluffy Tousled Anime Clay Hair (Kaworu reference) ----
-  if (hairBack === 'boy_3') {
-    const frontTufts: Array<{
-      l0: number;
-      lMid: number;
-      lEnd: number;
-      latEnd: number;
-      midOff: number;
-      w: number;
-      d: number;
-    }> = [
-      {l0: 14, lMid: 4, lEnd: -3, latEnd: 81, midOff: 0.068, w: 0.078, d: 0.035},
-      {l0: 4, lMid: -12, lEnd: -21, latEnd: 79, midOff: 0.066, w: 0.074, d: 0.034},
-      {l0: -10, lMid: -28, lEnd: -39, latEnd: 82, midOff: 0.064, w: 0.072, d: 0.032},
-      {l0: -22, lMid: -44, lEnd: -55, latEnd: 88, midOff: 0.06, w: 0.07, d: 0.03},
-      {l0: -32, lMid: -55, lEnd: -63, latEnd: 98, midOff: 0.056, w: 0.066, d: 0.028},
-      {l0: 20, lMid: 20, lEnd: 16, latEnd: 80, midOff: 0.066, w: 0.074, d: 0.034},
-      {l0: 28, lMid: 34, lEnd: 36, latEnd: 79, midOff: 0.064, w: 0.072, d: 0.032},
-      {l0: 36, lMid: 48, lEnd: 56, latEnd: 88, midOff: 0.06, w: 0.07, d: 0.03},
-      {l0: 42, lMid: 56, lEnd: 63, latEnd: 98, midOff: 0.056, w: 0.066, d: 0.028},
-    ];
-    frontTufts.forEach((b) =>
-      addBlade(
-        [
-          {lat: 12, lon: b.l0, offset: 0.086},
-          {lat: 45, lon: b.lMid, offset: b.midOff},
-          {lat: b.latEnd, lon: b.lEnd, offset: 0.034},
+      ),
+    );
+  } else if (hairBack === 'boy_3' && !isSnugCap) {
+    const upperPetals: {steps: LockStep[]; w: number; d: number}[] = [
+      {
+        steps: [
+          {lat: 12, lon: 14, offset: crownOuterOffset - 0.004},
+          {lat: 30, lon: -10, offset: crownOuterOffset + 0.026},
+          {lat: 54, lon: -28, offset: crownOuterOffset + 0.012},
         ],
-        b.w,
-        b.d,
-        {profile: 'tuft', roundTipScale: 0.12},
+        w: 0.092,
+        d: 0.038,
+      },
+      {
+        steps: [
+          {lat: 12, lon: 28, offset: crownOuterOffset - 0.004},
+          {lat: 28, lon: 60, offset: crownOuterOffset + 0.022},
+          {lat: 50, lon: 84, offset: crownOuterOffset + 0.008},
+        ],
+        w: 0.088,
+        d: 0.036,
+      },
+      {
+        steps: [
+          {lat: 12, lon: -28, offset: crownOuterOffset - 0.004},
+          {lat: 28, lon: -62, offset: crownOuterOffset + 0.022},
+          {lat: 50, lon: -86, offset: crownOuterOffset + 0.008},
+        ],
+        w: 0.088,
+        d: 0.036,
+      },
+    ];
+    upperPetals.forEach((p) =>
+      grp.add(
+        new THREE.Mesh(
+          createClayLockGeometry(sampleHeadSteps(p.steps, 14), {
+            width: p.w,
+            depth: p.d,
+            profile: 'tuft',
+            roundTipScale: 0.16,
+          }),
+          hairMat,
+        ),
+      ),
+    );
+  } else if (hairBack === 'boy_4' && !isSnugCap) {
+    // Two clean sculpted outward tips on viewer's left (-lon) + top cowlick ahoge
+    const leftFlares: LockStep[][] = [
+      [
+        {lat: 30, lon: -50, offset: crownOuterOffset - 0.004},
+        {lat: 56, lon: -68, offset: crownOuterOffset + 0.012},
+        {lat: 70, lon: -78, offset: crownOuterOffset + 0.044},
+      ],
+      [
+        {lat: 38, lon: -56, offset: crownOuterOffset - 0.004},
+        {lat: 66, lon: -72, offset: crownOuterOffset + 0.006},
+        {lat: 82, lon: -82, offset: crownOuterOffset + 0.036},
+      ],
+    ];
+    leftFlares.forEach((steps) =>
+      grp.add(
+        new THREE.Mesh(
+          createClayLockGeometry(sampleHeadSteps(steps, 12), {
+            width: 0.068,
+            depth: 0.03,
+            profile: 'tuft',
+            edgePinch: 0.22,
+            roundTipScale: 0.1,
+          }),
+          hairMat,
+        ),
       ),
     );
 
-    if (!isHatCap) {
-      const upperPetals: Array<{steps: LockStep[]; w: number; d: number}> = [
-        {
-          steps: [
-            {lat: 10, lon: 16, offset: 0.088},
-            {lat: 30, lon: -6, offset: 0.122},
-            {lat: 54, lon: -24, offset: 0.106},
-          ],
-          w: 0.084,
-          d: 0.038,
-        },
-        {
-          steps: [
-            {lat: 14, lon: -12, offset: 0.088},
-            {lat: 34, lon: -38, offset: 0.12},
-            {lat: 58, lon: -58, offset: 0.1},
-        ],
-          w: 0.08,
-          d: 0.036,
-        },
-        {
-          steps: [
-            {lat: 12, lon: 22, offset: 0.088},
-            {lat: 30, lon: 42, offset: 0.118},
-            {lat: 56, lon: 58, offset: 0.098},
-          ],
-          w: 0.08,
-          d: 0.036,
-        },
-        {
-          steps: [
-            {lat: 12, lon: 40, offset: 0.088},
-            {lat: 24, lon: 78, offset: 0.12},
-            {lat: 48, lon: 92, offset: 0.098},
-          ],
-          w: 0.082,
-          d: 0.036,
-        },
-        {
-          steps: [
-            {lat: 12, lon: -40, offset: 0.088},
-            {lat: 24, lon: -78, offset: 0.12},
-            {lat: 48, lon: -92, offset: 0.098},
-          ],
-          w: 0.082,
-          d: 0.036,
-        },
-      ];
-      upperPetals.forEach((p) =>
-        addBlade(p.steps, p.w, p.d, {profile: 'tuft', roundTipScale: 0.12}),
-      );
-    }
-    return grp;
-  }
-
-  // ---- MALE 4: Plush Nendoroid Reference Hair ("Tóc Nam 4" - big fluffy cloud + crisp bangs) ----
-  if (hairBack === 'boy_4') {
-    const refBangs: Array<{
-      l0: number;
-      lMid: number;
-      lEnd: number;
-      latEnd: number;
-      midOff: number;
-      w: number;
-      d: number;
-    }> = [
-      {l0: -38, lMid: -53, lEnd: -61, latEnd: 103, midOff: 0.062, w: 0.068, d: 0.028},
-      {l0: -28, lMid: -45, lEnd: -51, latEnd: 88, midOff: 0.064, w: 0.064, d: 0.028},
-      {l0: -20, lMid: -34, lEnd: -38, latEnd: 81, midOff: 0.066, w: 0.062, d: 0.029},
-      {l0: -12, lMid: -22, lEnd: -25, latEnd: 80, midOff: 0.067, w: 0.062, d: 0.029},
-      {l0: -4, lMid: -10, lEnd: -12, latEnd: 79, midOff: 0.067, w: 0.058, d: 0.028},
-      {l0: 4, lMid: 5, lEnd: 8, latEnd: 84, midOff: 0.068, w: 0.062, d: 0.03},
-      {l0: 12, lMid: 19, lEnd: 22, latEnd: 79, midOff: 0.067, w: 0.06, d: 0.029},
-      {l0: 20, lMid: 30, lEnd: 34, latEnd: 81, midOff: 0.066, w: 0.062, d: 0.029},
-      {l0: 28, lMid: 42, lEnd: 48, latEnd: 86, midOff: 0.064, w: 0.064, d: 0.028},
-      {l0: 38, lMid: 54, lEnd: 60, latEnd: 103, midOff: 0.062, w: 0.068, d: 0.029},
-    ];
-    refBangs.forEach((b) =>
-      addBlade(
-        [
-          {lat: 12, lon: b.l0, offset: 0.088},
-          {lat: 46, lon: b.lMid, offset: b.midOff},
-          {lat: b.latEnd, lon: b.lEnd, offset: 0.032},
-        ],
-        b.w,
-        b.d,
-        {
-          edgePinch: 0.16,
-          ridgeBoost: 0.16,
-          roundTipScale: 0.07,
-        },
-      ),
-    );
-
-    if (!isHatCap) {
-      // 2 iconic flared-out side tips poking diagonally out beyond the plush dome on viewer's left (-lon)
-      const leftFlares: LockStep[][] = [
-        [
-          {lat: 30, lon: -50, offset: 0.09},
-          {lat: 56, lon: -66, offset: 0.105},
-          {lat: 70, lon: -77, offset: 0.142},
-        ],
-        [
-          {lat: 38, lon: -56, offset: 0.09},
-          {lat: 66, lon: -72, offset: 0.098},
-          {lat: 82, lon: -81, offset: 0.132},
-        ],
-      ];
-      leftFlares.forEach((steps) =>
-        addBlade(steps, 0.062, 0.028, {
-          profile: 'tuft',
-          edgePinch: 0.15,
-          roundTipScale: 0.07,
-        }),
-      );
-
-      // Prominent cute top crown cowlick (ahoge) rising cleanly above the plush 0.10m dome
+    if (hatMode === 'none') {
       grp.add(
         new THREE.Mesh(
           createClayLockGeometry(
             [
-              [0.018, HEAD_CY + HEAD_RY + 0.082, -0.012],
-              [0.038, HEAD_CY + HEAD_RY + 0.132, -0.018],
-              [0.058, HEAD_CY + HEAD_RY + 0.172, -0.024],
+              [0.018, HEAD_CY + HEAD_RY + crownOuterOffset - 0.014, -0.012],
+              [0.038, HEAD_CY + HEAD_RY + crownOuterOffset + 0.034, -0.018],
+              [0.056, HEAD_CY + HEAD_RY + crownOuterOffset + 0.072, -0.024],
             ],
             {
               width: 0.022,
               depth: 0.014,
               innerFlatten: 0.65,
-              edgePinch: 0.22,
               profile: 'tuft',
               tubularSegs: 10,
               radialSegs: 8,
-              roundTipScale: 0.07,
+              roundTipScale: 0.08,
             },
           ),
           hairMat,
-        ),
-      );
-    }
-    return grp;
-  }
-
-  // ---- MALE 5: Fluffy Short Crop (Textured Voluminous Swept Quiff + under-brim hat variant) ----
-  if (hairBack === 'short_crop') {
-    if (!isHatCap) {
-      const quiffBlades: Array<{steps: LockStep[]; w: number; d: number}> = [
-        {
-          steps: [
-            {lat: 64, lon: -4, offset: 0.066},
-            {lat: 38, lon: -12, offset: 0.118},
-            {lat: 16, lon: -24, offset: 0.104},
-          ],
-          w: 0.086,
-          d: 0.038,
-        },
-        {
-          steps: [
-            {lat: 64, lon: 16, offset: 0.064},
-            {lat: 40, lon: 4, offset: 0.114},
-            {lat: 18, lon: -8, offset: 0.102},
-          ],
-          w: 0.08,
-          d: 0.036,
-        },
-        {
-          steps: [
-            {lat: 66, lon: -26, offset: 0.062},
-            {lat: 44, lon: -34, offset: 0.106},
-            {lat: 24, lon: -40, offset: 0.094},
-          ],
-          w: 0.074,
-          d: 0.032,
-        },
-        {
-          steps: [
-            {lat: 66, lon: 34, offset: 0.062},
-            {lat: 46, lon: 26, offset: 0.1},
-            {lat: 26, lon: 16, offset: 0.09},
-          ],
-          w: 0.072,
-          d: 0.03,
-        },
-        // Forehead-framing wispy brow locks so front never looks bald under quiff
-        {
-          steps: [
-            {lat: 22, lon: 18, offset: 0.082},
-            {lat: 52, lon: 38, offset: 0.068},
-            {lat: 78, lon: 52, offset: 0.034},
-          ],
-          w: 0.068,
-          d: 0.028,
-        },
-        {
-          steps: [
-            {lat: 22, lon: -18, offset: 0.082},
-            {lat: 52, lon: -40, offset: 0.068},
-            {lat: 78, lon: -54, offset: 0.034},
-          ],
-          w: 0.068,
-          d: 0.028,
-        },
-      ];
-      quiffBlades.forEach((q) =>
-        addBlade(q.steps, q.w, q.d, {profile: 'quiff', roundTipScale: 0.22}),
-      );
-    } else {
-      addBlade(
-        [
-          {lat: 36, lon: 14, offset: 0.016},
-          {lat: 56, lon: -4, offset: 0.032},
-          {lat: 72, lon: -20, offset: 0.022},
-        ],
-        0.076,
-        0.024,
-      );
-      addBlade(
-        [
-          {lat: 38, lon: -8, offset: 0.016},
-          {lat: 58, lon: -24, offset: 0.03},
-          {lat: 74, lon: -40, offset: 0.02},
-        ],
-        0.068,
-        0.022,
-      );
-      addBlade(
-        [
-          {lat: 38, lon: 22, offset: 0.016},
-          {lat: 58, lon: 34, offset: 0.03},
-          {lat: 74, lon: 46, offset: 0.02},
-        ],
-        0.064,
-        0.022,
-      );
-    }
-    return grp;
-  }
-
-  // ---- FEMALE BANGS ('air_bangs' | 'side_sweep' | 'curtain' | 'neat_fringe') ----
-  if (!male) {
-    if (hairFront === 'neat_fringe') {
-      const fringe = [
-        {l0: 0, lMid: 0, lEnd: 0, latEnd: 79, w: 0.078},
-        {l0: -10, lMid: -13, lEnd: -15, latEnd: 79, w: 0.074},
-        {l0: 10, lMid: 13, lEnd: 15, latEnd: 79, w: 0.074},
-        {l0: -20, lMid: -26, lEnd: -30, latEnd: 78.5, w: 0.072},
-        {l0: 20, lMid: 26, lEnd: 30, latEnd: 78.5, w: 0.072},
-        {l0: -30, lMid: -39, lEnd: -44, latEnd: 80, w: 0.07},
-        {l0: 30, lMid: 39, lEnd: 44, latEnd: 80, w: 0.07},
-        {l0: -38, lMid: -52, lEnd: -58, latEnd: 88, w: 0.068},
-        {l0: 38, lMid: 52, lEnd: 58, latEnd: 88, w: 0.068},
-      ];
-      fringe.forEach((b) =>
-        addBlade(
-          [
-            {lat: 12, lon: b.l0, offset: 0.082},
-            {lat: 46, lon: b.lMid, offset: 0.062},
-            {lat: b.latEnd, lon: b.lEnd, offset: 0.032},
-          ],
-          b.w,
-          0.032,
-          {roundTipScale: 0.22},
-        ),
-      );
-    } else if (hairFront === 'curtain') {
-      [-1, 1].forEach((side) => {
-        const blades = [
-          {l0: side * 2, lMid: side * 18, lEnd: side * 27, latEnd: 80, w: 0.076},
-          {l0: side * 10, lMid: side * 30, lEnd: side * 41, latEnd: 84, w: 0.074},
-          {l0: side * 20, lMid: side * 44, lEnd: side * 54, latEnd: 90, w: 0.07},
-          {l0: side * 30, lMid: side * 54, lEnd: side * 62, latEnd: 96, w: 0.066},
-        ];
-        blades.forEach((b) =>
-          addBlade(
-            [
-              {lat: 12, lon: b.l0, offset: 0.082},
-              {lat: 46, lon: b.lMid, offset: 0.064},
-              {lat: b.latEnd, lon: b.lEnd, offset: 0.032},
-            ],
-            b.w,
-            0.032,
-            {roundTipScale: 0.18},
-          ),
-        );
-      });
-    } else if (hairFront === 'side_sweep') {
-      const sweeps = [
-        {l0: -20, lMid: -4, lEnd: 12, latEnd: 78, w: 0.078},
-        {l0: -14, lMid: 10, lEnd: 28, latEnd: 79, w: 0.074},
-        {l0: -4, lMid: 24, lEnd: 42, latEnd: 82, w: 0.072},
-        {l0: 8, lMid: 40, lEnd: 56, latEnd: 88, w: 0.068},
-        {l0: -24, lMid: -37, lEnd: -46, latEnd: 82, w: 0.072},
-        {l0: -32, lMid: -50, lEnd: -59, latEnd: 90, w: 0.068},
-      ];
-      sweeps.forEach((b) =>
-        addBlade(
-          [
-            {lat: 12, lon: b.l0, offset: 0.082},
-            {lat: 46, lon: b.lMid, offset: 0.064},
-            {lat: b.latEnd, lon: b.lEnd, offset: 0.032},
-          ],
-          b.w,
-          0.032,
-          {roundTipScale: 0.18},
-        ),
-      );
-    } else {
-      // air_bangs: delicate airy bangs puffing smoothly out from plush crown
-      const airLocks = [
-        {l0: -1, lMid: -2, lEnd: -2, latEnd: 79, w: 0.06},
-        {l0: 11, lMid: 15, lEnd: 18, latEnd: 78, w: 0.06},
-        {l0: -13, lMid: -17, lEnd: -20, latEnd: 78, w: 0.06},
-        {l0: 22, lMid: 31, lEnd: 38, latEnd: 81, w: 0.066},
-        {l0: -24, lMid: -33, lEnd: -40, latEnd: 81, w: 0.066},
-        {l0: 32, lMid: 46, lEnd: 56, latEnd: 88, w: 0.068},
-        {l0: -34, lMid: -48, lEnd: -57, latEnd: 88, w: 0.068},
-      ];
-      airLocks.forEach((b) =>
-        addBlade(
-          [
-            {lat: 12, lon: b.l0, offset: 0.082},
-            {lat: 46, lon: b.lMid, offset: 0.062},
-            {lat: b.latEnd, lon: b.lEnd, offset: 0.031},
-          ],
-          b.w,
-          0.03,
-          {roundTipScale: 0.16},
         ),
       );
     }
@@ -1121,74 +1006,49 @@ function buildFrontHairLocks(
 }
 
 /**
- * 3. SIDE HAIR:
- * Seamless sculpted clay sideburn & behind-ear volume layers bridging FrontHair to BackHair.
+ * 3. SIDE CHEEK DRAPES:
+ * Thick, pillowy, smoothly curved clay cheek curtains for female styles (`long_wave`, `bob_cut`,
+ * and tied styles) framing the face in front of the ears with soft inward curl.
  */
-function buildSideHairLocks(
+function buildSideCheekDrapes(
   hairBack: HairBackStyle,
   hairMat: THREE.Material,
+  crownOffset: number,
   hatMode: HatFitMode,
 ): THREE.Group {
   const grp = new THREE.Group();
   grp.name = 'SideHair';
 
-  const male = isMaleStyle(hairBack);
-  const isLong = hairBack === 'long_wave';
-  const isBob = hairBack === 'bob_cut';
-  const isHatCap = hatMode === 'crown_cap';
-  const topLat = isHatCap ? 36 : 16;
-  const topOff = isHatCap ? 0.016 : 0.084;
-  const midSideOff = isHatCap ? 0.036 : 0.088;
+  if (isMaleStyle(hairBack)) {
+    // Male sideburns and over-ear shapes are smoothly sculpted directly into the unified HairBase!
+    return grp;
+  }
+
+  const rootOff = crownOffset * 0.9;
+  const sideOff = hatMode === 'snug_cap' ? 0.068 : crownOffset + 0.008;
 
   [-1, 1].forEach((side) => {
-    if (male) {
-      // Plush sideburn lock curving slightly toward cheek in front of ear + fuller behind-ear layer
-      const burnLen =
-        hairBack === 'boy_2' ? 110 : hairBack === 'boy_3' ? 108 : hairBack === 'boy_4' ? 108 : 104;
-      const burnPts = sampleHeadSteps(
-        [
-          {lat: topLat + 4, lon: side * 46, offset: topOff},
-          {lat: 68, lon: side * 62, offset: midSideOff},
-          {lat: burnLen, lon: side * 60, offset: 0.026},
-        ],
-        14,
-      );
+    if (hairBack === 'long_wave') {
+      // Broad smooth clay cheek drape hugging cheek/jaw cleanly with zero air gap
+      const pts: [number, number, number][] = [
+        headSurfacePoint(26, side * 56, rootOff),
+        headSurfacePoint(74, side * 66, sideOff * 0.56),
+        [side * 0.304, 0.19, 0.068],
+        [side * 0.286, 0.055, 0.068],
+        [side * 0.242, -0.082, 0.072],
+      ];
       grp.add(
         new THREE.Mesh(
-          createClayLockGeometry(burnPts, {
-            width: 0.068,
-            depth: 0.032,
-            innerFlatten: 0.3,
-            edgePinch: 0.26,
-            profile: 'blade',
-            tubularSegs: 14,
-            radialSegs: 12,
-            roundTipScale: 0.14,
-          }),
-          hairMat,
-        ),
-      );
-
-      // Behind-ear voluminous tapered nape-framing tuft
-      const behindPts = sampleHeadSteps(
-        [
-          {lat: topLat + 2, lon: side * 86, offset: topOff},
-          {lat: 74, lon: side * 104, offset: midSideOff},
-          {lat: hairBack === 'boy_2' ? 120 : 114, lon: side * 108, offset: 0.03},
-        ],
-        14,
-      );
-      grp.add(
-        new THREE.Mesh(
-          createClayLockGeometry(behindPts, {
-            width: 0.084,
-            depth: 0.034,
-            innerFlatten: 0.32,
-            edgePinch: 0.28,
-            profile: 'blade',
-            tubularSegs: 14,
-            radialSegs: 12,
-            roundTipScale: 0.18,
+          createClayLockGeometry(pts, {
+            width: 0.098,
+            depth: 0.048,
+            innerFlatten: 0.72,
+            edgePinch: 0.42,
+            profile: 'drape',
+            outwardMode: 'drape',
+            tubularSegs: 20,
+            radialSegs: 14,
+            roundTipScale: 0.48,
           }),
           hairMat,
         ),
@@ -1196,97 +1056,26 @@ function buildSideHairLocks(
       return;
     }
 
-    if (isLong) {
-      // 1) Plush face-framing cheek tendril with bouncy outer volume
-      const cheekPts: [number, number, number][] = [
-        headSurfacePoint(topLat + 4, side * 52, topOff),
-        headSurfacePoint(72, side * 62, midSideOff),
-        [side * 0.348, 0.21, 0.105],
-        [side * 0.326, 0.05, 0.104],
-        [side * 0.292, -0.11, 0.116],
+    if (hairBack === 'bob_cut') {
+      const pts: [number, number, number][] = [
+        headSurfacePoint(26, side * 56, rootOff),
+        headSurfacePoint(74, side * 66, sideOff * 0.56),
+        [side * 0.302, 0.19, 0.064],
+        [side * 0.268, 0.098, 0.07],
+        [side * 0.214, 0.046, 0.078],
       ];
       grp.add(
         new THREE.Mesh(
-          createClayLockGeometry(cheekPts, {
-            width: 0.074,
-            depth: 0.036,
-            innerFlatten: 0.38,
-            profile: 'wave',
-            outwardMode: 'drape',
-            tubularSegs: 18,
-            radialSegs: 12,
-          }),
-          hairMat,
-        ),
-      );
-
-      // 2) Full puffy side-shoulder wave behind ear bridging seamlessly into BackHair
-      const shoulderPts: [number, number, number][] = [
-        headSurfacePoint(topLat + 2, side * 88, topOff),
-        headSurfacePoint(74, side * 105, midSideOff + 0.008),
-        [side * 0.388, 0.19, -0.052],
-        [side * 0.386, 0.01, -0.095],
-        [side * 0.352, -0.15, -0.075],
-      ];
-      grp.add(
-        new THREE.Mesh(
-          createClayLockGeometry(shoulderPts, {
-            width: 0.108,
-            depth: 0.044,
-            innerFlatten: 0.42,
-            profile: 'wave',
-            outwardMode: 'drape',
-            tubularSegs: 18,
-            radialSegs: 12,
-          }),
-          hairMat,
-        ),
-      );
-      return;
-    }
-
-    if (isBob) {
-      // 1) Fluffy inward-tucked cheek bob curl
-      const cheekPts: [number, number, number][] = [
-        headSurfacePoint(topLat + 4, side * 54, topOff),
-        headSurfacePoint(72, side * 62, midSideOff),
-        [side * 0.352, 0.21, 0.092],
-        [side * 0.308, 0.095, 0.098],
-        [side * 0.246, 0.042, 0.108],
-      ];
-      grp.add(
-        new THREE.Mesh(
-          createClayLockGeometry(cheekPts, {
-            width: 0.078,
-            depth: 0.038,
-            innerFlatten: 0.38,
+          createClayLockGeometry(pts, {
+            width: 0.096,
+            depth: 0.046,
+            innerFlatten: 0.72,
+            edgePinch: 0.42,
             profile: 'bob',
             outwardMode: 'drape',
-            tubularSegs: 16,
-            radialSegs: 12,
-          }),
-          hairMat,
-        ),
-      );
-
-      // 2) Fluffy behind-ear bob C-curl layer
-      const sideBobPts: [number, number, number][] = [
-        headSurfacePoint(topLat + 2, side * 90, topOff),
-        headSurfacePoint(74, side * 106, midSideOff + 0.008),
-        [side * 0.372, 0.19, -0.052],
-        [side * 0.336, 0.08, -0.075],
-        [side * 0.268, 0.042, -0.04],
-      ];
-      grp.add(
-        new THREE.Mesh(
-          createClayLockGeometry(sideBobPts, {
-            width: 0.108,
-            depth: 0.044,
-            innerFlatten: 0.42,
-            profile: 'bob',
-            outwardMode: 'drape',
-            tubularSegs: 16,
-            radialSegs: 12,
+            tubularSegs: 18,
+            radialSegs: 14,
+            roundTipScale: 0.46,
           }),
           hairMat,
         ),
@@ -1294,24 +1083,25 @@ function buildSideHairLocks(
       return;
     }
 
-    // Tied styles (ponytail, twin_tails, twin_buns): plush cheek tendrils emerging cleanly
-    const wispPts: [number, number, number][] = [
-      headSurfacePoint(36, side * 54, isHatCap ? 0.022 : 0.078),
-      headSurfacePoint(74, side * 60, isHatCap ? 0.03 : 0.062),
-      [side * 0.306, 0.21, 0.104],
-      [side * 0.258, 0.11, 0.122],
+    // Tied styles (ponytail, twin_tails, twin_buns): snug face-framing cheek curls
+    const pts: [number, number, number][] = [
+      headSurfacePoint(42, side * 58, hatMode === 'snug_cap' ? 0.04 : crownOffset * 0.78),
+      headSurfacePoint(76, side * 62, sideOff * 0.45),
+      [side * 0.278, 0.198, 0.092],
+      [side * 0.228, 0.108, 0.106],
     ];
     grp.add(
       new THREE.Mesh(
-        createClayLockGeometry(wispPts, {
-          width: 0.06,
-          depth: 0.028,
-          innerFlatten: 0.34,
+        createClayLockGeometry(pts, {
+          width: 0.068,
+          depth: 0.034,
+          innerFlatten: 0.62,
+          edgePinch: 0.36,
           profile: 'blade',
           outwardMode: 'drape',
           tubularSegs: 14,
           radialSegs: 12,
-          roundTipScale: 0.16,
+          roundTipScale: 0.26,
         }),
         hairMat,
       ),
@@ -1323,303 +1113,120 @@ function buildSideHairLocks(
 
 /**
  * 4. BACK HAIR:
- * Multi-layered, curved, volumetric polymer clay hair structures flowing seamlessly
- * from the plush HairBase dome!
+ * - `long_wave` & `bob_cut`: Unified smooth sculpted polymer clay bell (zero frizz!).
+ * - `ponytail` / `twin_tails` / `twin_buns`: Smooth plump multi-lobe clay bells & swirl buns.
+ * - Male styles: Smooth nape already sculpted directly into `HairBase`!
  */
-function buildBackHairLayers(
+function buildBackClayStructures(
   hairBack: HairBackStyle,
   hairMat: THREE.Material,
   tieMat: THREE.Material,
+  crownOffset: number,
   hatMode: HatFitMode,
   backHairGroup: THREE.Group,
   accGroup: THREE.Group,
 ): void {
-  const isHatCap = hatMode === 'crown_cap';
-  const topLat = isHatCap ? 44 : 16;
-  const topOff = isHatCap ? 0.016 : 0.084;
-  const upperMidOff = isHatCap ? 0.038 : 0.094;
-  const midBackOff = isHatCap ? 0.042 : 0.088;
-
-  // ---- 1. LONG WAVE: Two overlapping sculpted tiers of curved clay S-waves ----
-  if (hairBack === 'long_wave') {
-    const innerLons = [-116, -138, -160, 180, 160, 138, 116];
-    innerLons.forEach((lon, idx) => {
-      const r0 = headSurfacePoint(topLat, lon, topOff);
-      const r1 = headSurfacePoint(74, lon, upperMidOff);
-      const r2 = headSurfacePoint(108, lon, midBackOff);
-      const flare = 1.15;
-      const rad = (lon * Math.PI) / 180;
-      const waveOut = idx % 2 === 0 ? 0.02 : -0.01;
-      const pMid: [number, number, number] = [
-        r2[0] * flare,
-        0.04,
-        r2[2] * flare - 0.032 + waveOut,
-      ];
-      const pHem: [number, number, number] = [
-        Math.sin(rad) * 0.365,
-        -0.17 - (idx === 3 ? 0.02 : 0),
-        Math.cos(rad) * 0.375 - 0.024,
-      ];
-
-      backHairGroup.add(
-        new THREE.Mesh(
-          createClayLockGeometry([r0, r1, r2, pMid, pHem], {
-            width: 0.124,
-            depth: 0.048,
-            innerFlatten: 0.42,
-            ridgeBoost: 0.12,
-            profile: 'wave',
-            outwardMode: 'drape',
-            tipLift: 0.006,
-            tubularSegs: 20,
-            radialSegs: 12,
-            roundTipScale: 0.34,
-          }),
-          hairMat,
-        ),
-      );
-    });
-
-    const upperLons = [-128, -154, 180, 154, 128];
-    upperLons.forEach((lon, idx) => {
-      const r0 = headSurfacePoint(topLat + 4, lon, topOff);
-      const r1 = headSurfacePoint(72, lon, upperMidOff + 0.008);
-      const r2 = headSurfacePoint(100, lon, midBackOff + 0.008);
-      const pEnd: [number, number, number] = [
-        r2[0] * 1.09,
-        0.06 - (idx === 2 ? 0.02 : 0),
-        r2[2] * 1.11 - 0.022,
-      ];
-
-      backHairGroup.add(
-        new THREE.Mesh(
-          createClayLockGeometry([r0, r1, r2, pEnd], {
-            width: 0.118,
-            depth: 0.042,
-            innerFlatten: 0.38,
-            ridgeBoost: 0.12,
-            profile: 'wave',
-            outwardMode: 'drape',
-            tubularSegs: 16,
-            radialSegs: 12,
-            roundTipScale: 0.28,
-          }),
-          hairMat,
-        ),
-      );
-    });
+  if (hairBack === 'long_wave' || hairBack === 'bob_cut') {
+    backHairGroup.add(
+      new THREE.Mesh(
+        createBackClayBellGeometry(hairBack, crownOffset),
+        hairMat,
+      ),
+    );
     return;
   }
 
-  // ---- 2. BOB CUT: Two overlapping curved C-curl clay tiers ----
-  if (hairBack === 'bob_cut') {
-    const innerLons = [-116, -138, -160, 180, 160, 138, 116];
-    innerLons.forEach((lon) => {
-      const r0 = headSurfacePoint(topLat, lon, topOff);
-      const r1 = headSurfacePoint(74, lon, upperMidOff);
-      const r2 = headSurfacePoint(108, lon, midBackOff);
-      const r3 = headSurfacePoint(126, lon, 0.032);
-      backHairGroup.add(
-        new THREE.Mesh(
-          createClayLockGeometry([r0, r1, r2, r3], {
-            width: 0.124,
-            depth: 0.048,
-            innerFlatten: 0.42,
-            ridgeBoost: 0.1,
-            profile: 'bob',
-            outwardMode: 'drape',
-            tubularSegs: 16,
-            radialSegs: 12,
-          }),
-          hairMat,
-        ),
-      );
-    });
+  const isSnugCap = hatMode === 'snug_cap';
 
-    const upperLons = [-130, -156, 180, 156, 130];
-    upperLons.forEach((lon) => {
-      const r0 = headSurfacePoint(topLat + 4, lon, topOff);
-      const r1 = headSurfacePoint(72, lon, upperMidOff + 0.008);
-      const r2 = headSurfacePoint(104, lon, midBackOff + 0.008);
-      backHairGroup.add(
-        new THREE.Mesh(
-          createClayLockGeometry([r0, r1, r2], {
-            width: 0.118,
-            depth: 0.04,
-            innerFlatten: 0.38,
-            ridgeBoost: 0.1,
-            profile: 'bob',
-            outwardMode: 'drape',
-            tubularSegs: 14,
-            radialSegs: 12,
-          }),
-          hairMat,
-        ),
-      );
-    });
-    return;
-  }
-
-  // ---- 3. PONYTAIL ----
   if (hairBack === 'ponytail') {
-    const rootLat = isHatCap ? 90 : 72;
-    const rootOff = isHatCap ? 0.042 : 0.088;
+    const rootLat = isSnugCap ? 88 : 74;
+    const rootOff = isSnugCap ? 0.046 : crownOffset + 0.008;
     const rootPt = headSurfacePoint(rootLat, 180, rootOff);
 
-    [-1, 1].forEach((side) => {
-      const sweepPts = sampleHeadSteps(
-        [
-          {lat: 112, lon: side * 140, offset: 0.026},
-          {lat: 94, lon: side * 160, offset: rootOff * 0.85},
-          {lat: rootLat, lon: side * 180, offset: rootOff},
-        ],
-        10,
-      );
-      backHairGroup.add(
-        new THREE.Mesh(
-          createClayLockGeometry(sweepPts, {
-            width: 0.082,
-            depth: 0.024,
-            innerFlatten: 0.35,
-            profile: 'lock',
-            tubularSegs: 10,
-            radialSegs: 10,
-          }),
-          hairMat,
-        ),
-      );
-    });
-
-    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.056, 16, 12), hairMat);
+    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.062, 16, 12), hairMat);
     knot.position.set(rootPt[0], rootPt[1], rootPt[2]);
     backHairGroup.add(knot);
 
     const tie = new THREE.Mesh(
-      new THREE.TorusGeometry(0.06, 0.018, 10, 18),
+      new THREE.TorusGeometry(0.066, 0.018, 10, 18),
       tieMat,
     );
     tie.position.set(rootPt[0], rootPt[1], rootPt[2]);
     tie.rotation.x = -0.28;
     accGroup.add(tie);
 
-    const ryOffset = isHatCap ? -0.065 : 0.0;
+    const ryOffset = isSnugCap ? -0.055 : 0.0;
+    // Main plump sculpted clay ponytail bell + subtle inner cushion
     backHairGroup.add(
       new THREE.Mesh(
         createClayLockGeometry(
           [
             rootPt,
-            [0, 0.37 + ryOffset, -0.39],
-            [0, 0.24 + ryOffset, -0.475],
-            [0, 0.07 + ryOffset, -0.45],
-            [0, -0.1 + ryOffset, -0.395],
+            [0, 0.36 + ryOffset, -0.4],
+            [0, 0.22 + ryOffset, -0.495],
+            [0, 0.05 + ryOffset, -0.465],
+            [0, -0.11 + ryOffset, -0.405],
           ],
           {
-            width: 0.108,
-            depth: 0.068,
-            innerFlatten: 0.62,
+            width: 0.135,
+            depth: 0.095,
+            innerFlatten: 0.72,
             ridgeBoost: 0.14,
-            profile: 'wave',
+            edgePinch: 0.45,
+            profile: 'bell',
             outwardMode: 'drape',
             tubularSegs: 20,
-            radialSegs: 12,
+            radialSegs: 16,
           },
         ),
         hairMat,
       ),
     );
-    [-1, 1].forEach((side) => {
-      backHairGroup.add(
-        new THREE.Mesh(
-          createClayLockGeometry(
-            [
-              rootPt,
-              [side * 0.058, 0.34 + ryOffset, -0.385],
-              [side * 0.092, 0.18 + ryOffset, -0.44],
-              [side * 0.068, 0.0 + ryOffset, -0.4],
-            ],
-            {
-              width: 0.068,
-              depth: 0.044,
-              innerFlatten: 0.52,
-              ridgeBoost: 0.12,
-              profile: 'wave',
-              outwardMode: 'drape',
-              tubularSegs: 18,
-              radialSegs: 12,
-            },
-          ),
-          hairMat,
-        ),
-      );
-    });
     return;
   }
 
-  // ---- 4. TWIN TAILS ----
   if (hairBack === 'twin_tails') {
     [-1, 1].forEach((side) => {
-      const rootLat = isHatCap ? 88 : 74;
-      const rootPt = headSurfacePoint(rootLat, side * 118, isHatCap ? 0.04 : 0.086);
+      const rootLat = isSnugCap ? 86 : 74;
+      const rootPt = headSurfacePoint(rootLat, side * 116, isSnugCap ? 0.044 : crownOffset + 0.006);
       const radialOut = new THREE.Vector3(
         rootPt[0],
         rootPt[1] - HEAD_CY,
         rootPt[2],
       ).normalize();
 
-      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.054, 14, 12), hairMat);
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.058, 14, 12), hairMat);
       knot.position.set(rootPt[0], rootPt[1], rootPt[2]);
       backHairGroup.add(knot);
 
       const tie = new THREE.Mesh(
-        new THREE.TorusGeometry(0.059, 0.018, 10, 18),
+        new THREE.TorusGeometry(0.062, 0.018, 10, 18),
         tieMat,
       );
       tie.position.set(rootPt[0], rootPt[1], rootPt[2]);
       tie.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), radialOut);
       accGroup.add(tie);
 
-      const yAdj = isHatCap ? -0.055 : 0;
+      const yAdj = isSnugCap ? -0.05 : 0;
       backHairGroup.add(
         new THREE.Mesh(
           createClayLockGeometry(
             [
               rootPt,
-              [side * 0.435, 0.26 + yAdj, -0.145],
-              [side * 0.475, 0.08 + yAdj, -0.16],
-              [side * 0.445, -0.12 + yAdj, -0.13],
+              [side * 0.435, 0.26 + yAdj, -0.155],
+              [side * 0.485, 0.07 + yAdj, -0.175],
+              [side * 0.45, -0.11 + yAdj, -0.145],
             ],
             {
-              width: 0.094,
-              depth: 0.062,
-              innerFlatten: 0.62,
+              width: 0.116,
+              depth: 0.086,
+              innerFlatten: 0.74,
               ridgeBoost: 0.12,
-              profile: 'wave',
+              edgePinch: 0.44,
+              profile: 'bell',
               outwardMode: 'drape',
               tubularSegs: 18,
-              radialSegs: 12,
-            },
-          ),
-          hairMat,
-        ),
-      );
-      backHairGroup.add(
-        new THREE.Mesh(
-          createClayLockGeometry(
-            [
-              rootPt,
-              [side * 0.405, 0.24 + yAdj, -0.2],
-              [side * 0.415, 0.06 + yAdj, -0.225],
-              [side * 0.385, -0.09 + yAdj, -0.19],
-            ],
-            {
-              width: 0.064,
-              depth: 0.044,
-              innerFlatten: 0.56,
-              ridgeBoost: 0.1,
-              profile: 'wave',
-              outwardMode: 'drape',
-              tubularSegs: 16,
-              radialSegs: 12,
+              radialSegs: 16,
             },
           ),
           hairMat,
@@ -1629,14 +1236,13 @@ function buildBackHairLayers(
     return;
   }
 
-  // ---- 5. TWIN BUNS ----
   if (hairBack === 'twin_buns') {
-    const bunLat = isHatCap ? 74 : 46;
-    const bunLon = isHatCap ? 114 : 104;
-    const bunScale = isHatCap ? 0.88 : 1.04;
+    const bunLat = isSnugCap ? 74 : 50;
+    const bunLon = isSnugCap ? 114 : 102;
+    const bunScale = isSnugCap ? 0.88 : 1.06;
 
     [-1, 1].forEach((side) => {
-      const pBun = headSurfacePoint(bunLat, side * bunLon, isHatCap ? 0.05 : 0.092);
+      const pBun = headSurfacePoint(bunLat, side * bunLon, isSnugCap ? 0.046 : crownOffset * 0.84);
       const radialDir = new THREE.Vector3(
         pBun[0],
         pBun[1] - HEAD_CY,
@@ -1644,7 +1250,7 @@ function buildBackHairLayers(
       ).normalize();
 
       const bunBase = new THREE.Mesh(
-        new THREE.SphereGeometry(0.114 * bunScale, 20, 16),
+        new THREE.SphereGeometry(0.116 * bunScale, 20, 16),
         hairMat,
       );
       bunBase.scale.set(1.06, 0.88, 0.98);
@@ -1662,7 +1268,7 @@ function buildBackHairLayers(
       swirlRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), radialDir);
 
       const tie = new THREE.Mesh(
-        new THREE.TorusGeometry(0.09 * bunScale, 0.018, 10, 18),
+        new THREE.TorusGeometry(0.092 * bunScale, 0.018, 10, 18),
         tieMat,
       );
       tie.position.set(
@@ -1675,72 +1281,11 @@ function buildBackHairLayers(
       backHairGroup.add(bunBase, swirlRing);
       accGroup.add(tie);
     });
-    return;
   }
-
-  // ---- 6. MALE & SHORT CROP BACK LAYERS: Seamless Nendoroid nape blades ----
-  const backCols: {lons: [number, number, number]; latEnd: number; w: number; d: number}[] =
-    hairBack === 'boy_2'
-      ? [
-          {lons: [180, 180, 180], latEnd: 134, w: 0.106, d: 0.03},
-          {lons: [154, 150, 144], latEnd: 132, w: 0.1, d: 0.028},
-          {lons: [-154, -150, -144], latEnd: 132, w: 0.1, d: 0.028},
-          {lons: [128, 124, 118], latEnd: 124, w: 0.088, d: 0.026},
-          {lons: [-128, -124, -118], latEnd: 124, w: 0.088, d: 0.026},
-        ]
-      : hairBack === 'boy_3'
-        ? [
-            {lons: [180, 180, 180], latEnd: 130, w: 0.106, d: 0.032},
-            {lons: [150, 146, 140], latEnd: 126, w: 0.096, d: 0.03},
-            {lons: [-150, -146, -140], latEnd: 126, w: 0.096, d: 0.03},
-            {lons: [124, 118, 114], latEnd: 118, w: 0.084, d: 0.026},
-            {lons: [-124, -118, -114], latEnd: 118, w: 0.084, d: 0.026},
-          ]
-        : hairBack === 'boy_4'
-          ? [
-              {lons: [180, 180, 180], latEnd: 126, w: 0.106, d: 0.03},
-              {lons: [152, 148, 144], latEnd: 122, w: 0.098, d: 0.028},
-              {lons: [-152, -148, -144], latEnd: 122, w: 0.098, d: 0.028},
-              {lons: [126, 122, 116], latEnd: 116, w: 0.086, d: 0.026},
-              {lons: [-126, -122, -116], latEnd: 116, w: 0.086, d: 0.026},
-            ]
-          : [
-              {lons: [180, 180, 180], latEnd: 124, w: 0.104, d: 0.028},
-              {lons: [150, 146, 142], latEnd: 120, w: 0.096, d: 0.026},
-              {lons: [-150, -146, -142], latEnd: 120, w: 0.096, d: 0.026},
-              {lons: [124, 120, 116], latEnd: 114, w: 0.082, d: 0.024},
-              {lons: [-124, -120, -116], latEnd: 114, w: 0.082, d: 0.024},
-            ];
-
-  backCols.forEach((b) => {
-    const pts = sampleHeadSteps(
-      [
-        {lat: isHatCap ? 44 : 16, lon: b.lons[0], offset: topOff},
-        {lat: 82, lon: b.lons[1], offset: isHatCap ? 0.024 : 0.092},
-        {lat: b.latEnd, lon: b.lons[2], offset: 0.028},
-      ],
-      14,
-    );
-    backHairGroup.add(
-      new THREE.Mesh(
-        createClayLockGeometry(pts, {
-          width: b.w * 1.12,
-          depth: b.d * 1.15,
-          innerFlatten: 0.32,
-          edgePinch: 0.28,
-          profile: hairBack === 'boy_3' ? 'tuft' : 'blade',
-          tubularSegs: 14,
-          radialSegs: 12,
-          roundTipScale: 0.18,
-        }),
-        hairMat,
-      ),
-    );
-  });
 }
 
 /**
- * Standardized entry point building all 6 modular hair components:
+ * Standardized entry point building all 6 modular sculpted clay hair components:
  * HairBase, FrontHair, SideHair, BackHair, HairAccessories, and HatAttachmentPoints.
  */
 export function buildCharacterHair(
@@ -1755,55 +1300,61 @@ export function buildCharacterHair(
 
   const hairBase = new THREE.Group();
   hairBase.name = 'HairBase';
-  const {geom: baseGeom, crownOuterOffset} = createHairBaseGeometry(
+  const {geom: baseGeom, crownOuterOffset} = createUnifiedClayCapGeometry(
     config.hairBack,
     config.hairFront,
     hatMode,
   );
   hairBase.add(new THREE.Mesh(baseGeom, hairMat));
 
-  const frontHair = buildFrontHairLocks(
+  const frontHair = buildFrontSignatureAccents(
     config.hairBack,
-    config.hairFront,
     hairMat,
     hatMode,
+    crownOuterOffset,
   );
-  const sideHair = buildSideHairLocks(config.hairBack, hairMat, hatMode);
+  const sideHair = buildSideCheekDrapes(
+    config.hairBack,
+    hairMat,
+    crownOuterOffset,
+    hatMode,
+  );
 
   const backHair = new THREE.Group();
   backHair.name = 'BackHair';
   const hairAccessories = new THREE.Group();
   hairAccessories.name = 'HairAccessories';
 
-  buildBackHairLayers(
+  buildBackClayStructures(
     config.hairBack,
     hairMat,
     tieMat,
+    crownOuterOffset,
     hatMode,
     backHair,
     hairAccessories,
   );
 
-  // Standardized Attachment Points hugging the actual outer fluffy hair envelope cleanly
-  const isHatCap = hatMode === 'crown_cap';
+  // Standardized Attachment Points hugging the outer clay silhouette cleanly
+  const isSnugCap = hatMode === 'snug_cap';
   const crownY = HEAD_CY + HEAD_RY + crownOuterOffset;
-  const sideSurf = headSurfacePoint(78, 90, isHatCap ? 0.022 : crownOuterOffset + 0.022);
-  const headbandRadius = Math.max(0.422, Math.abs(sideSurf[0]) + 0.008);
+  const sideSurf = headSurfacePoint(68, 90, isSnugCap ? 0.036 : crownOuterOffset * 0.56);
+  const headbandRadius = Math.min(0.382, Math.max(0.362, Math.abs(sideSurf[0]) + 0.008));
 
-  const templeL = headSurfacePoint(64, -50, isHatCap ? 0.042 : crownOuterOffset + 0.024);
-  const templeR = headSurfacePoint(64, 50, isHatCap ? 0.042 : crownOuterOffset + 0.024);
-  const foreheadPt = headSurfacePoint(54, 0, isHatCap ? 0.042 : crownOuterOffset + 0.018);
-  const backPt = headSurfacePoint(52, 180, crownOuterOffset * 0.92);
-  const napePt = headSurfacePoint(116, 180, 0.028);
+  const templeL = headSurfacePoint(64, -50, isSnugCap ? 0.048 : crownOuterOffset * 0.68 + 0.01);
+  const templeR = headSurfacePoint(64, 50, isSnugCap ? 0.048 : crownOuterOffset * 0.68 + 0.01);
+  const foreheadPt = headSurfacePoint(54, 0, isSnugCap ? 0.052 : crownOuterOffset * 0.82);
+  const backPt = headSurfacePoint(52, 180, crownOuterOffset * 0.9);
+  const napePt = headSurfacePoint(120, 180, 0.022);
 
   const attachments: HatAttachmentPoints = {
     crownTop: {
-      position: new THREE.Vector3(0, crownY - 0.02, -0.012),
+      position: new THREE.Vector3(0, crownY - 0.018, -0.012),
       rotation: new THREE.Euler(-0.06, 0, 0),
       radius: headbandRadius * 0.84,
     },
     crownTilted: {
-      position: new THREE.Vector3(0.038, crownY - 0.012, -0.016),
+      position: new THREE.Vector3(0.036, crownY - 0.012, -0.014),
       rotation: new THREE.Euler(-0.08, 0, -0.22),
     },
     foreheadRim: {
@@ -1835,7 +1386,6 @@ export function buildCharacterHair(
     },
   };
 
-  // Dedicated 6th technical group: HatAttachmentPoints (actual Three.js Object3D sockets)
   const hatAttachmentPoints = new THREE.Group();
   hatAttachmentPoints.name = 'HatAttachmentPoints';
   (

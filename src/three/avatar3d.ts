@@ -1816,28 +1816,25 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     const trimMat = clayMat('#F7F3EA', 0.62);
 
     const capGrp = new THREE.Group();
-    // Deeper seating covering the crown cleanly down toward brow & temples
-    capGrp.position.set(crownTop.position.x, crownTop.position.y - 0.162, crownTop.position.z - 0.004);
+    // Roomy sporty dome covering crown cleanly down to brow & temples while bangs peek out underneath
+    capGrp.position.set(crownTop.position.x, crownTop.position.y - 0.168, crownTop.position.z - 0.004);
     capGrp.rotation.set(-0.08, 0, 0);
 
-    // Fuller sculpted 6-panel athletic dome
     const domeGeo = new THREE.SphereGeometry(1, 32, 18, 0, Math.PI * 2, 0, Math.PI * 0.56);
-    domeGeo.scale(0.358, 0.245, 0.346);
+    domeGeo.scale(0.382, 0.252, 0.368);
     const dome = new THREE.Mesh(domeGeo, capMat);
 
-    // Subtle matching piping trim along cap base (no clunky white donut)
     const rimGeo = new THREE.TorusGeometry(1, 0.018, 10, 32);
     rimGeo.rotateX(Math.PI / 2);
-    rimGeo.scale(0.352, 1, 0.34);
+    rimGeo.scale(0.376, 1, 0.362);
     const rim = new THREE.Mesh(rimGeo, darkCapMat);
     rim.position.y = -0.004;
 
-    // Longer, sleeker, wider curved baseball visor
     const visorShape = new THREE.Shape();
-    visorShape.moveTo(-0.245, 0);
-    visorShape.bezierCurveTo(-0.24, 0.22, -0.13, 0.325, 0, 0.335);
-    visorShape.bezierCurveTo(0.13, 0.325, 0.24, 0.22, 0.245, 0);
-    visorShape.quadraticCurveTo(0, 0.075, -0.245, 0);
+    visorShape.moveTo(-0.255, 0);
+    visorShape.bezierCurveTo(-0.25, 0.225, -0.135, 0.335, 0, 0.345);
+    visorShape.bezierCurveTo(0.135, 0.335, 0.25, 0.225, 0.255, 0);
+    visorShape.quadraticCurveTo(0, 0.078, -0.255, 0);
 
     const visorGeo = new THREE.ExtrudeGeometry(visorShape, {
       depth: 0.018,
@@ -1856,19 +1853,18 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     }
     visorGeo.computeVertexNormals();
     const visor = new THREE.Mesh(visorGeo, capMat);
-    visor.position.set(0, 0.014, 0.255);
+    visor.position.set(0, 0.014, 0.272);
 
-    // Subtle crisp front visor edge trim + front crown emblem
     const emblem = new THREE.Mesh(
       new RoundedBoxGeometry(0.088, 0.048, 0.018, 2, 0.008),
       trimMat,
     );
-    emblem.position.set(0, 0.088, 0.332);
+    emblem.position.set(0, 0.09, 0.352);
     emblem.rotation.x = -0.34;
 
     const btn = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), darkCapMat);
     btn.scale.set(1, 0.52, 1);
-    btn.position.set(0, 0.245, 0);
+    btn.position.set(0, 0.252, 0);
 
     capGrp.add(dome, rim, visor, emblem, btn);
     accGroup.add(capGrp);
@@ -1879,31 +1875,30 @@ export function buildAvatarRig(config: AvatarConfig): AvatarRig {
     const pomMat = clayMat('#F8F4EC', 0.82);
 
     const beanieGrp = new THREE.Group();
-    beanieGrp.position.set(crownTop.position.x, crownTop.position.y - 0.105, crownTop.position.z - 0.006);
+    beanieGrp.position.set(crownTop.position.x, crownTop.position.y - 0.112, crownTop.position.z - 0.006);
     beanieGrp.rotation.set(-0.1, 0, 0);
 
-    // Ordered bottom-up so LatheGeometry normals point cleanly OUTWARD, oversized to cover hair
+    // Oversized plush knit beanie sitting snugly over hair without poke-through
     const pts = [
-      new THREE.Vector2(0.328, -0.076),
-      new THREE.Vector2(0.368, -0.068),
-      new THREE.Vector2(0.365, 0.018),
-      new THREE.Vector2(0.312, 0.108),
-      new THREE.Vector2(0.185, 0.162),
-      new THREE.Vector2(0.0, 0.172),
+      new THREE.Vector2(0.352, -0.076),
+      new THREE.Vector2(0.388, -0.068),
+      new THREE.Vector2(0.384, 0.018),
+      new THREE.Vector2(0.326, 0.112),
+      new THREE.Vector2(0.195, 0.168),
+      new THREE.Vector2(0.0, 0.178),
     ];
     const domeGeo = new THREE.LatheGeometry(pts, 32);
     domeGeo.scale(1.06, 1.0, 1.0);
     const dome = new THREE.Mesh(domeGeo, knitMat);
 
-    // Plush folded ribbed knit cuff covering the hair rim smoothly
-    const cuffGeo = new THREE.TorusGeometry(0.348, 0.046, 12, 32);
+    const cuffGeo = new THREE.TorusGeometry(0.368, 0.048, 12, 32);
     cuffGeo.rotateX(Math.PI / 2);
     cuffGeo.scale(1.06, 1.0, 1.0);
     const cuff = new THREE.Mesh(cuffGeo, cuffMat);
     cuff.position.y = -0.064;
 
     const pom = new THREE.Mesh(new THREE.SphereGeometry(0.064, 16, 12), pomMat);
-    pom.position.set(0, 0.194, -0.01);
+    pom.position.set(0, 0.2, -0.01);
 
     beanieGrp.add(dome, cuff, pom);
     accGroup.add(beanieGrp);
