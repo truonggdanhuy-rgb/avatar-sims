@@ -60,7 +60,7 @@ interface ActiveInsect {
   wingSpeed: number;
 }
 
-const ACTIVE_INSECT_COUNT = 18;
+const ACTIVE_INSECT_COUNT = 38;
 const _cullSphere = new THREE.Sphere();
 
 function buildAlertBadge(
@@ -352,19 +352,30 @@ export class TownInsectManager {
     this.parent = parent;
     this.anchors = anchors.length > 0 ? anchors : [{x: 12, y: 0.4, z: 12, habitat: 'flower'}];
 
-    const count = Math.min(ACTIVE_INSECT_COUNT, Math.max(8, this.anchors.length));
-    const usedIndices = new Set<number>();
-    for (let i = 0; i < count; i++) {
-      let idx = Math.floor((i * this.anchors.length) / count);
-      while (usedIndices.has(idx) && usedIndices.size < this.anchors.length) {
-        idx = (idx + 1) % this.anchors.length;
-      }
-      usedIndices.add(idx);
-      const anchor = this.anchors[idx];
+    const innerAnchors = this.anchors.filter((a) => Math.hypot(a.x, a.z) < 28);
+    const outerAnchors = this.anchors.filter((a) => Math.hypot(a.x, a.z) >= 28);
+
+    const chosenAnchors: InsectAnchor[] = [];
+    const targetCount = Math.min(ACTIVE_INSECT_COUNT, Math.max(12, this.anchors.length));
+    const outerGoal = Math.min(outerAnchors.length, Math.ceil(targetCount * 0.52));
+
+    for (let i = 0; i < outerGoal; i++) {
+      const idx = Math.floor((i * outerAnchors.length) / outerGoal);
+      chosenAnchors.push(outerAnchors[idx]);
+    }
+
+    const innerGoal = targetCount - chosenAnchors.length;
+    const innerPool = innerAnchors.length > 0 ? innerAnchors : this.anchors;
+    for (let i = 0; i < innerGoal; i++) {
+      const idx = Math.floor((i * innerPool.length) / Math.max(1, innerGoal));
+      chosenAnchors.push(innerPool[idx]);
+    }
+
+    chosenAnchors.forEach((anchor) => {
       const species = pickRandomInsectSpecies(anchor.habitat);
       const inst = this.spawnAtAnchor(species, anchor);
       this.insects.push(inst);
-    }
+    });
   }
 
   private pickAnchorForHabitat(habitat: InsectHabitat, avoid?: InsectAnchor): InsectAnchor {
@@ -598,6 +609,8 @@ export class TownInsectManager {
   ): InsectCatchEvaluation {
     const fwdX = Math.sin(playerRotY);
     const fwdZ = Math.cos(playerRotY);
+    const netHitX = playerX + fwdX * 0.92;
+    const netHitZ = playerZ + fwdZ * 0.92;
 
     let bestIdx = -1;
     let bestScore = Infinity;
@@ -611,15 +624,18 @@ export class TownInsectManager {
       const distXZ = Math.hypot(dx, dz);
       const dy = Math.abs(curPos.y - (playerY + 0.65));
 
-      if (distXZ > 2.25 || dy > 1.85) continue;
+      if (distXZ > 1.85 || dy > 1.45) continue;
 
-      if (distXZ > 0.25) {
+      if (distXZ > 0.14) {
         const dot = (dx * fwdX + dz * fwdZ) / distXZ;
-        if (dot < 0.7) continue; // Strict frontal net-swing cone (~±45 deg)
+        if (dot < 0.87) continue; // Strict straight-ahead cone (~±29 deg); standing sideways misses
       }
 
-      if (distXZ < bestScore) {
-        bestScore = distXZ;
+      const distToNetHead = Math.hypot(curPos.x - netHitX, curPos.z - netHitZ);
+      if (distToNetHead > 0.98) continue;
+
+      if (distToNetHead < bestScore) {
+        bestScore = distToNetHead;
         bestIdx = i;
       }
     }

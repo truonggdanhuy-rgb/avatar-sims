@@ -2536,31 +2536,31 @@ export function updateAvatarRigAnimation(
     rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = Math.sin(elapsed * 6) * 0.03;
   } else if (pose === 'creep') {
-    // Khum nhẹ người, bước chậm rón rén khi kéo nhẹ joystick lúc cầm vợt
-    const swing = Math.sin(elapsed * 5.2);
-    rig.leftLeg.rotation.x = swing * 0.28 - 0.12;
-    rig.rightLeg.rotation.x = -swing * 0.28 - 0.12;
+    // Khum nhẹ người, bước rất chậm rón rén khi kéo nhẹ joystick lúc cầm vợt
+    const swing = Math.sin(elapsed * 3.1);
+    rig.leftLeg.rotation.x = swing * 0.24 - 0.14;
+    rig.rightLeg.rotation.x = -swing * 0.24 - 0.14;
     rig.leftLeg.rotation.z = -0.04;
     rig.rightLeg.rotation.z = 0.04;
-    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.34 + Math.max(0, -swing) * 0.24;
-    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.34 + Math.max(0, swing) * 0.24;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.42 + Math.max(0, -swing) * 0.24;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.42 + Math.max(0, swing) * 0.24;
 
-    rig.leftArm.rotation.x = -0.26 - swing * 0.14;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.52;
+    rig.leftArm.rotation.x = -0.28 - swing * 0.11;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.58;
 
     if (hold === 'carry_net') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_net.armX + 0.12;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX + 0.14;
+      rig.rightArm.rotation.x = HAND_POSES.carry_net.armX + 0.14;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX + 0.16;
     } else {
-      rig.rightArm.rotation.x = -0.26 + swing * 0.14;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = -0.52;
+      rig.rightArm.rotation.x = -0.28 + swing * 0.11;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = -0.58;
     }
 
     if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
     rig.headPivot.position.y = HEAD_PIVOT_Y;
-    rig.bodyPivot.position.y = -0.075 + Math.abs(Math.cos(elapsed * 5.2)) * 0.022;
-    rig.bodyPivot.rotation.x = 0.24;
-    rig.headPivot.rotation.x = -0.18;
+    rig.bodyPivot.position.y = -0.09 + Math.abs(Math.cos(elapsed * 3.1)) * 0.016;
+    rig.bodyPivot.rotation.x = 0.27;
+    rig.headPivot.rotation.x = -0.2;
     rig.headPivot.rotation.z = 0;
   } else if (pose === 'net_swing') {
     const u = THREE.MathUtils.clamp(poseProgress, 0, 1);

@@ -9,7 +9,7 @@ import {
 
 export const WOODEN_NET_PRICE = 100;
 export const WOODEN_NET_MAX_DURABILITY = 25;
-export const WOODEN_NET_FULL_REPAIR_COST = 25;
+export const WOODEN_NET_FULL_REPAIR_COST = 36;
 
 export const INSECT_HABITAT_LABELS: Record<InsectHabitat, string> = {
   flower: 'Cụm hoa',
@@ -32,23 +32,23 @@ export function getNetRepairCost(durability: number, maxDurability: number): num
   const missing = Math.max(0, maxDurability - durability);
   if (missing <= 0) return 0;
   return Math.max(
-    4,
+    6,
     Math.ceil((missing / Math.max(1, maxDurability)) * WOODEN_NET_FULL_REPAIR_COST),
   );
 }
 
 /**
- * Xác suất hao mòn độ bền vợt cân bằng tương đương cần câu gỗ:
- * - Bắt trúng thường: ~36%
- * - Bắt trúng hiếm: ~52%
- * - Vung hụt: ~44%
+ * Xác suất hao mòn độ bền vợt cân bằng chống lạm phát:
+ * - Bắt trúng thường: ~40%
+ * - Bắt trúng hiếm: ~55%
+ * - Vung hụt: ~55%
  */
 export function rollNetDurabilityLoss(
   outcome: 'catch' | 'miss',
   rarity: InsectRarity = 'common',
 ): number {
   const loseChance =
-    outcome === 'miss' ? 0.44 : rarity === 'rare' ? 0.52 : 0.36;
+    outcome === 'miss' ? 0.55 : rarity === 'rare' ? 0.55 : 0.4;
   return Math.random() < loseChance ? 1 : 0;
 }
 
@@ -61,8 +61,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'butterfly',
     minMm: 36,
     maxMm: 58,
-    basePrice: 5,
-    pricePerMm: 0.1,
+    basePrice: 2,
+    pricePerMm: 0.03,
     dropWeight: 18,
     primaryColor: '#3A3A40',
     accentColor: '#2E2E35',
@@ -77,8 +77,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'bee',
     minMm: 13,
     maxMm: 22,
-    basePrice: 6,
-    pricePerMm: 0.25,
+    basePrice: 2,
+    pricePerMm: 0.08,
     dropWeight: 16,
     primaryColor: '#F5B82E',
     accentColor: '#3B2816',
@@ -93,8 +93,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'ladybug',
     minMm: 7,
     maxMm: 14,
-    basePrice: 6,
-    pricePerMm: 0.35,
+    basePrice: 2,
+    pricePerMm: 0.12,
     dropWeight: 15,
     primaryColor: '#E84848',
     accentColor: '#252124',
@@ -109,8 +109,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'grasshopper',
     minMm: 28,
     maxMm: 54,
-    basePrice: 5,
-    pricePerMm: 0.12,
+    basePrice: 2,
+    pricePerMm: 0.04,
     dropWeight: 15,
     primaryColor: '#76C143',
     accentColor: '#B8DE58',
@@ -125,8 +125,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'stinkbug',
     minMm: 12,
     maxMm: 21,
-    basePrice: 6,
-    pricePerMm: 0.22,
+    basePrice: 2,
+    pricePerMm: 0.08,
     dropWeight: 14,
     primaryColor: '#56A954',
     accentColor: '#C5D86D',
@@ -141,8 +141,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'dragonfly',
     minMm: 35,
     maxMm: 62,
-    basePrice: 6,
-    pricePerMm: 0.11,
+    basePrice: 3,
+    pricePerMm: 0.03,
     dropWeight: 14,
     primaryColor: '#E94F37',
     accentColor: '#9E2A2B',
@@ -157,8 +157,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'dragonfly',
     minMm: 46,
     maxMm: 78,
-    basePrice: 6,
-    pricePerMm: 0.1,
+    basePrice: 3,
+    pricePerMm: 0.03,
     dropWeight: 12,
     primaryColor: '#48A9A6',
     accentColor: '#E4DF82',
@@ -173,8 +173,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'cicada',
     minMm: 26,
     maxMm: 45,
-    basePrice: 6,
-    pricePerMm: 0.15,
+    basePrice: 3,
+    pricePerMm: 0.05,
     dropWeight: 13,
     primaryColor: '#6D4C3D',
     accentColor: '#9D7B52',
@@ -189,8 +189,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'butterfly',
     minMm: 55,
     maxMm: 86,
-    basePrice: 7,
-    pricePerMm: 0.09,
+    basePrice: 3,
+    pricePerMm: 0.03,
     dropWeight: 11,
     primaryColor: '#2E2926',
     accentColor: '#E5583B',
@@ -205,8 +205,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'mantis',
     minMm: 48,
     maxMm: 82,
-    basePrice: 7,
-    pricePerMm: 0.09,
+    basePrice: 3,
+    pricePerMm: 0.03,
     dropWeight: 10,
     primaryColor: '#69B84B',
     accentColor: '#3D7A2A',
@@ -221,8 +221,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'firefly',
     minMm: 11,
     maxMm: 19,
-    basePrice: 7,
-    pricePerMm: 0.3,
+    basePrice: 3,
+    pricePerMm: 0.1,
     dropWeight: 11,
     primaryColor: '#3B3635',
     accentColor: '#F6E85F',
@@ -237,8 +237,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'beetle',
     minMm: 18,
     maxMm: 34,
-    basePrice: 7,
-    pricePerMm: 0.18,
+    basePrice: 3,
+    pricePerMm: 0.06,
     dropWeight: 11,
     primaryColor: '#1E9B77',
     accentColor: '#7BE3B6',
@@ -253,8 +253,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'butterfly',
     minMm: 72,
     maxMm: 112,
-    basePrice: 15,
-    pricePerMm: 0.11,
+    basePrice: 7,
+    pricePerMm: 0.03,
     dropWeight: 5.5,
     primaryColor: '#1D334A',
     accentColor: '#6EE7F8',
@@ -269,8 +269,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'moth',
     minMm: 78,
     maxMm: 120,
-    basePrice: 16,
-    pricePerMm: 0.11,
+    basePrice: 7,
+    pricePerMm: 0.04,
     dropWeight: 4.5,
     primaryColor: '#8AD48B',
     accentColor: '#D67EA6',
@@ -285,8 +285,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'horned_beetle',
     minMm: 45,
     maxMm: 78,
-    basePrice: 18,
-    pricePerMm: 0.14,
+    basePrice: 8,
+    pricePerMm: 0.05,
     dropWeight: 4.2,
     primaryColor: '#5B3424',
     accentColor: '#8E5338',
@@ -301,8 +301,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'horned_beetle',
     minMm: 48,
     maxMm: 85,
-    basePrice: 20,
-    pricePerMm: 0.14,
+    basePrice: 9,
+    pricePerMm: 0.05,
     dropWeight: 3.4,
     primaryColor: '#8A5A1A',
     accentColor: '#E0AC3F',
@@ -317,8 +317,8 @@ export const INSECT_CATALOG: Record<InsectSpeciesId, InsectSpeciesDefinition> = 
     shapeKind: 'butterfly',
     minMm: 90,
     maxMm: 136,
-    basePrice: 23,
-    pricePerMm: 0.1,
+    basePrice: 10,
+    pricePerMm: 0.04,
     dropWeight: 2.4,
     primaryColor: '#2E1E4F',
     accentColor: '#FFD166',
@@ -349,8 +349,8 @@ export const INSECT_LIST: InsectSpeciesDefinition[] = [
 
 export function computeInsectSellPrice(speciesId: InsectSpeciesId, lengthMm: number): number {
   const spec = INSECT_CATALOG[speciesId];
-  if (!spec) return 5;
-  return Math.max(5, Math.round(spec.basePrice + lengthMm * spec.pricePerMm));
+  if (!spec) return 2;
+  return Math.max(2, Math.round(spec.basePrice + lengthMm * spec.pricePerMm));
 }
 
 export function rollInsectLengthMm(species: InsectSpeciesDefinition): number {

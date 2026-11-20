@@ -9,7 +9,7 @@ import {
 
 export const WOODEN_ROD_PRICE = 100;
 export const WOODEN_ROD_MAX_DURABILITY = 25;
-export const WOODEN_ROD_FULL_REPAIR_COST = 25;
+export const WOODEN_ROD_FULL_REPAIR_COST = 36;
 
 export interface FishRarityBehavior {
   label: string;
@@ -65,30 +65,29 @@ export function getRodRepairCost(durability: number, maxDurability: number): num
   const missing = Math.max(0, maxDurability - durability);
   if (missing <= 0) return 0;
   return Math.max(
-    4,
+    6,
     Math.ceil((missing / Math.max(1, maxDurability)) * WOODEN_ROD_FULL_REPAIR_COST),
   );
 }
 
 /**
  * Probabilistic durability loss so rods don't break every exact 25 casts/catches.
- * Catching common fish ~38% chance, rare fish ~55% chance, fish escaping ~62% chance.
+ * Catching common fish ~42% chance, rare fish ~58% chance, fish escaping ~65% chance.
  */
 export function rollRodDurabilityLoss(
   outcome: 'catch' | 'escape',
   rarity: FishRarity = 'common',
 ): number {
   const loseChance =
-    outcome === 'escape' ? 0.62 : rarity === 'rare' ? 0.55 : 0.38;
+    outcome === 'escape' ? 0.65 : rarity === 'rare' ? 0.58 : 0.42;
   return Math.random() < loseChance ? 1 : 0;
 }
 
 /**
  * Cá sông:
- * - Cá thường: Tôm càng xanh, Cá lóc, Cá chép, Cá cơm, Cá chình (~84% tổng tỷ lệ)
- * - Cá hiếm: Cá la hán, Cá lia thia 3 đuôi, Cá heo nước ngọt (~16% tổng tỷ lệ)
- * Giá được cân bằng theo trọng lượng & độ hiếm (trung bình ~12.1 Xu thô, trừ ~1 Xu khấu hao sửa cần)
- * giúp câu cá vui và có lời nhưng không gây lạm phát hay thay thế kinh tế Nông Trại & Bếp.
+ * - Cá thường (~84%): giá bán 2-5 Xu sau cân nặng
+ * - Cá hiếm (~16%): giá bán 9-14 Xu
+ * Cân bằng chống lạm phát Xu, giữ Nông Trại + Chế Biến là nguồn thu nhập chủ lực.
  */
 export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinition> = {
   ca_com: {
@@ -98,8 +97,8 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'common',
     minKg: 0.05,
     maxKg: 0.25,
-    basePrice: 4,
-    pricePerKg: 12,
+    basePrice: 2,
+    pricePerKg: 5,
     dropWeight: 20,
     description: 'Nhỏ nhắn ánh bạc, hay bơi thành đàn gần bờ hồ nước ngọt.',
   },
@@ -110,8 +109,8 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'common',
     minKg: 0.15,
     maxKg: 0.65,
-    basePrice: 5,
-    pricePerKg: 8,
+    basePrice: 2,
+    pricePerKg: 3.5,
     dropWeight: 18,
     description: 'Đôi càng xanh ngọc khỏe khoắn, rất chuộng vùng bùn cát đáy sông.',
   },
@@ -122,8 +121,8 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'common',
     minKg: 0.6,
     maxKg: 2.8,
-    basePrice: 5,
-    pricePerKg: 2.5,
+    basePrice: 2,
+    pricePerKg: 1.0,
     dropWeight: 17,
     description: 'Thân tròn vảy vàng óng, quen thuộc dưới những tán lá sen xanh.',
   },
@@ -134,8 +133,8 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'common',
     minKg: 0.5,
     maxKg: 2.4,
-    basePrice: 6,
-    pricePerKg: 2.8,
+    basePrice: 3,
+    pricePerKg: 1.0,
     dropWeight: 15,
     description: 'Săn mồi nhanh nhẹn ở vùng nước lặng có nhiều cỏ thủy sinh.',
   },
@@ -146,8 +145,8 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'common',
     minKg: 0.7,
     maxKg: 3.0,
-    basePrice: 7,
-    pricePerKg: 3.0,
+    basePrice: 3,
+    pricePerKg: 1.1,
     dropWeight: 14,
     description: 'Thân dài trơn láng, thường ẩn mình dưới rễ cây và bờ đá.',
   },
@@ -158,8 +157,8 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'rare',
     minKg: 0.08,
     maxKg: 0.38,
-    basePrice: 15,
-    pricePerKg: 26,
+    basePrice: 8,
+    pricePerKg: 10,
     dropWeight: 7,
     description: 'Hiếm gặp với bộ vây ba thùy thướt tha rực rỡ sắc màu.',
   },
@@ -170,8 +169,8 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'rare',
     minKg: 0.5,
     maxKg: 2.2,
-    basePrice: 18,
-    pricePerKg: 6.5,
+    basePrice: 9,
+    pricePerKg: 2.5,
     dropWeight: 5.5,
     description: 'Chú cá quý mang chiếc gù tròn may mắn cùng hàng châu lấp lánh.',
   },
@@ -182,8 +181,8 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'rare',
     minKg: 1.2,
     maxKg: 4.2,
-    basePrice: 22,
-    pricePerKg: 5.5,
+    basePrice: 11,
+    pricePerKg: 1.8,
     dropWeight: 3.5,
     description: 'Loài cá sông quý hiếm có vây đỏ cam rực rỡ và sọc vằn đặc trưng.',
   },

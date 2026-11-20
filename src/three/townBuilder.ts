@@ -393,98 +393,153 @@ function addInteractionProxy(
   return proxy;
 }
 
-// Build reusable merged geometries for tall Broadleaf Oak trees with broad spreading canopy & real branches
+// Helper: build a crisp, genuine 5-petal 3D stylized blossom + golden pistil center (static merged geometry)
+function append5PetalFlower(
+  petalParts: THREE.BufferGeometry[],
+  centerParts: THREE.BufferGeometry[],
+  cx: number,
+  cy: number,
+  cz: number,
+  scale = 1.0,
+  tiltX = 0,
+  tiltZ = 0,
+  rotPhase = 0,
+) {
+  const dummy = new THREE.Object3D();
+  dummy.position.set(cx, cy, cz);
+  dummy.rotation.set(tiltX, rotPhase, tiltZ);
+  dummy.scale.setScalar(scale);
+  dummy.updateMatrix();
+
+  for (let p = 0; p < 5; p++) {
+    const a = (p / 5) * Math.PI * 2;
+    const petal = new THREE.SphereGeometry(0.056, 6, 5);
+    petal.scale(0.84, 0.34, 1.48);
+    petal.rotateX(-0.22); // Cupped slightly upward so every petal silhouette reads clearly
+    petal.translate(0, 0.012, 0.068);
+    petal.rotateY(a);
+    petal.applyMatrix4(dummy.matrix);
+    petalParts.push(petal);
+  }
+
+  const pistil = new THREE.SphereGeometry(0.044, 6, 5);
+  pistil.scale(1.0, 0.62, 1.0);
+  pistil.translate(0, 0.02, 0);
+  pistil.applyMatrix4(dummy.matrix);
+  centerParts.push(pistil);
+}
+
+// Detailed Broadleaf Oak trees: flared roots, curved branches, sub-twigs & 12 sculpted foliage clusters
 export function createTreeGeometries() {
-  const rootFlare = new THREE.CylinderGeometry(0.32, 0.54, 0.55, 8);
-  rootFlare.translate(0, 0.26, 0);
+  const rootFlare = new THREE.CylinderGeometry(0.28, 0.56, 0.52, 9);
+  rootFlare.translate(0, 0.25, 0);
 
-  const trunk = new THREE.CylinderGeometry(0.24, 0.34, 2.25, 8);
-  trunk.translate(0, 1.38, 0);
+  const rootA = new THREE.CylinderGeometry(0.09, 0.17, 0.52, 6);
+  rootA.rotateZ(1.08);
+  rootA.translate(-0.34, 0.14, 0.12);
+  const rootB = new THREE.CylinderGeometry(0.09, 0.17, 0.5, 6);
+  rootB.rotateZ(-1.05);
+  rootB.translate(0.32, 0.14, -0.14);
 
-  // 4 visible thick wooden boughs angling outward under the wide shade canopy
-  const b1 = new THREE.CylinderGeometry(0.1, 0.16, 1.38, 7);
+  const trunk = new THREE.CylinderGeometry(0.22, 0.33, 2.25, 9);
+  trunk.translate(0, 1.36, 0);
+
+  const b1 = new THREE.CylinderGeometry(0.095, 0.16, 1.42, 7);
   b1.rotateZ(0.72);
   b1.translate(-0.56, 2.38, 0.18);
+  const twig1 = new THREE.CylinderGeometry(0.05, 0.08, 0.85, 6);
+  twig1.rotateZ(1.05);
+  twig1.rotateY(0.45);
+  twig1.translate(-1.05, 2.75, 0.38);
 
-  const b2 = new THREE.CylinderGeometry(0.1, 0.16, 1.34, 7);
+  const b2 = new THREE.CylinderGeometry(0.095, 0.16, 1.38, 7);
   b2.rotateZ(-0.7);
   b2.translate(0.54, 2.42, -0.14);
+  const twig2 = new THREE.CylinderGeometry(0.05, 0.08, 0.84, 6);
+  twig2.rotateZ(-1.04);
+  twig2.rotateY(-0.35);
+  twig2.translate(1.02, 2.76, -0.32);
 
-  const b3 = new THREE.CylinderGeometry(0.09, 0.14, 1.24, 7);
+  const b3 = new THREE.CylinderGeometry(0.085, 0.14, 1.26, 7);
   b3.rotateX(-0.68);
   b3.translate(0.1, 2.36, -0.52);
 
-  const b4 = new THREE.CylinderGeometry(0.09, 0.14, 1.22, 7);
+  const b4 = new THREE.CylinderGeometry(0.085, 0.14, 1.24, 7);
   b4.rotateX(0.66);
   b4.translate(-0.12, 2.4, 0.5);
 
-  const trunkGeo = mergeParts([rootFlare, trunk, b1, b2, b3, b4]);
+  const trunkGeo = mergeParts([rootFlare, rootA, rootB, trunk, b1, twig1, b2, twig2, b3, b4]);
 
-  // Wide, organic flattened multi-lobe broadleaf shade crown
-  const cCenter = new THREE.SphereGeometry(1.42, 11, 9);
-  cCenter.scale(1.22, 0.72, 1.18);
-  cCenter.translate(0, 3.35, 0);
+  // Multi-lobe layered canopy (lower lush silhouette + outer rim tufts)
+  const lowerSpecs: [number, number, number, number, number, number, number][] = [
+    [0, 3.3, 0, 1.26, 1.18, 0.72, 1.15],
+    [-1.18, 2.94, 0.34, 0.96, 1.15, 0.7, 1.08],
+    [1.16, 2.98, -0.28, 0.94, 1.14, 0.68, 1.08],
+    [0.16, 2.98, -1.08, 0.92, 1.12, 0.68, 1.12],
+    [-0.2, 3.04, 1.04, 0.88, 1.12, 0.68, 1.08],
+    [-0.95, 3.22, -0.78, 0.74, 1.08, 0.72, 1.06],
+  ];
+  const lowerParts = lowerSpecs.map(([x, y, z, r, sx, sy, sz]) => {
+    const g = new THREE.SphereGeometry(r, 10, 8);
+    g.scale(sx, sy, sz);
+    g.translate(x, y, z);
+    return g;
+  });
+  const lowerCanopyGeo = mergeParts(lowerParts);
 
-  const cWest = new THREE.SphereGeometry(1.12, 10, 8);
-  cWest.scale(1.18, 0.7, 1.12);
-  cWest.translate(-1.12, 2.98, 0.32);
-
-  const cEast = new THREE.SphereGeometry(1.08, 10, 8);
-  cEast.scale(1.16, 0.7, 1.1);
-  cEast.translate(1.1, 3.04, -0.26);
-
-  const cNorth = new THREE.SphereGeometry(1.04, 10, 8);
-  cNorth.scale(1.14, 0.68, 1.14);
-  cNorth.translate(0.18, 3.02, -1.04);
-
-  const lowerCanopyGeo = mergeParts([cCenter, cWest, cEast, cNorth]);
-
-  const cCrown = new THREE.SphereGeometry(1.16, 11, 9);
-  cCrown.scale(1.24, 0.72, 1.18);
-  cCrown.translate(0.05, 4.02, 0.04);
-
-  const cSouth = new THREE.SphereGeometry(0.98, 10, 8);
-  cSouth.scale(1.15, 0.68, 1.1);
-  cSouth.translate(-0.18, 3.1, 1.02);
-
-  const cSub = new THREE.SphereGeometry(0.86, 9, 8);
-  cSub.scale(1.12, 0.72, 1.08);
-  cSub.translate(0.86, 3.52, 0.64);
-
-  const upperCanopyGeo = mergeParts([cCrown, cSouth, cSub]);
+  // Sun-kissed upper sculpted crown & crisp outer foliage puffs
+  const upperSpecs: [number, number, number, number, number, number, number][] = [
+    [0.04, 3.98, 0.04, 1.02, 1.18, 0.72, 1.14],
+    [-0.68, 3.66, 0.58, 0.76, 1.12, 0.7, 1.08],
+    [0.78, 3.58, 0.44, 0.74, 1.12, 0.7, 1.08],
+    [-0.48, 3.74, -0.62, 0.72, 1.1, 0.72, 1.06],
+    [0.54, 3.82, -0.44, 0.68, 1.1, 0.7, 1.08],
+    [0.02, 4.44, 0.02, 0.58, 1.14, 0.68, 1.12],
+  ];
+  const upperParts = upperSpecs.map(([x, y, z, r, sx, sy, sz]) => {
+    const g = new THREE.SphereGeometry(r, 9, 7);
+    g.scale(sx, sy, sz);
+    g.translate(x, y, z);
+    return g;
+  });
+  const upperCanopyGeo = mergeParts(upperParts);
 
   return {trunkGeo, lowerCanopyGeo, upperCanopyGeo};
 }
 
-// Graceful multi-branched woodland trees with clearly visible forked limbs and airy foliage clusters
+// Graceful multi-branched woodland trees with clearly visible forked limbs and airy sculpted leaf puffs
 function createBranchedWoodlandGeometries() {
-  const root = new THREE.CylinderGeometry(0.2, 0.36, 0.42, 7);
-  root.translate(0, 0.21, 0);
+  const root = new THREE.CylinderGeometry(0.19, 0.38, 0.44, 8);
+  root.translate(0, 0.22, 0);
 
-  const lowerTrunk = new THREE.CylinderGeometry(0.15, 0.22, 1.55, 7);
+  const lowerTrunk = new THREE.CylinderGeometry(0.145, 0.22, 1.56, 8);
   lowerTrunk.translate(0, 1.05, 0);
 
-  const limbLeft = new THREE.CylinderGeometry(0.085, 0.13, 1.65, 7);
-  limbLeft.rotateZ(0.46);
-  limbLeft.translate(-0.42, 2.32, 0.08);
+  const limbLeft = new THREE.CylinderGeometry(0.08, 0.13, 1.68, 7);
+  limbLeft.rotateZ(0.48);
+  limbLeft.translate(-0.43, 2.32, 0.08);
 
-  const limbRight = new THREE.CylinderGeometry(0.08, 0.13, 1.55, 7);
-  limbRight.rotateZ(-0.5);
-  limbRight.translate(0.42, 2.26, -0.08);
+  const limbRight = new THREE.CylinderGeometry(0.075, 0.125, 1.58, 7);
+  limbRight.rotateZ(-0.52);
+  limbRight.translate(0.43, 2.26, -0.08);
 
-  const limbBack = new THREE.CylinderGeometry(0.07, 0.11, 1.35, 6);
+  const limbBack = new THREE.CylinderGeometry(0.068, 0.11, 1.38, 6);
   limbBack.rotateX(-0.48);
   limbBack.translate(0.04, 2.48, -0.36);
 
-  const twigLeft = new THREE.CylinderGeometry(0.05, 0.075, 0.95, 6);
-  twigLeft.rotateZ(0.82);
-  twigLeft.rotateY(0.4);
-  twigLeft.translate(-0.88, 2.75, 0.28);
+  const twigLeft = new THREE.CylinderGeometry(0.046, 0.074, 0.96, 6);
+  twigLeft.rotateZ(0.84);
+  twigLeft.rotateY(0.42);
+  twigLeft.translate(-0.9, 2.75, 0.28);
 
-  const twigRight = new THREE.CylinderGeometry(0.05, 0.075, 0.9, 6);
-  twigRight.rotateZ(-0.84);
-  twigRight.rotateY(-0.3);
-  twigRight.translate(0.86, 2.68, -0.22);
+  const twigRight = new THREE.CylinderGeometry(0.046, 0.074, 0.92, 6);
+  twigRight.rotateZ(-0.86);
+  twigRight.rotateY(-0.32);
+  twigRight.translate(0.88, 2.68, -0.22);
+
+  const twigFront = new THREE.CylinderGeometry(0.042, 0.068, 0.85, 6);
+  twigFront.rotateX(0.75);
+  twigFront.translate(0.14, 2.66, 0.46);
 
   const trunkGeo = mergeParts([
     root,
@@ -494,137 +549,165 @@ function createBranchedWoodlandGeometries() {
     limbBack,
     twigLeft,
     twigRight,
+    twigFront,
   ]);
 
-  // Separated foliage tufts perched on branch ends so limbs remain visible
-  const tuftL = new THREE.SphereGeometry(0.82, 10, 8);
-  tuftL.scale(1.22, 0.72, 1.12);
-  tuftL.translate(-1.12, 3.05, 0.34);
+  const lowerSpecs: [number, number, number, number, number, number, number][] = [
+    [-1.12, 3.04, 0.34, 0.72, 1.18, 0.72, 1.1],
+    [-0.78, 2.86, 0.62, 0.52, 1.12, 0.74, 1.08],
+    [1.08, 2.96, -0.26, 0.7, 1.16, 0.7, 1.1],
+    [0.08, 3.22, -0.7, 0.68, 1.14, 0.72, 1.08],
+    [0.32, 2.94, 0.72, 0.56, 1.12, 0.72, 1.08],
+  ];
+  const lowerCanopyGeo = mergeParts(
+    lowerSpecs.map(([x, y, z, r, sx, sy, sz]) => {
+      const g = new THREE.SphereGeometry(r, 9, 7);
+      g.scale(sx, sy, sz);
+      g.translate(x, y, z);
+      return g;
+    }),
+  );
 
-  const tuftR = new THREE.SphereGeometry(0.78, 10, 8);
-  tuftR.scale(1.18, 0.7, 1.12);
-  tuftR.translate(1.08, 2.98, -0.26);
-
-  const tuftB = new THREE.SphereGeometry(0.76, 9, 8);
-  tuftB.scale(1.16, 0.72, 1.1);
-  tuftB.translate(0.08, 3.24, -0.68);
-
-  const lowerCanopyGeo = mergeParts([tuftL, tuftR, tuftB]);
-
-  const tuftTop = new THREE.SphereGeometry(0.92, 10, 8);
-  tuftTop.scale(1.24, 0.7, 1.16);
-  tuftTop.translate(-0.08, 3.68, 0.18);
-
-  const tuftMid = new THREE.SphereGeometry(0.7, 9, 8);
-  tuftMid.scale(1.15, 0.72, 1.08);
-  tuftMid.translate(0.42, 3.45, 0.56);
-
-  const upperCanopyGeo = mergeParts([tuftTop, tuftMid]);
+  const upperSpecs: [number, number, number, number, number, number, number][] = [
+    [-0.08, 3.68, 0.16, 0.78, 1.2, 0.7, 1.14],
+    [-0.64, 3.44, 0.14, 0.58, 1.14, 0.72, 1.08],
+    [0.54, 3.42, 0.34, 0.6, 1.14, 0.72, 1.08],
+    [0.06, 4.02, -0.1, 0.48, 1.12, 0.7, 1.1],
+  ];
+  const upperCanopyGeo = mergeParts(
+    upperSpecs.map(([x, y, z, r, sx, sy, sz]) => {
+      const g = new THREE.SphereGeometry(r, 9, 7);
+      g.scale(sx, sy, sz);
+      g.translate(x, y, z);
+      return g;
+    }),
+  );
 
   return {trunkGeo, lowerCanopyGeo, upperCanopyGeo};
 }
 
-// Lush sculpted Evergreen Pine & Conifer trees with soft layered bough clusters
+// Cute, friendly & simple layered Evergreen Pine tree (clean rounded conical tiers, never scary!)
 function createPineConiferGeometries() {
-  const root = new THREE.CylinderGeometry(0.2, 0.36, 0.42, 8);
-  root.translate(0, 0.21, 0);
+  const root = new THREE.CylinderGeometry(0.18, 0.32, 0.36, 8);
+  root.translate(0, 0.18, 0);
 
-  const trunk = new THREE.CylinderGeometry(0.11, 0.23, 2.95, 8);
-  trunk.translate(0, 1.68, 0);
+  const trunk = new THREE.CylinderGeometry(0.12, 0.21, 1.45, 8);
+  trunk.translate(0, 0.88, 0);
 
   const trunkGeo = mergeParts([root, trunk]);
 
-  const lowerParts: THREE.BufferGeometry[] = [];
-  const upperParts: THREE.BufferGeometry[] = [];
+  // Lower 2 clean rounded conical skirts (9-sided cozy stylized pine)
+  const tier1 = new THREE.ConeGeometry(1.42, 1.38, 10);
+  tier1.translate(0, 1.82, 0);
+  const tier1Rim = new THREE.TorusGeometry(1.16, 0.22, 7, 12);
+  tier1Rim.rotateX(Math.PI / 2);
+  tier1Rim.scale(1, 1, 0.65);
+  tier1Rim.translate(0, 1.2, 0);
 
-  const addBoughWhorl = (
-    target: THREE.BufferGeometry[],
-    count: number,
-    y: number,
-    ringR: number,
-    puffW: number,
-    puffH: number,
-    puffLen: number,
-    tiltX: number,
-    phase: number,
-    coreR: number,
-  ) => {
-    const core = new THREE.SphereGeometry(coreR, 9, 7);
-    core.scale(1.05, 0.56, 1.05);
-    core.translate(0, y + 0.12, 0);
-    target.push(core);
+  const tier2 = new THREE.ConeGeometry(1.16, 1.28, 10);
+  tier2.rotateY(0.31);
+  tier2.translate(0, 2.58, 0);
 
-    for (let k = 0; k < count; k++) {
-      const a = phase + (k / count) * Math.PI * 2;
-      const bough = new THREE.SphereGeometry(0.56, 8, 7);
-      bough.scale(puffW, puffH, puffLen);
-      bough.rotateX(tiltX);
-      bough.rotateY(a);
-      bough.translate(Math.sin(a) * ringR, y - 0.06, Math.cos(a) * ringR);
-      target.push(bough);
-    }
-  };
+  const lowerFoliageGeo = mergeParts([tier1, tier1Rim, tier2]);
 
-  // Lower rich pine bough tiers (soft drooping evergreen sprays)
-  addBoughWhorl(lowerParts, 6, 1.65, 0.84, 1.08, 0.52, 1.38, 0.36, 0, 1.02);
-  addBoughWhorl(lowerParts, 6, 2.48, 0.68, 0.96, 0.5, 1.24, 0.34, 0.52, 0.86);
+  // Upper 2 sun-kissed conical tiers + soft rounded tip
+  const tier3 = new THREE.ConeGeometry(0.9, 1.16, 10);
+  tier3.rotateY(0.15);
+  tier3.translate(0, 3.28, 0);
 
-  // Upper sun-kissed pine tiers + graceful sculpted crown
-  addBoughWhorl(upperParts, 5, 3.24, 0.5, 0.84, 0.48, 1.12, 0.3, 0.22, 0.68);
-  addBoughWhorl(upperParts, 4, 3.92, 0.3, 0.66, 0.5, 0.88, 0.24, 0.65, 0.48);
+  const tier4 = new THREE.ConeGeometry(0.6, 0.98, 10);
+  tier4.rotateY(0.45);
+  tier4.translate(0, 3.94, 0);
 
-  const crownBase = new THREE.SphereGeometry(0.42, 8, 7);
-  crownBase.scale(0.88, 1.15, 0.88);
-  crownBase.translate(0, 4.38, 0);
-  upperParts.push(crownBase);
+  const crownTip = new THREE.SphereGeometry(0.18, 8, 6);
+  crownTip.scale(0.95, 1.25, 0.95);
+  crownTip.translate(0, 4.38, 0);
 
-  const crownTip = new THREE.SphereGeometry(0.22, 7, 6);
-  crownTip.scale(0.75, 1.75, 0.75);
-  crownTip.translate(0, 4.78, 0);
-  upperParts.push(crownTip);
-
-  const lowerFoliageGeo = mergeParts(lowerParts);
-  const upperFoliageGeo = mergeParts(upperParts);
+  const upperFoliageGeo = mergeParts([tier3, tier4, crownTip]);
 
   return {trunkGeo, lowerFoliageGeo, upperFoliageGeo};
 }
 
-// Sakura (Hoa Dao) tree geometries with wide graceful spreading boughs & full clouds
+// Detailed Sakura (Hoa Đào) tree: gnarled spreading boughs + layered pink canopy + accent flower buds
 function createSakuraGeometries() {
-  const root = new THREE.CylinderGeometry(0.24, 0.4, 0.42, 8);
-  root.translate(0, 0.21, 0);
-  const trunk = new THREE.CylinderGeometry(0.17, 0.26, 2.0, 8);
-  trunk.rotateZ(0.04);
-  trunk.translate(0, 1.15, 0);
-  const b1 = new THREE.CylinderGeometry(0.08, 0.12, 1.25, 7);
-  b1.rotateZ(0.74);
-  b1.translate(-0.52, 1.98, 0.12);
-  const b2 = new THREE.CylinderGeometry(0.08, 0.12, 1.2, 7);
-  b2.rotateZ(-0.68);
-  b2.translate(0.5, 2.02, -0.1);
-  const b3 = new THREE.CylinderGeometry(0.065, 0.1, 1.05, 6);
-  b3.rotateX(-0.6);
-  b3.translate(0.04, 2.08, -0.45);
-  const trunkGeo = mergeParts([root, trunk, b1, b2, b3]);
+  const root = new THREE.CylinderGeometry(0.24, 0.44, 0.44, 9);
+  root.translate(0, 0.22, 0);
 
-  const s1 = new THREE.SphereGeometry(1.18, 11, 9);
-  s1.scale(1.32, 0.68, 1.22);
-  s1.translate(0, 2.86, 0);
-  const s2 = new THREE.SphereGeometry(0.95, 10, 8);
-  s2.scale(1.25, 0.66, 1.16);
-  s2.translate(-0.98, 2.52, 0.3);
-  const s3 = new THREE.SphereGeometry(0.92, 10, 8);
-  s3.scale(1.24, 0.66, 1.14);
-  s3.translate(0.95, 2.56, -0.24);
-  const s4 = new THREE.SphereGeometry(0.84, 9, 8);
-  s4.scale(1.22, 0.68, 1.15);
-  s4.translate(0.1, 3.32, 0.14);
-  const s5 = new THREE.SphereGeometry(0.76, 9, 8);
-  s5.scale(1.2, 0.66, 1.14);
-  s5.translate(0.05, 2.66, -0.82);
-  const blossomGeo = mergeParts([s1, s2, s3, s4, s5]);
+  const lowerTrunk = new THREE.CylinderGeometry(0.19, 0.27, 1.25, 9);
+  lowerTrunk.rotateZ(0.08);
+  lowerTrunk.translate(-0.04, 0.85, 0);
 
-  return {trunkGeo, blossomGeo};
+  const upperTrunk = new THREE.CylinderGeometry(0.14, 0.2, 1.05, 8);
+  upperTrunk.rotateZ(-0.11);
+  upperTrunk.translate(0.04, 1.72, 0.02);
+
+  const b1 = new THREE.CylinderGeometry(0.075, 0.125, 1.38, 7);
+  b1.rotateZ(0.76);
+  b1.translate(-0.56, 2.08, 0.14);
+  const sub1 = new THREE.CylinderGeometry(0.042, 0.07, 0.84, 6);
+  sub1.rotateZ(1.12);
+  sub1.rotateY(0.35);
+  sub1.translate(-1.12, 2.42, 0.34);
+
+  const b2 = new THREE.CylinderGeometry(0.075, 0.125, 1.32, 7);
+  b2.rotateZ(-0.7);
+  b2.translate(0.54, 2.12, -0.1);
+  const sub2 = new THREE.CylinderGeometry(0.042, 0.07, 0.82, 6);
+  sub2.rotateZ(-1.08);
+  sub2.rotateY(-0.3);
+  sub2.translate(1.06, 2.44, -0.26);
+
+  const b3 = new THREE.CylinderGeometry(0.062, 0.102, 1.12, 6);
+  b3.rotateX(-0.64);
+  b3.translate(0.04, 2.14, -0.48);
+
+  const b4 = new THREE.CylinderGeometry(0.058, 0.094, 1.05, 6);
+  b4.rotateX(0.6);
+  b4.translate(-0.06, 2.12, 0.44);
+
+  const trunkGeo = mergeParts([root, lowerTrunk, upperTrunk, b1, sub1, b2, sub2, b3, b4]);
+
+  const cloudSpecs: [number, number, number, number, number, number, number][] = [
+    [0, 2.94, 0, 1.05, 1.28, 0.66, 1.18],
+    [-1.08, 2.58, 0.34, 0.84, 1.24, 0.64, 1.14],
+    [1.06, 2.62, -0.26, 0.82, 1.24, 0.64, 1.12],
+    [0.08, 3.38, 0.12, 0.8, 1.22, 0.66, 1.14],
+    [0.05, 2.68, -0.88, 0.74, 1.2, 0.64, 1.12],
+    [-0.12, 2.66, 0.82, 0.7, 1.18, 0.64, 1.1],
+    [-0.64, 3.06, -0.58, 0.64, 1.16, 0.66, 1.08],
+    [0.68, 3.12, 0.46, 0.62, 1.16, 0.66, 1.08],
+  ];
+  const blossomGeo = mergeParts(
+    cloudSpecs.map(([x, y, z, r, sx, sy, sz]) => {
+      const g = new THREE.SphereGeometry(r, 10, 8);
+      g.scale(sx, sy, sz);
+      g.translate(x, y, z);
+      return g;
+    }),
+  );
+
+  // Rich outer & lower pink cherry-blossom flower clusters (2nd instanced color layer for detail)
+  const accentParts: THREE.BufferGeometry[] = [];
+  const accentCenters: THREE.BufferGeometry[] = [];
+  const accentSpots: [number, number, number, number, number][] = [
+    [-1.42, 2.52, 0.56, 1.45, 0.2],
+    [-0.95, 2.95, 0.84, 1.35, -0.2],
+    [1.36, 2.54, -0.45, 1.4, -0.15],
+    [0.92, 3.02, 0.76, 1.35, 0.25],
+    [0.2, 3.68, 0.46, 1.4, 0.15],
+    [-0.36, 3.58, -0.32, 1.35, -0.15],
+    [-0.45, 2.48, 0.96, 1.3, 0.3],
+    [0.48, 2.52, -0.95, 1.3, -0.25],
+    [-1.24, 2.86, -0.36, 1.3, 0.1],
+    [1.18, 2.9, 0.26, 1.3, -0.1],
+  ];
+  accentSpots.forEach(([ax, ay, az, asc, tilt], idx) => {
+    append5PetalFlower(accentParts, accentCenters, ax, ay, az, asc, tilt, tilt * 0.6, idx * 0.7);
+  });
+  const accentBloomGeo = mergeParts(accentParts);
+  const accentCenterGeo = mergeParts(accentCenters);
+
+  return {trunkGeo, blossomGeo, accentBloomGeo, accentCenterGeo};
 }
 
 function buildPartialFenceSegment(
@@ -3751,11 +3834,6 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'box', id: 'petshop', x: PET_X, z: PET_Z, hw: 2.85, hd: 2.45, rotY: 0});
-    labelAnchors.push({
-      id: 'petshop',
-      label: 'Cửa Hàng Pets',
-      worldPos: new THREE.Vector3(PET_X, 6.2, PET_Z),
-    });
     mergeStaticGroupByMaterial(petShop);
     group.add(petShop);
   }
@@ -4164,6 +4242,14 @@ export function buildTownScene(): TownWorld {
     [55.5, 29.0, 1.28, true, -Math.PI + 0.3],
     [-40.5, 59.5, 1.26, true, 0.9],
     [40.5, 55.5, 1.26, true, 2.2],
+    [-25.5, 48.0, 1.22, true, 0.4],
+    [25.5, 48.0, 1.24, true, 2.7],
+    [-62.0, -34.0, 1.28, true, 0.5],
+    [62.5, -34.5, 1.26, true, 2.6],
+    [-60.5, 42.0, 1.24, true, -0.5],
+    [60.5, 41.5, 1.24, true, -2.5],
+    [-22.0, 62.5, 1.26, true, 1.1],
+    [22.5, 61.5, 1.28, true, 2.0],
   ];
 
   const oakTrunkIM = new THREE.InstancedMesh(trunkGeo, trunkMat, oakTrees.length);
@@ -4297,6 +4383,12 @@ export function buildTownScene(): TownWorld {
     [60.5, 11.5, 1.26, true, Math.PI - 0.15],
     [-48.5, -36.0, 1.28, true, -0.65],
     [49.0, -36.5, 1.28, true, -2.45],
+    [-33.5, 18.0, 1.18, true, 0.3],
+    [34.0, 18.0, 1.18, true, 2.8],
+    [-52.0, 56.0, 1.24, true, 0.5],
+    [52.5, 55.5, 1.24, true, 2.6],
+    [-18.5, -48.5, 1.22, true, -0.7],
+    [18.5, -48.5, 1.22, true, -2.4],
   ];
 
   const branchTrunkIM = new THREE.InstancedMesh(branchTrunkGeo, branchTrunkMat, branchedTrees.length);
@@ -4573,8 +4665,8 @@ export function buildTownScene(): TownWorld {
   const pineTrunkIM = new THREE.InstancedMesh(pineTrunkGeo, pineTrunkMat, pineCoords.length);
   const pineLowerIM = new THREE.InstancedMesh(pineLowerGeo, pineLowerMat, pineCoords.length);
   const pineUpperIM = new THREE.InstancedMesh(pineUpperGeo, pineUpperMat, pineCoords.length);
-  const pineLowPalette = ['#2E6A47', '#35744E', '#2A6041', '#3A7B53'];
-  const pineUpPalette = ['#418659', '#4A9162', '#3B7E53', '#529B6B'];
+  const pineLowPalette = ['#47995B', '#51A666', '#3F8E53', '#59AF6E'];
+  const pineUpPalette = ['#5EB672', '#68C27C', '#54AA68', '#73CC85'];
 
   pineCoords.forEach(([px, pz, ps], i) => {
     _instDummy.position.set(px, getTownGroundHeight(px, pz) - 0.05, pz);
@@ -4605,9 +4697,16 @@ export function buildTownScene(): TownWorld {
   group.add(pineTrunkIM, pineLowerIM, pineUpperIM);
 
   // ========== 4. SAKURA (HOA ĐÀO) TREES & PETALS ON THE GENTLE SCENIC HILL ==========
-  const {trunkGeo: sakuraTrunkGeo, blossomGeo: sakuraBlossomGeo} = createSakuraGeometries();
+  const {
+    trunkGeo: sakuraTrunkGeo,
+    blossomGeo: sakuraBlossomGeo,
+    accentBloomGeo: sakuraAccentGeo,
+    accentCenterGeo: sakuraCenterGeo,
+  } = createSakuraGeometries();
   const sakuraTrunkMat = getMat('#5C3E32', 0.82);
   const sakuraBlossomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.65});
+  const sakuraAccentMat = getMat('#F579A5', 0.52);
+  const sakuraCenterMat = getMat('#FFE48F', 0.46);
 
   const sakuraTrees: [number, number, number][] = [
     [HILL_CENTER.x - 10.5, HILL_CENTER.z - 3.6, 1.32],
@@ -4626,6 +4725,8 @@ export function buildTownScene(): TownWorld {
 
   const sakuraTrunkIM = new THREE.InstancedMesh(sakuraTrunkGeo, sakuraTrunkMat, sakuraTrees.length);
   const sakuraBlossomIM = new THREE.InstancedMesh(sakuraBlossomGeo, sakuraBlossomMat, sakuraTrees.length);
+  const sakuraAccentIM = new THREE.InstancedMesh(sakuraAccentGeo, sakuraAccentMat, sakuraTrees.length);
+  const sakuraCenterIM = new THREE.InstancedMesh(sakuraCenterGeo, sakuraCenterMat, sakuraTrees.length);
   const sakuraTints = ['#FFADC6', '#FFB8CE', '#F89AB8', '#FFC6D9'];
 
   sakuraTrees.forEach(([sx, sz, ss], i) => {
@@ -4636,6 +4737,8 @@ export function buildTownScene(): TownWorld {
     _instDummy.updateMatrix();
     sakuraTrunkIM.setMatrixAt(i, _instDummy.matrix);
     sakuraBlossomIM.setMatrixAt(i, _instDummy.matrix);
+    sakuraAccentIM.setMatrixAt(i, _instDummy.matrix);
+    sakuraCenterIM.setMatrixAt(i, _instDummy.matrix);
 
     _instColor.set(sakuraTints[i % sakuraTints.length]);
     sakuraBlossomIM.setColorAt(i, _instColor);
@@ -4644,10 +4747,14 @@ export function buildTownScene(): TownWorld {
   });
   sakuraTrunkIM.instanceMatrix.needsUpdate = true;
   sakuraBlossomIM.instanceMatrix.needsUpdate = true;
+  sakuraAccentIM.instanceMatrix.needsUpdate = true;
+  sakuraCenterIM.instanceMatrix.needsUpdate = true;
   if (sakuraBlossomIM.instanceColor) sakuraBlossomIM.instanceColor.needsUpdate = true;
   sakuraTrunkIM.computeBoundingSphere();
   sakuraBlossomIM.computeBoundingSphere();
-  group.add(sakuraTrunkIM, sakuraBlossomIM);
+  sakuraAccentIM.computeBoundingSphere();
+  sakuraCenterIM.computeBoundingSphere();
+  group.add(sakuraTrunkIM, sakuraBlossomIM, sakuraAccentIM, sakuraCenterIM);
 
   // Static fallen sakura petals scattered across the gentle hill summit & slopes (1 draw call)
   const petalCount = 120;
@@ -5088,41 +5195,53 @@ export function buildTownScene(): TownWorld {
       }
     });
 
-    // Static repeatable InstancedMesh foliage cushions & vibrant flowers along both curved beds (2 draw calls)
-    const tuftPerSide = 22;
+    // Static repeatable InstancedMesh foliage cushions & crisp 5-petal flowers along both curved beds
+    const tuftPerSide = 24;
     const totalBedTufts = tuftPerSide * 2;
-    const bedFoliageGeo = new THREE.SphereGeometry(0.32, 8, 6);
-    bedFoliageGeo.scale(1.16, 0.62, 1.16);
-    bedFoliageGeo.translate(0, 0.08, 0);
+    const bedFoliageParts: THREE.BufferGeometry[] = [];
+    const bfMound = new THREE.SphereGeometry(0.32, 8, 6);
+    bfMound.scale(1.16, 0.56, 1.16);
+    bfMound.translate(0, 0.06, 0);
+    bedFoliageParts.push(bfMound);
+    for (let lf = 0; lf < 4; lf++) {
+      const a = (lf / 4) * Math.PI * 2 + 0.3;
+      const leaf = new THREE.SphereGeometry(0.14, 6, 5);
+      leaf.scale(0.85, 0.28, 1.65);
+      leaf.rotateX(-0.32);
+      leaf.translate(0, 0.12, 0.22);
+      leaf.rotateY(a);
+      bedFoliageParts.push(leaf);
+    }
+    const bedFoliageGeo = mergeParts(bedFoliageParts);
     const bedFoliageIM = new THREE.InstancedMesh(bedFoliageGeo, getMat('#54AC5C', 0.76), totalBedTufts);
 
-    const bf1 = new THREE.SphereGeometry(0.115, 6, 5);
-    bf1.scale(1.15, 0.68, 1.15);
-    bf1.translate(-0.1, 0.25, 0.06);
-    const bf2 = new THREE.SphereGeometry(0.105, 6, 5);
-    bf2.scale(1.15, 0.68, 1.15);
-    bf2.translate(0.11, 0.24, -0.07);
-    const bf3 = new THREE.SphereGeometry(0.095, 6, 5);
-    bf3.scale(1.15, 0.68, 1.15);
-    bf3.translate(0.01, 0.29, -0.02);
-    const bedBloomGeo = mergeParts([bf1, bf2, bf3]);
-    const bedBloomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.54});
+    const bedPetalParts: THREE.BufferGeometry[] = [];
+    const bedCenterParts: THREE.BufferGeometry[] = [];
+    append5PetalFlower(bedPetalParts, bedCenterParts, -0.13, 0.24, 0.08, 1.35, 0.2, 0.16, 0.2);
+    append5PetalFlower(bedPetalParts, bedCenterParts, 0.14, 0.23, -0.07, 1.25, -0.18, -0.18, 0.8);
+    append5PetalFlower(bedPetalParts, bedCenterParts, 0.01, 0.29, -0.02, 1.18, 0.08, -0.06, 1.4);
+    const bedBloomGeo = mergeParts(bedPetalParts);
+    const bedCenterGeo = mergeParts(bedCenterParts);
+    const bedBloomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.48});
+    const bedCenterMat = getMat('#FFD24C', 0.42);
     const bedBloomIM = new THREE.InstancedMesh(bedBloomGeo, bedBloomMat, totalBedTufts);
-    const bedBloomPalette = ['#FF9BB0', '#FFD166', '#FF8F70', '#D6B4FC', '#A8E0FF'];
+    const bedCenterIM = new THREE.InstancedMesh(bedCenterGeo, bedCenterMat, totalBedTufts);
+    const bedBloomPalette = ['#FF8DA8', '#FFAD70', '#8CD5FF', '#D1A6FF', '#FF7676', '#FFFFFF'];
 
     let bIdx = 0;
     [0, Math.PI].forEach((sideRotY) => {
       for (let t = 0; t < tuftPerSide; t++) {
         const u = t / (tuftPerSide - 1);
         const ang = THREE.MathUtils.lerp(-ARC_SPAN * 0.96, ARC_SPAN * 0.96, u) + sideRotY;
-        const rOff = (t % 2 === 0 ? -0.09 : 0.09);
+        const rOff = t % 2 === 0 ? -0.11 : 0.11;
         const r = ARC_MID_R + rOff;
         _instDummy.position.set(Math.cos(ang) * r, 0.96, Math.sin(ang) * r);
         _instDummy.rotation.set(0, -ang + t * 0.7, 0);
-        _instDummy.scale.setScalar(0.92 + (t % 3) * 0.12);
+        _instDummy.scale.setScalar(0.95 + (t % 3) * 0.12);
         _instDummy.updateMatrix();
         bedFoliageIM.setMatrixAt(bIdx, _instDummy.matrix);
         bedBloomIM.setMatrixAt(bIdx, _instDummy.matrix);
+        bedCenterIM.setMatrixAt(bIdx, _instDummy.matrix);
         _instColor.set(bedBloomPalette[bIdx % bedBloomPalette.length]);
         bedBloomIM.setColorAt(bIdx, _instColor);
         bIdx++;
@@ -5130,66 +5249,90 @@ export function buildTownScene(): TownWorld {
     });
     bedFoliageIM.instanceMatrix.needsUpdate = true;
     bedBloomIM.instanceMatrix.needsUpdate = true;
+    bedCenterIM.instanceMatrix.needsUpdate = true;
     if (bedBloomIM.instanceColor) bedBloomIM.instanceColor.needsUpdate = true;
     bedFoliageIM.computeBoundingSphere();
     bedBloomIM.computeBoundingSphere();
-    group.add(bedFoliageIM, bedBloomIM);
+    bedCenterIM.computeBoundingSphere();
+    group.add(bedFoliageIM, bedBloomIM, bedCenterIM);
   }
 
-  // B. Small & Medium Flowering Bushes (Bụi hoa nhỏ & vừa)
+  // B. Small & Medium Flowering Bushes (Bụi hoa nhỏ & vừa phủ khắp khu trung tâm & vùng ngoài)
   const bushCoords: [number, number, string, number?][] = [
     [-9.2, -7.8, '#F28482', 0.86],
-    [9.2, -7.8, '#F9C74F', 0.88],
+    [9.2, -7.8, '#8ECAE6', 0.88],
     [-9.2, 7.8, '#F7A8B8', 0.84],
     [9.2, 7.8, '#A8D8EA', 0.86],
-    [-38.2, -25.2, '#F9C74F', 0.95],
+    [-38.2, -25.2, '#FF9EBB', 0.95],
     [-25.8, -25.8, '#F28482', 0.92],
     [25.6, -25.8, '#F7A8B8', 0.94],
-    [38.5, -26.2, '#F9C74F', 0.96],
+    [38.5, -26.2, '#D0A6FF', 0.96],
     [-38.2, 13.5, '#A8D8EA', 0.9],
     [-25.5, 22.2, '#F7A8B8', 0.92],
     [38.5, 12.8, '#F28482', 0.94],
-    [25.5, 21.8, '#F9C74F', 0.9],
+    [25.5, 21.8, '#9CE0FF', 0.9],
     [-35.0, 40.5, '#A8D8EA', 0.88],
     [-11.8, 50.5, '#F7A8B8', 0.85],
-    [19.2, 37.5, '#F9C74F', 0.9],
+    [19.2, 37.5, '#FF9EBB', 0.9],
     [28.5, 37.2, '#F28482', 0.92],
     [-8.4, -27.2, '#F7A8B8', 0.88],
     [-19.2, -16.2, '#A8D8EA', 0.84],
-    [-21.5, 4.2, '#F9C74F', 0.82],
+    [-21.5, 4.2, '#D0A6FF', 0.82],
     [21.5, 4.2, '#F28482', 0.86],
     [-15.5, -9.5, '#F7A8B8', 0.78],
     [15.8, -9.4, '#A8D8EA', 0.76],
-    [-15.2, 9.6, '#F9C74F', 0.8],
+    [-15.2, 9.6, '#FFAD88', 0.8],
     [15.6, 9.8, '#F28482', 0.78],
     [-20.5, 32.5, '#F7A8B8', 0.76],
     [16.6, 41.0, '#A8D8EA', 0.82],
     [9.4, 15.8, '#F7A8B8', 0.86],
     [18.2, 16.4, '#A8D8EA', 0.88],
-    [-29.5, 7.5, '#F9C74F', 0.9],
+    [-29.5, 7.5, '#FF9EBB', 0.9],
     [29.5, 7.5, '#F28482', 0.9],
     [-5.5, 39.5, '#F7A8B8', 0.88],
     [6.5, 40.2, '#A8D8EA', 0.86],
-    [-46.0, 5.5, '#F9C74F', 0.94],
+    [-46.0, 5.5, '#D0A6FF', 0.94],
     [46.5, 5.0, '#F7A8B8', 0.94],
+    // Outer meadow & edge shrubs
+    [-48.0, 34.0, '#FF9EBB', 0.96],
+    [48.5, 33.5, '#8ECAE6', 0.96],
+    [-55.0, -14.5, '#F7A8B8', 0.98],
+    [55.5, -14.0, '#FFAD88', 0.98],
+    [-54.5, 16.0, '#D0A6FF', 0.96],
+    [55.0, 15.5, '#F28482', 0.96],
+    [-33.0, 53.0, '#FF9EBB', 0.94],
+    [33.5, 52.5, '#A8D8EA', 0.94],
+    [-18.0, 56.5, '#F28482', 0.92],
+    [18.5, 56.0, '#D0A6FF', 0.92],
+    [-44.5, -42.5, '#FFAD88', 0.96],
+    [44.5, -42.0, '#F7A8B8', 0.96],
+    [-60.0, 3.0, '#8ECAE6', 0.98],
+    [60.5, 2.5, '#FF9EBB', 0.98],
   ];
-  const bushBodyGeo = new THREE.SphereGeometry(0.42, 9, 7);
-  bushBodyGeo.scale(1.25, 0.78, 1.15);
-  bushBodyGeo.translate(0, 0.28, 0);
+  const bushBodyParts: THREE.BufferGeometry[] = [];
+  const bbMain = new THREE.SphereGeometry(0.42, 9, 7);
+  bbMain.scale(1.25, 0.76, 1.15);
+  bbMain.translate(0, 0.27, 0);
+  const bbSub = new THREE.SphereGeometry(0.28, 7, 6);
+  bbSub.scale(1.15, 0.74, 1.1);
+  bbSub.translate(0.28, 0.2, 0.16);
+  bushBodyParts.push(bbMain, bbSub);
+  const bushBodyGeo = mergeParts(bushBodyParts);
   const bushBodyMat = getMat('#5FB465', 0.76);
   const bushBodyIM = new THREE.InstancedMesh(bushBodyGeo, bushBodyMat, bushCoords.length);
 
-  const bDot1 = new THREE.SphereGeometry(0.11, 6, 6);
-  bDot1.translate(-0.18, 0.46, 0.14);
-  const bDot2 = new THREE.SphereGeometry(0.11, 6, 6);
-  bDot2.translate(0.18, 0.44, -0.08);
-  const bDot3 = new THREE.SphereGeometry(0.11, 6, 6);
-  bDot3.translate(0.02, 0.52, 0.2);
-  const bDot4 = new THREE.SphereGeometry(0.095, 6, 6);
-  bDot4.translate(-0.08, 0.42, -0.18);
-  const bushBlossomGeo = mergeParts([bDot1, bDot2, bDot3, bDot4]);
-  const bushBlossomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.56});
+  const bushPetalParts: THREE.BufferGeometry[] = [];
+  const bushCenterParts: THREE.BufferGeometry[] = [];
+  append5PetalFlower(bushPetalParts, bushCenterParts, -0.2, 0.5, 0.16, 1.32, 0.28, 0.22, 0.1);
+  append5PetalFlower(bushPetalParts, bushCenterParts, 0.21, 0.47, -0.09, 1.24, -0.22, -0.26, 0.8);
+  append5PetalFlower(bushPetalParts, bushCenterParts, 0.02, 0.58, 0.12, 1.28, 0.14, -0.08, 1.5);
+  append5PetalFlower(bushPetalParts, bushCenterParts, -0.08, 0.48, -0.22, 1.15, -0.28, 0.14, 2.2);
+  const bushBlossomGeo = mergeParts(bushPetalParts);
+  const bushCenterGeo = mergeParts(bushCenterParts);
+  const bushBlossomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.48});
+  const bushCenterMat = getMat('#FFD24C', 0.42);
   const bushBlossomIM = new THREE.InstancedMesh(bushBlossomGeo, bushBlossomMat, bushCoords.length);
+  const bushCenterIM = new THREE.InstancedMesh(bushCenterGeo, bushCenterMat, bushCoords.length);
 
   bushCoords.forEach(([bx, bz, col, scale], i) => {
     const by = getTownGroundHeight(bx, bz) - 0.02;
@@ -5200,18 +5343,21 @@ export function buildTownScene(): TownWorld {
     _instDummy.updateMatrix();
     bushBodyIM.setMatrixAt(i, _instDummy.matrix);
     bushBlossomIM.setMatrixAt(i, _instDummy.matrix);
+    bushCenterIM.setMatrixAt(i, _instDummy.matrix);
     _instColor.set(col);
     bushBlossomIM.setColorAt(i, _instColor);
     colliders.push({type: 'circle', x: bx, z: bz, r: 0.44 * sc});
   });
   bushBodyIM.instanceMatrix.needsUpdate = true;
   bushBlossomIM.instanceMatrix.needsUpdate = true;
+  bushCenterIM.instanceMatrix.needsUpdate = true;
   if (bushBlossomIM.instanceColor) bushBlossomIM.instanceColor.needsUpdate = true;
   bushBodyIM.computeBoundingSphere();
   bushBlossomIM.computeBoundingSphere();
-  group.add(bushBodyIM, bushBlossomIM);
+  bushCenterIM.computeBoundingSphere();
+  group.add(bushBodyIM, bushBlossomIM, bushCenterIM);
 
-  // C. Large Sculpted Multi-Mound Park & Woodland Bushes (Bụi cây lớn)
+  // C. Large Sculpted Multi-Mound Park & Woodland Bushes (Bụi cây lớn phủ rộng ra vùng ngoài)
   const bigBushParts: THREE.BufferGeometry[] = [];
   const mb1 = new THREE.SphereGeometry(0.62, 10, 8);
   mb1.scale(1.18, 0.85, 1.12);
@@ -5248,6 +5394,17 @@ export function buildTownScene(): TownWorld {
     [29.5, 52.0, 1.34, '#55AB5E'],
     [-8.5, -32.5, 1.22, '#4E9F57'],
     [8.8, -32.5, 1.24, '#56AE5E'],
+    // Outer ring lush bushes
+    [-58.0, -8.5, 1.36, '#4B9E54'],
+    [58.5, -8.0, 1.36, '#56AF5E'],
+    [-56.5, 22.0, 1.38, '#489A51'],
+    [57.0, 21.5, 1.38, '#53A95B'],
+    [-45.0, 52.0, 1.34, '#4E9F57'],
+    [45.5, 51.5, 1.34, '#58AF61'],
+    [-14.5, 60.5, 1.32, '#4CA256'],
+    [15.0, 60.0, 1.32, '#55AB5E'],
+    [-56.0, -44.0, 1.4, '#4A9D54'],
+    [56.5, -43.5, 1.4, '#54AC5D'],
   ];
   const bigBushIM = new THREE.InstancedMesh(bigBushGeo, bigBushMat, bigBushCoords.length);
   bigBushCoords.forEach(([bx, bz, bs, col], i) => {
@@ -5266,25 +5423,37 @@ export function buildTownScene(): TownWorld {
   bigBushIM.computeBoundingSphere();
   group.add(bigBushIM);
 
-  // Static wildflower clusters scattered across huge meadows & gentle hill (2 draw calls)
-  const FLOWER_COUNT = 380;
-  const fStem1 = new THREE.CylinderGeometry(0.02, 0.025, 0.18, 5);
-  fStem1.translate(0, 0.09, 0);
-  const fLeaf = new THREE.ConeGeometry(0.14, 0.08, 5);
-  fLeaf.translate(0, 0.04, 0);
-  const flowerBaseGeo = mergeParts([fStem1, fLeaf]);
+  // Static 5-petal wildflower clusters scattered generously across inner & outer meadows (3 draw calls total)
+  const FLOWER_COUNT = 560;
+  const fStem1 = new THREE.CylinderGeometry(0.018, 0.024, 0.24, 5);
+  fStem1.translate(0, 0.12, 0);
+  const fStem2 = new THREE.CylinderGeometry(0.014, 0.02, 0.18, 5);
+  fStem2.rotateZ(-0.28);
+  fStem2.translate(0.06, 0.09, 0.04);
+  const fLeafA = new THREE.SphereGeometry(0.075, 5, 4);
+  fLeafA.scale(0.55, 0.22, 1.45);
+  fLeafA.rotateX(-0.35);
+  fLeafA.rotateY(0.6);
+  fLeafA.translate(-0.05, 0.05, 0.06);
+  const fLeafB = new THREE.SphereGeometry(0.072, 5, 4);
+  fLeafB.scale(0.55, 0.22, 1.45);
+  fLeafB.rotateX(-0.35);
+  fLeafB.rotateY(-0.8);
+  fLeafB.translate(0.06, 0.05, -0.05);
+  const flowerBaseGeo = mergeParts([fStem1, fStem2, fLeafA, fLeafB]);
   const flowerBaseMat = getMat('#5CB662', 0.78);
   const flowerBaseIM = new THREE.InstancedMesh(flowerBaseGeo, flowerBaseMat, FLOWER_COUNT);
 
-  const fPet1 = new THREE.SphereGeometry(0.092, 6, 5);
-  fPet1.scale(1.15, 0.62, 1.15);
-  fPet1.translate(0, 0.2, 0);
-  const fPet2 = new THREE.SphereGeometry(0.072, 6, 5);
-  fPet2.scale(1.15, 0.62, 1.15);
-  fPet2.translate(0.12, 0.14, 0.08);
-  const flowerTopGeo = mergeParts([fPet1, fPet2]);
-  const flowerTopMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.56});
+  const wfPetals: THREE.BufferGeometry[] = [];
+  const wfCenters: THREE.BufferGeometry[] = [];
+  append5PetalFlower(wfPetals, wfCenters, 0, 0.24, 0, 1.08, 0.14, 0, 0.2);
+  append5PetalFlower(wfPetals, wfCenters, 0.09, 0.17, 0.05, 0.86, 0.22, -0.26, 1.1);
+  const flowerTopGeo = mergeParts(wfPetals);
+  const flowerCenterGeo = mergeParts(wfCenters);
+  const flowerTopMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.48});
+  const flowerCenterMat = getMat('#FFD24C', 0.42);
   const flowerTopIM = new THREE.InstancedMesh(flowerTopGeo, flowerTopMat, FLOWER_COUNT);
+  const flowerCenterIM = new THREE.InstancedMesh(flowerCenterGeo, flowerCenterMat, FLOWER_COUNT);
 
   const isOnRoadOrPlaza = (px: number, pz: number) => {
     if (Math.hypot(px, pz) < TOWN_PLAZA_RADIUS + 1.2) return true;
@@ -5311,11 +5480,11 @@ export function buildTownScene(): TownWorld {
     return false;
   };
 
-  const wildflowerPalette = ['#FFE066', '#FF9EAA', '#A8E0FF', '#D5B8FF', '#FFFFFF'];
+  const wildflowerPalette = ['#FF9EAA', '#A8E0FF', '#D5B8FF', '#FFFFFF', '#FFB48A'];
   let placedFlowers = 0;
-  for (let i = 0; i < 720 && placedFlowers < FLOWER_COUNT; i++) {
+  for (let i = 0; i < 1100 && placedFlowers < FLOWER_COUNT; i++) {
     const angle = i * 2.39996;
-    const rad = 8.4 + ((i * 1.49) % 68.0);
+    const rad = i % 3 === 0 ? 28.0 + ((i * 1.43) % 44.0) : 8.4 + ((i * 1.51) % 64.0);
     const fx = Math.cos(angle) * rad;
     const fz = Math.sin(angle) * rad;
     if (isOnRoadOrPlaza(fx, fz)) continue;
@@ -5323,25 +5492,29 @@ export function buildTownScene(): TownWorld {
     const fy = getTownGroundHeight(fx, fz) - 0.01;
     _instDummy.position.set(fx, fy, fz);
     _instDummy.rotation.set(0, angle, 0);
-    _instDummy.scale.setScalar(0.85 + (placedFlowers % 4) * 0.14);
+    _instDummy.scale.setScalar(0.92 + (placedFlowers % 4) * 0.16);
     _instDummy.updateMatrix();
     flowerBaseIM.setMatrixAt(placedFlowers, _instDummy.matrix);
     flowerTopIM.setMatrixAt(placedFlowers, _instDummy.matrix);
+    flowerCenterIM.setMatrixAt(placedFlowers, _instDummy.matrix);
     _instColor.set(wildflowerPalette[placedFlowers % wildflowerPalette.length]);
     flowerTopIM.setColorAt(placedFlowers, _instColor);
     placedFlowers++;
   }
   flowerBaseIM.count = placedFlowers;
   flowerTopIM.count = placedFlowers;
+  flowerCenterIM.count = placedFlowers;
   flowerBaseIM.instanceMatrix.needsUpdate = true;
   flowerTopIM.instanceMatrix.needsUpdate = true;
+  flowerCenterIM.instanceMatrix.needsUpdate = true;
   if (flowerTopIM.instanceColor) flowerTopIM.instanceColor.needsUpdate = true;
   flowerBaseIM.computeBoundingSphere();
   flowerTopIM.computeBoundingSphere();
-  group.add(flowerBaseIM, flowerTopIM);
+  flowerCenterIM.computeBoundingSphere();
+  group.add(flowerBaseIM, flowerTopIM, flowerCenterIM);
 
-  // D. Sculpted Layered Meadow Grass Clusters (Cỏ vừa & cỏ cao mượt mà dùng static InstancedMesh)
-  const TUFT_COUNT = 460;
+  // D. Sculpted Layered Meadow Grass Clusters (Cỏ vừa & cỏ cao mượt mà phủ đều ra rìa map)
+  const TUFT_COUNT = 720;
   const t1 = new THREE.ConeGeometry(0.085, 0.38, 4);
   t1.rotateZ(0.22);
   t1.translate(-0.07, 0.17, 0);
@@ -5359,16 +5532,16 @@ export function buildTownScene(): TownWorld {
   const tuftIM = new THREE.InstancedMesh(tuftGeo, tuftMat, TUFT_COUNT);
   const tuftPalette = ['#5EB662', '#68C16B', '#54AA58', '#73C972'];
   let placedTufts = 0;
-  for (let i = 0; i < 820 && placedTufts < TUFT_COUNT; i++) {
+  for (let i = 0; i < 1350 && placedTufts < TUFT_COUNT; i++) {
     const angle = i * 2.39996 + 0.9;
-    const rad = 8.4 + ((i * 1.53) % 68.0);
+    const rad = i % 2 === 0 ? 26.0 + ((i * 1.49) % 48.0) : 8.4 + ((i * 1.53) % 64.0);
     const gx = Math.cos(angle) * rad;
     const gz = Math.sin(angle) * rad;
     if (isOnRoadOrPlaza(gx, gz)) continue;
     const gy = getTownGroundHeight(gx, gz) - 0.01;
     _instDummy.position.set(gx, gy, gz);
     _instDummy.rotation.set(0, angle, 0);
-    _instDummy.scale.setScalar(0.86 + (placedTufts % 4) * 0.18);
+    _instDummy.scale.setScalar(0.88 + (placedTufts % 4) * 0.18);
     _instDummy.updateMatrix();
     tuftIM.setMatrixAt(placedTufts, _instDummy.matrix);
     _instColor.set(tuftPalette[placedTufts % tuftPalette.length]);
@@ -5381,8 +5554,8 @@ export function buildTownScene(): TownWorld {
   tuftIM.computeBoundingSphere();
   group.add(tuftIM);
 
-  // Tall Lush Meadow Grass Clumps (Cỏ cao rậm tự nhiên)
-  const TALL_GRASS_COUNT = 240;
+  // Tall Lush Meadow Grass Clumps (Cỏ cao rậm tự nhiên vùng ngoài)
+  const TALL_GRASS_COUNT = 420;
   const tg1 = new THREE.ConeGeometry(0.115, 0.72, 4);
   tg1.rotateZ(0.22);
   tg1.translate(-0.12, 0.34, 0.04);
@@ -5404,9 +5577,9 @@ export function buildTownScene(): TownWorld {
   const tallGrassIM = new THREE.InstancedMesh(tallGrassGeo, tallGrassMat, TALL_GRASS_COUNT);
   const tallGrassPalette = ['#50A255', '#5CB060', '#48964D', '#67BA6A', '#72C474'];
   let placedTall = 0;
-  for (let i = 0; i < 600 && placedTall < TALL_GRASS_COUNT; i++) {
+  for (let i = 0; i < 950 && placedTall < TALL_GRASS_COUNT; i++) {
     const angle = i * 2.39996 + 1.85;
-    const rad = 9.4 + ((i * 2.13) % 64.0);
+    const rad = i % 2 === 0 ? 27.0 + ((i * 1.97) % 45.0) : 9.4 + ((i * 2.13) % 62.0);
     const gx = Math.cos(angle) * rad;
     const gz = Math.sin(angle) * rad;
     if (isOnRoadOrPlaza(gx, gz)) continue;
@@ -5426,7 +5599,7 @@ export function buildTownScene(): TownWorld {
   tallGrassIM.computeBoundingSphere();
   group.add(tallGrassIM);
 
-  // Small Pebbles & Large Mossy Boulder Clusters (Tảng đá lớn bé rải rác quanh đường mòn, đồi & đồng cỏ)
+  // Small Pebbles & Large Mossy Boulder Clusters (Tảng đá lớn bé khắp đường mòn, đồi & vùng rìa)
   const smallRockCoords: [number, number, number][] = [
     [-9.5, -16.5, 0.44],
     [10.8, -18.5, 0.48],
@@ -5444,6 +5617,21 @@ export function buildTownScene(): TownWorld {
     [22.5, 55.5, 0.56],
     [-46.0, 10.5, 0.54],
     [46.5, 10.0, 0.56],
+    // Outer field stones
+    [-53.5, -2.5, 0.56],
+    [54.0, -3.0, 0.54],
+    [-51.0, 39.5, 0.58],
+    [51.5, 39.0, 0.56],
+    [-32.5, 62.0, 0.6],
+    [33.0, 61.5, 0.58],
+    [-6.0, 58.0, 0.54],
+    [8.0, 59.5, 0.55],
+    [-58.5, 24.5, 0.6],
+    [59.0, 24.0, 0.58],
+    [-55.0, -32.0, 0.58],
+    [55.5, -31.5, 0.56],
+    [-26.0, -45.0, 0.54],
+    [26.5, -44.5, 0.54],
   ];
   const p1 = new THREE.DodecahedronGeometry(0.55, 0);
   p1.scale(1.22, 0.68, 1.0);
@@ -5495,6 +5683,15 @@ export function buildTownScene(): TownWorld {
     [13.5, 58.0, 1.16],
     [-55.0, 34.0, 1.2],
     [55.5, 33.5, 1.18],
+    // Outer zone landmark boulders
+    [-59.5, 7.5, 1.16],
+    [60.0, 7.0, 1.16],
+    [-58.0, -24.5, 1.2],
+    [58.5, -24.0, 1.18],
+    [-25.5, 62.5, 1.14],
+    [26.0, 62.0, 1.16],
+    [-46.0, -49.5, 1.22],
+    [46.5, -49.0, 1.2],
   ];
   const heroBoulderIM = new THREE.InstancedMesh(heroBoulderGeo, heroBoulderMat, largeRockCoords.length);
   const heroMossIM = new THREE.InstancedMesh(mossCapGeo, mossCapMat, largeRockCoords.length);
@@ -5513,52 +5710,58 @@ export function buildTownScene(): TownWorld {
   heroMossIM.computeBoundingSphere();
   group.add(heroBoulderIM, heroMossIM);
 
-  // Large Meadow Flower Clusters (Cụm hoa to làm điểm đậu & thu hút côn trùng)
-  const BIG_FLOWER_MAX = 46;
+  // Large Hero Meadow Flower Clusters (Cụm hoa 5 cánh rõ nét phủ rộng ra vùng ngoài thu hút bướm/ong)
+  const BIG_FLOWER_MAX = 72;
   const bigFlowerCoords: [number, number][] = [];
+  const bfLeafParts: THREE.BufferGeometry[] = [];
   const bfBaseLeaf = new THREE.SphereGeometry(0.46, 8, 6);
-  bfBaseLeaf.scale(1.22, 0.42, 1.18);
-  bfBaseLeaf.translate(0, 0.14, 0);
-  const bfLeaf2 = new THREE.SphereGeometry(0.32, 7, 5);
-  bfLeaf2.scale(1.15, 0.46, 1.1);
-  bfLeaf2.translate(0.28, 0.12, -0.18);
-  const bfMoundGeo = mergeParts([bfBaseLeaf, bfLeaf2]);
+  bfBaseLeaf.scale(1.22, 0.36, 1.18);
+  bfBaseLeaf.translate(0, 0.11, 0);
+  bfLeafParts.push(bfBaseLeaf);
+  for (let l = 0; l < 5; l++) {
+    const a = (l / 5) * Math.PI * 2 + 0.25;
+    const leaf = new THREE.SphereGeometry(0.2, 6, 5);
+    leaf.scale(0.82, 0.24, 1.65);
+    leaf.rotateX(-0.26);
+    leaf.translate(0, 0.14, 0.34);
+    leaf.rotateY(a);
+    bfLeafParts.push(leaf);
+  }
+  const bfMoundGeo = mergeParts(bfLeafParts);
   const bfMoundMat = getMat('#4EA85B', 0.76);
   const bfMoundIM = new THREE.InstancedMesh(bfMoundGeo, bfMoundMat, BIG_FLOWER_MAX);
 
-  const bBloomParts: THREE.BufferGeometry[] = [];
-  const bloomOffsets: [number, number, number, number][] = [
-    [0, 0.38, 0, 0.16],
-    [-0.24, 0.31, 0.18, 0.13],
-    [0.24, 0.32, -0.14, 0.135],
-    [-0.1, 0.28, -0.24, 0.115],
-  ];
-  bloomOffsets.forEach(([ox, oy, oz, rad]) => {
-    const fl = new THREE.SphereGeometry(rad, 7, 6);
-    fl.scale(1.18, 0.62, 1.18);
-    fl.translate(ox, oy, oz);
-    bBloomParts.push(fl);
-  });
-  const bfBloomGeo = mergeParts(bBloomParts);
-  const bfBloomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.5});
+  const bfPetalParts: THREE.BufferGeometry[] = [];
+  const bfCenterParts: THREE.BufferGeometry[] = [];
+  append5PetalFlower(bfPetalParts, bfCenterParts, 0, 0.37, 0, 2.25, 0.08, 0.04, 0.1);
+  append5PetalFlower(bfPetalParts, bfCenterParts, -0.27, 0.29, 0.2, 1.85, 0.24, 0.2, 0.7);
+  append5PetalFlower(bfPetalParts, bfCenterParts, 0.26, 0.3, -0.16, 1.9, -0.2, -0.22, 1.3);
+  append5PetalFlower(bfPetalParts, bfCenterParts, -0.1, 0.26, -0.27, 1.7, -0.25, 0.12, 2.0);
+  append5PetalFlower(bfPetalParts, bfCenterParts, 0.2, 0.25, 0.24, 1.65, 0.22, -0.2, 2.6);
+  const bfBloomGeo = mergeParts(bfPetalParts);
+  const bfCenterGeo = mergeParts(bfCenterParts);
+  const bfBloomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.46});
+  const bfCenterMat = getMat('#FFD24C', 0.4);
   const bfBloomIM = new THREE.InstancedMesh(bfBloomGeo, bfBloomMat, BIG_FLOWER_MAX);
-  const bfPalette = ['#FF9BB0', '#FFD166', '#98D8FF', '#D5AEFF', '#FFAD85'];
+  const bfCenterIM = new THREE.InstancedMesh(bfCenterGeo, bfCenterMat, BIG_FLOWER_MAX);
+  const bfPalette = ['#FF8FA8', '#98D8FF', '#D5AEFF', '#FFAD85', '#FFFFFF'];
 
   let placedBigFlowers = 0;
-  for (let i = 0; i < 240 && placedBigFlowers < BIG_FLOWER_MAX; i++) {
+  for (let i = 0; i < 420 && placedBigFlowers < BIG_FLOWER_MAX; i++) {
     const angle = i * 2.39996 + 0.55;
-    const rad = 10.6 + ((i * 2.41) % 52.0);
+    const rad = i % 2 === 0 ? 29.0 + ((i * 2.17) % 34.0) : 10.6 + ((i * 2.41) % 52.0);
     const fx = Math.cos(angle) * rad;
     const fz = Math.sin(angle) * rad;
     if (isOnRoadOrPlaza(fx, fz)) continue;
     const fy = getTownGroundHeight(fx, fz) - 0.02;
-    const sc = 0.92 + (placedBigFlowers % 3) * 0.14;
+    const sc = 0.94 + (placedBigFlowers % 3) * 0.14;
     _instDummy.position.set(fx, fy, fz);
     _instDummy.rotation.set(0, angle * 1.1, 0);
     _instDummy.scale.setScalar(sc);
     _instDummy.updateMatrix();
     bfMoundIM.setMatrixAt(placedBigFlowers, _instDummy.matrix);
     bfBloomIM.setMatrixAt(placedBigFlowers, _instDummy.matrix);
+    bfCenterIM.setMatrixAt(placedBigFlowers, _instDummy.matrix);
     _instColor.set(bfPalette[placedBigFlowers % bfPalette.length]);
     bfBloomIM.setColorAt(placedBigFlowers, _instColor);
     bigFlowerCoords.push([fx, fz]);
@@ -5567,20 +5770,244 @@ export function buildTownScene(): TownWorld {
   }
   bfMoundIM.count = placedBigFlowers;
   bfBloomIM.count = placedBigFlowers;
+  bfCenterIM.count = placedBigFlowers;
   bfMoundIM.instanceMatrix.needsUpdate = true;
   bfBloomIM.instanceMatrix.needsUpdate = true;
+  bfCenterIM.instanceMatrix.needsUpdate = true;
   if (bfBloomIM.instanceColor) bfBloomIM.instanceColor.needsUpdate = true;
   bfMoundIM.computeBoundingSphere();
   bfBloomIM.computeBoundingSphere();
-  group.add(bfMoundIM, bfBloomIM);
+  bfCenterIM.computeBoundingSphere();
+  group.add(bfMoundIM, bfBloomIM, bfCenterIM);
 
-  // Town Insect Habitats & Live 3D Bug Manager (Côn trùng khắp thị trấn)
+  // ========== COZY LIFE-SIM REPEATABLE MAP PROPS (STATIC INSTANCED MESHES — ZERO LAG) ==========
+  // 1. Forest Toadstool Mushroom Clusters (Nấm rừng xinh gần gốc cây & đá tảng)
+  const MUSHROOM_COUNT = 32;
+  const mStem1 = new THREE.CylinderGeometry(0.036, 0.048, 0.18, 7);
+  mStem1.translate(0, 0.09, 0);
+  const mStem2 = new THREE.CylinderGeometry(0.025, 0.035, 0.13, 6);
+  mStem2.translate(0.11, 0.065, 0.07);
+  const mushStemGeo = mergeParts([mStem1, mStem2]);
+  const mushStemIM = new THREE.InstancedMesh(mushStemGeo, getMat('#FFF5E4', 0.65), MUSHROOM_COUNT);
+
+  const mCap1 = new THREE.SphereGeometry(0.11, 9, 6, 0, Math.PI * 2, 0, Math.PI * 0.56);
+  mCap1.scale(1.1, 0.78, 1.1);
+  mCap1.translate(0, 0.17, 0);
+  const mCap2 = new THREE.SphereGeometry(0.076, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.56);
+  mCap2.scale(1.1, 0.78, 1.1);
+  mCap2.translate(0.11, 0.125, 0.07);
+  const mushCapGeo = mergeParts([mCap1, mCap2]);
+  const mushCapMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.45});
+  const mushCapIM = new THREE.InstancedMesh(mushCapGeo, mushCapMat, MUSHROOM_COUNT);
+  const mushPalette = ['#E85D58', '#F28B50', '#E59866', '#E86F7A'];
+  for (let i = 0; i < MUSHROOM_COUNT; i++) {
+    const src = i < oakTrees.length ? oakTrees[i] : largeRockCoords[i % largeRockCoords.length];
+    const ang = (i * 2.1) % (Math.PI * 2);
+    const mx = src[0] + Math.cos(ang) * 1.15;
+    const mz = src[1] + Math.sin(ang) * 1.15;
+    _instDummy.position.set(mx, getTownGroundHeight(mx, mz) - 0.01, mz);
+    _instDummy.rotation.set(0, ang, 0);
+    _instDummy.scale.setScalar(1.0 + (i % 3) * 0.22);
+    _instDummy.updateMatrix();
+    mushStemIM.setMatrixAt(i, _instDummy.matrix);
+    mushCapIM.setMatrixAt(i, _instDummy.matrix);
+    _instColor.set(mushPalette[i % mushPalette.length]);
+    mushCapIM.setColorAt(i, _instColor);
+  }
+  mushStemIM.instanceMatrix.needsUpdate = true;
+  mushCapIM.instanceMatrix.needsUpdate = true;
+  if (mushCapIM.instanceColor) mushCapIM.instanceColor.needsUpdate = true;
+  mushStemIM.computeBoundingSphere();
+  mushCapIM.computeBoundingSphere();
+  group.add(mushStemIM, mushCapIM);
+
+  // 2. Mossy Fallen Logs (Khúc gỗ mục phủ rêu ngoài đồng cỏ & bìa rừng — điểm đậu côn trùng)
+  const fallenLogCoords: [number, number, number][] = [
+    [-46.5, 16.5, 0.4],
+    [47.0, 16.0, -0.5],
+    [-42.0, -28.0, 1.1],
+    [43.0, -27.5, -1.0],
+    [-26.5, 51.0, 0.25],
+    [27.0, 50.5, -0.3],
+    [-55.5, -1.5, 1.3],
+    [56.0, -1.0, -1.2],
+    [-16.0, 48.0, 0.8],
+    [16.5, 48.5, -0.75],
+    [-49.5, 40.5, 0.6],
+    [50.0, 40.0, -0.6],
+  ];
+  const logTrunk = new THREE.CylinderGeometry(0.24, 0.27, 2.05, 8);
+  logTrunk.rotateZ(Math.PI / 2);
+  logTrunk.translate(0, 0.22, 0);
+  const logStub = new THREE.CylinderGeometry(0.08, 0.11, 0.45, 6);
+  logStub.rotateZ(0.48);
+  logStub.translate(-0.45, 0.42, 0.08);
+  const fallenLogWoodGeo = mergeParts([logTrunk, logStub]);
+  const fallenLogWoodIM = new THREE.InstancedMesh(
+    fallenLogWoodGeo,
+    getMat('#734D34', 0.88),
+    fallenLogCoords.length,
+  );
+
+  const logMoss1 = new THREE.SphereGeometry(0.28, 7, 5);
+  logMoss1.scale(1.65, 0.35, 0.85);
+  logMoss1.translate(0.18, 0.41, 0);
+  const logMoss2 = new THREE.SphereGeometry(0.22, 7, 5);
+  logMoss2.scale(1.25, 0.32, 0.82);
+  logMoss2.translate(-0.48, 0.38, -0.05);
+  const fallenLogMossGeo = mergeParts([logMoss1, logMoss2]);
+  const fallenLogMossIM = new THREE.InstancedMesh(
+    fallenLogMossGeo,
+    getMat('#53A359', 0.84),
+    fallenLogCoords.length,
+  );
+  fallenLogCoords.forEach(([lx, lz, rot], i) => {
+    _instDummy.position.set(lx, getTownGroundHeight(lx, lz) - 0.02, lz);
+    _instDummy.rotation.set(0, rot, 0);
+    _instDummy.scale.setScalar(1.0);
+    _instDummy.updateMatrix();
+    fallenLogWoodIM.setMatrixAt(i, _instDummy.matrix);
+    fallenLogMossIM.setMatrixAt(i, _instDummy.matrix);
+    colliders.push({type: 'box', x: lx, z: lz, hw: 1.05, hd: 0.34, rotY: rot});
+  });
+  fallenLogWoodIM.instanceMatrix.needsUpdate = true;
+  fallenLogMossIM.instanceMatrix.needsUpdate = true;
+  fallenLogWoodIM.computeBoundingSphere();
+  fallenLogMossIM.computeBoundingSphere();
+  group.add(fallenLogWoodIM, fallenLogMossIM);
+
+  // 3. Rural Wooden Split-Rail Fences along scenic outer meadow paths (Hàng rào gỗ đồng quê)
+  const fenceCoords: [number, number, number][] = [
+    [-28.0, 29.5, 0.08],
+    [-25.0, 29.5, 0.04],
+    [25.0, 29.5, -0.04],
+    [28.0, 29.5, -0.08],
+    [-39.0, 3.0, Math.PI / 2],
+    [-39.0, 6.0, Math.PI / 2],
+    [39.0, 3.0, Math.PI / 2],
+    [39.0, 6.0, Math.PI / 2],
+    [-16.0, 52.5, 0.15],
+    [-13.0, 52.9, 0.15],
+    [13.0, 52.9, -0.15],
+    [16.0, 52.5, -0.15],
+    [-27.0, -32.0, 0.35],
+    [27.0, -32.0, -0.35],
+  ];
+  const fp1 = new THREE.CylinderGeometry(0.065, 0.08, 0.88, 6);
+  fp1.translate(-1.25, 0.44, 0);
+  const fp2 = new THREE.CylinderGeometry(0.065, 0.08, 0.88, 6);
+  fp2.translate(1.25, 0.44, 0);
+  const frTop = new THREE.BoxGeometry(2.75, 0.085, 0.075);
+  frTop.translate(0, 0.68, 0);
+  const frBot = new THREE.BoxGeometry(2.75, 0.085, 0.075);
+  frBot.translate(0, 0.36, 0);
+  const woodenFenceGeo = mergeParts([fp1, fp2, frTop, frBot]);
+  const woodenFenceIM = new THREE.InstancedMesh(
+    woodenFenceGeo,
+    getMat('#9E734B', 0.82),
+    fenceCoords.length,
+  );
+  fenceCoords.forEach(([fx, fz, rot], i) => {
+    _instDummy.position.set(fx, getTownGroundHeight(fx, fz) - 0.02, fz);
+    _instDummy.rotation.set(0, rot, 0);
+    _instDummy.scale.setScalar(1.0);
+    _instDummy.updateMatrix();
+    woodenFenceIM.setMatrixAt(i, _instDummy.matrix);
+    colliders.push({type: 'box', x: fx, z: fz, hw: 1.4, hd: 0.24, rotY: rot});
+  });
+  woodenFenceIM.instanceMatrix.needsUpdate = true;
+  woodenFenceIM.computeBoundingSphere();
+  group.add(woodenFenceIM);
+
+  // 4. Water Lily Pads & Floating Lotus Blossoms on Main Lake Edge & Mini Pond (Lá sen & hoa súng mặt nước)
+  const lilySpots: [number, number, number][] = [];
+  for (let i = 0; i < 20; i++) {
+    const th = (i / 20) * Math.PI * 2 + 0.14;
+    if (Math.abs(Math.sin(th - 0.5)) < 0.18 && Math.cos(th - 0.5) < 0) continue; // skip fishing pier
+    const r = getLakeShoreRadius(th) - 1.05 - (i % 3) * 0.45;
+    lilySpots.push([LAKE_CENTER.x + Math.cos(th) * r, TOWN_LAKE_WATER_Y + 0.015, LAKE_CENTER.z + Math.sin(th) * r]);
+  }
+  for (let i = 0; i < 6; i++) {
+    const th = (i / 6) * Math.PI * 2 + 0.4;
+    const r = 1.45 + (i % 2) * 0.35;
+    lilySpots.push([13.8 + Math.cos(th) * r, 0.102, 13.8 + Math.sin(th) * r]);
+  }
+  const padGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.024, 12, 1, false, 0.22, Math.PI * 1.86);
+  const lilyPadIM = new THREE.InstancedMesh(padGeo, getMat('#4E9D57', 0.65), lilySpots.length);
+
+  const lilyPetalParts: THREE.BufferGeometry[] = [];
+  const lilyCenterParts: THREE.BufferGeometry[] = [];
+  append5PetalFlower(lilyPetalParts, lilyCenterParts, 0.04, 0.035, 0.02, 1.35, 0.05, 0.04, 0);
+  const lilyBloomGeo = mergeParts(lilyPetalParts);
+  const lilyCenterGeo = mergeParts(lilyCenterParts);
+  const lilyBloomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.42});
+  const lilyBloomIM = new THREE.InstancedMesh(lilyBloomGeo, lilyBloomMat, lilySpots.length);
+  const lilyCenterIM = new THREE.InstancedMesh(lilyCenterGeo, getMat('#FFD24C', 0.38), lilySpots.length);
+  const lilyColors = ['#FFA8C2', '#FFFFFF', '#FFB8D0', '#FFE3F0'];
+
+  lilySpots.forEach(([lx, ly, lz], i) => {
+    _instDummy.position.set(lx, ly, lz);
+    _instDummy.rotation.set(0, (i * 1.9) % (Math.PI * 2), 0);
+    _instDummy.scale.setScalar(0.82 + (i % 3) * 0.18);
+    _instDummy.updateMatrix();
+    lilyPadIM.setMatrixAt(i, _instDummy.matrix);
+    lilyBloomIM.setMatrixAt(i, _instDummy.matrix);
+    lilyCenterIM.setMatrixAt(i, _instDummy.matrix);
+    _instColor.set(lilyColors[i % lilyColors.length]);
+    lilyBloomIM.setColorAt(i, _instColor);
+  });
+  lilyPadIM.instanceMatrix.needsUpdate = true;
+  lilyBloomIM.instanceMatrix.needsUpdate = true;
+  lilyCenterIM.instanceMatrix.needsUpdate = true;
+  if (lilyBloomIM.instanceColor) lilyBloomIM.instanceColor.needsUpdate = true;
+  lilyPadIM.computeBoundingSphere();
+  lilyBloomIM.computeBoundingSphere();
+  lilyCenterIM.computeBoundingSphere();
+  group.add(lilyPadIM, lilyBloomIM, lilyCenterIM);
+
+  // 5. Wooden Trail Direction Signposts at outer path junctions (Biển chỉ đường gỗ ngã ba)
+  const signpostCoords: [number, number, number][] = [
+    [-21.2, 24.5, 0.45],
+    [21.2, 24.5, -0.45],
+    [-21.2, -14.8, 0.75],
+    [21.2, -14.8, -0.75],
+    [-2.5, 44.0, 0.2],
+    [2.5, -24.5, -0.2],
+  ];
+  const spPost = new THREE.CylinderGeometry(0.065, 0.08, 1.35, 7);
+  spPost.translate(0, 0.675, 0);
+  const spCap = new THREE.SphereGeometry(0.08, 7, 6);
+  spCap.translate(0, 1.38, 0);
+  const spArm1 = new THREE.BoxGeometry(0.68, 0.18, 0.06);
+  spArm1.translate(0.18, 1.15, 0.04);
+  const spArm2 = new THREE.BoxGeometry(0.62, 0.16, 0.06);
+  spArm2.rotateY(0.55);
+  spArm2.translate(-0.14, 0.9, -0.04);
+  const signpostGeo = mergeParts([spPost, spCap, spArm1, spArm2]);
+  const signpostIM = new THREE.InstancedMesh(
+    signpostGeo,
+    getMat('#8F623E', 0.8),
+    signpostCoords.length,
+  );
+  signpostCoords.forEach(([sx, sz, rot], i) => {
+    _instDummy.position.set(sx, getTownGroundHeight(sx, sz) - 0.02, sz);
+    _instDummy.rotation.set(0, rot, 0);
+    _instDummy.scale.setScalar(1.0);
+    _instDummy.updateMatrix();
+    signpostIM.setMatrixAt(i, _instDummy.matrix);
+    colliders.push({type: 'circle', x: sx, z: sz, r: 0.28});
+  });
+  signpostIM.instanceMatrix.needsUpdate = true;
+  signpostIM.computeBoundingSphere();
+  group.add(signpostIM);
+
+  // Town Insect Habitats & Live 3D Bug Manager (Côn trùng khắp trung tâm lẫn vùng ngoài)
   const insectAnchors: InsectAnchor[] = [];
   bigFlowerCoords.forEach(([fx, fz]) => {
-    insectAnchors.push({x: fx, y: getTownGroundHeight(fx, fz) + 0.32, z: fz, habitat: 'flower'});
+    insectAnchors.push({x: fx, y: getTownGroundHeight(fx, fz) + 0.34, z: fz, habitat: 'flower'});
   });
   bushCoords.forEach(([bx, bz]) => {
-    insectAnchors.push({x: bx, y: getTownGroundHeight(bx, bz) + 0.42, z: bz, habitat: 'bush'});
+    insectAnchors.push({x: bx, y: getTownGroundHeight(bx, bz) + 0.44, z: bz, habitat: 'bush'});
   });
   bigBushCoords.forEach(([bx, bz]) => {
     insectAnchors.push({x: bx, y: getTownGroundHeight(bx, bz) + 0.56, z: bz, habitat: 'bush'});
@@ -5591,14 +6018,17 @@ export function buildTownScene(): TownWorld {
   branchedTrees.forEach(([tx, tz]) => {
     insectAnchors.push({x: tx - 0.35, y: getTownGroundHeight(tx, tz) + 0.82, z: tz + 0.3, habitat: 'tree'});
   });
+  fallenLogCoords.forEach(([lx, lz]) => {
+    insectAnchors.push({x: lx, y: getTownGroundHeight(lx, lz) + 0.45, z: lz, habitat: 'tree'});
+  });
   smallRockCoords.forEach(([rx, rz]) => {
     insectAnchors.push({x: rx, y: getTownGroundHeight(rx, rz) + 0.35, z: rz, habitat: 'rock'});
   });
   largeRockCoords.forEach(([rx, rz]) => {
     insectAnchors.push({x: rx, y: getTownGroundHeight(rx, rz) + 0.92, z: rz, habitat: 'rock'});
   });
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
     const sr = getLakeShoreRadius(a) + 0.85;
     const wx = LAKE_CENTER.x + Math.cos(a) * sr;
     const wz = LAKE_CENTER.z + Math.sin(a) * sr;

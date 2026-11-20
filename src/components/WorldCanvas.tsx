@@ -2680,9 +2680,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const moveDirX = rightX * joy.x + fwdX * -joy.y;
         const moveDirZ = rightZ * joy.x + fwdZ * -joy.y;
         const moveLen = Math.hypot(moveDirX, moveDirZ) || 1;
-        isCreepingNow = z === 'town' && stateRef.current.bugNet.equipped && joyMag <= 0.54 && !isAirborne;
+        isCreepingNow = z === 'town' && stateRef.current.bugNet.equipped && joyMag <= 0.58 && !isAirborne;
         const speed = isCreepingNow
-          ? 1.55
+          ? 0.68
           : (z === 'town' ? 5.6 : 3.6) * Math.min(1, joyMag);
         const stepLen = speed * delta;
         const rawX = playerPos.x + (moveDirX / moveLen) * stepLen;
