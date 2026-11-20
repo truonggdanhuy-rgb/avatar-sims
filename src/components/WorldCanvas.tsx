@@ -196,7 +196,7 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
 
 function getZoneWalkBounds(zone: ZoneId) {
   if (zone === 'town') {
-    return {minX: -54, maxX: 54, minZ: -56, maxZ: 48};
+    return {minX: -82, maxX: 82, minZ: -98, maxZ: 78};
   }
   if (zone === 'home') {
     return {minX: -12.85, maxX: 9.85, minZ: -8.95, maxZ: 6.95};
@@ -633,7 +633,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#B2DDF2');
-    scene.fog = new THREE.FogExp2('#B2DDF2', 0.0034);
+    scene.fog = new THREE.FogExp2('#B2DDF2', 0.0021);
 
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -642,7 +642,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     pmrem.dispose();
 
     const initCam = getResponsiveCameraSettings(stateRef.current.zone, width / height);
-    const camera = new THREE.PerspectiveCamera(initCam.fov, width / height, 0.4, 320);
+    const camera = new THREE.PerspectiveCamera(initCam.fov, width / height, 0.4, 420);
     camera.position.set(initCam.pos[0], initCam.pos[1], initCam.pos[2]);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -655,7 +655,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     controls.rotateSpeed = 0.78;
     controls.zoomSpeed = 0.9;
     controls.minDistance = 4.8;
-    controls.maxDistance = 90;
+    controls.maxDistance = 115;
     controls.minPolarAngle = Math.PI * 0.14;
     controls.maxPolarAngle = Math.PI * 0.46;
     controls.update();

@@ -2023,10 +2023,6 @@ export default function App() {
           dailyQuests={dailyQuests}
           storageUsed={storageUsed}
           storageCapacity={storageCapacity}
-          onChangeZone={(next) => {
-            handleZoneChange(next);
-            setPhoneOpen(false);
-          }}
           onOpenWardrobe={() => {
             setPhoneOpen(false);
             setWardrobeOpen(true);
@@ -2038,15 +2034,6 @@ export default function App() {
           onOpenSettings={() => {
             setPhoneOpen(false);
             setSettingsOpen(true);
-          }}
-          onOpenFurniture={() => {
-            setPhoneOpen(false);
-            if (zone !== 'home') {
-              handleZoneChange('home');
-            }
-            setEditFurnitureMode(false);
-            setSelectedFurnitureId(null);
-            setFurnitureModalOpen(true);
           }}
           onOpenStorage={() => {
             setPhoneOpen(false);

@@ -2,22 +2,26 @@ import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {TimeOfDay, ZoneId} from '../types/game';
-import {createCobblestoneTexture, createGrassTexture, glossyClayMat} from './materials';
+import {
+  createGrassTexture,
+  createStoneWalkwayTexture,
+  glossyClayMat,
+} from './materials';
 
-export const TOWN_PLAZA_RADIUS = 7.0;
-export const HILL_CENTER = {x: 0, z: -42.5};
-export const HILL_RADIUS = 12.2;
-export const HILL_PEAK_Y = 3.8;
+export const TOWN_PLAZA_RADIUS = 7.2;
+export const HILL_CENTER = {x: 0, z: -64};
+export const HILL_RADIUS = 40.0;
+export const HILL_PEAK_Y = 8.4;
 
 export const TOWN_ZONE_ENTRANCES: Record<
   Exclude<ZoneId, 'town'>,
   {tx: number; tz: number; exitRotY: number}
 > = {
-  home: {tx: -28.35, tz: -13.95, exitRotY: 0.38},
-  garden: {tx: 29.35, tz: -13.9, exitRotY: -0.38},
-  boutique: {tx: -29.55, tz: 16.45, exitRotY: 0.95},
-  arcade: {tx: 29.4, tz: 15.55, exitRotY: -0.95},
-  fishing: {tx: -17.2, tz: 26.3, exitRotY: 0.45},
+  home: {tx: -32.0, tz: -16.2, exitRotY: 0},
+  garden: {tx: 32.0, tz: -16.4, exitRotY: 0},
+  boutique: {tx: -32.0, tz: 23.2, exitRotY: 0},
+  arcade: {tx: 32.0, tz: 23.1, exitRotY: 0},
+  fishing: {tx: -19.6, tz: 38.6, exitRotY: 0},
 };
 
 export function getTownGroundHeight(
@@ -168,75 +172,236 @@ function addInteractionProxy(
   targets.push(proxy);
 }
 
-// Build reusable merged geometries for tall sculpted trees (base height ~4.4m -> scaled 1.2..1.75 => 5.3m..7.7m)
+// Build reusable merged geometries for tall Broadleaf Oak trees with broad spreading canopy & real branches
 export function createTreeGeometries() {
-  const rootFlare = new THREE.CylinderGeometry(0.26, 0.44, 0.45, 8);
-  rootFlare.translate(0, 0.22, 0);
+  const rootFlare = new THREE.CylinderGeometry(0.32, 0.54, 0.55, 8);
+  rootFlare.translate(0, 0.26, 0);
 
-  const trunk = new THREE.CylinderGeometry(0.19, 0.28, 2.35, 8);
-  trunk.translate(0, 1.35, 0);
+  const trunk = new THREE.CylinderGeometry(0.24, 0.34, 2.25, 8);
+  trunk.translate(0, 1.38, 0);
 
-  const branchL = new THREE.CylinderGeometry(0.08, 0.13, 0.95, 7);
-  branchL.rotateZ(0.55);
-  branchL.translate(-0.34, 2.1, 0.08);
+  // 4 visible thick wooden boughs angling outward under the wide shade canopy
+  const b1 = new THREE.CylinderGeometry(0.1, 0.16, 1.38, 7);
+  b1.rotateZ(0.72);
+  b1.translate(-0.56, 2.38, 0.18);
 
-  const branchR = new THREE.CylinderGeometry(0.08, 0.12, 0.88, 7);
-  branchR.rotateZ(-0.52);
-  branchR.translate(0.32, 2.18, -0.06);
+  const b2 = new THREE.CylinderGeometry(0.1, 0.16, 1.34, 7);
+  b2.rotateZ(-0.7);
+  b2.translate(0.54, 2.42, -0.14);
 
-  const branchF = new THREE.CylinderGeometry(0.07, 0.1, 0.72, 6);
-  branchF.rotateX(0.45);
-  branchF.translate(0.04, 2.22, 0.24);
+  const b3 = new THREE.CylinderGeometry(0.09, 0.14, 1.24, 7);
+  b3.rotateX(-0.68);
+  b3.translate(0.1, 2.36, -0.52);
 
-  const trunkGeo = mergeParts([rootFlare, trunk, branchL, branchR, branchF]);
+  const b4 = new THREE.CylinderGeometry(0.09, 0.14, 1.22, 7);
+  b4.rotateX(0.66);
+  b4.translate(-0.12, 2.4, 0.5);
 
-  const cMain = new THREE.SphereGeometry(1.06, 11, 9);
-  cMain.translate(0, 2.95, 0);
-  const cLeft = new THREE.SphereGeometry(0.76, 10, 8);
-  cLeft.translate(-0.68, 2.66, 0.28);
-  const cBack = new THREE.SphereGeometry(0.74, 10, 8);
-  cBack.translate(-0.12, 2.74, -0.62);
-  const lowerCanopyGeo = mergeParts([cMain, cLeft, cBack]);
+  const trunkGeo = mergeParts([rootFlare, trunk, b1, b2, b3, b4]);
 
-  const cTop = new THREE.SphereGeometry(0.84, 11, 9);
-  cTop.translate(0.06, 3.62, 0.05);
-  const cRight = new THREE.SphereGeometry(0.72, 10, 8);
-  cRight.translate(0.68, 2.78, -0.2);
-  const cFront = new THREE.SphereGeometry(0.64, 9, 8);
-  cFront.translate(0.14, 2.72, 0.62);
-  const upperCanopyGeo = mergeParts([cTop, cRight, cFront]);
+  // Wide, organic flattened multi-lobe broadleaf shade crown
+  const cCenter = new THREE.SphereGeometry(1.42, 11, 9);
+  cCenter.scale(1.22, 0.72, 1.18);
+  cCenter.translate(0, 3.35, 0);
+
+  const cWest = new THREE.SphereGeometry(1.12, 10, 8);
+  cWest.scale(1.18, 0.7, 1.12);
+  cWest.translate(-1.12, 2.98, 0.32);
+
+  const cEast = new THREE.SphereGeometry(1.08, 10, 8);
+  cEast.scale(1.16, 0.7, 1.1);
+  cEast.translate(1.1, 3.04, -0.26);
+
+  const cNorth = new THREE.SphereGeometry(1.04, 10, 8);
+  cNorth.scale(1.14, 0.68, 1.14);
+  cNorth.translate(0.18, 3.02, -1.04);
+
+  const lowerCanopyGeo = mergeParts([cCenter, cWest, cEast, cNorth]);
+
+  const cCrown = new THREE.SphereGeometry(1.16, 11, 9);
+  cCrown.scale(1.24, 0.72, 1.18);
+  cCrown.translate(0.05, 4.02, 0.04);
+
+  const cSouth = new THREE.SphereGeometry(0.98, 10, 8);
+  cSouth.scale(1.15, 0.68, 1.1);
+  cSouth.translate(-0.18, 3.1, 1.02);
+
+  const cSub = new THREE.SphereGeometry(0.86, 9, 8);
+  cSub.scale(1.12, 0.72, 1.08);
+  cSub.translate(0.86, 3.52, 0.64);
+
+  const upperCanopyGeo = mergeParts([cCrown, cSouth, cSub]);
 
   return {trunkGeo, lowerCanopyGeo, upperCanopyGeo};
 }
 
-// Sakura (Hoa Dao) tree geometries with graceful spreading crown
-function createSakuraGeometries() {
-  const root = new THREE.CylinderGeometry(0.22, 0.36, 0.38, 8);
-  root.translate(0, 0.19, 0);
-  const trunk = new THREE.CylinderGeometry(0.16, 0.24, 1.9, 8);
-  trunk.rotateZ(0.05);
-  trunk.translate(0, 1.1, 0);
-  const b1 = new THREE.CylinderGeometry(0.07, 0.11, 1.05, 7);
-  b1.rotateZ(0.68);
-  b1.translate(-0.42, 1.88, 0.08);
-  const b2 = new THREE.CylinderGeometry(0.07, 0.11, 1.0, 7);
-  b2.rotateZ(-0.62);
-  b2.translate(0.4, 1.94, -0.06);
-  const trunkGeo = mergeParts([root, trunk, b1, b2]);
+// Graceful multi-branched woodland trees with clearly visible forked limbs and airy foliage clusters
+function createBranchedWoodlandGeometries() {
+  const root = new THREE.CylinderGeometry(0.2, 0.36, 0.42, 7);
+  root.translate(0, 0.21, 0);
 
-  const s1 = new THREE.SphereGeometry(0.95, 11, 9);
-  s1.scale(1.25, 0.72, 1.15);
-  s1.translate(0, 2.65, 0);
-  const s2 = new THREE.SphereGeometry(0.76, 10, 8);
-  s2.scale(1.2, 0.68, 1.1);
-  s2.translate(-0.78, 2.38, 0.24);
-  const s3 = new THREE.SphereGeometry(0.74, 10, 8);
-  s3.scale(1.2, 0.68, 1.1);
-  s3.translate(0.76, 2.42, -0.18);
-  const s4 = new THREE.SphereGeometry(0.68, 9, 8);
-  s4.scale(1.15, 0.72, 1.1);
-  s4.translate(0.08, 3.05, 0.12);
-  const blossomGeo = mergeParts([s1, s2, s3, s4]);
+  const lowerTrunk = new THREE.CylinderGeometry(0.15, 0.22, 1.55, 7);
+  lowerTrunk.translate(0, 1.05, 0);
+
+  const limbLeft = new THREE.CylinderGeometry(0.085, 0.13, 1.65, 7);
+  limbLeft.rotateZ(0.46);
+  limbLeft.translate(-0.42, 2.32, 0.08);
+
+  const limbRight = new THREE.CylinderGeometry(0.08, 0.13, 1.55, 7);
+  limbRight.rotateZ(-0.5);
+  limbRight.translate(0.42, 2.26, -0.08);
+
+  const limbBack = new THREE.CylinderGeometry(0.07, 0.11, 1.35, 6);
+  limbBack.rotateX(-0.48);
+  limbBack.translate(0.04, 2.48, -0.36);
+
+  const twigLeft = new THREE.CylinderGeometry(0.05, 0.075, 0.95, 6);
+  twigLeft.rotateZ(0.82);
+  twigLeft.rotateY(0.4);
+  twigLeft.translate(-0.88, 2.75, 0.28);
+
+  const twigRight = new THREE.CylinderGeometry(0.05, 0.075, 0.9, 6);
+  twigRight.rotateZ(-0.84);
+  twigRight.rotateY(-0.3);
+  twigRight.translate(0.86, 2.68, -0.22);
+
+  const trunkGeo = mergeParts([
+    root,
+    lowerTrunk,
+    limbLeft,
+    limbRight,
+    limbBack,
+    twigLeft,
+    twigRight,
+  ]);
+
+  // Separated foliage tufts perched on branch ends so limbs remain visible
+  const tuftL = new THREE.SphereGeometry(0.82, 10, 8);
+  tuftL.scale(1.22, 0.72, 1.12);
+  tuftL.translate(-1.12, 3.05, 0.34);
+
+  const tuftR = new THREE.SphereGeometry(0.78, 10, 8);
+  tuftR.scale(1.18, 0.7, 1.12);
+  tuftR.translate(1.08, 2.98, -0.26);
+
+  const tuftB = new THREE.SphereGeometry(0.76, 9, 8);
+  tuftB.scale(1.16, 0.72, 1.1);
+  tuftB.translate(0.08, 3.24, -0.68);
+
+  const lowerCanopyGeo = mergeParts([tuftL, tuftR, tuftB]);
+
+  const tuftTop = new THREE.SphereGeometry(0.92, 10, 8);
+  tuftTop.scale(1.24, 0.7, 1.16);
+  tuftTop.translate(-0.08, 3.68, 0.18);
+
+  const tuftMid = new THREE.SphereGeometry(0.7, 9, 8);
+  tuftMid.scale(1.15, 0.72, 1.08);
+  tuftMid.translate(0.42, 3.45, 0.56);
+
+  const upperCanopyGeo = mergeParts([tuftTop, tuftMid]);
+
+  return {trunkGeo, lowerCanopyGeo, upperCanopyGeo};
+}
+
+// Lush sculpted Evergreen Pine & Conifer trees with soft layered bough clusters
+function createPineConiferGeometries() {
+  const root = new THREE.CylinderGeometry(0.2, 0.36, 0.42, 8);
+  root.translate(0, 0.21, 0);
+
+  const trunk = new THREE.CylinderGeometry(0.11, 0.23, 2.95, 8);
+  trunk.translate(0, 1.68, 0);
+
+  const trunkGeo = mergeParts([root, trunk]);
+
+  const lowerParts: THREE.BufferGeometry[] = [];
+  const upperParts: THREE.BufferGeometry[] = [];
+
+  const addBoughWhorl = (
+    target: THREE.BufferGeometry[],
+    count: number,
+    y: number,
+    ringR: number,
+    puffW: number,
+    puffH: number,
+    puffLen: number,
+    tiltX: number,
+    phase: number,
+    coreR: number,
+  ) => {
+    const core = new THREE.SphereGeometry(coreR, 9, 7);
+    core.scale(1.05, 0.56, 1.05);
+    core.translate(0, y + 0.12, 0);
+    target.push(core);
+
+    for (let k = 0; k < count; k++) {
+      const a = phase + (k / count) * Math.PI * 2;
+      const bough = new THREE.SphereGeometry(0.56, 8, 7);
+      bough.scale(puffW, puffH, puffLen);
+      bough.rotateX(tiltX);
+      bough.rotateY(a);
+      bough.translate(Math.sin(a) * ringR, y - 0.06, Math.cos(a) * ringR);
+      target.push(bough);
+    }
+  };
+
+  // Lower rich pine bough tiers (soft drooping evergreen sprays)
+  addBoughWhorl(lowerParts, 6, 1.65, 0.84, 1.08, 0.52, 1.38, 0.36, 0, 1.02);
+  addBoughWhorl(lowerParts, 6, 2.48, 0.68, 0.96, 0.5, 1.24, 0.34, 0.52, 0.86);
+
+  // Upper sun-kissed pine tiers + graceful sculpted crown
+  addBoughWhorl(upperParts, 5, 3.24, 0.5, 0.84, 0.48, 1.12, 0.3, 0.22, 0.68);
+  addBoughWhorl(upperParts, 4, 3.92, 0.3, 0.66, 0.5, 0.88, 0.24, 0.65, 0.48);
+
+  const crownBase = new THREE.SphereGeometry(0.42, 8, 7);
+  crownBase.scale(0.88, 1.15, 0.88);
+  crownBase.translate(0, 4.38, 0);
+  upperParts.push(crownBase);
+
+  const crownTip = new THREE.SphereGeometry(0.22, 7, 6);
+  crownTip.scale(0.75, 1.75, 0.75);
+  crownTip.translate(0, 4.78, 0);
+  upperParts.push(crownTip);
+
+  const lowerFoliageGeo = mergeParts(lowerParts);
+  const upperFoliageGeo = mergeParts(upperParts);
+
+  return {trunkGeo, lowerFoliageGeo, upperFoliageGeo};
+}
+
+// Sakura (Hoa Dao) tree geometries with wide graceful spreading boughs & full clouds
+function createSakuraGeometries() {
+  const root = new THREE.CylinderGeometry(0.24, 0.4, 0.42, 8);
+  root.translate(0, 0.21, 0);
+  const trunk = new THREE.CylinderGeometry(0.17, 0.26, 2.0, 8);
+  trunk.rotateZ(0.04);
+  trunk.translate(0, 1.15, 0);
+  const b1 = new THREE.CylinderGeometry(0.08, 0.12, 1.25, 7);
+  b1.rotateZ(0.74);
+  b1.translate(-0.52, 1.98, 0.12);
+  const b2 = new THREE.CylinderGeometry(0.08, 0.12, 1.2, 7);
+  b2.rotateZ(-0.68);
+  b2.translate(0.5, 2.02, -0.1);
+  const b3 = new THREE.CylinderGeometry(0.065, 0.1, 1.05, 6);
+  b3.rotateX(-0.6);
+  b3.translate(0.04, 2.08, -0.45);
+  const trunkGeo = mergeParts([root, trunk, b1, b2, b3]);
+
+  const s1 = new THREE.SphereGeometry(1.18, 11, 9);
+  s1.scale(1.32, 0.68, 1.22);
+  s1.translate(0, 2.86, 0);
+  const s2 = new THREE.SphereGeometry(0.95, 10, 8);
+  s2.scale(1.25, 0.66, 1.16);
+  s2.translate(-0.98, 2.52, 0.3);
+  const s3 = new THREE.SphereGeometry(0.92, 10, 8);
+  s3.scale(1.24, 0.66, 1.14);
+  s3.translate(0.95, 2.56, -0.24);
+  const s4 = new THREE.SphereGeometry(0.84, 9, 8);
+  s4.scale(1.22, 0.68, 1.15);
+  s4.translate(0.1, 3.32, 0.14);
+  const s5 = new THREE.SphereGeometry(0.76, 9, 8);
+  s5.scale(1.2, 0.66, 1.14);
+  s5.translate(0.05, 2.66, -0.82);
+  const blossomGeo = mergeParts([s1, s2, s3, s4, s5]);
 
   return {trunkGeo, blossomGeo};
 }
@@ -312,15 +477,12 @@ export function buildTownScene(): TownWorld {
 
   const getMat = createMatPool();
   const grassTex = createGrassTexture();
-  grassTex.repeat.set(64, 64);
-  const cobbleTex = createCobblestoneTexture();
-  const roadCobbleTex = createCobblestoneTexture();
-  roadCobbleTex.wrapS = THREE.RepeatWrapping;
-  roadCobbleTex.wrapT = THREE.RepeatWrapping;
+  grassTex.repeat.set(110, 110);
+  const plazaStoneTex = createStoneWalkwayTexture(4, 4);
   const signTex = createDailyQuestSignTexture();
 
-  // ========== 1. EXPANDED TERRAIN + 1 WALKABLE SAKURA HILL IN DISTANCE ==========
-  const terrainGeo = new THREE.CircleGeometry(225, 64);
+  // ========== 1. EXPANDED TERRAIN + GENTLE WALKABLE SCENIC SAKURA HILL (NO FENCE, NO PATH) ==========
+  const terrainGeo = new THREE.CircleGeometry(300, 64);
   terrainGeo.rotateX(-Math.PI / 2);
   const terrainMat = new THREE.MeshStandardMaterial({
     map: grassTex,
@@ -331,9 +493,9 @@ export function buildTownScene(): TownWorld {
   groundMesh.userData = {kind: 'ground'};
   group.add(groundMesh);
 
-  // Single walkable Sakura Hill in the far background (-Z)
-  const hillSize = HILL_RADIUS * 2.15;
-  const hillGeo = new THREE.PlaneGeometry(hillSize, hillSize, 36, 36);
+  // Gentle walkable Scenic Overlook Hill in the North (-Z)
+  const hillSize = HILL_RADIUS * 2.12;
+  const hillGeo = new THREE.PlaneGeometry(hillSize, hillSize, 64, 64);
   hillGeo.rotateX(-Math.PI / 2);
   const hillPosAttr = hillGeo.attributes.position;
   for (let i = 0; i < hillPosAttr.count; i++) {
@@ -350,7 +512,7 @@ export function buildTownScene(): TownWorld {
   }
   hillGeo.computeVertexNormals();
   const hillTex = createGrassTexture();
-  hillTex.repeat.set(6, 6);
+  hillTex.repeat.set(18, 18);
   const hillMat = new THREE.MeshStandardMaterial({
     map: hillTex,
     color: '#A5DC8E',
@@ -362,16 +524,16 @@ export function buildTownScene(): TownWorld {
   hillMesh.userData = {kind: 'ground'};
   group.add(hillMesh);
 
-  // Static sculpted sky clouds spread wide
+  // Static sculpted sky clouds spread high above the gentle mountain & broad town
   const cloudMat = getMat('#FFFFFF', 0.85);
   [
-    [-44, 19.5, -54, 2.1],
-    [42, 20.2, -52, 1.9],
-    [-48, 17.5, 42, 1.85],
-    [44, 18.2, 44, 1.95],
-    [0, 21.5, -62, 2.3],
-    [-54, 18.5, -4, 1.8],
-    [54, 18.8, -6, 1.8],
+    [-58, 25.5, -76, 2.3],
+    [56, 26.2, -74, 2.1],
+    [-62, 22.5, 52, 2.0],
+    [58, 23.2, 54, 2.1],
+    [0, 27.5, -92, 2.5],
+    [-66, 23.0, -6, 2.0],
+    [66, 23.5, -8, 2.0],
   ].forEach(([cx, cy, cz, cs]) => {
     const cloud = new THREE.Group();
     const p1 = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), cloudMat);
@@ -385,15 +547,16 @@ export function buildTownScene(): TownWorld {
     group.add(cloud);
   });
 
-  // Central Cobblestone Plaza
+  // Central Calm Pale Natural Stone Plaza
   const plazaMat = new THREE.MeshStandardMaterial({
-    map: cobbleTex,
-    roughness: 0.78,
-    metalness: 0.02,
+    map: plazaStoneTex,
+    color: '#F4F0E7',
+    roughness: 0.84,
+    metalness: 0.01,
   });
   const plazaRim = new THREE.Mesh(
     new THREE.CylinderGeometry(TOWN_PLAZA_RADIUS + 0.42, TOWN_PLAZA_RADIUS + 0.72, 0.14, 44),
-    getMat('#D8C3A5', 0.76),
+    getMat('#D8CFBF', 0.8),
   );
   plazaRim.position.set(0, 0.04, 0);
   group.add(plazaRim);
@@ -605,8 +768,9 @@ export function buildTownScene(): TownWorld {
   const smokeOriginWorld = new THREE.Vector3();
   {
     const home = new THREE.Group();
-    home.position.set(-30, 0, -18);
-    home.rotation.y = 0.38;
+    home.position.set(-32, 0, -22.5);
+    home.rotation.y = 0;
+    home.scale.setScalar(1.68);
 
     const stoneMat = getMat('#B8B2A6', 0.82);
     const creamMat = getMat('#FFF4E2', 0.72);
@@ -846,13 +1010,13 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'home', x: -30, z: -18, hw: 2.85, hd: 2.35, rotY: 0.38});
+    colliders.push({type: 'box', id: 'home', x: -32, z: -22.5, hw: 4.8, hd: 4.0, rotY: 0});
     const mailWorld = new THREE.Vector3(1.55, 0, 3.08).applyMatrix4(home.matrixWorld);
-    colliders.push({type: 'circle', id: 'home_mailbox', x: mailWorld.x, z: mailWorld.z, r: 0.34});
+    colliders.push({type: 'circle', id: 'home_mailbox', x: mailWorld.x, z: mailWorld.z, r: 0.54});
     group.add(home);
 
     // Lightweight 1-draw-call InstancedMesh chimney smoke
-    const smokeGeo = new THREE.SphereGeometry(0.22, 7, 6);
+    const smokeGeo = new THREE.SphereGeometry(0.26, 7, 6);
     const smokeMat = new THREE.MeshStandardMaterial({
       color: '#FFFFFF',
       roughness: 0.9,
@@ -868,8 +1032,9 @@ export function buildTownScene(): TownWorld {
   // ========== BIỂN "NHIỆM VỤ NGÀY" TRƯỚC SÂN NHÀ ==========
   {
     const signBoardGroup = new THREE.Group();
-    signBoardGroup.position.set(-24.0, 0, -15.8);
-    signBoardGroup.rotation.y = 0.34;
+    signBoardGroup.position.set(-22.6, 0, -17.8);
+    signBoardGroup.rotation.y = 0;
+    signBoardGroup.scale.setScalar(1.28);
 
     const postMat = getMat('#7A5032', 0.76);
     const footingMat = getMat('#AEB8C2', 0.8);
@@ -902,10 +1067,10 @@ export function buildTownScene(): TownWorld {
       signBoardGroup,
       [1.7, 2.0, 0.8],
       1.0,
-      {kind: 'daily_quests', tx: -23.3, tz: -14.1},
+      {kind: 'daily_quests', tx: -22.6, tz: -15.9},
       clickTargets,
     );
-    colliders.push({type: 'circle', id: 'daily_quests', x: -24.0, z: -15.8, r: 0.58});
+    colliders.push({type: 'circle', id: 'daily_quests', x: -22.6, z: -17.8, r: 0.74});
     group.add(signBoardGroup);
   }
 
@@ -913,8 +1078,9 @@ export function buildTownScene(): TownWorld {
   let windmillSailHub: THREE.Group | null = null;
   {
     const garden = new THREE.Group();
-    garden.position.set(31, 0, -18);
-    garden.rotation.y = -0.38;
+    garden.position.set(32, 0, -22.5);
+    garden.rotation.y = 0;
+    garden.scale.setScalar(1.58);
 
     const stoneBaseMat2 = getMat('#BFB19A', 0.82);
     const brickKneeMat = getMat('#EFE0C9', 0.76);
@@ -1254,13 +1420,14 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'garden', x: 31, z: -18, hw: 2.9, hd: 2.5, rotY: -0.38});
+    colliders.push({type: 'box', id: 'garden', x: 32, z: -22.5, hw: 4.6, hd: 4.0, rotY: 0});
     group.add(garden);
 
-    // === CỐI XAY GIÓ BÊN CẠNH NHÀ KÍNH (X = 37.5, Z = -19.2) ===
+    // === CỐI XAY GIÓ BÊN CẠNH NHÀ KÍNH ===
     const windmill = new THREE.Group();
-    windmill.position.set(37.5, 0, -19.2);
-    windmill.rotation.y = -0.42;
+    windmill.position.set(42.8, 0, -23.2);
+    windmill.rotation.y = 0;
+    windmill.scale.setScalar(1.58);
 
     const wmPlinth = new THREE.Mesh(
       new THREE.CylinderGeometry(1.52, 1.66, 0.42, 14),
@@ -1348,15 +1515,16 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'circle', id: 'garden_windmill', x: 37.5, z: -19.2, r: 1.58});
+    colliders.push({type: 'circle', id: 'garden_windmill', x: 42.8, z: -23.2, r: 2.5});
     group.add(windmill);
   }
 
   // ========== DISTRICT 3: TIỆM THỜI TRANG (Parisian Pastel Boutique) ==========
   {
     const shop = new THREE.Group();
-    shop.position.set(-33, 0, 14);
-    shop.rotation.y = 0.95;
+    shop.position.set(-32, 0, 18.0);
+    shop.rotation.y = 0;
+    shop.scale.setScalar(1.68);
 
     const stoneStepMat = getMat('#EDE0D8', 0.78);
     const bodyMat = getMat('#FFEAF0', 0.65);
@@ -1501,15 +1669,16 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'boutique', x: -33, z: 14, hw: 2.65, hd: 2.25, rotY: 0.95});
+    colliders.push({type: 'box', id: 'boutique', x: -32, z: 18.0, hw: 4.55, hd: 3.85, rotY: 0});
     group.add(shop);
   }
 
   // ========== DISTRICT 4: TIỆM MINIGAME (Large Flat-Roofed Game House + Upright 3D GAME Sign on Roof) ==========
   {
     const arcade = new THREE.Group();
-    arcade.position.set(33, 0, 13);
-    arcade.rotation.y = -0.95;
+    arcade.position.set(32, 0, 17.5);
+    arcade.rotation.y = 0;
+    arcade.scale.setScalar(1.52);
 
     const stonePlinthMat = getMat('#CFC8E2', 0.76);
     const stepMat = getMat('#DFDAEC', 0.74);
@@ -1983,14 +2152,15 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'arcade', x: 33, z: 13, hw: 3.35, hd: 2.55, rotY: -0.95});
+    colliders.push({type: 'box', id: 'arcade', x: 32, z: 17.5, hw: 5.1, hd: 3.95, rotY: 0});
     group.add(arcade);
   }
 
-  // ========== DISTRICT 5: HỒ CÂU CÁ (Scenic Lakeside + Wooden Pier + Bait Stand) ==========
+  // ========== DISTRICT 5: HỒ CÂU CÁ (Scenic Lakeside + Orthogonal Wooden Pier) ==========
   {
     const lake = new THREE.Group();
-    lake.position.set(-20, 0, 30);
+    lake.position.set(-23, 0, 44.5);
+    lake.scale.setScalar(1.35);
 
     const shoreMat = getMat('#E5D1B0', 0.84);
     const waterMat = glossyClayMat('#4AB4DB', 0.12);
@@ -2008,21 +2178,21 @@ export function buildTownScene(): TownWorld {
     const waterCove = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.16, 18), waterMat);
     waterCove.position.set(1.85, 0.05, -0.65);
 
-    // Timber Pier with pilings & side bollards
+    // Orthogonal Timber Pier connecting straight to the South Stone Promenade
     const woodPierMat = getMat('#C59160', 0.72);
     const woodDarkMat = getMat('#7A5230', 0.76);
     const pier = new THREE.Mesh(
-      new RoundedBoxGeometry(1.48, 0.18, 2.9, 2, 0.04),
+      new RoundedBoxGeometry(1.65, 0.18, 3.1, 2, 0.04),
       woodPierMat,
     );
-    pier.position.set(1.5, 0.24, -1.95);
-    pier.rotation.y = 0.58;
+    pier.position.set(2.5, 0.24, -2.05);
+    pier.rotation.y = 0;
 
     [
-      [0.7, -2.5],
-      [2.25, -1.45],
-      [0.95, -1.1],
-      [2.1, -2.75],
+      [1.82, -3.2],
+      [3.18, -3.2],
+      [1.82, -1.05],
+      [3.18, -1.05],
     ].forEach(([px, pz]) => {
       const piling = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.095, 0.52, 8), woodDarkMat);
       piling.position.set(px, 0.26, pz);
@@ -2033,7 +2203,7 @@ export function buildTownScene(): TownWorld {
       new THREE.CylinderGeometry(0.07, 0.09, 1.6, 8),
       woodDarkMat,
     );
-    lanternPost.position.set(2.12, 0.94, -1.42);
+    lanternPost.position.set(3.18, 0.94, -1.22);
     const pierLampMat = new THREE.MeshStandardMaterial({
       color: '#FFF4C2',
       emissive: '#FFCC66',
@@ -2042,13 +2212,13 @@ export function buildTownScene(): TownWorld {
     });
     lampBulbs.push(pierLampMat);
     const pierLamp = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), pierLampMat);
-    pierLamp.position.set(2.12, 1.78, -1.42);
+    pierLamp.position.set(3.18, 1.78, -1.22);
 
     const barrel = new THREE.Mesh(
       new THREE.CylinderGeometry(0.28, 0.25, 0.52, 10),
       getMat('#A06B3E', 0.76),
     );
-    barrel.position.set(0.96, 0.56, -2.25);
+    barrel.position.set(1.86, 0.56, -2.6);
 
     // Lily pads & lotus blooms
     const padMat = getMat('#5DB86A', 0.68);
@@ -2065,12 +2235,12 @@ export function buildTownScene(): TownWorld {
       lake.add(pad, lotus);
     });
 
-    // Shore boulders & cattails
+    // Shore boulders
     const rockMat = getMat('#9DA7B2', 0.8);
     [
       [-3.55, 0.5, 0.5],
       [-2.85, 2.4, 0.42],
-      [3.8, -0.65, 0.46],
+      [3.8, -0.45, 0.46],
     ].forEach(([rx, rz, rs]) => {
       const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(rs, 0), rockMat);
       rock.scale.set(1.2, 0.75, 1.0);
@@ -2101,16 +2271,17 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'circle', id: 'fishing_a', x: -20.5, z: 30.35, r: 3.15});
-    colliders.push({type: 'circle', id: 'fishing_b', x: -18.15, z: 29.35, r: 2.55});
+    colliders.push({type: 'circle', id: 'fishing_a', x: -23.68, z: 44.97, r: 4.25});
+    colliders.push({type: 'circle', id: 'fishing_b', x: -20.5, z: 43.62, r: 3.44});
     group.add(lake);
   }
 
-  // ========== DISTRICT 6: TRẠM BƯU ĐIỆN & ĐỒNG HỒ (Town Clock Tower & Post Office) ==========
+  // ========== DISTRICT 6: TRẠM BƯU ĐIỆN & ĐỒNG HỒ (Orthogonal Clock Tower & Post Office) ==========
   {
     const kiosk = new THREE.Group();
-    kiosk.position.set(20, 0, 29);
-    kiosk.rotation.y = -0.45;
+    kiosk.position.set(24, 0, 39.5);
+    kiosk.rotation.y = 0;
+    kiosk.scale.setScalar(1.6);
 
     const stoneBaseMat2 = getMat('#C8B8A4', 0.78);
     const brickLowerMat = getMat('#D88C6F', 0.74);
@@ -2204,158 +2375,101 @@ export function buildTownScene(): TownWorld {
       kiosk,
       [3.6, 5.6, 3.2],
       2.5,
-      {kind: 'settings', tx: 18.65, tz: 31.79},
+      {kind: 'settings', tx: 24, tz: 43.4},
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'settings', x: 20, z: 29, hw: 1.75, hd: 1.55, rotY: -0.45});
+    colliders.push({type: 'box', id: 'settings', x: 24, z: 39.5, hw: 2.8, hd: 2.48, rotY: 0});
     group.add(kiosk);
   }
 
-  // ========== BOULEVARD COBBLESTONE ROADS & INSTANCED STREETLIGHTS ==========
+  // ========== SPARSE FARM-STYLE PALE STEPPING STONES (STOPPING SHORT BEFORE BUILDINGS) ==========
   {
-    const roadGeos: THREE.BufferGeometry[] = [];
-    const curbGeos: THREE.BufferGeometry[] = [];
+    const stoneTrailSpots: [number, number, number, number][] = [];
 
-    const addRoadRect = (cx: number, cz: number, w: number, l: number, rotY = 0, addCurbL = true, addCurbR = true) => {
-      const roadSeg = new THREE.PlaneGeometry(w, l, 1, 1);
-      roadSeg.rotateX(-Math.PI / 2);
-      roadSeg.rotateY(rotY);
-      roadSeg.translate(cx, 0.042, cz);
-
-      const pos = roadSeg.attributes.position;
-      const uv = roadSeg.attributes.uv;
-      for (let i = 0; i < pos.count; i++) {
-        uv.setXY(i, pos.getX(i) * 0.24, pos.getZ(i) * 0.24);
-      }
-      roadGeos.push(roadSeg);
-
-      if (addCurbL) {
-        const cL = new THREE.BoxGeometry(0.18, 0.06, l);
-        cL.translate(-w / 2 - 0.08, 0.048, 0);
-        cL.rotateY(rotY);
-        cL.translate(cx, 0, cz);
-        curbGeos.push(cL);
-      }
-      if (addCurbR) {
-        const cR = new THREE.BoxGeometry(0.18, 0.06, l);
-        cR.translate(w / 2 + 0.08, 0.048, 0);
-        cR.rotateY(rotY);
-        cR.translate(cx, 0, cz);
-        curbGeos.push(cR);
-      }
-    };
-
-    const addRoadSpan = (x0: number, z0: number, x1: number, z1: number, w: number) => {
+    const addSteppingTrail = (
+      x0: number,
+      z0: number,
+      x1: number,
+      z1: number,
+      spacing = 1.38,
+      stagger = 0.34,
+    ) => {
       const dx = x1 - x0;
       const dz = z1 - z0;
       const len = Math.hypot(dx, dz);
-      const cx = (x0 + x1) / 2;
-      const cz = (z0 + z1) / 2;
-      const rotY = Math.atan2(dx, dz);
-      addRoadRect(cx, cz, w, len, rotY, true, true);
+      if (len < 0.2) return;
+      const ux = dx / len;
+      const uz = dz / len;
+      const px = -uz;
+      const pz = ux;
+      const count = Math.max(1, Math.floor(len / spacing) + 1);
+      for (let i = 0; i < count; i++) {
+        const d = i * spacing;
+        const t = Math.min(1, d / len);
+        const side = (i % 2 === 0 ? -1 : 1) * stagger;
+        const sx = THREE.MathUtils.lerp(x0, x1, t) + px * side;
+        const sz = THREE.MathUtils.lerp(z0, z1, t) + pz * side;
+        const scale = 0.88 + (i % 3) * 0.13;
+        const rot = ((Math.round(sx * 7 + sz * 11) + i) * 0.65) % (Math.PI * 2);
+        stoneTrailSpots.push([sx, sz, scale, rot]);
+      }
     };
 
-    // East-West Avenue outward from central plaza
-    addRoadSpan(-6.8, 0, -26.5, 0, 3.6);
-    addRoadSpan(6.8, 0, 27.2, 0, 3.6);
-    addRoadRect(-28.3, 0, 3.6, 3.6, 0, false, false);
-    addRoadRect(29.0, 0, 3.6, 3.6, 0, false, false);
+    // East-West Main Trail (z = 0)
+    addSteppingTrail(-35.5, 0, -8.8, 0);
+    addSteppingTrail(8.8, 0, 35.5, 0);
 
-    // West spurs (North to House, South to Boutique)
-    addRoadSpan(-28.3, -1.8, -28.3, -13.6, 3.0);
-    addRoadSpan(-28.3, 1.8, -29.5, 16.2, 3.0);
+    // Center North-South Spine (stops well short of Hill in North, flows south into meadow)
+    addSteppingTrail(0, -8.8, 0, -19.2);
+    addSteppingTrail(0, 8.8, 0, 51.0);
 
-    // East spurs (North to Farm, South to Arcade)
-    addRoadSpan(29.0, -1.8, 29.3, -13.6, 3.0);
-    addRoadSpan(29.0, 1.8, 29.4, 15.2, 3.0);
+    // North Street (z = -12.5) + short approach spurs that STOP before reaching Home / Patio / Garden
+    addSteppingTrail(-32.0, -12.5, -1.6, -12.5);
+    addSteppingTrail(1.6, -12.5, 32.0, -12.5);
+    addSteppingTrail(-32.0, -13.9, -32.0, -14.2);
+    addSteppingTrail(-12.5, -13.9, -12.5, -14.2);
+    addSteppingTrail(32.0, -13.9, 32.0, -14.2);
 
-    // North Avenue to Sakura Hill + side branch to Tea Patio
-    addRoadSpan(0, -6.8, 0, -29.8, 3.4);
-    addRoadSpan(-1.7, -22.5, -8.3, -22.5, 2.2);
+    // West & East N-S Connector Trails (x = ±23.5, cleanly clear of all buildings)
+    addSteppingTrail(-23.5, -11.0, -23.5, -1.6);
+    addSteppingTrail(-23.5, 1.6, -23.5, 25.2);
+    addSteppingTrail(23.5, -11.0, 23.5, -1.6);
+    addSteppingTrail(23.5, 1.6, 23.5, 25.2);
 
-    // South Promenade & forks (Fishing Lake & Post Office)
-    addRoadSpan(0, 6.8, 0, 22.8, 3.4);
-    addRoadRect(0, 24.5, 3.4, 3.4, 0, false, false);
-    addRoadSpan(-1.7, 24.5, -17.0, 26.2, 2.8);
-    addRoadSpan(1.7, 24.5, 18.4, 31.4, 2.8);
+    // South Street (z = 26.8) + short approach spurs that STOP cleanly before Boutique & Arcade
+    addSteppingTrail(-32.0, 26.8, -1.6, 26.8);
+    addSteppingTrail(1.6, 26.8, 32.0, 26.8);
+    addSteppingTrail(-32.0, 25.3, -32.0, 25.0);
+    addSteppingTrail(32.0, 25.3, 32.0, 25.0);
 
-    const roadMerged = mergeParts(roadGeos);
-    const roadMesh = new THREE.Mesh(
-      roadMerged,
-      new THREE.MeshStandardMaterial({
-        map: roadCobbleTex,
-        color: '#F4EAE0',
-        roughness: 0.82,
-        metalness: 0.02,
-      }),
-    );
-    roadMesh.userData = {kind: 'ground'};
-    group.add(roadMesh);
+    // Far-South Spurs stopping cleanly ~3-4.5m BEFORE Fishing Pier & Post Office
+    addSteppingTrail(-19.6, 35.2, -1.6, 35.2);
+    addSteppingTrail(1.6, 46.2, 24.0, 46.2);
+    addSteppingTrail(24.0, 44.8, 24.0, 44.5);
 
-    const curbMerged = mergeParts(curbGeos);
-    const curbMesh = new THREE.Mesh(curbMerged, getMat('#D6C4AB', 0.78));
-    group.add(curbMesh);
+    const stoneGeo = new THREE.CylinderGeometry(0.42, 0.48, 0.055, 9);
+    const stoneMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.84});
+    const stoneTrailIM = new THREE.InstancedMesh(stoneGeo, stoneMat, stoneTrailSpots.length);
+    const paleStonePalette = ['#E4D6C0', '#D6C5AC', '#EBE0CD', '#CBBBA2'];
 
-    // Instanced Avenue Streetlights flanking roads cleanly (3 draw calls total)
-    const roadLampCoords: [number, number][] = [
-      [-11.5, -2.25],
-      [11.5, -2.25],
-      [-21.0, 2.25],
-      [21.0, 2.25],
-      [-30.4, -7.2],
-      [-26.2, 8.2],
-      [31.2, -7.2],
-      [26.8, 8.2],
-      [-2.2, -13.0],
-      [2.2, -19.5],
-      [-2.2, -28.0],
-      [-2.2, 13.5],
-      [2.2, 18.8],
-      [-9.2, 23.1],
-      [9.8, 26.2],
-      [-25.4, -14.8],
-    ];
-
-    const sBase = new THREE.CylinderGeometry(0.11, 0.16, 0.28, 8);
-    sBase.translate(0, 0.14, 0);
-    const sPole = new THREE.CylinderGeometry(0.06, 0.085, 2.25, 8);
-    sPole.translate(0, 1.4, 0);
-    const sCollar = new THREE.CylinderGeometry(0.14, 0.09, 0.1, 8);
-    sCollar.translate(0, 2.52, 0);
-    const sCap = new THREE.ConeGeometry(0.28, 0.18, 8);
-    sCap.translate(0, 2.94, 0);
-    const roadLampPostGeo = mergeParts([sBase, sPole, sCollar, sCap]);
-    const roadLampBulbGeo = new THREE.SphereGeometry(0.2, 9, 8);
-    roadLampBulbGeo.translate(0, 2.72, 0);
-
-    const roadLampBulbMat = new THREE.MeshStandardMaterial({
-      color: '#FFF4C2',
-      emissive: '#FFCC66',
-      emissiveIntensity: 0.14,
-      roughness: 0.25,
-    });
-    lampBulbs.push(roadLampBulbMat);
-
-    const roadLampPostIM = new THREE.InstancedMesh(roadLampPostGeo, lampPostMat, roadLampCoords.length);
-    const roadLampBulbIM = new THREE.InstancedMesh(roadLampBulbGeo, roadLampBulbMat, roadLampCoords.length);
-    roadLampCoords.forEach(([lx, lz], i) => {
-      _instDummy.position.set(lx, 0.02, lz);
-      _instDummy.rotation.set(0, 0, 0);
-      _instDummy.scale.setScalar(1);
+    stoneTrailSpots.forEach(([sx, sz, s, rot], i) => {
+      _instDummy.position.set(sx, getTownGroundHeight(sx, sz) + 0.008, sz);
+      _instDummy.rotation.set(0, rot, 0);
+      _instDummy.scale.set(s * (1 + (i % 2) * 0.16), 1, s * 0.86);
       _instDummy.updateMatrix();
-      roadLampPostIM.setMatrixAt(i, _instDummy.matrix);
-      roadLampBulbIM.setMatrixAt(i, _instDummy.matrix);
-      colliders.push({type: 'circle', x: lx, z: lz, r: 0.28});
+      stoneTrailIM.setMatrixAt(i, _instDummy.matrix);
+      _instColor.set(paleStonePalette[i % paleStonePalette.length]);
+      stoneTrailIM.setColorAt(i, _instColor);
     });
-    roadLampPostIM.instanceMatrix.needsUpdate = true;
-    roadLampBulbIM.instanceMatrix.needsUpdate = true;
-    roadLampPostIM.computeBoundingSphere();
-    roadLampBulbIM.computeBoundingSphere();
-    group.add(roadLampPostIM, roadLampBulbIM);
+    stoneTrailIM.instanceMatrix.needsUpdate = true;
+    if (stoneTrailIM.instanceColor) stoneTrailIM.instanceColor.needsUpdate = true;
+    stoneTrailIM.computeBoundingSphere();
+    stoneTrailIM.userData = {kind: 'ground'};
+    group.add(stoneTrailIM);
   }
 
   // ========== DISTRICT 7: GÓC TRÀ BÁNH, ANH ĐÀO RỤNG HOA & DÂY ĐÈN ĐÊM ==========
-  const patioCenter = {x: -12.5, z: -22.5};
+  const patioCenter = {x: -12.5, z: -21.5};
   let patioNightLight: THREE.PointLight | null = null;
   let stringBulbMat: THREE.MeshStandardMaterial | null = null;
   const FALL_PETAL_COUNT = 26;
@@ -2640,108 +2754,324 @@ export function buildTownScene(): TownWorld {
     group.add(patio);
   }
 
-  // ========== 3. TALL INSTANCED GREEN TREES (AIRY & SPARSE ACROSS WIDE MAP — 3 DRAW CALLS TOTAL!) ==========
+  // ========== 3. DIVERSE SCULPTED TREES ACROSS VAST OPEN MAP (OAKS + BRANCHED + LUSH PINES + SMALL UNDER-CANOPY LANTERNS) ==========
+  // A. Broadleaf Shade Oaks (Wide canopies + visible boughs, never hiding enlarged buildings)
   const {trunkGeo, lowerCanopyGeo, upperCanopyGeo} = createTreeGeometries();
-  const trunkMat = getMat('#7B5337', 0.82);
+  const trunkMat = getMat('#734C32', 0.84);
   const lowerLeafMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.74});
   const upperLeafMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.7});
 
-  const greenTrees: [number, number, number][] = [
-    // Spacious town avenues & lawn parks (clear of all roads, plaza, tea patio & buildings)
-    [-14.5, -9.8, 1.54],
-    [13.8, -10.5, 1.58],
-    [-16.2, 7.6, 1.48],
-    [15.4, 7.4, 1.52],
-    [-7.8, 13.6, 1.46],
-    [8.2, 13.4, 1.48],
-    [-22.5, -8.5, 1.6],
-    [21.6, -9.4, 1.62],
-    [10.2, -25.4, 1.64],
-    [-22.4, -25.8, 1.68],
-    // North & Hillside scenic frame
-    [-17.2, -37.2, 1.82],
-    [17.5, -36.8, 1.84],
-    [-27.8, -32.4, 1.78],
-    [27.6, -31.8, 1.82],
-    [-39.0, -28.0, 1.88],
-    [39.5, -28.6, 1.86],
-    // Outer residential & farm countryside perimeter
-    [-38.8, -19.2, 1.76],
-    [-40.5, -7.8, 1.84],
-    [41.5, -9.2, 1.78],
-    [43.8, -21.0, 1.84],
-    [-41.2, 5.2, 1.78],
-    [42.4, 4.8, 1.82],
-    [-41.5, 18.6, 1.86],
-    [42.0, 18.2, 1.86],
-    // South meadows & lakeside border
-    [-33.6, 26.8, 1.74],
-    [-29.2, 35.8, 1.82],
-    [-11.8, 36.2, 1.72],
-    [-4.8, 35.5, 1.66],
-    [9.4, 36.0, 1.74],
-    [29.8, 34.4, 1.8],
-    [35.2, 26.8, 1.76],
-    // Far scenic meadow depth (sparse horizon canopy)
-    [-48.0, -34.0, 1.9],
-    [48.5, -33.5, 1.9],
-    [-49.5, 30.0, 1.88],
-    [49.0, 29.5, 1.92],
-    [-21.0, -47.0, 1.85],
-    [21.5, -46.8, 1.86],
-    [0.0, 42.5, 1.84],
+  // [x, z, scale, hasLantern, lanternAngleRad]
+  const oakTrees: [number, number, number, boolean?, number?][] = [
+    [-13.5, -5.8, 1.14, true, 0.78],
+    [13.8, -5.8, 1.16, true, 2.36],
+    [-13.8, 6.2, 1.15, true, -0.78],
+    [13.8, 6.2, 1.15, true, -2.36],
+    [-10.2, 17.5, 1.12, true, 0.2],
+    [10.5, 17.5, 1.14, true, Math.PI - 0.2],
+    [-44.5, -18.5, 1.24],
+    [51.5, -18.5, 1.24],
+    [-44.5, 16.5, 1.22],
+    [45.0, 16.5, 1.24],
+    [-35.5, 36.0, 1.2],
+    [36.5, 35.5, 1.22],
+    [-12.5, 53.5, 1.24],
+    [12.8, 53.5, 1.24],
+    [-56.0, -4.5, 1.28],
+    [56.5, -4.8, 1.26],
+    [-55.0, 29.5, 1.26],
+    [55.5, 29.0, 1.28],
+    [-40.0, 56.0, 1.26],
+    [40.5, 55.5, 1.26],
   ];
 
-  const treeTrunkIM = new THREE.InstancedMesh(trunkGeo, trunkMat, greenTrees.length);
-  const treeLowerIM = new THREE.InstancedMesh(lowerCanopyGeo, lowerLeafMat, greenTrees.length);
-  const treeUpperIM = new THREE.InstancedMesh(upperCanopyGeo, upperLeafMat, greenTrees.length);
+  const oakTrunkIM = new THREE.InstancedMesh(trunkGeo, trunkMat, oakTrees.length);
+  const oakLowerIM = new THREE.InstancedMesh(lowerCanopyGeo, lowerLeafMat, oakTrees.length);
+  const oakUpperIM = new THREE.InstancedMesh(upperCanopyGeo, upperLeafMat, oakTrees.length);
 
-  const lowerPalette = ['#549F5C', '#5EA964', '#4F9857', '#62AE68'];
-  const upperPalette = ['#70C477', '#7DCE83', '#69BC70', '#84D489'];
+  const oakLowerPalette = ['#4E9756', '#56A25E', '#488E50', '#5CA863'];
+  const oakUpperPalette = ['#6BBC73', '#75C67D', '#64B46C', '#7ECD85'];
 
-  greenTrees.forEach(([tx, tz, ts], i) => {
-    _instDummy.position.set(tx, getTownGroundHeight(tx, tz) - 0.04, tz);
-    _instDummy.rotation.set(0, (i * 1.37) % (Math.PI * 2), 0);
+  const treeLanternSpots: {x: number; y: number; z: number; rotY: number; scale: number}[] = [];
+
+  oakTrees.forEach(([tx, tz, ts, hasLantern, lanternAng], i) => {
+    const gy = getTownGroundHeight(tx, tz) - 0.04;
+    _instDummy.position.set(tx, gy, tz);
+    _instDummy.rotation.set(0, (i * 1.41) % (Math.PI * 2), 0);
     _instDummy.scale.setScalar(ts);
     _instDummy.updateMatrix();
-    treeTrunkIM.setMatrixAt(i, _instDummy.matrix);
-    treeLowerIM.setMatrixAt(i, _instDummy.matrix);
-    treeUpperIM.setMatrixAt(i, _instDummy.matrix);
+    oakTrunkIM.setMatrixAt(i, _instDummy.matrix);
+    oakLowerIM.setMatrixAt(i, _instDummy.matrix);
+    oakUpperIM.setMatrixAt(i, _instDummy.matrix);
 
-    _instColor.set(lowerPalette[i % lowerPalette.length]);
-    treeLowerIM.setColorAt(i, _instColor);
-    _instColor.set(upperPalette[i % upperPalette.length]);
-    treeUpperIM.setColorAt(i, _instColor);
+    _instColor.set(oakLowerPalette[i % oakLowerPalette.length]);
+    oakLowerIM.setColorAt(i, _instColor);
+    _instColor.set(oakUpperPalette[i % oakUpperPalette.length]);
+    oakUpperIM.setColorAt(i, _instColor);
 
-    if (Math.abs(tx) < 52 && Math.abs(tz) < 52) {
-      colliders.push({type: 'circle', x: tx, z: tz, r: 0.42 * ts});
+    colliders.push({type: 'circle', x: tx, z: tz, r: 0.48 * ts});
+
+    if (hasLantern) {
+      treeLanternSpots.push({
+        x: tx,
+        y: gy + 1.88 * ts,
+        z: tz,
+        rotY: lanternAng ?? 0,
+        scale: ts,
+      });
     }
   });
-  treeTrunkIM.instanceMatrix.needsUpdate = true;
-  treeLowerIM.instanceMatrix.needsUpdate = true;
-  treeUpperIM.instanceMatrix.needsUpdate = true;
-  if (treeLowerIM.instanceColor) treeLowerIM.instanceColor.needsUpdate = true;
-  if (treeUpperIM.instanceColor) treeUpperIM.instanceColor.needsUpdate = true;
-  treeTrunkIM.computeBoundingSphere();
-  treeLowerIM.computeBoundingSphere();
-  treeUpperIM.computeBoundingSphere();
-  group.add(treeTrunkIM, treeLowerIM, treeUpperIM);
+  oakTrunkIM.instanceMatrix.needsUpdate = true;
+  oakLowerIM.instanceMatrix.needsUpdate = true;
+  oakUpperIM.instanceMatrix.needsUpdate = true;
+  if (oakLowerIM.instanceColor) oakLowerIM.instanceColor.needsUpdate = true;
+  if (oakUpperIM.instanceColor) oakUpperIM.instanceColor.needsUpdate = true;
+  oakTrunkIM.computeBoundingSphere();
+  oakLowerIM.computeBoundingSphere();
+  oakUpperIM.computeBoundingSphere();
+  group.add(oakTrunkIM, oakLowerIM, oakUpperIM);
 
-  // ========== 4. SAKURA (HOA ĐÀO) TREES & PETALS ON THE WALKABLE HILL ==========
+  // B. Multi-Branched Woodland Trees (visible forked boughs & airy leaf tufts)
+  const {
+    trunkGeo: branchTrunkGeo,
+    lowerCanopyGeo: branchLowerGeo,
+    upperCanopyGeo: branchUpperGeo,
+  } = createBranchedWoodlandGeometries();
+  const branchTrunkMat = getMat('#8B6B4F', 0.8);
+  const branchLeafLowMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.72});
+  const branchLeafUpMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.68});
+
+  const branchedTrees: [number, number, number, boolean?, number?][] = [
+    [-8.2, -9.2, 1.1, true, -0.4],
+    [8.4, -9.2, 1.12, true, -Math.PI + 0.4],
+    [-8.2, 31.5, 1.14, true, 0.3],
+    [8.4, 31.5, 1.12],
+    [-18.8, 6.8, 1.14],
+    [18.8, 6.8, 1.14],
+    [-42.5, -5.2, 1.2],
+    [43.0, -5.5, 1.2],
+    [-42.0, 29.5, 1.22],
+    [42.0, 29.5, 1.22],
+    [-27.5, -34.0, 1.24],
+    [27.5, -33.5, 1.24],
+    [-60.0, 12.0, 1.26],
+    [60.5, 11.5, 1.26],
+    [-48.5, -36.0, 1.28],
+    [49.0, -36.5, 1.28],
+  ];
+
+  const branchTrunkIM = new THREE.InstancedMesh(branchTrunkGeo, branchTrunkMat, branchedTrees.length);
+  const branchLowIM = new THREE.InstancedMesh(branchLowerGeo, branchLeafLowMat, branchedTrees.length);
+  const branchUpIM = new THREE.InstancedMesh(branchUpperGeo, branchLeafUpMat, branchedTrees.length);
+
+  const birchLowPalette = ['#68AE64', '#72B66A', '#5FA45E', '#7AC071'];
+  const birchUpPalette = ['#86CC7D', '#93D688', '#7CC474', '#9DDD92'];
+
+  branchedTrees.forEach(([tx, tz, ts, hasLantern, lanternAng], i) => {
+    const gy = getTownGroundHeight(tx, tz) - 0.04;
+    _instDummy.position.set(tx, gy, tz);
+    _instDummy.rotation.set(0, (i * 1.95) % (Math.PI * 2), 0);
+    _instDummy.scale.setScalar(ts);
+    _instDummy.updateMatrix();
+    branchTrunkIM.setMatrixAt(i, _instDummy.matrix);
+    branchLowIM.setMatrixAt(i, _instDummy.matrix);
+    branchUpIM.setMatrixAt(i, _instDummy.matrix);
+
+    _instColor.set(birchLowPalette[i % birchLowPalette.length]);
+    branchLowIM.setColorAt(i, _instColor);
+    _instColor.set(birchUpPalette[i % birchUpPalette.length]);
+    branchUpIM.setColorAt(i, _instColor);
+
+    colliders.push({type: 'circle', x: tx, z: tz, r: 0.36 * ts});
+
+    if (hasLantern) {
+      treeLanternSpots.push({
+        x: tx,
+        y: gy + 1.54 * ts,
+        z: tz,
+        rotY: lanternAng ?? 0,
+        scale: ts * 0.92,
+      });
+    }
+  });
+  branchTrunkIM.instanceMatrix.needsUpdate = true;
+  branchLowIM.instanceMatrix.needsUpdate = true;
+  branchUpIM.instanceMatrix.needsUpdate = true;
+  if (branchLowIM.instanceColor) branchLowIM.instanceColor.needsUpdate = true;
+  if (branchUpIM.instanceColor) branchUpIM.instanceColor.needsUpdate = true;
+  branchTrunkIM.computeBoundingSphere();
+  branchLowIM.computeBoundingSphere();
+  branchUpIM.computeBoundingSphere();
+  group.add(branchTrunkIM, branchLowIM, branchUpIM);
+
+  // Small Under-Canopy Hanging Tree Lanterns (hooked gently onto upper trunks of 9 selected trees)
+  if (treeLanternSpots.length > 0) {
+    const armGeo = new THREE.BoxGeometry(0.46, 0.045, 0.045);
+    armGeo.translate(0.24, 0, 0);
+    const braceGeo = new THREE.BoxGeometry(0.24, 0.036, 0.036);
+    braceGeo.rotateZ(0.65);
+    braceGeo.translate(0.14, -0.09, 0);
+    const cordGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.16, 6);
+    cordGeo.translate(0.44, -0.08, 0);
+    const capGeo = new THREE.ConeGeometry(0.11, 0.08, 8);
+    capGeo.translate(0.44, -0.17, 0);
+
+    const treeLampBracketGeo = mergeParts([armGeo, braceGeo, cordGeo, capGeo]);
+    const treeLampBulbGeo = new THREE.SphereGeometry(0.088, 9, 8);
+    treeLampBulbGeo.translate(0.44, -0.26, 0);
+
+    const treeLampBracketMat = getMat('#5C3E28', 0.72, 0.18);
+    const treeLampBulbMat = new THREE.MeshStandardMaterial({
+      color: '#FFF4C8',
+      emissive: '#FFB347',
+      emissiveIntensity: 0.14,
+      roughness: 0.22,
+    });
+    lampBulbs.push(treeLampBulbMat);
+
+    const treeLampBracketIM = new THREE.InstancedMesh(
+      treeLampBracketGeo,
+      treeLampBracketMat,
+      treeLanternSpots.length,
+    );
+    const treeLampBulbIM = new THREE.InstancedMesh(
+      treeLampBulbGeo,
+      treeLampBulbMat,
+      treeLanternSpots.length,
+    );
+
+    treeLanternSpots.forEach((spot, i) => {
+      _instDummy.position.set(spot.x, spot.y, spot.z);
+      _instDummy.rotation.set(0, spot.rotY, 0);
+      _instDummy.scale.setScalar(spot.scale);
+      _instDummy.updateMatrix();
+      treeLampBracketIM.setMatrixAt(i, _instDummy.matrix);
+      treeLampBulbIM.setMatrixAt(i, _instDummy.matrix);
+    });
+    treeLampBracketIM.instanceMatrix.needsUpdate = true;
+    treeLampBulbIM.instanceMatrix.needsUpdate = true;
+    treeLampBracketIM.computeBoundingSphere();
+    treeLampBulbIM.computeBoundingSphere();
+    group.add(treeLampBracketIM, treeLampBulbIM);
+  }
+
+  // C. Lush Evergreen Pine & Conifer Trees (spanning outer meadows, mountain foothills & distant forest edge — zero perimeter fence!)
+  const {
+    trunkGeo: pineTrunkGeo,
+    lowerFoliageGeo: pineLowerGeo,
+    upperFoliageGeo: pineUpperGeo,
+  } = createPineConiferGeometries();
+  const pineTrunkMat = getMat('#5E3E29', 0.86);
+  const pineLowerMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.8});
+  const pineUpperMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.74});
+
+  const pineCoords: [number, number, number][] = [
+    // Explorable Outer Meadows (showing players the world extends far!)
+    [-9.5, 45.0, 1.32],
+    [9.8, 44.5, 1.34],
+    [-28.0, 56.0, 1.42],
+    [28.5, 55.0, 1.4],
+    [-5.2, 64.5, 1.48],
+    [5.8, 65.0, 1.46],
+    [-48.5, 44.0, 1.44],
+    [49.0, 43.5, 1.46],
+    [-60.0, 48.0, 1.5],
+    [60.5, 47.5, 1.52],
+    [-65.0, 18.0, 1.46],
+    [65.5, 18.5, 1.48],
+    [-65.0, -24.0, 1.5],
+    [65.5, -23.5, 1.48],
+    [-52.5, -52.0, 1.52],
+    [53.0, -51.5, 1.54],
+    [-38.0, -52.0, 1.44],
+    [38.5, -51.5, 1.46],
+    [-42.0, -76.0, 1.5],
+    [42.5, -75.5, 1.52],
+    [-62.0, -70.0, 1.54],
+    [62.5, -69.5, 1.52],
+    // Gentle Hill Foothills & Rear Slopes
+    [-34.0, -44.5, 1.36],
+    [34.5, -44.0, 1.38],
+    [-36.5, -66.0, 1.42],
+    [37.0, -65.5, 1.44],
+    [-22.5, -88.0, 1.48],
+    [23.0, -87.5, 1.5],
+    // Outer Natural Forest Edge (well beyond walkable area so boundary feels natural)
+    [-70.0, 64.0, 1.52],
+    [-50.0, 68.5, 1.48],
+    [-26.0, 70.0, 1.46],
+    [26.5, 69.5, 1.48],
+    [50.5, 68.0, 1.5],
+    [70.0, 63.5, 1.52],
+    [-72.0, -5.0, 1.48],
+    [72.0, -4.5, 1.5],
+    [-71.5, -50.0, 1.54],
+    [72.0, -49.5, 1.54],
+    [-70.0, -84.0, 1.56],
+    [70.5, -83.5, 1.56],
+  ];
+
+  // Outer Scenic Evergreen Ring far outside walkable zone
+  for (let i = 0; i < 46; i++) {
+    const a = (i / 46) * Math.PI * 2;
+    const rx = Math.cos(a) * 92 + Math.sin(a * 3) * 6;
+    const rz = -10 + Math.sin(a) * 98 + Math.cos(a * 2) * 6;
+    const s = 1.42 + (i % 5) * 0.1;
+    pineCoords.push([rx, rz, s]);
+  }
+
+  const pineTrunkIM = new THREE.InstancedMesh(pineTrunkGeo, pineTrunkMat, pineCoords.length);
+  const pineLowerIM = new THREE.InstancedMesh(pineLowerGeo, pineLowerMat, pineCoords.length);
+  const pineUpperIM = new THREE.InstancedMesh(pineUpperGeo, pineUpperMat, pineCoords.length);
+  const pineLowPalette = ['#2E6A47', '#35744E', '#2A6041', '#3A7B53'];
+  const pineUpPalette = ['#418659', '#4A9162', '#3B7E53', '#529B6B'];
+
+  pineCoords.forEach(([px, pz, ps], i) => {
+    _instDummy.position.set(px, getTownGroundHeight(px, pz) - 0.05, pz);
+    _instDummy.rotation.set(0, (i * 0.79) % (Math.PI * 2), 0);
+    _instDummy.scale.setScalar(ps);
+    _instDummy.updateMatrix();
+    pineTrunkIM.setMatrixAt(i, _instDummy.matrix);
+    pineLowerIM.setMatrixAt(i, _instDummy.matrix);
+    pineUpperIM.setMatrixAt(i, _instDummy.matrix);
+
+    _instColor.set(pineLowPalette[i % pineLowPalette.length]);
+    pineLowerIM.setColorAt(i, _instColor);
+    _instColor.set(pineUpPalette[i % pineUpPalette.length]);
+    pineUpperIM.setColorAt(i, _instColor);
+
+    if (px >= -82 && px <= 82 && pz >= -98 && pz <= 78) {
+      colliders.push({type: 'circle', x: px, z: pz, r: 0.44 * ps});
+    }
+  });
+  pineTrunkIM.instanceMatrix.needsUpdate = true;
+  pineLowerIM.instanceMatrix.needsUpdate = true;
+  pineUpperIM.instanceMatrix.needsUpdate = true;
+  if (pineLowerIM.instanceColor) pineLowerIM.instanceColor.needsUpdate = true;
+  if (pineUpperIM.instanceColor) pineUpperIM.instanceColor.needsUpdate = true;
+  pineTrunkIM.computeBoundingSphere();
+  pineLowerIM.computeBoundingSphere();
+  pineUpperIM.computeBoundingSphere();
+  group.add(pineTrunkIM, pineLowerIM, pineUpperIM);
+
+  // ========== 4. SAKURA (HOA ĐÀO) TREES & PETALS ON THE GENTLE SCENIC HILL ==========
   const {trunkGeo: sakuraTrunkGeo, blossomGeo: sakuraBlossomGeo} = createSakuraGeometries();
   const sakuraTrunkMat = getMat('#5C3E32', 0.82);
   const sakuraBlossomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.65});
 
-  // Ring of 8 sakura trees crowning the summit & upper slopes of the hill, leaving center clear
   const sakuraTrees: [number, number, number][] = [
-    [HILL_CENTER.x - 4.0, HILL_CENTER.z - 2.8, 1.42],
-    [HILL_CENTER.x + 4.2, HILL_CENTER.z - 2.6, 1.46],
-    [HILL_CENTER.x - 0.5, HILL_CENTER.z - 4.8, 1.58],
-    [HILL_CENTER.x - 5.8, HILL_CENTER.z + 1.6, 1.36],
-    [HILL_CENTER.x + 5.8, HILL_CENTER.z + 1.8, 1.38],
-    [HILL_CENTER.x - 3.6, HILL_CENTER.z + 5.4, 1.28],
-    [HILL_CENTER.x + 3.8, HILL_CENTER.z + 5.4, 1.3],
-    [HILL_CENTER.x + 2.0, HILL_CENTER.z - 6.0, 1.52],
+    [HILL_CENTER.x - 10.5, HILL_CENTER.z - 3.6, 1.32],
+    [HILL_CENTER.x + 10.8, HILL_CENTER.z - 3.4, 1.35],
+    [HILL_CENTER.x - 6.4, HILL_CENTER.z - 10.5, 1.4],
+    [HILL_CENTER.x + 6.6, HILL_CENTER.z - 10.2, 1.38],
+    [HILL_CENTER.x - 12.2, HILL_CENTER.z + 6.5, 1.28],
+    [HILL_CENTER.x + 12.2, HILL_CENTER.z + 6.5, 1.3],
+    [HILL_CENTER.x - 9.2, HILL_CENTER.z + 14.5, 1.24],
+    [HILL_CENTER.x + 9.2, HILL_CENTER.z + 14.5, 1.26],
+    [HILL_CENTER.x, HILL_CENTER.z - 13.0, 1.44],
+    [HILL_CENTER.x - 17.5, HILL_CENTER.z + 0.8, 1.28],
+    [HILL_CENTER.x + 17.8, HILL_CENTER.z + 1.0, 1.3],
+    [HILL_CENTER.x - 14.5, HILL_CENTER.z - 13.5, 1.34],
   ];
 
   const sakuraTrunkIM = new THREE.InstancedMesh(sakuraTrunkGeo, sakuraTrunkMat, sakuraTrees.length);
@@ -2749,7 +3079,7 @@ export function buildTownScene(): TownWorld {
   const sakuraTints = ['#FFADC6', '#FFB8CE', '#F89AB8', '#FFC6D9'];
 
   sakuraTrees.forEach(([sx, sz, ss], i) => {
-    const sy = getTownGroundHeight(sx, sz) - 0.08;
+    const sy = getTownGroundHeight(sx, sz) - 0.1;
     _instDummy.position.set(sx, sy, sz);
     _instDummy.rotation.set(0, i * 1.1, 0);
     _instDummy.scale.setScalar(ss);
@@ -2760,7 +3090,7 @@ export function buildTownScene(): TownWorld {
     _instColor.set(sakuraTints[i % sakuraTints.length]);
     sakuraBlossomIM.setColorAt(i, _instColor);
 
-    colliders.push({type: 'circle', x: sx, z: sz, r: 0.36 * ss});
+    colliders.push({type: 'circle', x: sx, z: sz, r: 0.4 * ss});
   });
   sakuraTrunkIM.instanceMatrix.needsUpdate = true;
   sakuraBlossomIM.instanceMatrix.needsUpdate = true;
@@ -2769,9 +3099,9 @@ export function buildTownScene(): TownWorld {
   sakuraBlossomIM.computeBoundingSphere();
   group.add(sakuraTrunkIM, sakuraBlossomIM);
 
-  // Static fallen sakura petals scattered across the hill summit & upper slope (1 draw call)
-  const petalCount = 70;
-  const petalGeo = new THREE.CircleGeometry(0.11, 5);
+  // Static fallen sakura petals scattered across the gentle hill summit & slopes (1 draw call)
+  const petalCount = 120;
+  const petalGeo = new THREE.CircleGeometry(0.12, 5);
   petalGeo.rotateX(-Math.PI / 2);
   const petalMat = new THREE.MeshStandardMaterial({
     color: '#FFB7CE',
@@ -2781,13 +3111,13 @@ export function buildTownScene(): TownWorld {
   const petalIM = new THREE.InstancedMesh(petalGeo, petalMat, petalCount);
   for (let i = 0; i < petalCount; i++) {
     const angle = i * 2.39996;
-    const rad = 0.6 + ((i * 0.48) % 8.4);
+    const rad = 1.0 + ((i * 0.74) % 21.0);
     const px = HILL_CENTER.x + Math.cos(angle) * rad;
     const pz = HILL_CENTER.z + Math.sin(angle) * rad;
-    const py = getTownGroundHeight(px, pz) + 0.03;
+    const py = getTownGroundHeight(px, pz) + 0.04;
     _instDummy.position.set(px, py, pz);
     _instDummy.rotation.set(0, angle, 0);
-    _instDummy.scale.set(1.2, 1, 0.75);
+    _instDummy.scale.set(1.25, 1, 0.78);
     _instDummy.updateMatrix();
     petalIM.setMatrixAt(i, _instDummy.matrix);
   }
@@ -2795,93 +3125,28 @@ export function buildTownScene(): TownWorld {
   petalIM.computeBoundingSphere();
   group.add(petalIM);
 
-  // ========== 5. SHORT DOORSTEP STEPPING STONES & WOODEN MATS RIGHT IN FRONT OF EACH BUILDING ==========
-  const stonePoints: [number, number, number][] = [];
-  const addDoorstepStones = (
-    x0: number,
-    z0: number,
-    x1: number,
-    z1: number,
-    steps: number,
-  ) => {
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      const sx = THREE.MathUtils.lerp(x0, x1, t) + (s % 2 === 0 ? 0.14 : -0.14);
-      const sz = THREE.MathUtils.lerp(z0, z1, t);
-      stonePoints.push([sx, sz, 0.85 + ((s * 37) % 8) * 0.03]);
-    }
-  };
-
-  // Doorstep stones + Sakura hill trail
-  addDoorstepStones(TOWN_ZONE_ENTRANCES.home.tx + 0.2, TOWN_ZONE_ENTRANCES.home.tz + 0.2, TOWN_ZONE_ENTRANCES.home.tx + 0.9, TOWN_ZONE_ENTRANCES.home.tz + 1.4, 2);
-  addDoorstepStones(TOWN_ZONE_ENTRANCES.garden.tx - 0.2, TOWN_ZONE_ENTRANCES.garden.tz + 0.2, TOWN_ZONE_ENTRANCES.garden.tx - 0.9, TOWN_ZONE_ENTRANCES.garden.tz + 1.4, 2);
-  addDoorstepStones(TOWN_ZONE_ENTRANCES.boutique.tx + 0.3, TOWN_ZONE_ENTRANCES.boutique.tz + 0.1, TOWN_ZONE_ENTRANCES.boutique.tx + 1.6, TOWN_ZONE_ENTRANCES.boutique.tz - 0.3, 2);
-  addDoorstepStones(TOWN_ZONE_ENTRANCES.arcade.tx - 0.3, TOWN_ZONE_ENTRANCES.arcade.tz + 0.1, TOWN_ZONE_ENTRANCES.arcade.tx - 1.6, TOWN_ZONE_ENTRANCES.arcade.tz - 0.3, 2);
-  addDoorstepStones(TOWN_ZONE_ENTRANCES.fishing.tx + 0.2, TOWN_ZONE_ENTRANCES.fishing.tz - 0.4, TOWN_ZONE_ENTRANCES.fishing.tx + 1.0, TOWN_ZONE_ENTRANCES.fishing.tz - 1.5, 2);
-  addDoorstepStones(HILL_CENTER.x - 0.2, HILL_CENTER.z + 11.4, HILL_CENTER.x, HILL_CENTER.z + 3.8, 6);
-
-  const stepStoneGeo = new THREE.CylinderGeometry(0.46, 0.52, 0.06, 9);
-  const stepStoneMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.82});
-  const stepStoneIM = new THREE.InstancedMesh(stepStoneGeo, stepStoneMat, stonePoints.length);
-  const stoneTints = ['#E2D3BC', '#D8C7AE', '#EADBC5', '#CFC4B4'];
-  stonePoints.forEach(([sx, sz, scale], i) => {
-    const sy = getTownGroundHeight(sx, sz) + 0.02;
-    _instDummy.position.set(sx, sy, sz);
-    _instDummy.rotation.set(0, (i * 0.9) % Math.PI, 0);
-    _instDummy.scale.set(scale * 1.15, 1, scale * 0.88);
-    _instDummy.updateMatrix();
-    stepStoneIM.setMatrixAt(i, _instDummy.matrix);
-    _instColor.set(stoneTints[i % stoneTints.length]);
-    stepStoneIM.setColorAt(i, _instColor);
-  });
-  stepStoneIM.instanceMatrix.needsUpdate = true;
-  if (stepStoneIM.instanceColor) stepStoneIM.instanceColor.needsUpdate = true;
-  stepStoneIM.computeBoundingSphere();
-  group.add(stepStoneIM);
-
-  // Small wooden plank welcome mats directly in front of doors
-  const plankGeo = new RoundedBoxGeometry(1.55, 0.05, 0.32, 2, 0.015);
-  const plankMat = getMat('#BA8554', 0.76);
-  const plankCoords: [number, number, number][] = [
-    [TOWN_ZONE_ENTRANCES.home.tx, TOWN_ZONE_ENTRANCES.home.tz, 0.38],
-    [TOWN_ZONE_ENTRANCES.boutique.tx, TOWN_ZONE_ENTRANCES.boutique.tz, 0.95],
-    [TOWN_ZONE_ENTRANCES.arcade.tx, TOWN_ZONE_ENTRANCES.arcade.tz, -0.95],
-    [TOWN_ZONE_ENTRANCES.fishing.tx, TOWN_ZONE_ENTRANCES.fishing.tz, 0.45],
-  ];
-  const plankIM = new THREE.InstancedMesh(plankGeo, plankMat, plankCoords.length);
-  plankCoords.forEach(([px, pz, prot], i) => {
-    _instDummy.position.set(px, getTownGroundHeight(px, pz) + 0.02, pz);
-    _instDummy.rotation.set(0, prot, 0);
-    _instDummy.scale.setScalar(1);
-    _instDummy.updateMatrix();
-    plankIM.setMatrixAt(i, _instDummy.matrix);
-  });
-  plankIM.instanceMatrix.needsUpdate = true;
-  plankIM.computeBoundingSphere();
-  group.add(plankIM);
-
-  // ========== 6. STATIC INSTANCED GROUND FLORA (BUSHES, WILDFLOWERS, GRASS TUFTS, ROCKS) ==========
+  // ========== 5. STATIC INSTANCED GROUND FLORA (BUSHES, WILDFLOWERS, GRASS TUFTS, ROCKS) ==========
   const bushCoords: [number, number, string][] = [
     [-7.8, -3.2, '#F28482'],
     [7.8, -3.2, '#F9C74F'],
     [-7.8, 3.2, '#F7A8B8'],
     [7.8, 3.2, '#A8D8EA'],
-    [-33.5, -20.8, '#F9C74F'],
-    [-25.5, -21.2, '#F28482'],
-    [26.2, -20.8, '#F7A8B8'],
-    [35.8, -22.8, '#F9C74F'],
-    [-36.2, 9.8, '#A8D8EA'],
-    [-29.2, 19.6, '#F7A8B8'],
-    [36.5, 9.2, '#F28482'],
-    [29.8, 19.2, '#F9C74F'],
-    [-24.2, 28.4, '#A8D8EA'],
-    [-14.5, 32.2, '#F7A8B8'],
-    [15.6, 28.0, '#F9C74F'],
-    [23.2, 27.6, '#F28482'],
+    [-38.2, -25.2, '#F9C74F'],
+    [-25.8, -25.8, '#F28482'],
+    [25.6, -25.8, '#F7A8B8'],
+    [38.5, -26.2, '#F9C74F'],
+    [-38.2, 13.5, '#A8D8EA'],
+    [-25.5, 22.2, '#F7A8B8'],
+    [38.5, 12.8, '#F28482'],
+    [25.5, 21.8, '#F9C74F'],
+    [-28.5, 39.5, '#A8D8EA'],
+    [-16.2, 48.2, '#F7A8B8'],
+    [19.2, 37.5, '#F9C74F'],
+    [28.5, 37.2, '#F28482'],
     [-8.4, -27.2, '#F7A8B8'],
-    [-16.8, -18.2, '#A8D8EA'],
-    [-22.5, 4.2, '#F9C74F'],
-    [22.5, 4.2, '#F28482'],
+    [-19.2, -16.2, '#A8D8EA'],
+    [-21.5, 4.2, '#F9C74F'],
+    [21.5, 4.2, '#F28482'],
   ];
   const bushBodyGeo = new THREE.SphereGeometry(0.42, 9, 7);
   bushBodyGeo.scale(1.25, 0.78, 1.15);
@@ -2918,8 +3183,8 @@ export function buildTownScene(): TownWorld {
   bushBlossomIM.computeBoundingSphere();
   group.add(bushBodyIM, bushBlossomIM);
 
-  // Static wildflower clusters scattered across wide meadows & hill (2 draw calls)
-  const FLOWER_COUNT = 180;
+  // Static wildflower clusters scattered across huge meadows & gentle hill (2 draw calls)
+  const FLOWER_COUNT = 260;
   const fStem1 = new THREE.CylinderGeometry(0.02, 0.025, 0.18, 5);
   fStem1.translate(0, 0.09, 0);
   const fLeaf = new THREE.ConeGeometry(0.14, 0.08, 5);
@@ -2940,25 +3205,30 @@ export function buildTownScene(): TownWorld {
 
   const isOnRoadOrPlaza = (px: number, pz: number) => {
     if (Math.hypot(px, pz) < TOWN_PLAZA_RADIUS + 1.2) return true;
-    if (Math.abs(pz) < 2.5 && px > -31 && px < 32) return true;
-    if (Math.abs(px) < 2.4 && pz > -32 && pz < 26) return true;
-    if (Math.abs(px + 28.3) < 2.2 && pz > -16 && pz < 18) return true;
-    if (Math.abs(px - 29.0) < 2.2 && pz > -16 && pz < 17) return true;
-    if (Math.hypot(px - patioCenter.x, pz - patioCenter.z) < 4.9) return true;
-    if (Math.hypot(px + 20, pz - 30) < 5.0) return true;
-    if (Math.hypot(px + 30, pz + 18) < 4.4) return true;
-    if (Math.hypot(px - 31, pz + 18) < 4.4) return true;
-    if (Math.hypot(px + 33, pz - 14) < 4.2) return true;
-    if (Math.hypot(px - 33, pz - 13) < 4.6) return true;
-    if (Math.hypot(px - 20, pz - 29) < 3.4) return true;
+    if (Math.abs(pz) < 1.8 && px > -37 && px < 37) return true;
+    if (Math.abs(pz + 12.5) < 1.8 && px > -34 && px < 34) return true;
+    if (Math.abs(pz - 26.8) < 1.8 && px > -34 && px < 34) return true;
+    if (Math.abs(pz - 35.2) < 1.6 && px > -21 && px < 2) return true;
+    if (Math.abs(pz - 46.2) < 1.6 && px > -2 && px < 26) return true;
+    if (Math.abs(px) < 1.8 && pz > -21 && pz < 53) return true;
+    if (Math.abs(px + 23.5) < 1.6 && pz > -13 && pz < 27) return true;
+    if (Math.abs(px - 23.5) < 1.6 && pz > -13 && pz < 27) return true;
+    if (Math.hypot(px - patioCenter.x, pz - patioCenter.z) < 5.0) return true;
+    if (Math.hypot(px + 23, pz - 44.5) < 6.4) return true;
+    if (Math.hypot(px + 32, pz + 22.5) < 6.5) return true;
+    if (Math.hypot(px - 32, pz + 22.5) < 6.5) return true;
+    if (Math.hypot(px - 42.8, pz + 23.2) < 3.6) return true;
+    if (Math.hypot(px + 32, pz - 18.0) < 6.2) return true;
+    if (Math.hypot(px - 32, pz - 17.5) < 6.6) return true;
+    if (Math.hypot(px - 24, pz - 39.5) < 4.5) return true;
     return false;
   };
 
   const wildflowerPalette = ['#FFE066', '#FF9EAA', '#A8E0FF', '#D5B8FF', '#FFFFFF'];
   let placedFlowers = 0;
-  for (let i = 0; i < 360 && placedFlowers < FLOWER_COUNT; i++) {
+  for (let i = 0; i < 540 && placedFlowers < FLOWER_COUNT; i++) {
     const angle = i * 2.39996;
-    const rad = 8.4 + ((i * 1.13) % 41.0);
+    const rad = 8.4 + ((i * 1.49) % 68.0);
     const fx = Math.cos(angle) * rad;
     const fz = Math.sin(angle) * rad;
     if (isOnRoadOrPlaza(fx, fz)) continue;
@@ -2984,7 +3254,7 @@ export function buildTownScene(): TownWorld {
   group.add(flowerBaseIM, flowerTopIM);
 
   // Static grass tufts (1 draw call)
-  const TUFT_COUNT = 160;
+  const TUFT_COUNT = 230;
   const t1 = new THREE.ConeGeometry(0.08, 0.24, 4);
   t1.rotateZ(0.22);
   t1.translate(-0.06, 0.11, 0);
@@ -2998,9 +3268,9 @@ export function buildTownScene(): TownWorld {
   const tuftMat = getMat('#66B868', 0.8);
   const tuftIM = new THREE.InstancedMesh(tuftGeo, tuftMat, TUFT_COUNT);
   let placedTufts = 0;
-  for (let i = 0; i < 340 && placedTufts < TUFT_COUNT; i++) {
+  for (let i = 0; i < 480 && placedTufts < TUFT_COUNT; i++) {
     const angle = i * 2.39996 + 0.9;
-    const rad = 8.4 + ((i * 1.19) % 42.0);
+    const rad = 8.4 + ((i * 1.53) % 68.0);
     const gx = Math.cos(angle) * rad;
     const gz = Math.sin(angle) * rad;
     if (isOnRoadOrPlaza(gx, gz)) continue;
@@ -3017,20 +3287,24 @@ export function buildTownScene(): TownWorld {
   tuftIM.computeBoundingSphere();
   group.add(tuftIM);
 
-  // Static accent pebbles / mossy rocks near edges & hill base (1 draw call)
+  // Static accent pebbles / mossy rocks near meadows, gentle mountain & forest trails (1 draw call)
   const rockCoords: [number, number, number][] = [
-    [-9.5, -15.5, 0.44],
-    [10.8, -17.5, 0.48],
-    [-23.5, -3.5, 0.45],
-    [24.5, -3.8, 0.46],
-    [-8.5, 19.5, 0.4],
-    [8.5, 18.8, 0.42],
-    [HILL_CENTER.x - 8.5, HILL_CENTER.z + 6.2, 0.58],
-    [HILL_CENTER.x + 8.8, HILL_CENTER.z + 5.8, 0.54],
-    [HILL_CENTER.x - 6.2, HILL_CENTER.z - 7.8, 0.62],
-    [HILL_CENTER.x + 6.6, HILL_CENTER.z - 7.4, 0.6],
-    [-35.0, 20.8, 0.52],
-    [35.2, 20.2, 0.5],
+    [-9.5, -16.5, 0.44],
+    [10.8, -18.5, 0.48],
+    [-21.5, -4.5, 0.45],
+    [21.5, -4.5, 0.46],
+    [-8.5, 21.5, 0.4],
+    [8.5, 21.5, 0.42],
+    [HILL_CENTER.x - 22.5, HILL_CENTER.z + 18.2, 0.68],
+    [HILL_CENTER.x + 22.8, HILL_CENTER.z + 17.8, 0.64],
+    [HILL_CENTER.x - 18.2, HILL_CENTER.z - 22.8, 0.72],
+    [HILL_CENTER.x + 18.6, HILL_CENTER.z - 22.4, 0.7],
+    [-38.0, 29.8, 0.52],
+    [38.2, 29.2, 0.5],
+    [-22.0, 56.0, 0.62],
+    [22.5, 55.5, 0.6],
+    [-55.0, 34.0, 0.65],
+    [55.5, 33.5, 0.64],
   ];
   const pebbleGeo = new THREE.DodecahedronGeometry(0.65, 0);
   pebbleGeo.scale(1.25, 0.72, 1.0);
@@ -3057,7 +3331,7 @@ export function buildTownScene(): TownWorld {
       const isNight = timeOfDay === 'night';
       const isSunset = timeOfDay === 'sunset';
       const winEmissive = isNight ? 1.15 : isSunset ? 0.65 : 0.08;
-      const bulbEmissive = isNight ? 1.45 : isSunset ? 0.78 : 0.14;
+      const bulbEmissive = isNight ? 1.9 : isSunset ? 0.92 : 0.14;
 
       windowMeshes.forEach((m) => {
         m.emissiveIntensity = winEmissive;
@@ -3100,10 +3374,10 @@ export function buildTownScene(): TownWorld {
     if (chimneySmokeMesh) {
       for (let i = 0; i < SMOKE_COUNT; i++) {
         const t = (elapsed * 0.28 + i / SMOKE_COUNT) % 1;
-        const sx = smokeOriginWorld.x + Math.sin(t * Math.PI * 2 + i) * 0.22 + t * 0.35;
-        const sy = smokeOriginWorld.y + t * 2.4;
-        const sz = smokeOriginWorld.z + Math.cos(t * Math.PI * 1.6 + i) * 0.15 - t * 0.2;
-        const s = Math.sin(t * Math.PI) * (0.65 + t * 0.85);
+        const sx = smokeOriginWorld.x + Math.sin(t * Math.PI * 2 + i) * 0.28 + t * 0.42;
+        const sy = smokeOriginWorld.y + t * 2.8;
+        const sz = smokeOriginWorld.z + Math.cos(t * Math.PI * 1.6 + i) * 0.2 - t * 0.25;
+        const s = Math.sin(t * Math.PI) * (0.85 + t * 1.05);
         _smokeDummy.position.set(sx, sy, sz);
         _smokeDummy.scale.setScalar(Math.max(0.001, s));
         _smokeDummy.updateMatrix();
@@ -3143,8 +3417,7 @@ export function buildTownScene(): TownWorld {
   const dispose = () => {
     grassTex.dispose();
     hillTex.dispose();
-    cobbleTex.dispose();
-    roadCobbleTex.dispose();
+    plazaStoneTex.dispose();
     signTex.dispose();
     group.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {

@@ -104,6 +104,78 @@ export function createFlagstonePathTexture(repX = 2, repY = 8): THREE.CanvasText
   return tex;
 }
 
+export function createStoneWalkwayTexture(repX = 1, repY = 1): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+
+  // Soft warm stone mortar base (low contrast so paths stay calm on the eyes)
+  ctx.fillStyle = '#AEAAA0';
+  ctx.fillRect(0, 0, 512, 512);
+
+  const stonePalette = [
+    '#D7D3C9',
+    '#CBC7BD',
+    '#DDD9CF',
+    '#C3BFB5',
+    '#D1CDC3',
+  ];
+
+  // Larger, clean ashlar / flagstone slabs (4 rows x 3-4 wide slabs)
+  const rows = 4;
+  const rowH = 512 / rows;
+  for (let r = 0; r < rows; r++) {
+    const cols = r % 2 === 0 ? 3 : 4;
+    let x = r % 2 === 0 ? 0 : -44;
+    for (let c = 0; c <= cols; c++) {
+      const baseW = r % 2 === 0 ? 170 : 128;
+      const jitter = ((r * 29 + c * 43) % 24) - 12;
+      const w = baseW + jitter;
+      const y = r * rowH + 4;
+      const h = rowH - 8;
+
+      ctx.fillStyle = stonePalette[(r * 5 + c * 3) % stonePalette.length];
+      ctx.beginPath();
+      ctx.roundRect(x + 4, y, w - 8, h, 14);
+      ctx.fill();
+
+      // Gentle top-left highlight & subtle bottom edge
+      ctx.strokeStyle = 'rgba(255, 253, 246, 0.32)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(92, 88, 78, 0.16)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(x + 5, y + 2, w - 10, h - 3, 12);
+      ctx.stroke();
+
+      x += w;
+    }
+  }
+
+  // Very subtle natural mineral grain (seeded, low-opacity)
+  let seed = 0x2f81d9a3;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  for (let i = 0; i < 240; i++) {
+    const sx = rnd() * 512;
+    const sy = rnd() * 512;
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(105, 100, 90, 0.08)' : 'rgba(255, 253, 245, 0.09)';
+    ctx.fillRect(sx, sy, 3, 3);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(repX, repY);
+  return tex;
+}
+
 export function createWoodPlankTexture(base = '#CC965E', seam = '#9E6C3B'): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
