@@ -72,6 +72,7 @@ interface WorldCanvasProps {
   onBoostMood: () => void;
   onDrinkWellWater: () => void;
   onOpenPlot: (plotId: number) => void;
+  onHarvestPlot: (plotId: number) => void;
   onOpenWorkshop: (tab: 'mill' | 'kitchen') => void;
   onOpenOrders: () => void;
   onOpenPasture: (coop?: CoopKind) => void;
@@ -345,6 +346,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onBoostMood,
   onDrinkWellWater,
   onOpenPlot,
+  onHarvestPlot,
   onOpenWorkshop,
   onOpenOrders,
   onOpenPasture,
@@ -412,6 +414,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onBoostMood,
     onDrinkWellWater,
     onOpenPlot,
+    onHarvestPlot,
     onOpenWorkshop,
     onOpenOrders,
     onOpenPasture,
@@ -436,6 +439,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onBoostMood,
     onDrinkWellWater,
     onOpenPlot,
+    onHarvestPlot,
     onOpenWorkshop,
     onOpenOrders,
     onOpenPasture,

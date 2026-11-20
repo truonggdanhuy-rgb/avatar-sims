@@ -34,7 +34,7 @@ interface LivestockModalProps {
   inventory: FarmInventory;
   onBuyAnimal: (type: AnimalType) => void;
   onFeedAnimal: (animalId: string) => void;
-  onRefillTrough: (coop: CoopKind, amount?: number) => void;
+  onFillTrough: (coop: CoopKind) => void;
   onCureAnimal: (animalId: string) => void;
   onCollectProduce: (animalId: string) => void;
   onSellAnimal: (animalId: string) => void;
@@ -63,7 +63,7 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
   inventory,
   onBuyAnimal,
   onFeedAnimal,
-  onRefillTrough,
+  onFillTrough,
   onCureAnimal,
   onCollectProduce,
   onSellAnimal,
@@ -202,56 +202,49 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
           {tab !== 'market' ? (
             <div className="space-y-3">
               {/* Coop Trough Strip */}
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#DFC7A5] bg-white px-3.5 py-2.5">
-                <div className="text-xs">
-                  <span className="font-bold text-[#4A3525]">
-                    Máng Cám {activeCoop === 'poultry' ? 'Chuồng Gia Cầm' : 'Chuồng Gia Súc'}:{' '}
-                  </span>
-                  <span
-                    className={`font-bold tabular-nums ${
-                      troughQty > 0 ? 'text-[#4B8A5B]' : 'text-[#C2515E]'
-                    }`}
-                  >
-                    {troughQty} phần
-                  </span>
-                  <div className="text-[11px] text-[#7A6048]">
-                    Vật nuôi tự ăn khi đói nếu máng còn cám · Tối đa {coopCap} con trong chuồng
+              {(() => {
+                const needed = Math.max(0, coopAnimals.length - troughQty);
+                const missingBags = Math.max(0, needed - inventory.supplies.animalFeed);
+                const extraCost = missingBags * SUPPLY_PRICES.animalFeed;
+                const canFill = needed > 0 && coins >= extraCost;
+                return (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#DFC7A5] bg-white px-3.5 py-2.5">
+                    <div className="text-xs">
+                      <span className="font-bold text-[#4A3525]">
+                        Máng Cám {activeCoop === 'poultry' ? 'Chuồng Gia Cầm' : 'Chuồng Gia Súc'}:{' '}
+                      </span>
+                      <span
+                        className={`font-bold tabular-nums ${
+                          needed === 0 ? 'text-[#4B8A5B]' : troughQty > 0 ? 'text-[#C98A32]' : 'text-[#C2515E]'
+                        }`}
+                      >
+                        {troughQty}/{coopAnimals.length} phần
+                      </span>
+                      <div className="text-[11px] text-[#7A6048]">
+                        Làm đầy máng tốn {coopAnimals.length} túi cho {coopAnimals.length} con (thú ít đói, ăn ~2 lần cả đời)
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canFill}
+                      onClick={() => {
+                        soundFX.tap();
+                        onFillTrough(activeCoop);
+                      }}
+                      className="flex min-h-[36px] items-center gap-1.5 rounded-xl bg-[#E09B3D] px-3.5 text-xs font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
+                    >
+                      <Utensils className="h-3.5 w-3.5" />
+                      <span>
+                        {needed === 0
+                          ? 'Máng Đã Đầy'
+                          : extraCost > 0
+                            ? `Làm Đầy Máng (+${needed} túi · ${extraCost} Xu)`
+                            : `Làm Đầy Máng (${needed} Cám)`}
+                      </span>
+                    </button>
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    disabled={
-                      inventory.supplies.animalFeed <= 0 && coins < SUPPLY_PRICES.animalFeed
-                    }
-                    onClick={() => {
-                      soundFX.tap();
-                      onRefillTrough(activeCoop, 1);
-                    }}
-                    className="flex min-h-[34px] items-center gap-1 rounded-xl bg-[#E09B3D] px-3 text-xs font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
-                  >
-                    <Utensils className="h-3.5 w-3.5" />
-                    <span>
-                      {inventory.supplies.animalFeed > 0
-                        ? 'Đổ +1 Cám'
-                        : `Đổ +1 (${SUPPLY_PRICES.animalFeed} Xu)`}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={
-                      inventory.supplies.animalFeed < 3 && coins < SUPPLY_PRICES.animalFeed * 3
-                    }
-                    onClick={() => {
-                      soundFX.tap();
-                      onRefillTrough(activeCoop, 3);
-                    }}
-                    className="flex min-h-[34px] items-center rounded-xl bg-[#8C5B32] px-2.5 text-xs font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:bg-[#E6DDD1] disabled:text-[#9B8C7E]"
-                  >
-                    ×3
-                  </button>
-                </div>
-              </div>
+                );
+              })()}
 
               {coopAnimals.length === 0 ? (
                 <div className="flex h-44 flex-col items-center justify-center rounded-2xl border border-dashed border-[#DFCCB0] bg-white p-6 text-center">
@@ -404,7 +397,7 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                           {ani.sick && (
                             <div className="flex items-center gap-1.5 rounded-xl border border-[#EAB1B9] bg-[#FFEBEF] px-2.5 py-1.5 text-[11px] font-semibold text-[#A43245]">
                               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                              <span>Vật nuôi bị ốm, cần Thuốc Thú Y để hồi phục!</span>
+                              <span>Vật nuôi bị bệnh (còn +1 sản phẩm thay vì +2). Hãy chữa bệnh!</span>
                             </div>
                           )}
                         </div>
@@ -420,7 +413,7 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                               className="flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-xl bg-[#5FA86B] px-3 text-xs font-bold text-white shadow-xs transition-transform active:scale-95"
                             >
                               <PackageCheck className="h-4 w-4" />
-                              <span>Thu +2 {prod.name}</span>
+                              <span>Thu +{ani.sick ? 1 : 2} {prod.name}</span>
                             </button>
                           )}
 

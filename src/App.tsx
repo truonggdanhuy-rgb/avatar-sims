@@ -513,15 +513,24 @@ export default function App() {
           if (dt < 800) return ani;
           changed = true;
 
-          // Hunger drops ~4% per hour; eats automatically from coop trough if hungry
-          const hungerDrop = (dt / 3600000) * 4;
-          let nextHunger = Math.max(0, ani.hunger - hungerDrop);
+          const totalLifeMs = ani.growDurationMs + ani.activeDurationMs;
+          const remainingLifeMs = ani.growRemainingMs + ani.activeRemainingMs;
+          const elapsedLifeMs = Math.max(0, totalLifeMs - remainingLifeMs);
+
+          // Animals only eat ~2 times across their entire lifespan; eat from trough when meal time arrives
+          let nextHunger = ani.hunger;
           let nextMeals = ani.mealsRemaining;
-          if (nextHunger < 45 && nextMeals > 0 && currentTroughs[ani.coop] > 0) {
-            currentTroughs[ani.coop] -= 1;
-            troughsConsumed = true;
+          let nextMealAt = ani.nextMealElapsedMs;
+          if (nextMeals > 0 && elapsedLifeMs >= nextMealAt) {
+            if (currentTroughs[ani.coop] > 0) {
+              currentTroughs[ani.coop] -= 1;
+              troughsConsumed = true;
+              nextHunger = 100;
+            } else {
+              nextHunger = Math.max(10, ani.hunger - 55);
+            }
             nextMeals -= 1;
-            nextHunger = 100;
+            nextMealAt = Math.round(totalLifeMs * 0.72);
           }
 
           let nextSick = ani.sick;
@@ -533,32 +542,32 @@ export default function App() {
 
           if (nextStage !== 'retired') {
             if (!nextSick && dt >= 1000) {
-              const pPerSec = nextHunger < 30 ? 0.0016 : 0.0004;
+              // Moderate sickness chance (slightly higher if hungry)
+              const pPerSec = nextHunger < 35 ? 0.00045 : 0.00012;
               if (Math.random() < 1 - Math.pow(1 - pPerSec, Math.min(dt / 1000, 120))) {
                 nextSick = true;
               }
             }
 
-            if (!nextSick) {
-              const speed = nextHunger <= 15 ? 0.5 : 1.0;
-              const effDt = dt * speed;
+            const hungerSpeed = nextHunger <= 20 ? 0.65 : 1.0;
+            const sickSpeed = nextSick ? 0.85 : 1.0;
+            const effDt = dt * hungerSpeed * sickSpeed;
 
-              if (nextStage === 'baby') {
-                nextGrowRem = Math.max(0, nextGrowRem - effDt);
-                if (nextGrowRem <= 0) {
-                  nextStage = 'adult';
+            if (nextStage === 'baby') {
+              nextGrowRem = Math.max(0, nextGrowRem - effDt);
+              if (nextGrowRem <= 0) {
+                nextStage = 'adult';
+              }
+            } else {
+              nextActiveRem = Math.max(0, nextActiveRem - effDt);
+              if (!nextHasProduce) {
+                nextProdRem = Math.max(0, nextProdRem - effDt);
+                if (nextProdRem <= 0) {
+                  nextHasProduce = true;
                 }
-              } else {
-                nextActiveRem = Math.max(0, nextActiveRem - effDt);
-                if (!nextHasProduce) {
-                  nextProdRem = Math.max(0, nextProdRem - effDt);
-                  if (nextProdRem <= 0) {
-                    nextHasProduce = true;
-                  }
-                }
-                if (nextActiveRem <= 0) {
-                  nextStage = 'retired';
-                }
+              }
+              if (nextActiveRem <= 0) {
+                nextStage = 'retired';
               }
             }
           }
@@ -569,6 +578,7 @@ export default function App() {
             growRemainingMs: nextGrowRem,
             activeRemainingMs: nextActiveRem,
             mealsRemaining: nextMeals,
+            nextMealElapsedMs: nextMealAt,
             hunger: nextHunger,
             sick: nextSick,
             hasProduce: nextHasProduce,
@@ -779,7 +789,22 @@ export default function App() {
     }));
   };
 
-  const handleCatchPest = (plotId: number) => {
+  const handleSprayPest = (plotId: number) => {
+    const target = plots.find((p) => p.id === plotId);
+    if (!target || !target.hasPest) return;
+
+    const hasSpray = farmInventory.supplies.bugSpray > 0;
+    if (!hasSpray && stats.coins < SUPPLY_PRICES.bugSpray) return;
+
+    if (hasSpray) {
+      setFarmInventory((prev) => ({
+        ...prev,
+        supplies: {...prev.supplies, bugSpray: prev.supplies.bugSpray - 1},
+      }));
+    } else {
+      setStats((prev) => ({...prev, coins: prev.coins - SUPPLY_PRICES.bugSpray}));
+    }
+
     setPlots((prev) =>
       prev.map((plot) => (plot.id === plotId ? {...plot, hasPest: false} : plot)),
     );
@@ -788,6 +813,27 @@ export default function App() {
       energy: Math.max(5, prev.energy - 1),
       mood: Math.min(100, prev.mood + 2),
     }));
+  };
+
+  const handleCancelCrop = (plotId: number) => {
+    setPlots((prev) =>
+      prev.map((p) =>
+        p.id === plotId && p.stage === 'growing'
+          ? {
+              ...p,
+              stage: 'empty',
+              crop: null,
+              watered: false,
+              hasPest: false,
+              pestRolled: false,
+              plantedAt: null,
+              readyAt: null,
+              durationMs: 0,
+            }
+          : p,
+      ),
+    );
+    setActivePlotId(null);
   };
 
   const handleHarvestPlot = (plotId: number) => {
@@ -971,10 +1017,14 @@ export default function App() {
     );
   };
 
-  const handleRefillTrough = (coop: CoopKind, amount = 1) => {
+  const handleFillCoopTrough = (coop: CoopKind) => {
+    const coopCount = livestock.filter((a) => a.coop === coop).length;
+    const needed = Math.max(0, coopCount - troughs[coop]);
+    if (needed <= 0) return;
+
     const inBag = farmInventory.supplies.animalFeed;
-    const fromBag = Math.min(inBag, amount);
-    const needBuy = amount - fromBag;
+    const fromBag = Math.min(inBag, needed);
+    const needBuy = needed - fromBag;
     const cost = needBuy * SUPPLY_PRICES.animalFeed;
     if (stats.coins < cost) return;
 
@@ -988,7 +1038,7 @@ export default function App() {
       setStats((prev) => ({...prev, coins: prev.coins - cost}));
     }
     setTroughs((prev) => {
-      const next = {...prev, [coop]: prev[coop] + amount};
+      const next = {...prev, [coop]: Math.max(prev[coop], coopCount)};
       troughsRef.current = next;
       return next;
     });
@@ -1016,9 +1066,10 @@ export default function App() {
     const ani = livestock.find((a) => a.id === animalId);
     if (!ani || !ani.hasProduce) return;
     const def = ANIMALS[ani.type];
+    const yieldQty = ani.sick ? 1 : 2;
 
     setFarmInventory((prev) =>
-      adjustFarmInventory(prev, [{kind: 'animal_product', id: def.produceId, delta: 2}]),
+      adjustFarmInventory(prev, [{kind: 'animal_product', id: def.produceId, delta: yieldQty}]),
     );
     setLivestock((prev) =>
       prev.map((a) =>
@@ -1379,6 +1430,7 @@ export default function App() {
           setStats((prev) => ({...prev, energy: Math.min(100, prev.energy + 15)}))
         }
         onOpenPlot={(plotId) => setActivePlotId(plotId)}
+        onHarvestPlot={handleHarvestPlot}
         onOpenWorkshop={(tab) => setWorkshopTab(tab)}
         onOpenOrders={() => setOrderBoardOpen(true)}
         onOpenPasture={(coop) => setPastureCoop(coop ?? 'poultry')}
@@ -1408,9 +1460,11 @@ export default function App() {
         <GardenPlotModal
           plot={activePlot}
           coins={stats.coins}
+          bugSprayCount={farmInventory.supplies.bugSpray}
           onPlant={handlePlantPlot}
           onWater={handleWaterPlot}
-          onCatchPest={handleCatchPest}
+          onSprayPest={handleSprayPest}
+          onCancelCrop={handleCancelCrop}
           onHarvest={handleHarvestPlot}
           onUpgradePlot={handleUpgradePlot}
           onClose={() => setActivePlotId(null)}
@@ -1449,7 +1503,7 @@ export default function App() {
           inventory={farmInventory}
           onBuyAnimal={handleBuyAnimal}
           onFeedAnimal={handleFeedAnimal}
-          onRefillTrough={handleRefillTrough}
+          onFillTrough={handleFillCoopTrough}
           onCureAnimal={handleCureAnimal}
           onCollectProduce={handleCollectProduce}
           onSellAnimal={handleSellAnimal}
