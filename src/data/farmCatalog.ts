@@ -206,7 +206,7 @@ export const PLOT_LEVELS: Record<PlotLevel, PlotLevelInfo> = {
     name: 'Đất Thường (Lv.1)',
     speedMultiplier: 1.0,
     pestChance: 0.25,
-    upgradeCostToNext: 1150,
+    upgradeCostToNext: 480,
     frameColor: '#8D6240',
     description: 'Tỉ lệ sâu 25% · Tốc độ trồng chuẩn',
   },
@@ -215,7 +215,7 @@ export const PLOT_LEVELS: Record<PlotLevel, PlotLevelInfo> = {
     name: 'Đất Phù Sa (Lv.2)',
     speedMultiplier: 0.9,
     pestChance: 0.18,
-    upgradeCostToNext: 2800,
+    upgradeCostToNext: 1150,
     frameColor: '#8D6240',
     description: 'Giảm sâu còn 18% · Trồng nhanh hơn 10%',
   },
@@ -370,31 +370,31 @@ export const POND_FISH_SPECIES: Record<PondFishSpecies, FishSpeciesDefinition> =
     species: 'fish_12h',
     name: 'Cá Chép Vàng',
     durationHours: 12,
-    fryPrice: 45,
+    fryPrice: 35,
     matureSellPrice: 95,
     bodyColor: '#F39C3D',
     accentColor: '#FFE194',
-    description: 'Lớn sau 12 giờ · Bơi khỏe, bán thu 95 Xu (lời +50 Xu)',
+    description: 'Lớn sau 12 giờ · Bơi khỏe, bán thu 95 Xu (lời +60 Xu)',
   },
   duck_24h: {
     species: 'duck_24h',
     name: 'Vịt Vàng',
     durationHours: 24,
-    fryPrice: 85,
+    fryPrice: 65,
     matureSellPrice: 195,
     bodyColor: '#F7CF46',
     accentColor: '#F28B30',
-    description: 'Xuất bán sau 1 ngày (24h) · Thu 195 Xu (lời +110 Xu)',
+    description: 'Xuất bán sau 1 ngày (24h) · Thu 195 Xu (lời +130 Xu)',
   },
   turtle_48h: {
     species: 'turtle_48h',
     name: 'Rùa Xanh',
     durationHours: 48,
-    fryPrice: 150,
+    fryPrice: 120,
     matureSellPrice: 375,
     bodyColor: '#4E8C57',
     accentColor: '#85BD78',
-    description: 'Xuất bán sau 2 ngày (48h) · Lời cao nhất 375 Xu (+225 Xu)',
+    description: 'Xuất bán sau 2 ngày (48h) · Lời cao nhất 375 Xu (+255 Xu)',
   },
 };
 
@@ -557,7 +557,7 @@ export const KITCHEN_LEVELS: Record<KitchenLevel, KitchenLevelInfo> = {
     name: 'Bếp Nông Trại (Lv.1)',
     speedMultiplier: 1.0,
     slots: 5,
-    upgradeCostToNext: 750,
+    upgradeCostToNext: 360,
     description: 'Tốc độ chuẩn · 5 ô nấu cùng lúc',
   },
   2: {
@@ -565,7 +565,7 @@ export const KITCHEN_LEVELS: Record<KitchenLevel, KitchenLevelInfo> = {
     name: 'Bếp Gạch Đỏ (Lv.2)',
     speedMultiplier: 0.85,
     slots: 7,
-    upgradeCostToNext: 1950,
+    upgradeCostToNext: 880,
     description: 'Giảm 15% thời gian · 7 ô nấu cùng lúc',
   },
   3: {
@@ -1112,20 +1112,20 @@ export const INITIAL_WELL_STORED = 8;
 export const FARM_STORAGE_BASE_CAPACITY = 250;
 export const FARM_STORAGE_STEP = 25;
 export const WAREHOUSE_UPGRADE_COSTS = [
-  200, // 250 -> 275
-  350, // 275 -> 300
-  500, // 300 -> 325
-  700, // 325 -> 350
-  900, // 350 -> 375
-  1100, // 375 -> 400
-  1300, // 400 -> 425
-  1550, // 425 -> 450
-  1850, // 450 -> 475
-  2200, // 475 -> 500
-  2600, // 500 -> 525
-  3050, // 525 -> 550
-  3550, // 550 -> 575
-  4100, // 575 -> 600
+  120, // 250 -> 275
+  200, // 275 -> 300
+  300, // 300 -> 325
+  420, // 325 -> 350
+  560, // 350 -> 375
+  720, // 375 -> 400
+  900, // 400 -> 425
+  1100, // 425 -> 450
+  1350, // 450 -> 475
+  1650, // 475 -> 500
+  2000, // 500 -> 525
+  2400, // 525 -> 550
+  2850, // 550 -> 575
+  3350, // 575 -> 600
 ] as const;
 export const MAX_WAREHOUSE_LEVEL = WAREHOUSE_UPGRADE_COSTS.length + 1; // 250 -> 600 đơn vị lưu trữ
 

@@ -19,19 +19,19 @@ const QUEST_LIST: {
     key: 'garden',
     title: 'Chăm Sóc Nông Trại',
     desc: 'Gieo hạt hoặc thu hoạch 1 ô cây tại Nông Trại.',
-    reward: 25,
+    reward: 40,
   },
   {
     key: 'fishing',
     title: 'Thú Vui Bên Hồ',
     desc: 'Câu thành công 1 chú cá ở Hồ Câu Cá.',
-    reward: 25,
+    reward: 40,
   },
   {
     key: 'dressup',
     title: 'Làm Mới Phong Cách',
     desc: 'Thay một món đồ mới trong Tủ Đồ hoặc Cửa Hàng.',
-    reward: 20,
+    reward: 35,
   },
 ];
 

@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+import {BackpackModal, BagSubTab} from './components/modals/BackpackModal';
 import {BoutiqueModal} from './components/modals/BoutiqueModal';
 import {DailyQuestsModal} from './components/modals/DailyQuestsModal';
 import {FarmShopModal} from './components/modals/FarmShopModal';
@@ -16,8 +17,15 @@ import {SettingsModal} from './components/modals/SettingsModal';
 import {ShipShopModal} from './components/modals/ShipShopModal';
 import {WardrobeModal} from './components/modals/WardrobeModal';
 import {KoiShopModal} from './components/modals/KoiShopModal';
+import {BbqGrillModal} from './components/modals/BbqGrillModal';
+import {VendingMachineModal} from './components/modals/VendingMachineModal';
 import {WorldCanvas} from './components/WorldCanvas';
 import {DEFAULT_AVATAR, SHOP_ITEMS, STARTER_OWNED_IDS} from './data/avatarCatalog';
+import {
+  BBQ_FOOD_CATALOG,
+  createInitialBbqFoods,
+  HANDHELD_CONSUMABLE_LIST,
+} from './data/foodCatalog';
 import {
   applyPetCureCare,
   applyPetFeedCare,
@@ -100,6 +108,7 @@ import {
   AnimalProduceId,
   AnimalType,
   AvatarConfig,
+  BbqFoodId,
   BugNetState,
   CaughtFishItem,
   CaughtInsectItem,
@@ -237,6 +246,19 @@ function migrateSavedPlots(rawPlots: unknown): GardenPlotState[] {
   });
 }
 
+function pruneZeroCounts<K extends string>(
+  rec: Partial<Record<K, number>> | undefined,
+): Partial<Record<K, number>> {
+  const out: Partial<Record<K, number>> = {};
+  if (!rec) return out;
+  for (const [k, v] of Object.entries(rec)) {
+    if (typeof v === 'number' && v > 0) {
+      out[k as K] = v;
+    }
+  }
+  return out;
+}
+
 function adjustFarmInventory(
   inv: FarmInventory,
   deltas: {kind: FarmItemKind; id: string; delta: number}[],
@@ -329,8 +351,11 @@ export default function App() {
   const [shipShopOpen, setShipShopOpen] = useState(false);
   const [petSupplyShopOpen, setPetSupplyShopOpen] = useState(false);
   const [petAdoptOpen, setPetAdoptOpen] = useState(false);
-  const [phoneInitialTab, setPhoneInitialTab] = useState<'menu' | 'guide' | 'bag' | 'fishdex'>('menu');
-  const [phoneBagSubTab, setPhoneBagSubTab] = useState<'list' | 'tools' | 'pets' | 'boats' | 'mounts'>('list');
+  const [bbqGrillOpen, setBbqGrillOpen] = useState(false);
+  const [vendingOpen, setVendingOpen] = useState(false);
+  const [bagOpen, setBagOpen] = useState(false);
+  const [bagInitialSubTab, setBagInitialSubTab] = useState<BagSubTab>('list');
+  const [phoneInitialTab, setPhoneInitialTab] = useState<'menu' | 'account' | 'guide' | 'fishdex'>('menu');
   const [nearPond, setNearPond] = useState(false);
   const [pondFeedPulse, setPondFeedPulse] = useState(0);
   const [farmPondFishPulse, setFarmPondFishPulse] = useState(0);
@@ -417,12 +442,22 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.stats) return parsed.stats;
+        if (parsed.stats) {
+          return {
+            coins: typeof parsed.stats.coins === 'number' ? parsed.stats.coins : 150,
+            energy: typeof parsed.stats.energy === 'number' ? parsed.stats.energy : 85,
+            mood: typeof parsed.stats.mood === 'number' ? parsed.stats.mood : 90,
+            hunger:
+              typeof parsed.stats.hunger === 'number' && Number.isFinite(parsed.stats.hunger)
+                ? Math.max(0, Math.min(100, parsed.stats.hunger))
+                : 90,
+          };
+        }
       }
     } catch {
       // ignore storage errors
     }
-    return {coins: 100, energy: 85, mood: 90};
+    return {coins: 150, energy: 85, mood: 90, hunger: 90};
   });
 
   const [plots, setPlots] = useState<GardenPlotState[]>(() => {
@@ -1157,6 +1192,46 @@ export default function App() {
     return defaults;
   });
 
+  const [bbqFoods, setBbqFoods] = useState<Partial<Record<BbqFoodId, number>>>(() => {
+    const defaults = createInitialBbqFoods();
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.bbqFoods && typeof parsed.bbqFoods === 'object') {
+          for (const item of HANDHELD_CONSUMABLE_LIST) {
+            const val = parsed.bbqFoods[item.id];
+            if (typeof val === 'number' && Number.isFinite(val)) {
+              defaults[item.id] = Math.max(0, Math.floor(val));
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return defaults;
+  });
+
+  const [equippedFoodId, setEquippedFoodId] = useState<BbqFoodId | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          typeof parsed.equippedFoodId === 'string' &&
+          parsed.equippedFoodId in BBQ_FOOD_CATALOG
+        ) {
+          const fid = parsed.equippedFoodId as BbqFoodId;
+          if ((parsed.bbqFoods?.[fid] ?? 0) > 0) return fid;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return null;
+  });
+
   const [teleportToPlazaPulse, setTeleportToPlazaPulse] = useState(0);
   const [teleportCooldownEndAt, setTeleportCooldownEndAt] = useState(0);
   const [teleportClockNow, setTeleportClockNow] = useState(() => Date.now());
@@ -1436,7 +1511,14 @@ export default function App() {
             avatar,
             stats,
             plots,
-            farmInventory,
+            farmInventory: {
+              seeds: pruneZeroCounts(farmInventory.seeds),
+              crops: pruneZeroCounts(farmInventory.crops),
+              animalProducts: pruneZeroCounts(farmInventory.animalProducts),
+              processed: pruneZeroCounts(farmInventory.processed),
+              dishes: pruneZeroCounts(farmInventory.dishes),
+              supplies: farmInventory.supplies,
+            },
             kitchenLevel,
             warehouseLevel,
             millQueue,
@@ -1450,7 +1532,7 @@ export default function App() {
             ownedIds,
             dailyQuests,
             placedFurniture,
-            furnitureInventory,
+            furnitureInventory: pruneZeroCounts(furnitureInventory),
             fishingRod,
             woodenBoat,
             fishBasket,
@@ -1467,6 +1549,8 @@ export default function App() {
             activePetId,
             carriedPetId,
             petSupplies,
+            bbqFoods: pruneZeroCounts(bbqFoods),
+            equippedFoodId,
           }),
         );
       } catch {
@@ -1517,7 +1601,21 @@ export default function App() {
     activePetId,
     carriedPetId,
     petSupplies,
+    bbqFoods,
+    equippedFoodId,
   ]);
+
+  // Gentle passive hunger decay (-1 every 65 seconds for relaxed family pacing)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setStats((prev) => {
+        const cur = prev.hunger ?? 100;
+        if (cur <= 0) return prev;
+        return {...prev, hunger: Math.max(0, cur - 1)};
+      });
+    }, 65000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const handleZoneChange = (next: ZoneId) => {
     setZone(next);
@@ -1536,6 +1634,7 @@ export default function App() {
     }
     if (next !== 'town') {
       setShipShopOpen(false);
+      setBbqGrillOpen(false);
     }
     if (next !== 'petshop') {
       setPetSupplyShopOpen(false);
@@ -2278,9 +2377,10 @@ export default function App() {
     if (!fishingRod.owned) return;
     const nextEquipped = !fishingRod.equipped;
     setFishingRod((prev) => ({...prev, equipped: nextEquipped}));
-    // Stowing bug net & handheld item back when equipping fishing rod
+    // Stowing bug net, handheld food & fashion item back when equipping fishing rod
     if (nextEquipped) {
       setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setEquippedFoodId(null);
       setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
     }
   };
@@ -2344,6 +2444,7 @@ export default function App() {
     setStats((prev) => ({
       ...prev,
       energy: Math.max(5, prev.energy - 2),
+      hunger: Math.max(0, (prev.hunger ?? 90) - 2),
       mood: Math.min(100, prev.mood + 2),
     }));
     markQuestDone('fishing');
@@ -2460,6 +2561,7 @@ export default function App() {
     setBugNet((prev) => ({...prev, equipped: nextEquipped}));
     if (nextEquipped) {
       setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setEquippedFoodId(null);
       setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
     }
   };
@@ -2516,6 +2618,7 @@ export default function App() {
     setStats((prev) => ({
       ...prev,
       energy: Math.max(5, prev.energy - 2),
+      hunger: Math.max(0, (prev.hunger ?? 90) - 2),
       mood: Math.min(100, prev.mood + 2),
     }));
 
@@ -2592,12 +2695,74 @@ export default function App() {
     }));
   };
 
+  // === BBQ CAMPSITE FOOD & VENDING DRINK HANDLERS ===
+  const handleCookBbqFood = (foodId: BbqFoodId): {ok: boolean; message: string} => {
+    const def = BBQ_FOOD_CATALOG[foodId];
+    if (!def) return {ok: false, message: 'Món nướng không hợp lệ.'};
+    if (stats.coins < def.price) {
+      return {ok: false, message: `Bạn cần ${def.price} Xu để nướng ${def.name}.`};
+    }
+    setStats((prev) => ({...prev, coins: prev.coins - def.price}));
+    setBbqFoods((prev) => ({...prev, [foodId]: (prev[foodId] ?? 0) + 1}));
+    return {ok: true, message: `Đã nướng thơm phức 1 ${def.name}! Mở Túi Đồ -> Thức Ăn để cầm trên tay nhé.`};
+  };
+
+  const handleBuyVendingDrink = (drinkId: BbqFoodId): {ok: boolean; message: string} => {
+    const def = BBQ_FOOD_CATALOG[drinkId];
+    if (!def || def.kind !== 'drink') return {ok: false, message: 'Thức uống không hợp lệ.'};
+    if (stats.coins < def.price) {
+      return {ok: false, message: `Bạn cần ${def.price} Xu để mua ${def.name}.`};
+    }
+    setStats((prev) => ({...prev, coins: prev.coins - def.price}));
+    setBbqFoods((prev) => ({...prev, [drinkId]: (prev[drinkId] ?? 0) + 1}));
+    return {ok: true, message: `Đã mua 1 ${def.name}! Mở Túi Đồ -> Thức Ăn để cầm trên tay và uống nhé.`};
+  };
+
+  const handleToggleEquipFood = (foodId: BbqFoodId) => {
+    if ((bbqFoods[foodId] ?? 0) <= 0) return;
+    if (equippedFoodId === foodId) {
+      setEquippedFoodId(null);
+      return;
+    }
+    setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
+    setEquippedFoodId(foodId);
+  };
+
+  const handleEatBbqFood = (foodId: BbqFoodId): {ok: boolean; message: string} => {
+    const def = BBQ_FOOD_CATALOG[foodId];
+    const count = bbqFoods[foodId] ?? 0;
+    if (!def || count <= 0) {
+      return {
+        ok: false,
+        message: def?.kind === 'drink' ? 'Bạn đã hết nước uống này trong túi.' : 'Bạn đã hết món ăn này trong túi.',
+      };
+    }
+    if ((stats.hunger ?? 100) >= 100) {
+      return {ok: false, message: 'Bạn đã no căng rồi (100% Độ no)!'};
+    }
+    const nextCount = count - 1;
+    setBbqFoods((prev) => ({...prev, [foodId]: nextCount}));
+    if (nextCount <= 0 && equippedFoodId === foodId) {
+      setEquippedFoodId(null);
+    }
+    setStats((prev) => ({
+      ...prev,
+      hunger: Math.min(100, Math.round((prev.hunger ?? 100) + def.hungerRestore)),
+      mood: Math.min(100, prev.mood + 3),
+    }));
+    const verb = def.kind === 'drink' ? 'Đã uống' : 'Đã ăn';
+    return {ok: true, message: `${verb} ${def.name}! (+${def.hungerRestore}% Độ no)`};
+  };
+
   // === AVATAR, SHOPS & HOUSE FURNITURE ===
   const handleEquipAvatar = (next: AvatarConfig) => {
     setAvatar(next);
     if (next.handheld !== 'none') {
       setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
       setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setEquippedFoodId(null);
     }
     markQuestDone('dressup');
   };
@@ -2614,6 +2779,7 @@ export default function App() {
     if (item.patch.handheld && item.patch.handheld !== 'none') {
       setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
       setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setEquippedFoodId(null);
     }
     markQuestDone('dressup');
   };
@@ -3031,6 +3197,16 @@ export default function App() {
         activePet={activePet}
         carriedPetId={effectiveCarriedPetId}
         petSupplies={petSupplies}
+        equippedFoodId={equippedFoodId}
+        bbqFoods={bbqFoods}
+        onOpenBbqGrill={() => setBbqGrillOpen(true)}
+        onOpenVendingMachine={() => setVendingOpen(true)}
+        onEatEquippedFood={() =>
+          equippedFoodId
+            ? handleEatBbqFood(equippedFoodId)
+            : {ok: false, message: 'Chưa cầm thức ăn hay thức uống nào.'}
+        }
+        onUnequipFood={() => setEquippedFoodId(null)}
         onChangeZone={handleZoneChange}
         onOpenWardrobe={() => setWardrobeOpen(true)}
         onOpenShop={() => setBoutiqueOpen(true)}
@@ -3048,8 +3224,11 @@ export default function App() {
         onOpenDailyQuests={() => setDailyQuestsOpen(true)}
         onOpenPhone={() => {
           setPhoneInitialTab('menu');
-          setPhoneBagSubTab('list');
           setPhoneOpen(true);
+        }}
+        onOpenBag={() => {
+          setBagInitialSubTab('list');
+          setBagOpen(true);
         }}
         onOpenFurniture={() => {
           setEditFurnitureMode(false);
@@ -3218,11 +3397,40 @@ export default function App() {
           onSellAllUnlockedInsects={handleSellAllUnlockedInsects}
           onOpenBagTools={() => {
             setKoiShopOpen(false);
-            setPhoneInitialTab('bag');
-            setPhoneBagSubTab('tools');
-            setPhoneOpen(true);
+            setBagInitialSubTab('tools');
+            setBagOpen(true);
           }}
           onClose={() => setKoiShopOpen(false)}
+        />
+      )}
+
+      {zone === 'town' && bbqGrillOpen && (
+        <BbqGrillModal
+          coins={stats.coins}
+          hunger={stats.hunger ?? 100}
+          bbqFoods={bbqFoods}
+          onCookFood={handleCookBbqFood}
+          onOpenBagFood={() => {
+            setBbqGrillOpen(false);
+            setBagInitialSubTab('food');
+            setBagOpen(true);
+          }}
+          onClose={() => setBbqGrillOpen(false)}
+        />
+      )}
+
+      {zone === 'town' && vendingOpen && (
+        <VendingMachineModal
+          coins={stats.coins}
+          hunger={stats.hunger ?? 100}
+          bbqFoods={bbqFoods}
+          onBuyDrink={handleBuyVendingDrink}
+          onOpenBagFood={() => {
+            setVendingOpen(false);
+            setBagInitialSubTab('food');
+            setBagOpen(true);
+          }}
+          onClose={() => setVendingOpen(false)}
         />
       )}
 
@@ -3233,9 +3441,8 @@ export default function App() {
           onBuyBoat={handleBuyWoodenBoat}
           onOpenBagBoats={() => {
             setShipShopOpen(false);
-            setPhoneInitialTab('bag');
-            setPhoneBagSubTab('boats');
-            setPhoneOpen(true);
+            setBagInitialSubTab('boats');
+            setBagOpen(true);
           }}
           onClose={() => setShipShopOpen(false)}
         />
@@ -3270,6 +3477,28 @@ export default function App() {
         />
       )}
 
+      {bagOpen && (
+        <BackpackModal
+          fishingRod={fishingRod}
+          bugNet={bugNet}
+          woodenBoat={woodenBoat}
+          ownedPets={ownedPets}
+          activePetId={activePetId}
+          petSupplies={petSupplies}
+          bbqFoods={bbqFoods}
+          equippedFoodId={equippedFoodId}
+          farmDishes={farmInventory.dishes}
+          initialSubTab={bagInitialSubTab}
+          onToggleEquipRod={handleToggleEquipRod}
+          onToggleEquipNet={handleToggleEquipNet}
+          onToggleEquipFood={handleToggleEquipFood}
+          onToggleSummonPet={handleToggleSummonPet}
+          onRenamePet={handleRenamePet}
+          onUsePetSupply={handleUsePetSupply}
+          onClose={() => setBagOpen(false)}
+        />
+      )}
+
       {phoneOpen && (
         <PhoneMenuModal
           zone={zone}
@@ -3280,26 +3509,14 @@ export default function App() {
           dailyQuests={dailyQuests}
           storageUsed={storageUsed}
           storageCapacity={storageCapacity}
-          fishingRod={fishingRod}
-          bugNet={bugNet}
-          woodenBoat={woodenBoat}
           fishDex={fishDex}
           insectDex={insectDex}
-          ownedPets={ownedPets}
-          activePetId={activePetId}
-          petSupplies={petSupplies}
           accountCreatedAt={accountCreatedAt}
           accountId={accountId}
           showJoystick={showJoystick}
           showJumpButton={showJumpButton}
           teleportCooldownSec={teleportCooldownSec}
           initialTab={phoneInitialTab}
-          initialBagSubTab={phoneBagSubTab}
-          onToggleEquipRod={handleToggleEquipRod}
-          onToggleEquipNet={handleToggleEquipNet}
-          onToggleSummonPet={handleToggleSummonPet}
-          onRenamePet={handleRenamePet}
-          onUsePetSupply={handleUsePetSupply}
           onToggleJoystick={() => setShowJoystick((prev) => !prev)}
           onToggleJumpButton={() => setShowJumpButton((prev) => !prev)}
           onTeleportToPlaza={handleTeleportToPlaza}

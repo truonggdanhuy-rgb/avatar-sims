@@ -34,12 +34,12 @@ export const TOWN_ZONE_ENTRANCES: Record<
   Exclude<ZoneId, 'town'>,
   {tx: number; tz: number; exitRotY: number}
 > = {
-  home: {tx: -32.0, tz: -16.2, exitRotY: 0},
+  home: {tx: -32.0, tz: -15.3, exitRotY: 0},
   garden: {tx: 32.0, tz: -16.4, exitRotY: 0},
   boutique: {tx: -32.0, tz: 23.2, exitRotY: 0},
   arcade: {tx: 32.0, tz: 23.1, exitRotY: 0},
   fishing: {tx: -19.6, tz: 38.6, exitRotY: 0},
-  petshop: {tx: 11.8, tz: 43.2, exitRotY: 0},
+  petshop: {tx: 11.8, tz: 43.85, exitRotY: 0},
 };
 
 export const LAKE_CENTER = {x: -23.0, z: 46.8};
@@ -80,7 +80,7 @@ export function getWestRiverNavBounds(z: number): {minX: number; maxX: number} {
 }
 
 export function getWestRiverBridgeHeight(x: number, z: number): number | null {
-  if (Math.abs(z - WEST_BRIDGE_Z) > 1.32) return null;
+  if (Math.abs(z - WEST_BRIDGE_Z) > 1.48) return null;
   const midX = getWestRiverCenterX(WEST_BRIDGE_Z);
   const dx = x - midX;
   if (Math.abs(dx) > WEST_BRIDGE_HALF_SPAN) return null;
@@ -792,6 +792,12 @@ export function buildTownScene(): TownWorld {
   const warmGlowTex = getWarmGlowTexture();
   let koiRig: AvatarRig | null = null;
   let shipRig: AvatarRig | null = null;
+  let westCampFlameA: THREE.Mesh | null = null;
+  let westCampFlameB: THREE.Mesh | null = null;
+  let westCampGlowMat: THREE.MeshBasicMaterial | null = null;
+  let westCampLanternMat: THREE.MeshStandardMaterial | null = null;
+  let westCampLanternPoolMat: THREE.MeshBasicMaterial | null = null;
+  let lastCampLanternLit: boolean | null = null;
 
   const isInWestRiverOrCliffZone = (x: number, z: number, pad = 2.6): boolean => {
     if (x > -58) return false;
@@ -799,6 +805,7 @@ export function buildTownScene(): TownWorld {
     if (x >= -77.8 && x <= -61.5 && z >= -17.0 && z <= 12.2) return true;
     if (x >= -101.8 && x <= -91.0 && z >= 5.2 && z <= 21.5) return true;
     if (x >= -146.5 && x <= -94.0 && z >= -39.5 && z <= 25.5) return true;
+    if (x >= -129.0 - pad && x <= -98.0 + pad && z >= 25.0 - pad && z <= 49.0 + pad) return true;
     return false;
   };
 
@@ -1043,6 +1050,35 @@ export function buildTownScene(): TownWorld {
   );
   topFinial.position.y = 2.92;
 
+  // 4 Sculpted Bronze Fountain Spouts + 2 Cute Perched Rim Songbirds
+  const bronzeMat = getMat('#B88B4A', 0.38, 0.45);
+  const birdBodyMat = getMat('#8A9BA8', 0.62);
+  const birdChestMat = getMat('#F5E6D3', 0.68);
+  for (let sp = 0; sp < 4; sp++) {
+    const a = (sp / 4) * Math.PI * 2 + Math.PI / 4;
+    const spout = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.26, 7), bronzeMat);
+    spout.position.set(Math.cos(a) * 1.84, 0.66, Math.sin(a) * 1.84);
+    spout.rotation.z = -Math.PI * 0.25 * Math.cos(a);
+    spout.rotation.x = Math.PI * 0.25 * Math.sin(a);
+    fountain.add(spout);
+  }
+  [0.18, -2.55].forEach((ba) => {
+    const bird = new THREE.Group();
+    bird.position.set(Math.cos(ba) * 1.86, 0.69, Math.sin(ba) * 1.86);
+    bird.rotation.y = -ba + Math.PI * 0.5;
+    const bBody = new THREE.Mesh(new THREE.SphereGeometry(0.085, 8, 7), birdBodyMat);
+    bBody.scale.set(0.85, 0.9, 1.3);
+    const bChest = new THREE.Mesh(new THREE.SphereGeometry(0.062, 7, 6), birdChestMat);
+    bChest.position.set(0, -0.015, 0.045);
+    const bHead = new THREE.Mesh(new THREE.SphereGeometry(0.056, 8, 7), birdBodyMat);
+    bHead.position.set(0, 0.078, 0.068);
+    const bBeak = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.05, 5), getMat('#F2B138', 0.4));
+    bBeak.rotation.x = Math.PI / 2;
+    bBeak.position.set(0, 0.072, 0.13);
+    bird.add(bBody, bChest, bHead, bBeak);
+    fountain.add(bird);
+  });
+
   fountain.add(lowerStep, outerBasin, outerLip, waterPool, pillar, midWater, topFinial);
   group.add(fountain);
   colliders.push({type: 'circle', id: 'fountain', x: 0, z: 0, r: 2.26});
@@ -1160,6 +1196,294 @@ export function buildTownScene(): TownWorld {
     colliders.push({type: 'circle', x: lx, z: lz, r: 0.3});
   });
 
+  // ========== 2B. SOCIAL PLAZA LANDMARKS (Flush Mosaic Inlays, Floral Arches, Town Bulletin & Bistro Quadrants) ==========
+  {
+    const plazaDecor = new THREE.Group();
+    const mosaicTerracottaMat = getMat('#D9876C', 0.78);
+    const mosaicTealMat = getMat('#6EAAB0', 0.78);
+    const mosaicCreamMat = getMat('#EFE5D2', 0.8);
+    const archIronMat = getMat('#333E4A', 0.45, 0.55);
+    const archGoldMat = getMat('#E8BC5E', 0.32, 0.5);
+    const urnStoneMat = getMat('#E6DDD0', 0.74);
+    const foliageLushMat = getMat('#4EA85B', 0.74);
+    const noticeWoodMat = getMat('#9C653A', 0.74);
+    const noticeBoardMat = getMat('#FBF4E4', 0.84);
+    const postboxRedMat = getMat('#D64545', 0.42);
+    const cafeClothCoralMat = getMat('#E87D72', 0.62);
+    const cafeClothCreamMat = getMat('#FFFBF0', 0.65);
+
+    // 1. Flush Decorative Compass Ring & Border Mosaic Inlays (y = 0.146, zero walk impediment / zero Z-fighting)
+    const compassRingInner = new THREE.Mesh(
+      new THREE.RingGeometry(2.38, 2.54, 40),
+      mosaicTerracottaMat,
+    );
+    compassRingInner.rotation.x = -Math.PI / 2;
+    compassRingInner.position.y = 0.146;
+    const compassRingOuter = new THREE.Mesh(
+      new THREE.RingGeometry(6.55, 6.82, 48),
+      mosaicTealMat,
+    );
+    compassRingOuter.rotation.x = -Math.PI / 2;
+    compassRingOuter.position.y = 0.146;
+    plazaDecor.add(compassRingInner, compassRingOuter);
+
+    for (let d = 0; d < 8; d++) {
+      const a = (d / 8) * Math.PI * 2;
+      const diamond = new THREE.Mesh(
+        new THREE.CircleGeometry(0.28, 4),
+        d % 2 === 0 ? mosaicTerracottaMat : mosaicTealMat,
+      );
+      diamond.rotation.x = -Math.PI / 2;
+      diamond.rotation.z = -a;
+      diamond.position.set(Math.cos(a) * 2.86, 0.147, Math.sin(a) * 2.86);
+
+      const outerTile = new THREE.Mesh(
+        new THREE.CircleGeometry(0.22, 6),
+        d % 2 === 0 ? mosaicCreamMat : mosaicTerracottaMat,
+      );
+      outerTile.rotation.x = -Math.PI / 2;
+      outerTile.position.set(Math.cos(a) * 6.32, 0.147, Math.sin(a) * 6.32);
+      plazaDecor.add(diamond, outerTile);
+    }
+
+    // 2. North & South Floral Iron Entrance Archways (wide 4.9m clearance across walkways!)
+    [-7.02, 7.02].forEach((az, archIdx) => {
+      const archGrp = new THREE.Group();
+      archGrp.position.set(0, 0.1, az);
+
+      [-2.45, 2.45].forEach((px) => {
+        const plinth = new THREE.Mesh(new RoundedBoxGeometry(0.54, 0.62, 0.54, 2, 0.05), urnStoneMat);
+        plinth.position.set(px, 0.31, 0);
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.115, 2.9, 10), archIronMat);
+        col.position.set(px, 2.02, 0);
+        const urnBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.14, 0.28, 10), urnStoneMat);
+        urnBowl.position.set(px, 0.76, 0);
+        const urnBush = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 7), foliageLushMat);
+        urnBush.position.set(px, 1.04, 0);
+        archGrp.add(plinth, col, urnBowl, urnBush);
+        colliders.push({type: 'circle', id: `plaza_arch_${archIdx}_${px}`, x: px, z: az, r: 0.32});
+      });
+
+      const archSpan = new THREE.Mesh(
+        new THREE.TorusGeometry(2.45, 0.085, 8, 28, Math.PI),
+        archIronMat,
+      );
+      archSpan.position.set(0, 3.35, 0);
+      const innerScroll = new THREE.Mesh(
+        new THREE.TorusGeometry(2.26, 0.045, 6, 24, Math.PI),
+        archGoldMat,
+      );
+      innerScroll.position.set(0, 3.35, 0);
+      archGrp.add(archSpan, innerScroll);
+
+      // Decorative blossom garland along arch crest
+      const archBloomCols = ['#FF85A1', '#FFD166', '#9BE080', '#FF9F68'];
+      for (let b = 0; b <= 6; b++) {
+        const phi = 0.25 + (b / 6) * (Math.PI - 0.5);
+        const bx = Math.cos(phi) * 2.44;
+        const by = 3.35 + Math.sin(phi) * 2.44;
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.18, 7, 6), foliageLushMat);
+        leaf.position.set(bx, by, 0);
+        const blossom = new THREE.Mesh(
+          new THREE.SphereGeometry(0.095, 6, 6),
+          getMat(archBloomCols[b % archBloomCols.length], 0.58),
+        );
+        blossom.position.set(bx, by + 0.04, 0.12);
+        const blossomBack = blossom.clone();
+        blossomBack.position.z = -0.12;
+        archGrp.add(leaf, blossom, blossomBack);
+      }
+
+      // Crest Star Finial at the top center
+      const crestFinial = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), archGoldMat);
+      crestFinial.position.set(0, 5.98, 0);
+      archGrp.add(crestFinial);
+      plazaDecor.add(archGrp);
+    });
+
+    // 3. NW & SE Plaza Quadrant Cozy Café Tables + Umbrella + Interactive Stools
+    [
+      {
+        id: 'nw_cafe',
+        cx: -3.22,
+        cz: -3.48,
+        withUmbrella: true,
+        stoolOff: {ox: 0.72, oz: 0.35},
+      },
+      {
+        id: 'se_cafe',
+        cx: 3.22,
+        cz: 3.48,
+        withUmbrella: false,
+        stoolOff: {ox: -0.72, oz: -0.35},
+      },
+    ].forEach(({id, cx, cz, withUmbrella, stoolOff}) => {
+      const tbl = new THREE.Group();
+      tbl.position.set(cx, 0.14, cz);
+      const tBase = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.06, 12), archIronMat);
+      tBase.position.y = 0.03;
+      const tStem = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.68, 8), archIronMat);
+      tStem.position.y = 0.38;
+      const tTop = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.5, 0.06, 16), mosaicCreamMat);
+      tTop.position.y = 0.72;
+      const tRim = new THREE.Mesh(new THREE.TorusGeometry(0.51, 0.024, 6, 18), archGoldMat);
+      tRim.rotation.x = Math.PI / 2;
+      tRim.position.y = 0.72;
+      tbl.add(tBase, tStem, tTop, tRim);
+
+      if (withUmbrella) {
+        const uPole = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.032, 2.25, 8), noticeWoodMat);
+        uPole.position.y = 1.84;
+        const uDome = new THREE.Mesh(new THREE.ConeGeometry(1.18, 0.38, 8), cafeClothCoralMat);
+        uDome.position.y = 2.88;
+        const uStripe = new THREE.Mesh(new THREE.ConeGeometry(1.19, 0.382, 2, 1, false, 0, Math.PI / 4), cafeClothCreamMat);
+        uStripe.position.y = 2.885;
+        const uStripe2 = uStripe.clone();
+        uStripe2.rotation.y = Math.PI;
+        tbl.add(uPole, uDome, uStripe, uStripe2);
+      } else {
+        // Checkered mini board + coffee mugs on SE table
+        const board = new THREE.Mesh(new RoundedBoxGeometry(0.42, 0.03, 0.42, 1, 0.01), noticeWoodMat);
+        board.position.y = 0.765;
+        const grid = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.015, 0.32), mosaicCreamMat);
+        grid.position.y = 0.78;
+        tbl.add(board, grid);
+      }
+
+      // Coffee cups on table
+      [-0.18, 0.2].forEach((mx, mi) => {
+        const mug = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.048, 0.04, 0.1, 8),
+          getMat(mi === 0 ? '#6FBAD6' : '#F28B82', 0.4),
+        );
+        mug.position.set(mx, 0.8, mi === 0 ? 0.14 : -0.14);
+        tbl.add(mug);
+      });
+      plazaDecor.add(tbl);
+      colliders.push({type: 'circle', id: `plaza_${id}_tbl`, x: cx, z: cz, r: 0.56});
+
+      // Sit-able Café Stool beside table
+      const sx = cx + stoolOff.ox;
+      const sz = cz + stoolOff.oz;
+      const sRotY = Math.atan2(cx - sx, cz - sz);
+      const stool = new THREE.Group();
+      stool.position.set(sx, 0.14, sz);
+      const sLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.36, 8), archIronMat);
+      sLeg.position.y = 0.18;
+      const sBase = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.04, 10), archIronMat);
+      sBase.position.y = 0.02;
+      const sCushion = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.22, 0.09, 12), noticeWoodMat);
+      sCushion.position.y = 0.38;
+      stool.add(sLeg, sBase, sCushion);
+      addInteractionProxy(
+        stool,
+        [0.62, 0.65, 0.62],
+        0.32,
+        {
+          kind: 'bench',
+          tx: sx + Math.sin(sRotY) * -0.52,
+          tz: sz + Math.cos(sRotY) * -0.52,
+          seatX: sx,
+          seatZ: sz,
+          seatY: 0.56,
+          sitRotY: sRotY,
+        },
+        clickTargets,
+      );
+      plazaDecor.add(stool);
+      colliders.push({type: 'circle', id: `plaza_${id}_stool`, x: sx, z: sz, r: 0.28});
+    });
+
+    // 4. NE Quadrant: Town Community Bulletin Kiosk & Classic Postbox
+    {
+      const bx = 3.45;
+      const bz = -3.45;
+      const kiosk = new THREE.Group();
+      kiosk.position.set(bx, 0.14, bz);
+      kiosk.rotation.y = -Math.PI * 0.75;
+      [-0.65, 0.65].forEach((px) => {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 1.85, 8), noticeWoodMat);
+        post.position.set(px, 0.92, 0);
+        kiosk.add(post);
+      });
+      const boardFrame = new THREE.Mesh(new RoundedBoxGeometry(1.52, 1.02, 0.12, 2, 0.03), noticeWoodMat);
+      boardFrame.position.set(0, 1.32, 0);
+      const boardInner = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.84, 0.14), noticeBoardMat);
+      boardInner.position.set(0, 1.32, 0);
+      const boardRoof = new THREE.Mesh(new RoundedBoxGeometry(1.72, 0.14, 0.42, 2, 0.04), getMat('#C95D4B', 0.62));
+      boardRoof.position.set(0, 1.9, 0);
+      // Mini pinned flyers on board
+      [
+        [-0.36, 1.42, '#FFD166'],
+        [0.04, 1.38, '#8ECAE6'],
+        [0.38, 1.24, '#FFB4C6'],
+        [-0.22, 1.12, '#B7E4C7'],
+      ].forEach(([nx, ny, nc]) => {
+        const note = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.24, 0.02), getMat(nc as string, 0.65));
+        note.position.set(nx as number, ny as number, 0.075);
+        kiosk.add(note);
+      });
+      kiosk.add(boardFrame, boardInner, boardRoof);
+      plazaDecor.add(kiosk);
+      colliders.push({type: 'circle', id: 'plaza_bulletin', x: bx, z: bz, r: 0.85});
+
+      // Classic Plaza Postbox beside Bulletin Board
+      const pbx = 2.45;
+      const pbz = -4.15;
+      const postbox = new THREE.Group();
+      postbox.position.set(pbx, 0.14, pbz);
+      postbox.rotation.y = -Math.PI * 0.82;
+      const pbPed = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.45, 10), archIronMat);
+      pbPed.position.y = 0.22;
+      const pbBody = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.72, 12), postboxRedMat);
+      pbBody.position.y = 0.78;
+      const pbCap = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), postboxRedMat);
+      pbCap.position.y = 1.14;
+      const pbTrim = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.025, 6, 14), archGoldMat);
+      pbTrim.rotation.x = Math.PI / 2;
+      pbTrim.position.y = 1.12;
+      postbox.add(pbPed, pbBody, pbCap, pbTrim);
+      plazaDecor.add(postbox);
+      colliders.push({type: 'circle', id: 'plaza_postbox', x: pbx, z: pbz, r: 0.3});
+    }
+
+    // 5. SW Quadrant: Ornate Topiary Tiers & Festive Plaza Balloon Flower Pedestal
+    {
+      const gx = -3.4;
+      const gz = 3.45;
+      const ped = new THREE.Group();
+      ped.position.set(gx, 0.14, gz);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 0.48, 12), urnStoneMat);
+      base.position.y = 0.24;
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.045, 6, 14), archGoldMat);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.y = 0.48;
+      const mound = new THREE.Mesh(new THREE.SphereGeometry(0.38, 10, 8), foliageLushMat);
+      mound.position.y = 0.62;
+      // Trio of floating sculpted colorful festival balloons anchored to pedestal
+      const balloonCols = ['#FF7597', '#67C6E3', '#FFD166'];
+      [
+        [-0.18, 1.55, 0.06],
+        [0.16, 1.72, -0.08],
+        [0.02, 1.92, 0.12],
+      ].forEach(([blx, bly, blz], bi) => {
+        const stringH = bly - 0.62;
+        const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, stringH, 4), mosaicCreamMat);
+        wire.position.set(blx * 0.5, 0.62 + stringH * 0.5, blz * 0.5);
+        const bal = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), getMat(balloonCols[bi], 0.35));
+        bal.scale.set(0.95, 1.15, 0.95);
+        bal.position.set(blx, bly, blz);
+        ped.add(wire, bal);
+      });
+      ped.add(base, rim, mound);
+      plazaDecor.add(ped);
+      colliders.push({type: 'circle', id: 'plaza_balloon_urn', x: gx, z: gz, r: 0.58});
+    }
+
+    mergeStaticGroupByMaterial(plazaDecor);
+    group.add(plazaDecor);
+  }
+
   // Pooled warm ground light pools at Plaza & main porches (1 instanced draw call at night — zero PointLight shader lag)
   const districtNightPoolGeo = new THREE.PlaneGeometry(4.8, 4.8);
   districtNightPoolGeo.rotateX(-Math.PI / 2);
@@ -1228,7 +1552,7 @@ export function buildTownScene(): TownWorld {
     const home = new THREE.Group();
     home.position.set(-32, 0, -22.5);
     home.rotation.y = 0;
-    home.scale.setScalar(1.68);
+    home.scale.setScalar(1.98);
 
     const stoneMat = getMat('#B8B2A6', 0.82);
     const creamMat = getMat('#FFF4E2', 0.72);
@@ -1297,10 +1621,15 @@ export function buildTownScene(): TownWorld {
     );
     porchDeck.position.set(0, 0.25, 2.24);
     const porchStep = new THREE.Mesh(
-      new RoundedBoxGeometry(1.75, 0.16, 0.56, 2, 0.04),
+      new RoundedBoxGeometry(1.82, 0.16, 0.5, 2, 0.04),
       stoneMat,
     );
-    porchStep.position.set(0, 0.08, 2.84);
+    porchStep.position.set(0, 0.13, 2.72);
+    const porchLowerStep = new THREE.Mesh(
+      new RoundedBoxGeometry(2.1, 0.12, 0.46, 2, 0.04),
+      stoneMat,
+    );
+    porchLowerStep.position.set(0, 0.05, 3.04);
     const porchRoof = createExtrudedRoof(2.25, 0.62, 1.25, roofTrimMat);
     porchRoof.position.set(0, 2.52, 2.22);
     [-0.86, 0.86].forEach((px) => {
@@ -1309,7 +1638,7 @@ export function buildTownScene(): TownWorld {
       home.add(post);
     });
 
-    // Porch warm lantern
+    // Porch warm twin lanterns + front topiary planters
     const lanternMat = new THREE.MeshStandardMaterial({
       color: '#FFF4C2',
       emissive: '#FFCC66',
@@ -1319,6 +1648,17 @@ export function buildTownScene(): TownWorld {
     lampBulbs.push(lanternMat);
     const porchLantern = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), lanternMat);
     porchLantern.position.set(0.66, 2.02, 2.24);
+    const porchLanternL = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), lanternMat);
+    porchLanternL.position.set(-0.66, 2.02, 2.24);
+    home.add(porchLowerStep, porchLanternL);
+
+    [-1.18, 1.18].forEach((sx) => {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.24, 9), roofMat);
+      pot.position.set(sx, 0.12, 2.92);
+      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 7), shutterMat);
+      bush.position.set(sx, 0.34, 2.92);
+      home.add(pot, bush);
+    });
 
     // Arched Front Door + Brass Handle
     const doorFrame = new THREE.Mesh(
@@ -1458,8 +1798,8 @@ export function buildTownScene(): TownWorld {
 
     addInteractionProxy(
       home,
-      [5.4, 5.2, 5.0],
-      2.4,
+      [6.2, 5.8, 5.6],
+      2.7,
       {
         kind: 'zone',
         zone: 'home' as ZoneId,
@@ -1468,9 +1808,9 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'home', x: -32, z: -22.5, hw: 4.8, hd: 4.0, rotY: 0});
+    colliders.push({type: 'box', id: 'home', x: -32, z: -22.5, hw: 5.55, hd: 4.55, rotY: 0});
     const mailWorld = new THREE.Vector3(1.55, 0, 3.08).applyMatrix4(home.matrixWorld);
-    colliders.push({type: 'circle', id: 'home_mailbox', x: mailWorld.x, z: mailWorld.z, r: 0.54});
+    colliders.push({type: 'circle', id: 'home_mailbox', x: mailWorld.x, z: mailWorld.z, r: 0.58});
     mergeStaticGroupByMaterial(home);
     group.add(home);
 
@@ -2092,13 +2432,17 @@ export function buildTownScene(): TownWorld {
       getMat('#9E4B5D', 0.58),
     );
     door.position.set(1.08, 1.15, 1.72);
-    const doorArch = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.62, 0.62, 0.2, 16, 1, false, 0, Math.PI),
-      pilasterMat,
-    );
-    doorArch.rotation.x = Math.PI / 2;
-    doorArch.rotation.z = Math.PI / 2;
-    doorArch.position.set(1.08, 2.02, 1.7);
+    const doorArchShape = new THREE.Shape();
+    doorArchShape.absarc(0, 0, 0.65, 0, Math.PI, false);
+    doorArchShape.lineTo(-0.65, 0);
+    const doorArchGeo = new THREE.ExtrudeGeometry(doorArchShape, {
+      depth: 0.2,
+      bevelEnabled: false,
+      curveSegments: 16,
+    });
+    doorArchGeo.translate(0, 0, -0.1);
+    const doorArch = new THREE.Mesh(doorArchGeo, pilasterMat);
+    doorArch.position.set(1.08, 2.08, 1.7);
     [0.98, 1.18].forEach((hx) => {
       const handle = new THREE.Mesh(new RoundedBoxGeometry(0.04, 0.24, 0.06, 2, 0.02), goldMat);
       handle.position.set(hx, 1.12, 1.85);
@@ -2133,7 +2477,7 @@ export function buildTownScene(): TownWorld {
       shop.add(uPil);
     });
 
-    // Upper Story Arched French Windows + Shutters
+    // Upper Story Arched French Windows + Shutters + Side Window Flower Boxes
     [-1.24, 0, 1.24].forEach((wx, idx) => {
       const uw = buildFramedWindow(
         idx === 1 ? 0.96 : 0.76,
@@ -2144,9 +2488,31 @@ export function buildTownScene(): TownWorld {
       );
       uw.position.set(wx, idx === 1 ? 4.04 : 4.08, 1.54);
       shop.add(uw);
+
+      if (idx !== 1) {
+        const winPlanter = new THREE.Mesh(
+          new RoundedBoxGeometry(0.86, 0.16, 0.24, 2, 0.03),
+          stoneStepMat,
+        );
+        winPlanter.position.set(wx, 3.44, 1.66);
+        shop.add(winPlanter);
+        [-0.24, 0, 0.24].forEach((fx, fi) => {
+          const leafBed = new THREE.Mesh(
+            new THREE.SphereGeometry(0.11, 7, 6),
+            topiaryMat,
+          );
+          leafBed.position.set(wx + fx, 3.55, 1.68);
+          const wBloom = new THREE.Mesh(
+            new THREE.SphereGeometry(0.085, 7, 6),
+            getMat(fi === 1 ? '#FFE066' : '#FF7B9C', 0.6),
+          );
+          wBloom.position.set(wx + fx, 3.63, 1.7);
+          shop.add(leafBed, wBloom);
+        });
+      }
     });
 
-    // Projecting Center Juliette Balcony with Wrought-Iron Rail + Flower Box
+    // Projecting Center Juliette Balcony with Outer Mounted Flower Trough (visible OVER the railing!)
     const balcSlab = new THREE.Mesh(
       new RoundedBoxGeometry(1.64, 0.12, 0.52, 2, 0.04),
       pilasterMat,
@@ -2163,17 +2529,19 @@ export function buildTownScene(): TownWorld {
       shop.add(bar);
     });
     const balcPlanter = new THREE.Mesh(
-      new RoundedBoxGeometry(1.1, 0.16, 0.22, 2, 0.03),
+      new RoundedBoxGeometry(1.16, 0.18, 0.24, 2, 0.03),
       stoneStepMat,
     );
-    balcPlanter.position.set(0, 3.36, 1.88);
-    [-0.36, 0, 0.36].forEach((fx, fi) => {
+    balcPlanter.position.set(0, 3.6, 2.06);
+    [-0.38, -0.13, 0.13, 0.38].forEach((fx, fi) => {
+      const foliage = new THREE.Mesh(new THREE.SphereGeometry(0.12, 7, 6), topiaryMat);
+      foliage.position.set(fx, 3.72, 2.08);
       const bloom = new THREE.Mesh(
-        new THREE.SphereGeometry(0.11, 7, 7),
-        getMat(fi === 1 ? '#FFD166' : '#FF7B9C', 0.65),
+        new THREE.SphereGeometry(0.105, 7, 7),
+        getMat(fi % 2 === 0 ? '#FF7B9C' : '#FFD166', 0.62),
       );
-      bloom.position.set(fx, 3.48, 1.9);
-      shop.add(bloom);
+      bloom.position.set(fx, 3.8, 2.1);
+      shop.add(foliage, bloom);
     });
     shop.add(balcSlab, balcTopRail, balcPlanter);
 
@@ -2259,12 +2627,16 @@ export function buildTownScene(): TownWorld {
       pilasterMat,
     );
     castleGable.position.set(0, 5.56, 1.44);
-    const castleGableArch = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.56, 0.56, 0.66, 24, 1, false, 0, Math.PI),
-      roofTrimMat,
-    );
-    castleGableArch.rotation.x = Math.PI / 2;
-    castleGableArch.rotation.z = Math.PI / 2;
+    const gableArchShape = new THREE.Shape();
+    gableArchShape.absarc(0, 0, 0.56, 0, Math.PI, false);
+    gableArchShape.lineTo(-0.56, 0);
+    const gableArchGeo = new THREE.ExtrudeGeometry(gableArchShape, {
+      depth: 0.64,
+      bevelEnabled: false,
+      curveSegments: 18,
+    });
+    gableArchGeo.translate(0, 0, -0.32);
+    const castleGableArch = new THREE.Mesh(gableArchGeo, roofTrimMat);
     castleGableArch.position.set(0, 5.92, 1.44);
     const castleGableWin = new THREE.Mesh(
       new RoundedBoxGeometry(0.66, 0.58, 0.08, 3, 0.06),
@@ -3767,12 +4139,12 @@ export function buildTownScene(): TownWorld {
     group.add(stall);
   }
 
-  // ========== DISTRICT 6: TRẠM BƯU ĐIỆN & ĐỒNG HỒ (Orthogonal Clock Tower & Post Office) ==========
+  // ========== DISTRICT 6: TRẠM BƯU ĐIỆN & ĐỒNG HỒ (Taller Belfry Clock Tower & Post Office, 2 Tiers) ==========
   {
     const kiosk = new THREE.Group();
     kiosk.position.set(24, 0, 39.5);
     kiosk.rotation.y = 0;
-    kiosk.scale.setScalar(1.6);
+    kiosk.scale.setScalar(1.88);
 
     const stoneBaseMat2 = getMat('#C8B8A4', 0.78);
     const brickLowerMat = getMat('#D88C6F', 0.74);
@@ -3781,70 +4153,110 @@ export function buildTownScene(): TownWorld {
     const woodDoorMat = getMat('#7D5333', 0.68);
     const goldMat = glossyClayMat('#FFD166', 0.24);
 
-    const base = new THREE.Mesh(new RoundedBoxGeometry(3.1, 0.34, 2.8, 2, 0.06), stoneBaseMat2);
-    base.position.y = 0.17;
+    const base = new THREE.Mesh(new RoundedBoxGeometry(3.2, 0.36, 2.9, 2, 0.06), stoneBaseMat2);
+    base.position.y = 0.18;
 
     const lowerStory = new THREE.Mesh(
-      new RoundedBoxGeometry(2.35, 1.65, 2.2, 2, 0.08),
+      new RoundedBoxGeometry(2.42, 1.72, 2.26, 2, 0.08),
       brickLowerMat,
     );
-    lowerStory.position.y = 1.12;
+    lowerStory.position.y = 1.18;
+
+    // 4 Corner stone pilasters for grand post-office silhouette
+    [
+      [-1.16, 1.08],
+      [1.16, 1.08],
+      [-1.16, -1.08],
+      [1.16, -1.08],
+    ].forEach(([px, pz]) => {
+      const pilaster = new THREE.Mesh(new RoundedBoxGeometry(0.22, 1.74, 0.22, 2, 0.03), stoneBaseMat2);
+      pilaster.position.set(px, 1.18, pz);
+      kiosk.add(pilaster);
+    });
 
     const midLedge = new THREE.Mesh(
-      new RoundedBoxGeometry(2.58, 0.18, 2.42, 2, 0.04),
+      new RoundedBoxGeometry(2.68, 0.2, 2.5, 2, 0.04),
       stoneBaseMat2,
     );
-    midLedge.position.y = 1.98;
+    midLedge.position.y = 2.08;
 
     const tower = new THREE.Mesh(
-      new RoundedBoxGeometry(1.9, 1.65, 1.9, 2, 0.08),
+      new RoundedBoxGeometry(1.94, 2.15, 1.94, 2, 0.08),
       creamUpperMat,
     );
-    tower.position.y = 2.82;
+    tower.position.y = 3.07;
 
-    const spire = new THREE.Mesh(new THREE.ConeGeometry(1.58, 1.75, 4), spireMat);
+    const belfryTrim = new THREE.Mesh(
+      new RoundedBoxGeometry(2.14, 0.16, 2.14, 2, 0.04),
+      stoneBaseMat2,
+    );
+    belfryTrim.position.y = 4.14;
+    kiosk.add(belfryTrim);
+
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(1.64, 2.25, 4), spireMat);
     spire.rotation.y = Math.PI / 4;
-    spire.position.y = 4.48;
+    spire.position.y = 5.18;
 
-    const spireFinial = new THREE.Mesh(new THREE.SphereGeometry(0.2, 9, 9), goldMat);
-    spireFinial.position.y = 5.42;
+    const spireFinial = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 10), goldMat);
+    spireFinial.position.y = 6.38;
 
-    // Clock Face + Rim + Hands
+    // Grand Clock Face + Rim + 12 Brass Tick Marks + Hands
     const clockFace = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.54, 0.54, 0.1, 16),
+      new THREE.CylinderGeometry(0.6, 0.6, 0.1, 18),
       getMat('#FFFFFF', 0.35),
     );
     clockFace.rotation.x = Math.PI / 2;
-    clockFace.position.set(0, 2.88, 0.96);
+    clockFace.position.set(0, 3.12, 0.98);
 
     const clockRim = new THREE.Mesh(
-      new THREE.TorusGeometry(0.55, 0.07, 8, 18),
+      new THREE.TorusGeometry(0.62, 0.08, 8, 20),
       getMat('#6E4E34', 0.58),
     );
-    clockRim.position.set(0, 2.88, 0.98);
+    clockRim.position.set(0, 3.12, 1.0);
 
-    const handHour = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.28, 0.04), getMat('#2B2D42', 0.5));
-    handHour.position.set(0, 2.98, 1.03);
-    const handMin = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.04, 0.04), getMat('#2B2D42', 0.5));
-    handMin.position.set(0.14, 2.88, 1.03);
+    for (let h = 0; h < 12; h++) {
+      const ang = (h / 12) * Math.PI * 2;
+      const tick = new THREE.Mesh(new THREE.SphereGeometry(0.032, 6, 6), goldMat);
+      tick.position.set(Math.sin(ang) * 0.48, 3.12 + Math.cos(ang) * 0.48, 1.04);
+      kiosk.add(tick);
+    }
 
-    // Post-office arched door + striped canopy + red postbox + parcel crate
-    const doorCanopy = createExtrudedRoof(1.38, 0.42, 0.72, spireMat);
-    doorCanopy.position.set(0, 1.78, 1.28);
-    const door = new THREE.Mesh(new RoundedBoxGeometry(0.86, 1.32, 0.16, 2, 0.04), woodDoorMat);
-    door.position.set(0, 0.96, 1.12);
+    const handHour = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.3, 0.04), getMat('#2B2D42', 0.5));
+    handHour.position.set(0, 3.24, 1.05);
+    const handMin = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.045, 0.04), getMat('#2B2D42', 0.5));
+    handMin.position.set(0.15, 3.12, 1.05);
+
+    // Post-office arched door + striped canopy + warm twin wall lanterns + royal red postbox + parcel crate
+    const doorCanopy = createExtrudedRoof(1.48, 0.44, 0.78, spireMat);
+    doorCanopy.position.set(0, 1.84, 1.32);
+    const door = new THREE.Mesh(new RoundedBoxGeometry(0.92, 1.38, 0.16, 2, 0.04), woodDoorMat);
+    door.position.set(0, 1.0, 1.15);
+
+    const postLanternMat = new THREE.MeshStandardMaterial({
+      color: '#FFF4C2',
+      emissive: '#FFCC66',
+      emissiveIntensity: 0.4,
+      roughness: 0.25,
+    });
+    lampBulbs.push(postLanternMat);
+    [-0.72, 0.72].forEach((lx) => {
+      const lOrb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), postLanternMat);
+      lOrb.position.set(lx, 1.48, 1.24);
+      kiosk.add(lOrb);
+    });
 
     const postbox = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.32, 0.56, 7, 10),
+      new THREE.CapsuleGeometry(0.34, 0.62, 7, 10),
       glossyClayMat('#D94F4F', 0.3),
     );
-    postbox.position.set(1.36, 0.74, 0.65);
+    postbox.scale.setScalar(1.12);
+    postbox.position.set(1.4, 0.78, 0.68);
 
     const parcel = new THREE.Mesh(
-      new RoundedBoxGeometry(0.46, 0.4, 0.42, 2, 0.04),
+      new RoundedBoxGeometry(0.5, 0.42, 0.44, 2, 0.04),
       getMat('#D9A566', 0.78),
     );
-    parcel.position.set(-1.32, 0.54, 0.72);
+    parcel.position.set(-1.36, 0.56, 0.75);
 
     kiosk.add(
       base,
@@ -3864,12 +4276,12 @@ export function buildTownScene(): TownWorld {
     );
     addInteractionProxy(
       kiosk,
-      [3.6, 5.6, 3.2],
-      2.5,
-      {kind: 'settings', tx: 24, tz: 43.4},
+      [4.4, 6.8, 3.8],
+      2.8,
+      {kind: 'settings', tx: 24, tz: 44.1},
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'settings', x: 24, z: 39.5, hw: 2.8, hd: 2.48, rotY: 0});
+    colliders.push({type: 'box', id: 'settings', x: 24, z: 39.5, hw: 3.25, hd: 2.88, rotY: 0});
     mergeStaticGroupByMaterial(kiosk);
     group.add(kiosk);
   }
@@ -3880,7 +4292,7 @@ export function buildTownScene(): TownWorld {
     const PET_Z = 38.6;
     const petShop = new THREE.Group();
     petShop.position.set(PET_X, 0, PET_Z);
-    petShop.scale.setScalar(1.42);
+    petShop.scale.setScalar(1.72);
 
     const pPlinthMat = getMat('#E5D6C3', 0.78);
     const pWallMat = getMat('#FFF5E4', 0.7);
@@ -3955,6 +4367,7 @@ export function buildTownScene(): TownWorld {
     // ===== CHÚ CÚN CON TO TRÊN MÁI NHÀ (Large Sculpted Puppy on the Roof) =====
     const pupGroup = new THREE.Group();
     pupGroup.position.set(0, 4.06, 0.15);
+    pupGroup.scale.setScalar(1.12);
     const pupFurMat = glossyClayMat('#F4C37A', 0.42);
     const pupBellyMat = glossyClayMat('#FFF6E3', 0.48);
     const pupEarMat = glossyClayMat('#A66135', 0.48);
@@ -4173,10 +4586,40 @@ export function buildTownScene(): TownWorld {
       backWin,
     );
 
+    // Golden paw medallion on front gable + warm doorway lantern + twin terracotta planters
+    const pawPad = new THREE.Mesh(new THREE.SphereGeometry(0.18, 9, 8), pGoldMat);
+    pawPad.scale.set(1.1, 0.9, 0.4);
+    pawPad.position.set(0, 2.52, 1.44);
+    petShop.add(pawPad);
+    [-0.17, 0, 0.17].forEach((tx, ti) => {
+      const toe = new THREE.Mesh(new THREE.SphereGeometry(0.068, 7, 7), pGoldMat);
+      toe.scale.set(1, 1, 0.45);
+      toe.position.set(tx, 2.71 + (ti === 1 ? 0.04 : 0), 1.44);
+      petShop.add(toe);
+    });
+    const doorLanternMat = new THREE.MeshStandardMaterial({
+      color: '#FFF4C2',
+      emissive: '#FFCC66',
+      emissiveIntensity: 0.4,
+      roughness: 0.25,
+    });
+    lampBulbs.push(doorLanternMat);
+    const doorLantern = new THREE.Mesh(new THREE.SphereGeometry(0.095, 8, 8), doorLanternMat);
+    doorLantern.position.set(0.74, 2.02, 1.56);
+    petShop.add(doorLantern);
+
+    [0.05, 1.44].forEach((px) => {
+      const fPot = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.11, 0.2, 8), pRoofMat);
+      fPot.position.set(px, 0.12, 1.85);
+      const fLeaf = new THREE.Mesh(new THREE.SphereGeometry(0.17, 7, 7), getMat('#66B872', 0.65));
+      fLeaf.position.set(px, 0.29, 1.85);
+      petShop.add(fPot, fLeaf);
+    });
+
     addInteractionProxy(
       petShop,
-      [4.5, 5.2, 3.8],
-      2.3,
+      [5.4, 6.2, 4.5],
+      2.6,
       {
         kind: 'zone',
         zone: 'petshop' as ZoneId,
@@ -4185,7 +4628,7 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'petshop', x: PET_X, z: PET_Z, hw: 2.85, hd: 2.45, rotY: 0});
+    colliders.push({type: 'box', id: 'petshop', x: PET_X, z: PET_Z, hw: 3.48, hd: 2.95, rotY: 0});
     mergeStaticGroupByMaterial(petShop);
     group.add(petShop);
   }
@@ -4263,18 +4706,128 @@ export function buildTownScene(): TownWorld {
     podiumRoofBand.position.set(-54.7, 7.44, -2.5);
     mallStatic.add(podiumBase, podiumPlinth, podiumRoofBand);
 
-    // Warm Wood Architectural Louvers & Display Windows around Podium
-    const sideStoreWinGeo = new THREE.BoxGeometry(0.18, 2.55, 3.8);
+    // Architectural Curtain-Wall Glass Storefront Bays on East Front, North, South & Back West Faces!
+    const buildMallBayPanel = (w: number, h: number) => {
+      const bay = new THREE.Group();
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.08), towerGlassMat);
+      const topMullion = new THREE.Mesh(new THREE.BoxGeometry(w + 0.14, 0.14, 0.16), silverSteelMat);
+      topMullion.position.y = h * 0.5;
+      const botMullion = topMullion.clone();
+      botMullion.position.y = -h * 0.5;
+      [-w * 0.5, 0, w * 0.5].forEach((mx) => {
+        const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.11, h + 0.14, 0.16), champagneMat);
+        mullion.position.x = mx;
+        bay.add(mullion);
+      });
+      bay.add(glass, topMullion, botMullion);
+      return bay;
+    };
+
+    // East Front upper/lower windows + decorative wood fins
     [1.6].forEach((wz) => {
-      const storeWin = new THREE.Mesh(sideStoreWinGeo, towerGlassMat);
-      storeWin.position.set(-48.96, 2.1, wz);
-      const upperWin = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.0, 3.8), towerGlassMat);
-      upperWin.position.set(-48.96, 5.25, wz);
-      mallStatic.add(storeWin, upperWin);
+      const storeBay = buildMallBayPanel(3.8, 2.55);
+      storeBay.rotation.y = Math.PI / 2;
+      storeBay.position.set(-48.94, 2.15, wz);
+      const upperBay = buildMallBayPanel(3.8, 2.0);
+      upperBay.rotation.y = Math.PI / 2;
+      upperBay.position.set(-48.94, 5.25, wz);
+      mallStatic.add(storeBay, upperBay);
     });
-    const upperEntranceWin = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.0, 3.8), towerGlassMat);
-    upperEntranceWin.position.set(-48.96, 5.25, -6.5);
-    mallStatic.add(upperEntranceWin);
+    const upperEntranceBay = buildMallBayPanel(3.8, 2.0);
+    upperEntranceBay.rotation.y = Math.PI / 2;
+    upperEntranceBay.position.set(-48.94, 5.25, -6.5);
+    mallStatic.add(upperEntranceBay);
+
+    // North (z = -10.02) & South (z = +5.02) curtain glass storefront bays + upper horizontal band
+    [-1, 1].forEach((zSide) => {
+      const zFace = zSide < 0 ? -10.02 : 5.02;
+      [-57.5, -51.9].forEach((bx) => {
+        const lowerSideBay = buildMallBayPanel(3.9, 2.5);
+        lowerSideBay.position.set(bx, 2.18, zFace);
+        const upperSideBay = buildMallBayPanel(3.9, 1.95);
+        upperSideBay.position.set(bx, 5.25, zFace);
+        mallStatic.add(lowerSideBay, upperSideBay);
+      });
+      const sideBand = new THREE.Mesh(
+        new RoundedBoxGeometry(11.6, 0.24, 0.22, 1, 0.03),
+        champagneMat,
+      );
+      sideBand.position.set(-54.7, 3.82, zFace);
+      mallStatic.add(sideBand);
+    });
+
+    // West Back Wall (x = -60.42): Multi-bay glass panels, Service Exit Double Doors + Bollards + Awning
+    {
+      [-6.8, 1.8].forEach((bz) => {
+        const backLower = buildMallBayPanel(4.1, 2.45);
+        backLower.rotation.y = Math.PI / 2;
+        backLower.position.set(-60.42, 2.18, bz);
+        const backUpper = buildMallBayPanel(4.1, 1.95);
+        backUpper.rotation.y = Math.PI / 2;
+        backUpper.position.set(-60.42, 5.25, bz);
+        mallStatic.add(backLower, backUpper);
+      });
+      const backUpperMid = buildMallBayPanel(3.2, 1.95);
+      backUpperMid.rotation.y = Math.PI / 2;
+      backUpperMid.position.set(-60.42, 5.25, -2.5);
+      const backBand = new THREE.Mesh(
+        new RoundedBoxGeometry(0.22, 0.24, 15.2, 1, 0.03),
+        champagneMat,
+      );
+      backBand.position.set(-60.42, 3.82, -2.5);
+      // Rear Service Door & Safety Bollards
+      const svcFrame = new THREE.Mesh(new RoundedBoxGeometry(0.26, 2.55, 2.2, 2, 0.04), darkSteelMat);
+      svcFrame.position.set(-60.42, 1.48, -2.5);
+      const svcDoor = new THREE.Mesh(new RoundedBoxGeometry(0.28, 2.35, 1.88, 1, 0.02), silverSteelMat);
+      svcDoor.position.set(-60.46, 1.44, -2.5);
+      const svcCanopy = new THREE.Mesh(new RoundedBoxGeometry(1.1, 0.16, 2.6, 2, 0.03), silverSteelMat);
+      svcCanopy.position.set(-60.95, 2.95, -2.5);
+      [-3.95, -1.05].forEach((bolZ) => {
+        const bol = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.85, 8), getMat('#F2B138', 0.4));
+        bol.position.set(-61.05, 0.62, bolZ);
+        mallStatic.add(bol);
+      });
+      // Rooftop HVAC Chiller Boxes on podium roof (x = -58.5, y = 7.7)
+      [-6.5, 1.5].forEach((hz) => {
+        const hvac = new THREE.Mesh(new RoundedBoxGeometry(2.1, 0.92, 2.4, 2, 0.05), silverSteelMat);
+        hvac.position.set(-58.2, 8.1, hz);
+        const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.18, 12), darkSteelMat);
+        vent.position.set(-58.2, 8.62, hz);
+        mallStatic.add(hvac, vent);
+      });
+      mallStatic.add(backUpperMid, backBand, svcFrame, svcDoor, svcCanopy);
+    }
+
+    // Fire Extinguisher Station ("Bình Cứu Hỏa") on South-East Mall Wall & South Wall
+    const fireCabinetRedMat = getMat('#D63434', 0.36);
+    const fireNozzleMat = getMat('#242A30', 0.45, 0.5);
+    [
+      {fx: -48.72, fz: 4.55, rotY: Math.PI / 2},
+      {fx: -54.7, fz: 5.18, rotY: 0},
+    ].forEach(({fx, fz, rotY}) => {
+      const feGroup = new THREE.Group();
+      feGroup.position.set(fx, 0.21, fz);
+      feGroup.rotation.y = rotY;
+      const stand = new THREE.Mesh(new RoundedBoxGeometry(0.68, 0.08, 0.34, 1, 0.02), fireCabinetRedMat);
+      stand.position.y = 0.04;
+      [-0.14, 0.14].forEach((cx) => {
+        const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.105, 0.64, 12), fireCabinetRedMat);
+        tank.position.set(cx, 0.4, 0.02);
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.105, 10, 7, 0, Math.PI * 2, 0, Math.PI * 0.5), fireCabinetRedMat);
+        cap.position.set(cx, 0.72, 0.02);
+        const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.11, 8), goldAccentMat);
+        valve.position.set(cx, 0.84, 0.02);
+        const hose = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.018, 6, 12, Math.PI * 0.8), fireNozzleMat);
+        hose.position.set(cx + 0.04, 0.72, 0.08);
+        feGroup.add(tank, cap, valve, hose);
+      });
+      const hoseCabinet = new THREE.Mesh(new RoundedBoxGeometry(0.62, 0.58, 0.2, 2, 0.03), fireCabinetRedMat);
+      hoseCabinet.position.set(0, 1.38, -0.02);
+      const cabGlass = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.38, 0.22), skyGlassMat);
+      cabGlass.position.set(0, 1.38, -0.01);
+      feGroup.add(stand, hoseCabinet, cabGlass);
+      mallStatic.add(feGroup);
+    });
 
     for (let s = 0; s < 5; s++) {
       const slat = new THREE.Mesh(new THREE.BoxGeometry(0.16, 6.4, 0.18), warmWoodMat);
@@ -4382,7 +4935,27 @@ export function buildTownScene(): TownWorld {
       foliage.position.set(-48.3, 0.88, pz);
       mallStatic.add(planter, foliage);
     });
+    // Sleek Mall Red-Gold Entry Welcome Runner Mat + Front Bollard Lights
+    const entryMat = new THREE.Mesh(
+      new RoundedBoxGeometry(2.5, 0.025, 2.75, 1, 0.01),
+      getMat('#B9464E', 0.85),
+    );
+    entryMat.position.set(-47.4, 0.215, -6.5);
+    const entryMatTrim = new THREE.Mesh(
+      new RoundedBoxGeometry(2.6, 0.02, 2.86, 1, 0.01),
+      goldAccentMat,
+    );
+    entryMatTrim.position.set(-47.4, 0.212, -6.5);
+    [-9.45, -4.15].forEach((bz) => {
+      const bolPost = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.85, 8), darkSteelMat);
+      bolPost.position.set(-44.65, 0.63, bz);
+      const bolGlow = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.18, 8), lobbyGlowMat);
+      bolGlow.position.set(-44.65, 0.94, bz);
+      mallStatic.add(bolPost, bolGlow);
+    });
     mallStatic.add(
+      entryMatTrim,
+      entryMat,
       canopy,
       canopyGoldTrim,
       portalJambL,
@@ -5010,6 +5583,134 @@ export function buildTownScene(): TownWorld {
       cabHit,
     );
     group.add(mallElevatorCabin);
+
+    // 6. Forecourt Interactive Vending Machine + 2 Static Decorative Bicycles (Zero text!)
+    {
+      // A. Interactive Vending Machine ("Máy Bán Nước Tự Động") on South-East Forecourt Apron
+      const vmX = -48.32;
+      const vmZ = 1.48;
+      const vmGroup = new THREE.Group();
+      vmGroup.position.set(vmX, 0.21, vmZ);
+      vmGroup.rotation.y = Math.PI / 2;
+
+      const vmBodyMat = getMat('#2F83B8', 0.42);
+      const vmSideMat = getMat('#1F5E87', 0.46);
+      const vmTrimMat = silverSteelMat;
+      const vmGlassMat = new THREE.MeshStandardMaterial({
+        color: '#E5F7FF',
+        emissive: '#8CE2FF',
+        emissiveIntensity: 0.24,
+        roughness: 0.16,
+      });
+
+      const vmShell = new THREE.Mesh(new RoundedBoxGeometry(1.18, 1.98, 0.78, 2, 0.05), vmBodyMat);
+      vmShell.position.y = 0.99;
+      const vmRoof = new THREE.Mesh(new RoundedBoxGeometry(1.24, 0.12, 0.84, 2, 0.03), vmSideMat);
+      vmRoof.position.y = 2.0;
+      const vmDisplayWindow = new THREE.Mesh(new RoundedBoxGeometry(0.76, 1.05, 0.06, 1, 0.02), vmGlassMat);
+      vmDisplayWindow.position.set(-0.12, 1.24, 0.37);
+
+      // 3 Rows of Colorful Static Drink Cans & Bottles Visible Inside Display Window
+      const drinkRowCols = [
+        ['#4BB7EB', '#4BB7EB', '#FF94B6', '#FF94B6'],
+        ['#69BD76', '#69BD76', '#EC6D38', '#EC6D38'],
+        ['#FFD166', '#4BB7EB', '#FF94B6', '#69BD76'],
+      ];
+      drinkRowCols.forEach((row, rIdx) => {
+        const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.025, 0.09), vmTrimMat);
+        shelf.position.set(-0.12, 1.5 - rIdx * 0.32, 0.37);
+        vmGroup.add(shelf);
+        row.forEach((col, cIdx) => {
+          const item = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.045, 0.045, 0.16, 8),
+            getMat(col, 0.32),
+          );
+          item.position.set(-0.37 + cIdx * 0.165, 1.6 - rIdx * 0.32, 0.39);
+          vmGroup.add(item);
+        });
+      });
+
+      // Coin Keypad + Push Flap Dispenser Bin
+      const keypadPanel = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.44, 0.06, 1, 0.02), darkSteelMat);
+      keypadPanel.position.set(0.39, 1.22, 0.38);
+      const coinSlot = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.02), goldAccentMat);
+      coinSlot.position.set(0.39, 1.32, 0.41);
+      const pickupFlap = new THREE.Mesh(new RoundedBoxGeometry(0.82, 0.34, 0.08, 1, 0.02), darkSteelMat);
+      pickupFlap.position.set(-0.08, 0.44, 0.37);
+      vmGroup.add(vmShell, vmRoof, vmDisplayWindow, keypadPanel, coinSlot, pickupFlap);
+      mallStatic.add(vmGroup);
+
+      const vmHit = new THREE.Mesh(
+        new THREE.BoxGeometry(1.1, 2.05, 1.45),
+        new THREE.MeshBasicMaterial({visible: false}),
+      );
+      vmHit.position.set(vmX, 1.24, vmZ);
+      vmHit.userData = {
+        kind: 'mall_vending_machine',
+        tx: -46.85,
+        tz: vmZ,
+      };
+      group.add(vmHit);
+      clickTargets.push(vmHit);
+      colliders.push({type: 'box', id: 'mall_vending', x: vmX, z: vmZ, hw: 0.52, hd: 0.72, rotY: 0});
+
+      // B. Steel Bike Rack + 2 Static Pastel & Mint Bicycles outside May Mall Front (NO Text Labels!)
+      const rackX = -45.72;
+      const rackZCenter = 3.35;
+      [-0.85, 0.15, 1.15].forEach((rz) => {
+        const uLoop = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.032, 6, 14, Math.PI), silverSteelMat);
+        uLoop.position.set(rackX, 0.23, rackZCenter + rz);
+        mallStatic.add(uLoop);
+      });
+
+      const tireMat = getMat('#2B3038', 0.85);
+      const chromeMat = silverSteelMat;
+      const leatherMat = getMat('#8F5832', 0.68);
+      [
+        {bz: rackZCenter - 0.35, frameHex: '#59B6D8', basketHex: '#DFB684'},
+        {bz: rackZCenter + 0.65, frameHex: '#F0837B', basketHex: '#DFB684'},
+      ].forEach(({bz, frameHex, basketHex}) => {
+        const bike = new THREE.Group();
+        bike.position.set(rackX + 0.18, 0.21, bz);
+        const fMat = getMat(frameHex, 0.42);
+        const wMat = getMat(basketHex, 0.7);
+        // Front & Rear Tires + Rims
+        [-0.5, 0.5].forEach((wx) => {
+          const tire = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.042, 8, 18), tireMat);
+          tire.position.set(wx, 0.3, 0);
+          const rim = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.015, 6, 14), chromeMat);
+          rim.position.set(wx, 0.3, 0);
+          const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.08, 8), chromeMat);
+          hub.rotation.x = Math.PI / 2;
+          hub.position.set(wx, 0.3, 0);
+          bike.add(tire, rim, hub);
+        });
+        // Frame Tubes (Down tube, Top tube, Seat post, Fork & Handlebar)
+        const chainStay = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.54, 7), fMat);
+        chainStay.rotation.z = Math.PI / 2;
+        chainStay.position.set(-0.24, 0.32, 0);
+        const seatTube = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.52, 7), fMat);
+        seatTube.rotation.z = 0.28;
+        seatTube.position.set(-0.14, 0.55, 0);
+        const downTube = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.58, 7), fMat);
+        downTube.rotation.z = -0.82;
+        downTube.position.set(0.14, 0.5, 0);
+        const fork = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.56, 7), fMat);
+        fork.rotation.z = 0.24;
+        fork.position.set(0.42, 0.56, 0);
+        const handleBar = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.44, 7), chromeMat);
+        handleBar.rotation.x = Math.PI / 2;
+        handleBar.position.set(0.36, 0.84, 0);
+        const seat = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.07, 0.14, 1, 0.025), leatherMat);
+        seat.position.set(-0.22, 0.82, 0);
+        // Cute front woven basket
+        const basket = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.2, 0.28, 2, 0.02), wMat);
+        basket.position.set(0.56, 0.68, 0);
+        bike.add(chainStay, seatTube, downTube, fork, handleBar, seat, basket);
+        mallStatic.add(bike);
+      });
+      colliders.push({type: 'box', id: 'mall_bike_rack', x: rackX + 0.18, z: rackZCenter + 0.15, hw: 0.92, hd: 1.35, rotY: 0});
+    }
 
     // Colliders on Ground Level for Mall Podium & Elevator Shaft
     colliders.push({type: 'box', id: 'mall_podium', x: -54.7, z: -2.5, hw: 5.95, hd: 7.75, rotY: 0});
@@ -5766,8 +6467,8 @@ export function buildTownScene(): TownWorld {
         }
       }
 
-      // Smooth invisible curved walkable bridge raycast surface
-      const bWalkGeo = new THREE.PlaneGeometry(span, deckW, 20, 2);
+      // Smooth invisible curved walkable bridge raycast surface (widened for effortless tapping & 2-lane pathing)
+      const bWalkGeo = new THREE.PlaneGeometry(span, deckW + 0.36, 20, 2);
       bWalkGeo.rotateX(-Math.PI / 2);
       const bAttr = bWalkGeo.attributes.position;
       for (let i = 0; i < bAttr.count; i++) {
@@ -5782,22 +6483,22 @@ export function buildTownScene(): TownWorld {
       pierWalkableMeshes.push(bWalkMesh);
       bridgeGroup.add(bWalkMesh);
 
-      // Bridge side railing colliders (keep both ends wide open!)
+      // Bridge side railing colliders (shifted slightly outward so two clear nav grid lanes traverse bridge)
       colliders.push({
         type: 'box',
         id: 'west_bridge_rail_n',
         x: midX,
-        z: WEST_BRIDGE_Z - 1.38,
+        z: WEST_BRIDGE_Z - 1.52,
         hw: WEST_BRIDGE_HALF_SPAN - 0.5,
-        hd: 0.24,
+        hd: 0.18,
       });
       colliders.push({
         type: 'box',
         id: 'west_bridge_rail_s',
         x: midX,
-        z: WEST_BRIDGE_Z + 1.38,
+        z: WEST_BRIDGE_Z + 1.52,
         hw: WEST_BRIDGE_HALF_SPAN - 0.5,
-        hd: 0.24,
+        hd: 0.18,
       });
 
       mergeStaticGroupByMaterial(bridgeGroup, new Set([bWalkMesh]));
@@ -6732,7 +7433,15 @@ export function buildTownScene(): TownWorld {
         _instColor.set(wUpPal[i % wUpPal.length]);
         wuIM.setColorAt(i, _instColor);
         colliders.push({type: 'circle', x: tx, z: tz, r: 0.46 * ts});
-        westInsectAnchors.push({x: tx + 0.4, y: gy + 0.85, z: tz + 0.2, habitat: 'tree'});
+        const barkAng = (i * 1.9 + 0.7) % (Math.PI * 2);
+        const barkR = 0.29 * ts;
+        westInsectAnchors.push({
+          x: tx + Math.sin(barkAng) * barkR,
+          y: gy + 0.96 * ts,
+          z: tz + Math.cos(barkAng) * barkR,
+          habitat: 'tree',
+          clingAngle: barkAng,
+        });
       });
       wtIM.instanceMatrix.needsUpdate = true;
       wlIM.instanceMatrix.needsUpdate = true;
@@ -6743,6 +7452,688 @@ export function buildTownScene(): TownWorld {
       wlIM.computeBoundingSphere();
       wuIM.computeBoundingSphere();
       eco.add(wtIM, wlIM, wuIM);
+    }
+
+    // 8. Khu Cắm Trại Bờ Tây (Large Walk-In Tent + 2 Log Benches + Fish-Roasting Firepit + BBQ Grill + Night Neon String Lights)
+    {
+      const campSite = new THREE.Group();
+      const campSoilMat = new THREE.MeshStandardMaterial({
+        color: '#C6AF84',
+        roughness: 0.9,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      });
+      const campPadCenter = new THREE.Mesh(new THREE.CircleGeometry(10.5, 28), campSoilMat);
+      campPadCenter.rotation.x = -Math.PI / 2;
+      campPadCenter.position.set(-113.5, 0.015, 36.2);
+      const campPadTent = new THREE.Mesh(new THREE.CircleGeometry(5.6, 22), campSoilMat);
+      campPadTent.rotation.x = -Math.PI / 2;
+      campPadTent.position.set(-119.5, 0.016, 31.8);
+      campSite.add(campPadCenter, campPadTent);
+
+      // A. Walk-In Golden Dome Camping Tent (seamless curved arch doorway, solid thick groundsheet, attached rolled curtains)
+      const TENT_X = -119.5;
+      const TENT_Z = 31.8;
+      const TENT_ROT_Y = 0.78;
+      const tentGroup = new THREE.Group();
+      tentGroup.position.set(TENT_X, 0.02, TENT_Z);
+      tentGroup.rotation.y = TENT_ROT_Y;
+
+      const tentGoldMat = new THREE.MeshStandardMaterial({
+        color: '#F4B829',
+        roughness: 0.62,
+        side: THREE.DoubleSide,
+      });
+      const tentInnerGoldMat = new THREE.MeshStandardMaterial({
+        color: '#DDA11E',
+        roughness: 0.74,
+        side: THREE.BackSide,
+      });
+      const tentTrimMat = getMat('#2E3746', 0.62);
+      const tentFloorMat = getMat('#364152', 0.84);
+      const tentMatMat = getMat('#D65F54', 0.75);
+      const tentPillowMat = getMat('#FFF6E5', 0.7);
+      const tentPoleMat = getMat('#262B34', 0.55);
+
+      const TENT_R = 2.85;
+      const TENT_H = 3.38;
+      const DOOR_MAX_PHI = Math.asin(2.34 / TENT_H); // Crown of entrance arch at ~2.34m height
+      const DOOR_BASE_HALF_THETA = 0.54; // Wide welcoming front arch without ragged doorway triangles
+      const U_SEGS = 28;
+      const V_SEGS = 16;
+      const domeVerts: number[] = [];
+      const domeUvs: number[] = [];
+      const domeIdx: number[] = [];
+      const leftDoorPts: THREE.Vector3[] = [];
+      const rightDoorPts: THREE.Vector3[] = [];
+
+      for (let v = 0; v <= V_SEGS; v++) {
+        const phi = (v / V_SEGS) * (Math.PI * 0.5);
+        const rawY = TENT_H * Math.sin(phi);
+        const y = v === 0 ? -0.025 : rawY;
+        const ringR = TENT_R * Math.cos(phi);
+        let doorHalf = 0;
+        if (phi < DOOR_MAX_PHI) {
+          const hNorm = Math.max(0, rawY) / (TENT_H * Math.sin(DOOR_MAX_PHI));
+          doorHalf = DOOR_BASE_HALF_THETA * Math.sqrt(Math.max(0, 1 - hNorm * hNorm));
+        }
+
+        const thetaStart = doorHalf;
+        const thetaEnd = Math.PI * 2 - doorHalf;
+
+        if (phi <= DOOR_MAX_PHI) {
+          leftDoorPts.push(new THREE.Vector3(Math.sin(thetaStart) * ringR, Math.max(0, y), Math.cos(thetaStart) * ringR));
+          rightDoorPts.push(new THREE.Vector3(Math.sin(thetaEnd) * ringR, Math.max(0, y), Math.cos(thetaEnd) * ringR));
+        }
+
+        for (let u = 0; u <= U_SEGS; u++) {
+          const frac = u / U_SEGS;
+          const theta = thetaStart + (thetaEnd - thetaStart) * frac;
+          const vx = Math.sin(theta) * ringR;
+          const vz = Math.cos(theta) * ringR;
+          domeVerts.push(vx, y, vz);
+          domeUvs.push(frac, v / V_SEGS);
+        }
+      }
+      // Crown bridge point for the archway curve
+      const crownPhi = DOOR_MAX_PHI;
+      const crownPt = new THREE.Vector3(
+        0,
+        TENT_H * Math.sin(crownPhi),
+        TENT_R * Math.cos(crownPhi),
+      );
+      const archCurvePts = [...leftDoorPts, crownPt, ...rightDoorPts.reverse()];
+
+      const rowStride = U_SEGS + 1;
+      for (let v = 0; v < V_SEGS; v++) {
+        for (let u = 0; u < U_SEGS; u++) {
+          const a = v * rowStride + u;
+          const b = a + 1;
+          const c = a + rowStride;
+          const d = c + 1;
+          domeIdx.push(a, b, c, b, d, c);
+        }
+      }
+      const domeGeo = new THREE.BufferGeometry();
+      domeGeo.setAttribute('position', new THREE.Float32BufferAttribute(domeVerts, 3));
+      domeGeo.setAttribute('uv', new THREE.Float32BufferAttribute(domeUvs, 2));
+      domeGeo.setIndex(domeIdx);
+      domeGeo.computeVertexNormals();
+      const domeCanopy = new THREE.Mesh(domeGeo, tentGoldMat);
+      tentGroup.add(domeCanopy);
+
+      // Smooth continuous charcoal trim tube hugging the arched tent doorway edge cleanly
+      const doorArchCurve = new THREE.CatmullRomCurve3(archCurvePts);
+      const doorArchMesh = new THREE.Mesh(
+        new THREE.TubeGeometry(doorArchCurve, 28, 0.052, 8, false),
+        tentTrimMat,
+      );
+      tentGroup.add(doorArchMesh);
+
+      // Solid raised waterproof groundsheet cylinder (completely prevents sandy terrain Z-fighting inside tent!)
+      const tentFloor = new THREE.Mesh(
+        new THREE.CylinderGeometry(TENT_R - 0.06, TENT_R - 0.06, 0.08, 28),
+        tentFloorMat,
+      );
+      tentFloor.position.y = 0.04;
+      const tentFloorRim = new THREE.Mesh(
+        new THREE.TorusGeometry(TENT_R - 0.08, 0.045, 6, 28),
+        tentTrimMat,
+      );
+      tentFloorRim.rotation.x = Math.PI / 2;
+      tentFloorRim.position.y = 0.068;
+
+      const sleepingPad = new THREE.Mesh(new RoundedBoxGeometry(1.18, 0.09, 2.05, 2, 0.03), tentMatMat);
+      sleepingPad.position.set(-0.68, 0.125, -0.52);
+      const pillow = new THREE.Mesh(new RoundedBoxGeometry(0.68, 0.14, 0.38, 2, 0.05), tentPillowMat);
+      pillow.position.set(-0.68, 0.205, -1.28);
+      const rolledBag = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.2, 0.2, 1.05, 9),
+        getMat('#548C9C', 0.72),
+      );
+      rolledBag.rotation.z = Math.PI / 2;
+      rolledBag.position.set(0.75, 0.27, -1.25);
+      tentGroup.add(tentFloor, tentFloorRim, sleepingPad, pillow, rolledBag);
+
+      // Exterior Ribbed Arch Poles positioned strictly over solid dome canvas (avoiding doorway gap)
+      [Math.PI * 0.36, Math.PI * 0.72, Math.PI * 1.28, Math.PI * 1.64].forEach((a) => {
+        const ribCurvePts: THREE.Vector3[] = [];
+        for (let s = 0; s <= 12; s++) {
+          const p = (s / 12) * Math.PI * 0.5;
+          ribCurvePts.push(
+            new THREE.Vector3(
+              Math.sin(a) * (TENT_R + 0.035) * Math.cos(p),
+              (TENT_H + 0.035) * Math.sin(p),
+              Math.cos(a) * (TENT_R + 0.035) * Math.cos(p),
+            ),
+          );
+        }
+        const rib = new THREE.Mesh(
+          new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ribCurvePts), 14, 0.042, 6, false),
+          tentPoleMat,
+        );
+        tentGroup.add(rib);
+      });
+
+      // Softly draped side tie-back flaps tucked directly onto left & right arch pillars (never floating)
+      [-1, 1].forEach((side) => {
+        const tieAng = side * DOOR_BASE_HALF_THETA;
+        const fx = Math.sin(tieAng) * (TENT_R - 0.08);
+        const fz = Math.cos(tieAng) * (TENT_R - 0.08);
+        const flap = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.085, 1.25, 4, 8),
+          tentInnerGoldMat,
+        );
+        flap.material = tentTrimMat;
+        flap.position.set(fx * 0.98, 0.85, fz * 0.99);
+        flap.rotation.z = side * 0.24;
+        flap.rotation.x = -0.18;
+        tentGroup.add(flap);
+      });
+
+      const tentHook = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.26, 6), tentPoleMat);
+      tentHook.position.set(0, TENT_H - 0.16, 0);
+      const tentLampMat = new THREE.MeshStandardMaterial({
+        color: '#FFF4C2',
+        emissive: '#FFCC66',
+        emissiveIntensity: 0.45,
+        roughness: 0.25,
+      });
+      lampBulbs.push(tentLampMat);
+      const tentLamp = new THREE.Mesh(new THREE.SphereGeometry(0.14, 9, 9), tentLampMat);
+      tentLamp.position.set(0, TENT_H - 0.34, 0);
+      tentGroup.add(tentHook, tentLamp);
+
+      // Perimeter wall-only colliders (open front arc so player walks freely inside the tent!)
+      [Math.PI * 0.48, Math.PI * 0.74, Math.PI, -Math.PI * 0.74, -Math.PI * 0.48].forEach((ang, idx) => {
+        const lx = Math.sin(ang) * 2.68;
+        const lz = Math.cos(ang) * 2.68;
+        const cosT = Math.cos(TENT_ROT_Y);
+        const sinT = Math.sin(TENT_ROT_Y);
+        const wx = TENT_X + lx * cosT + lz * sinT;
+        const wz = TENT_Z - lx * sinT + lz * cosT;
+        colliders.push({type: 'circle', id: `camp_tent_wall_${idx}`, x: wx, z: wz, r: 0.62});
+      });
+      mergeStaticGroupByMaterial(tentGroup);
+      campSite.add(tentGroup);
+
+      // B. Warm Fish-Roasting Campfire Pit at (-112.5, 0, 36.2)
+      const FIRE_X = -112.5;
+      const FIRE_Z = 36.2;
+      const fireGroup = new THREE.Group();
+      fireGroup.position.set(FIRE_X, 0.02, FIRE_Z);
+      const fStoneMat = getMat('#89929D', 0.86);
+      const fLogMat = getMat('#6E4325', 0.82);
+      const fStickMat = getMat('#7E5130', 0.78);
+      const fFishSkinMat = getMat('#C86A28', 0.48);
+      const fFishBellyMat = getMat('#F8DFA8', 0.56);
+      const fFishSearMat = getMat('#4A2512', 0.72);
+      const fFishFinMat = getMat('#B85522', 0.52);
+      const fFishEyeMat = getMat('#1C1714', 0.16);
+
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 0), fStoneMat);
+        stone.scale.set(1.25, 0.7, 1.0);
+        stone.position.set(Math.cos(a) * 0.88, 0.1, Math.sin(a) * 0.88);
+        stone.rotation.y = a;
+        fireGroup.add(stone);
+      }
+      const emberCore = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.68, 0.74, 0.07, 12),
+        new THREE.MeshStandardMaterial({
+          color: '#4E2C1B',
+          emissive: '#DD4B1E',
+          emissiveIntensity: 0.72,
+          roughness: 0.8,
+        }),
+      );
+      emberCore.position.y = 0.04;
+      fireGroup.add(emberCore);
+
+      [0.25, -0.45, 1.15, 2.0].forEach((rot) => {
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.125, 1.15, 7), fLogMat);
+        log.rotation.z = Math.PI / 2 - 0.18;
+        log.rotation.y = rot;
+        log.position.y = 0.14;
+        fireGroup.add(log);
+      });
+
+      // 3 Realistic Forked Skewers Roasting Golden Crispy Whole Fish Over the Coals
+      const roastFishProfile = [
+        new THREE.Vector2(0.001, -0.22),
+        new THREE.Vector2(0.056, -0.13),
+        new THREE.Vector2(0.095, -0.02),
+        new THREE.Vector2(0.102, 0.07),
+        new THREE.Vector2(0.078, 0.16),
+        new THREE.Vector2(0.001, 0.21),
+      ];
+      const roastFishBodyGeo = new THREE.LatheGeometry(roastFishProfile, 12);
+      roastFishBodyGeo.rotateX(Math.PI / 2);
+
+      [0.4, 2.35, -1.65].forEach((fa) => {
+        const skewer = new THREE.Group();
+        skewer.position.set(Math.cos(fa) * 1.14, 0.02, Math.sin(fa) * 1.14);
+        skewer.rotation.y = Math.atan2(-Math.cos(fa), -Math.sin(fa));
+
+        // Grounded Y-fork wooden prop holding the skewer
+        const propPost = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.03, 0.42, 6), fStickMat);
+        propPost.position.set(0, 0.21, 0.1);
+        const propForkL = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.16, 5), fStickMat);
+        propForkL.position.set(-0.04, 0.44, 0.12);
+        propForkL.rotation.z = 0.45;
+        const propForkR = propForkL.clone();
+        propForkR.position.x = 0.04;
+        propForkR.rotation.z = -0.45;
+
+        // Angled roasting stick extending diagonally above the glowing coals
+        const stickAnchor = new THREE.Group();
+        stickAnchor.position.set(0, 0.42, 0.12);
+        stickAnchor.rotation.x = -0.46;
+
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.022, 1.12, 6), fStickMat);
+        stick.rotation.x = Math.PI / 2;
+        stick.position.set(0, 0, 0.34);
+
+        const fishGroup = new THREE.Group();
+        fishGroup.position.set(0, 0.015, 0.66);
+
+        const fishBody = new THREE.Mesh(roastFishBodyGeo, fFishSkinMat);
+        fishBody.scale.set(0.54, 1.0, 1.0);
+        const fishBelly = new THREE.Mesh(new THREE.SphereGeometry(0.072, 10, 8), fFishBellyMat);
+        fishBelly.scale.set(0.56, 0.56, 1.78);
+        fishBelly.position.set(0, -0.048, 0.02);
+
+        // Charcoal sear grill marks across the fish flanks
+        [-0.06, 0.01, 0.08].forEach((sz) => {
+          const sear = new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.008, 5, 12), fFishSearMat);
+          sear.scale.set(0.76, 1.12, 0.7);
+          sear.position.z = sz;
+          fishGroup.add(sear);
+        });
+
+        // Flared forked tail fin, dorsal fin, side pectoral fins & glossy eye
+        const tailUp = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.14, 3), fFishFinMat);
+        tailUp.scale.set(0.28, 1, 1);
+        tailUp.rotation.x = -Math.PI * 0.35;
+        tailUp.position.set(0, 0.04, -0.25);
+        const tailDown = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.13, 3), fFishFinMat);
+        tailDown.scale.set(0.28, 1, 1);
+        tailDown.rotation.x = -Math.PI * 0.65;
+        tailDown.position.set(0, -0.04, -0.25);
+
+        const dorsalFin = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 3), fFishFinMat);
+        dorsalFin.scale.set(0.25, 0.9, 1.4);
+        dorsalFin.rotation.x = -0.35;
+        dorsalFin.position.set(0, 0.11, -0.02);
+
+        [-1, 1].forEach((side) => {
+          const pecFin = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.09, 3), fFishFinMat);
+          pecFin.scale.set(0.25, 1, 0.8);
+          pecFin.rotation.z = side * 0.9;
+          pecFin.rotation.x = 0.6;
+          pecFin.position.set(side * 0.055, -0.02, 0.07);
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 7, 6), fFishEyeMat);
+          eye.position.set(side * 0.036, 0.032, 0.145);
+          fishGroup.add(pecFin, eye);
+        });
+
+        fishGroup.add(fishBody, fishBelly, tailUp, tailDown, dorsalFin);
+        stickAnchor.add(stick, fishGroup);
+        skewer.add(propPost, propForkL, propForkR, stickAnchor);
+        fireGroup.add(skewer);
+      });
+
+      westCampFlameA = new THREE.Mesh(
+        new THREE.ConeGeometry(0.34, 0.85, 7),
+        new THREE.MeshBasicMaterial({color: '#FF7B29', transparent: true, opacity: 0.92, depthWrite: false}),
+      );
+      westCampFlameA.position.y = 0.48;
+      westCampFlameA.renderOrder = 6;
+      westCampFlameB = new THREE.Mesh(
+        new THREE.ConeGeometry(0.22, 0.62, 6),
+        new THREE.MeshBasicMaterial({color: '#FFE066', transparent: true, opacity: 0.95, depthWrite: false}),
+      );
+      westCampFlameB.position.set(0.05, 0.42, -0.04);
+      westCampFlameB.renderOrder = 6;
+      westCampGlowMat = new THREE.MeshBasicMaterial({
+        map: warmGlowTex,
+        transparent: true,
+        opacity: 0.45,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      });
+      const westGlowPool = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 4.6), westCampGlowMat);
+      westGlowPool.rotation.x = -Math.PI / 2;
+      westGlowPool.position.y = 0.036;
+      westGlowPool.renderOrder = 2;
+      fireGroup.add(westCampFlameA, westCampFlameB, westGlowPool);
+
+      colliders.push({type: 'circle', id: 'west_camp_fire', x: FIRE_X, z: FIRE_Z, r: 1.18});
+      mergeStaticGroupByMaterial(fireGroup, new Set([westCampFlameA, westCampFlameB, westGlowPool]));
+      campSite.add(fireGroup);
+
+      // C. Two Sit-able Carved Bark Log Benches (2 seats per log!) + 2 Folding Camping Chairs = 6 Total Seats around the Fire!
+      const logBarkMat = getMat('#7C4E2C', 0.8);
+      const logRingMat = getMat('#DFBA88', 0.72);
+      [
+        {id: 'west_camp_log_1', lx: -114.6, lz: 39.8},
+        {id: 'west_camp_log_2', lx: -109.8, lz: 39.2},
+      ].forEach(({id, lx, lz}) => {
+        const rotY = Math.atan2(FIRE_X - lx, FIRE_Z - lz);
+        const logGroup = new THREE.Group();
+        logGroup.position.set(lx, 0.02, lz);
+        logGroup.rotation.y = rotY;
+
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 2.55, 11), logBarkMat);
+        trunk.rotation.z = Math.PI / 2;
+        trunk.position.y = 0.24;
+        [-1.28, 1.28].forEach((ex) => {
+          const endCap = new THREE.Mesh(new THREE.CircleGeometry(0.21, 10), logRingMat);
+          endCap.rotation.y = ex < 0 ? -Math.PI / 2 : Math.PI / 2;
+          endCap.position.set(ex, 0.24, 0);
+          logGroup.add(endCap);
+        });
+        [-0.78, 0.78].forEach((cx) => {
+          const chock = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.14, 0.42, 2, 0.03), fStoneMat);
+          chock.position.set(cx, 0.06, 0);
+          logGroup.add(chock);
+        });
+        logGroup.add(trunk);
+
+        // Two distinct sit slots (±0.62m along log's local X axis) so 2 people can sit on each log
+        const cosL = Math.cos(rotY);
+        const sinL = Math.sin(rotY);
+        const seatSlots = [-0.62, 0.62].map((localOffsetX) => {
+          const sx = lx + localOffsetX * cosL;
+          const sz = lz - localOffsetX * sinL;
+          return {
+            seatX: sx,
+            seatZ: sz,
+            seatY: 0.5,
+            sitRotY: rotY,
+            tx: sx - sinL * 0.92,
+            tz: sz - cosL * 0.92,
+          };
+        });
+        addInteractionProxy(
+          logGroup,
+          [2.75, 0.85, 0.92],
+          0.35,
+          {
+            kind: 'bench',
+            tx: seatSlots[0].tx,
+            tz: seatSlots[0].tz,
+            seatX: seatSlots[0].seatX,
+            seatZ: seatSlots[0].seatZ,
+            seatY: 0.5,
+            sitRotY: rotY,
+            seatSlots,
+          },
+          clickTargets,
+        );
+        colliders.push({type: 'box', id, x: lx, z: lz, hw: 1.28, hd: 0.34, rotY});
+        mergeStaticGroupByMaterial(logGroup);
+        campSite.add(logGroup);
+      });
+
+      // 2 Additional Folding Canvas & Wood Camping Chairs around Campfire (total 2*2 + 2 = 6 seats)
+      const campChairWoodMat = getMat('#9C6B3F', 0.72);
+      [
+        {id: 'west_camp_chair_1', cx: -110.9, cz: 33.1, fabricHex: '#4E8F7C'},
+        {id: 'west_camp_chair_2', cx: -114.2, cz: 33.4, fabricHex: '#D97B48'},
+      ].forEach(({id, cx, cz, fabricHex}) => {
+        const rotY = Math.atan2(FIRE_X - cx, FIRE_Z - cz);
+        const fabricMat = getMat(fabricHex, 0.74);
+        const chair = new THREE.Group();
+        chair.position.set(cx, 0.02, cz);
+        chair.rotation.y = rotY;
+
+        // Crossed wooden X-legs
+        [-0.25, 0.25].forEach((lx) => {
+          const legA = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.54, 6), campChairWoodMat);
+          legA.position.set(lx, 0.21, 0);
+          legA.rotation.x = 0.62;
+          const legB = legA.clone();
+          legB.rotation.x = -0.62;
+          const arm = new THREE.Mesh(new RoundedBoxGeometry(0.06, 0.045, 0.52, 1, 0.015), campChairWoodMat);
+          arm.position.set(lx, 0.62, -0.02);
+          chair.add(legA, legB, arm);
+        });
+        const seatCanvas = new THREE.Mesh(new RoundedBoxGeometry(0.56, 0.065, 0.48, 2, 0.02), fabricMat);
+        seatCanvas.position.set(0, 0.38, 0.02);
+        const backCanvas = new THREE.Mesh(new RoundedBoxGeometry(0.56, 0.52, 0.065, 2, 0.02), fabricMat);
+        backCanvas.position.set(0, 0.64, -0.22);
+        backCanvas.rotation.x = -0.16;
+        chair.add(seatCanvas, backCanvas);
+
+        const standX = cx - Math.sin(rotY) * 0.78;
+        const standZ = cz - Math.cos(rotY) * 0.78;
+        addInteractionProxy(
+          chair,
+          [0.72, 0.95, 0.72],
+          0.45,
+          {
+            kind: 'bench',
+            tx: standX,
+            tz: standZ,
+            seatX: cx,
+            seatZ: cz,
+            seatY: 0.48,
+            sitRotY: rotY,
+          },
+          clickTargets,
+        );
+        colliders.push({type: 'circle', id, x: cx, z: cz, r: 0.44});
+        mergeStaticGroupByMaterial(chair);
+        campSite.add(chair);
+      });
+
+      // D. Interactive Outdoor BBQ Grill ("Lò Nướng BBQ") at (-107.6, 0, 34.4)
+      const BBQ_X = -107.6;
+      const BBQ_Z = 34.4;
+      const bbqGroup = new THREE.Group();
+      bbqGroup.position.set(BBQ_X, 0.02, BBQ_Z);
+      bbqGroup.rotation.y = -0.68;
+
+      const bbqIronMat = getMat('#2F3540', 0.45, 0.55);
+      const bbqSteelMat = getMat('#B7C0CC', 0.35, 0.68);
+      const bbqShelfMat = getMat('#BA8551', 0.72);
+      const bbqCoalMat = new THREE.MeshStandardMaterial({
+        color: '#3A1F14',
+        emissive: '#E54E1E',
+        emissiveIntensity: 0.85,
+        roughness: 0.8,
+      });
+
+      const bbqBasin = new THREE.Mesh(new RoundedBoxGeometry(1.42, 0.34, 0.84, 2, 0.05), bbqIronMat);
+      bbqBasin.position.y = 0.86;
+      const coalBed = new THREE.Mesh(new RoundedBoxGeometry(1.26, 0.08, 0.68, 1, 0.02), bbqCoalMat);
+      coalBed.position.y = 0.98;
+      const grateFrame = new THREE.Mesh(new RoundedBoxGeometry(1.34, 0.04, 0.74, 1, 0.01), bbqSteelMat);
+      grateFrame.position.y = 1.05;
+      [-0.58, 0.58].forEach((lx) => {
+        [-0.32, 0.32].forEach((lz) => {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.74, 7), bbqIronMat);
+          leg.position.set(lx, 0.37, lz);
+          bbqGroup.add(leg);
+        });
+      });
+      const sideShelf = new THREE.Mesh(new RoundedBoxGeometry(0.55, 0.06, 0.72, 2, 0.02), bbqShelfMat);
+      sideShelf.position.set(-0.98, 0.84, 0);
+      // Prop skewers + corn + sausage sizzling on the grate
+      const gSkewer = new THREE.Mesh(new RoundedBoxGeometry(0.32, 0.11, 0.14, 2, 0.04), getMat('#B54935', 0.55));
+      gSkewer.position.set(-0.28, 1.12, 0.08);
+      const gCorn = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.075, 0.28, 8), getMat('#F5C836', 0.45));
+      gCorn.rotation.z = Math.PI / 2;
+      gCorn.position.set(0.28, 1.12, -0.08);
+      const gSausage = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.22, 4, 8), getMat('#C84D3C', 0.48));
+      gSausage.rotation.z = Math.PI / 2;
+      gSausage.position.set(0.18, 1.11, 0.18);
+      bbqGroup.add(bbqBasin, coalBed, grateFrame, sideShelf, gSkewer, gCorn, gSausage);
+
+      addInteractionProxy(
+        bbqGroup,
+        [2.2, 1.65, 1.3],
+        0.75,
+        {
+          kind: 'campsite_bbq',
+          tx: -108.9,
+          tz: 35.8,
+        },
+        clickTargets,
+      );
+      colliders.push({type: 'box', id: 'west_camp_bbq', x: BBQ_X, z: BBQ_Z, hw: 0.92, hd: 0.62, rotY: -0.68});
+      mergeStaticGroupByMaterial(bbqGroup);
+      campSite.add(bbqGroup);
+
+      labelAnchors.push({
+        id: 'campsite_bbq_tag',
+        label: 'Lò Nướng BBQ',
+        worldPos: new THREE.Vector3(BBQ_X, 1.95, BBQ_Z),
+      });
+
+      // E. Overhead String Garland with Non-Glowing Colorful 5-Point Stars + 1 Gentle Campsite Lantern Near Tent
+      const POLE_COORDS: [number, number][] = [
+        [-123.5, 29.2],
+        [-123.5, 42.2],
+        [-111.5, 43.2],
+        [-105.0, 38.2],
+        [-106.5, 29.2],
+      ];
+      const poleWoodMat = getMat('#6D472B', 0.8);
+      const cableMat = getMat('#282C34', 0.72);
+      const pennantColors = ['#FF6B7B', '#FFD166', '#4DD0E1', '#FF9F68', '#C38FFF'];
+      const starPalette = ['#FF6B9C', '#4DD0E1', '#FFD166', '#8AE66E', '#C38FFF', '#FF9F68'];
+
+      POLE_COORDS.forEach(([px, pz], idx) => {
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.115, 6.2, 8), poleWoodMat);
+        pole.position.set(px, 3.1, pz);
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.125, 7, 6), poleWoodMat);
+        cap.position.set(px, 6.22, pz);
+        campSite.add(pole, cap);
+        colliders.push({type: 'circle', id: `camp_pole_${idx}`, x: px, z: pz, r: 0.34});
+      });
+
+      // Build shared extruded 5-pointed matte 3D star geometry (zero glow / zero glare!)
+      const starShape = new THREE.Shape();
+      for (let p = 0; p < 10; p++) {
+        const rad = p % 2 === 0 ? 0.155 : 0.068;
+        const a = (p / 10) * Math.PI * 2 - Math.PI / 2;
+        const sx = Math.cos(a) * rad;
+        const sy = Math.sin(a) * rad;
+        if (p === 0) starShape.moveTo(sx, sy);
+        else starShape.lineTo(sx, sy);
+      }
+      starShape.closePath();
+      const starGeo = new THREE.ExtrudeGeometry(starShape, {
+        depth: 0.055,
+        bevelEnabled: false,
+      });
+      starGeo.translate(0, 0, -0.0275);
+
+      const stringPairs: [number, number][] = [
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [3, 4],
+        [4, 0],
+        [1, 4],
+      ];
+
+      stringPairs.forEach(([ia, ib], sIdx) => {
+        const [ax, az] = POLE_COORDS[ia];
+        const [bx, bz] = POLE_COORDS[ib];
+        const segs = 10;
+        let prevPt = new THREE.Vector3(ax, 5.95, az);
+        const lineYaw = Math.atan2(bz - az, bx - ax);
+        for (let k = 1; k <= segs; k++) {
+          const t = k / segs;
+          const curPt = new THREE.Vector3(
+            THREE.MathUtils.lerp(ax, bx, t),
+            5.95 - Math.sin(t * Math.PI) * 0.55,
+            THREE.MathUtils.lerp(az, bz, t),
+          );
+          const d = prevPt.distanceTo(curPt);
+          const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, d, 5), cableMat);
+          wire.position.copy(prevPt).lerp(curPt, 0.5);
+          wire.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),
+            curPt.clone().sub(prevPt).normalize(),
+          );
+          campSite.add(wire);
+
+          if (k < segs) {
+            const flag = new THREE.Mesh(
+              new THREE.ConeGeometry(0.15, 0.3, 3),
+              getMat(pennantColors[(sIdx + k) % pennantColors.length], 0.62),
+            );
+            flag.rotation.x = Math.PI;
+            flag.rotation.y = lineYaw;
+            flag.position.set(curPt.x, curPt.y - 0.17, curPt.z);
+            campSite.add(flag);
+
+            if (k % 2 === 1) {
+              // Non-glowing colorful star charm hanging neatly on string cable
+              const starMat = getMat(starPalette[(sIdx + k) % starPalette.length], 0.54);
+              const star = new THREE.Mesh(starGeo, starMat);
+              star.position.set(curPt.x, curPt.y - 0.12, curPt.z);
+              star.rotation.y = lineYaw;
+              star.rotation.z = Math.sin(k + sIdx) * 0.12;
+              campSite.add(star);
+            }
+          }
+          prevPt = curPt;
+        }
+      });
+
+      // Gentle Warm Campsite Lantern Pole Beside the Golden Tent (sole soft warm light at night)
+      const LANTERN_X = -116.1;
+      const LANTERN_Z = 32.3;
+      const lanternStand = new THREE.Group();
+      lanternStand.position.set(LANTERN_X, 0.02, LANTERN_Z);
+      const lBase = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.14, 8), poleWoodMat);
+      lBase.position.y = 0.07;
+      const lPost = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.072, 2.55, 8), poleWoodMat);
+      lPost.position.y = 1.3;
+      const lArm = new THREE.Mesh(new RoundedBoxGeometry(0.46, 0.06, 0.06, 1, 0.015), poleWoodMat);
+      lArm.position.set(0.18, 2.48, 0);
+      const lCap = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.14, 8), cableMat);
+      lCap.position.set(0.36, 2.34, 0);
+      westCampLanternMat = new THREE.MeshStandardMaterial({
+        color: '#FFF4CE',
+        emissive: '#FFCC73',
+        emissiveIntensity: 0.12,
+        roughness: 0.3,
+      });
+      const lGlobe = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.24, 10), westCampLanternMat);
+      lGlobe.position.set(0.36, 2.18, 0);
+      const lBot = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.11, 0.05, 8), cableMat);
+      lBot.position.set(0.36, 2.04, 0);
+      westCampLanternPoolMat = new THREE.MeshBasicMaterial({
+        map: warmGlowTex,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      });
+      const lPool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), westCampLanternPoolMat);
+      lPool.rotation.x = -Math.PI / 2;
+      lPool.position.set(0.36, 0.035, 0);
+      lPool.renderOrder = 2;
+      lanternStand.add(lBase, lPost, lArm, lCap, lGlobe, lBot, lPool);
+      colliders.push({type: 'circle', id: 'west_camp_lantern', x: LANTERN_X, z: LANTERN_Z, r: 0.28});
+
+      mergeStaticGroupByMaterial(campSite, new Set([lGlobe, lPool]));
+      campSite.add(lanternStand);
+      eco.add(campSite);
     }
 
     group.add(eco);
@@ -8395,13 +9786,13 @@ export function buildTownScene(): TownWorld {
     if (Math.hypot(px - LAKE_CENTER.x, pz - LAKE_CENTER.z) < 12.2) return true;
     if (Math.hypot(px - 13.8, pz - 13.8) < 3.55) return true;
     if (Math.hypot(px - 14.5, pz + 21.0) < 4.6) return true;
-    if (Math.hypot(px + 32, pz + 22.5) < 6.5) return true;
+    if (Math.hypot(px + 32, pz + 22.5) < 7.4) return true;
     if (Math.hypot(px - 32, pz + 22.5) < 6.5) return true;
     if (Math.hypot(px - 42.8, pz + 23.2) < 3.6) return true;
     if (Math.hypot(px + 32, pz - 18.0) < 6.2) return true;
     if (Math.hypot(px - 32, pz - 17.5) < 6.6) return true;
-    if (Math.hypot(px - 24, pz - 39.5) < 4.5) return true;
-    if (Math.hypot(px - 11.8, pz - 38.6) < 4.4) return true;
+    if (Math.hypot(px - 24, pz - 39.5) < 5.2) return true;
+    if (Math.hypot(px - 11.8, pz - 38.6) < 5.0) return true;
     if (Math.hypot(px + 16.8, pz - 37.2) < 3.4) return true;
     if (px >= -64.5 && px <= -36.5 && pz >= -13.0 && pz <= 8.5) return true;
     if (isInWestRiverOrCliffZone(px, pz, 1.5)) return true;
@@ -8928,11 +10319,43 @@ export function buildTownScene(): TownWorld {
   bigBushCoords.forEach(([bx, bz]) => {
     insectAnchors.push({x: bx, y: getTownGroundHeight(bx, bz) + 0.56, z: bz, habitat: 'bush'});
   });
-  oakTrees.forEach(([tx, tz]) => {
-    insectAnchors.push({x: tx + 0.42, y: getTownGroundHeight(tx, tz) + 0.86, z: tz + 0.25, habitat: 'tree'});
+  oakTrees.forEach(([tx, tz, ts], i) => {
+    const gy = getTownGroundHeight(tx, tz);
+    const clingAng = (i * 1.7 + 0.5) % (Math.PI * 2);
+    const trunkSurfaceR = 0.28 * ts;
+    insectAnchors.push({
+      x: tx + Math.sin(clingAng) * trunkSurfaceR,
+      y: gy + 1.05 * ts,
+      z: tz + Math.cos(clingAng) * trunkSurfaceR,
+      habitat: 'tree',
+      clingAngle: clingAng,
+    });
   });
-  branchedTrees.forEach(([tx, tz]) => {
-    insectAnchors.push({x: tx - 0.35, y: getTownGroundHeight(tx, tz) + 0.82, z: tz + 0.3, habitat: 'tree'});
+  branchedTrees.forEach(([tx, tz, ts], i) => {
+    const gy = getTownGroundHeight(tx, tz);
+    const clingAng = (i * 2.1 + 1.2) % (Math.PI * 2);
+    const trunkSurfaceR = 0.19 * ts;
+    insectAnchors.push({
+      x: tx + Math.sin(clingAng) * trunkSurfaceR,
+      y: gy + 0.92 * ts,
+      z: tz + Math.cos(clingAng) * trunkSurfaceR,
+      habitat: 'tree',
+      clingAngle: clingAng,
+    });
+  });
+  pineCoords.forEach(([px, pz, ps], i) => {
+    if (px >= -142 && px <= 78 && pz >= -92 && pz <= 72 && i % 2 === 0) {
+      const gy = getTownGroundHeight(px, pz);
+      const clingAng = (i * 1.45 + 0.35) % (Math.PI * 2);
+      const trunkSurfaceR = 0.17 * ps;
+      insectAnchors.push({
+        x: px + Math.sin(clingAng) * trunkSurfaceR,
+        y: gy + 0.88 * ps,
+        z: pz + Math.cos(clingAng) * trunkSurfaceR,
+        habitat: 'tree',
+        clingAngle: clingAng,
+      });
+    }
   });
   fallenLogCoords.forEach(([lx, lz]) => {
     insectAnchors.push({x: lx, y: getTownGroundHeight(lx, lz) + 0.45, z: lz, habitat: 'tree'});
@@ -8970,6 +10393,7 @@ export function buildTownScene(): TownWorld {
   const _koiSphere = new THREE.Sphere(new THREE.Vector3(-16.8, 1.2, 37.2), 3.2);
   const _shipSphere = new THREE.Sphere(new THREE.Vector3(SHIP_STALL_POS.x, 1.4, SHIP_STALL_POS.z), 3.4);
   const _waterfallSphere = new THREE.Sphere(new THREE.Vector3(-96.0, 4.2, -9.0), 14.0);
+  const _westCampSphere = new THREE.Sphere(new THREE.Vector3(-113.5, 1.5, 36.2), 16.0);
 
   let useExternalFishingFrame = false;
   let prevTownElapsed = 0;
@@ -9271,6 +10695,33 @@ export function buildTownScene(): TownWorld {
       campfireFlameA.scale.set(1, fPulse, 1);
       campfireFlameB.scale.set(1, 1.05 - (fPulse - 0.9) * 0.8, 1);
       campfireGlowMat.opacity = isNight ? 0.52 + Math.sin(elapsed * 8) * 0.08 : 0.26;
+    }
+
+    // 7B. West Meadow Campsite Fire Flicker + Night & Proximity-Gated Neon String Lights
+    if (
+      westCampFlameA &&
+      westCampFlameB &&
+      westCampGlowMat &&
+      (!frustum || frustum.intersectsSphere(_westCampSphere)) &&
+      (!cameraPos || cameraPos.distanceToSquared(_westCampSphere.center) < 46 * 46)
+    ) {
+      const fPulse = 0.9 + Math.sin(elapsed * 10.2 + 0.6) * 0.14 + Math.cos(elapsed * 16.4) * 0.07;
+      westCampFlameA.scale.set(1, fPulse, 1);
+      westCampFlameB.scale.set(1, 1.06 - (fPulse - 0.9) * 0.85, 1);
+      westCampGlowMat.opacity = isNight ? 0.56 + Math.sin(elapsed * 7.5) * 0.09 : 0.28;
+    }
+    const showCampLantern =
+      isNight &&
+      (!cameraPos || cameraPos.distanceToSquared(_westCampSphere.center) < 42 * 42) &&
+      (!frustum || frustum.intersectsSphere(_westCampSphere));
+    if (showCampLantern !== lastCampLanternLit) {
+      lastCampLanternLit = showCampLantern;
+      if (westCampLanternMat) {
+        westCampLanternMat.emissiveIntensity = showCampLantern ? 0.92 : 0.12;
+      }
+      if (westCampLanternPoolMat) {
+        westCampLanternPoolMat.opacity = showCampLantern ? 0.24 : 0;
+      }
     }
 
     // 8. Fallback legacy lake bobber update if Play Together frame driver is idle

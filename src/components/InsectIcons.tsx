@@ -218,6 +218,7 @@ export function InsectIllustration({
 
   if (shapeKind === 'horned_beetle') {
     const isStag = speciesId === 'bo_kep_kim';
+    const isDeerHorn = speciesId === 'bo_sung_huou_nui';
     return (
       <svg viewBox="0 0 48 48" fill="none" className={className}>
         {/* Legs */}
@@ -227,6 +228,11 @@ export function InsectIllustration({
           <>
             <path d="M20.5 16.5C17 11.5 17 7.5 21 6.5C19.8 9.2 20.5 11.8 22.5 13.5" stroke={accentColor} strokeWidth="2.4" strokeLinecap="round" />
             <path d="M27.5 16.5C31 11.5 31 7.5 27 6.5C28.2 9.2 27.5 11.8 25.5 13.5" stroke={accentColor} strokeWidth="2.4" strokeLinecap="round" />
+          </>
+        ) : isDeerHorn ? (
+          <>
+            <path d="M21 17C16.5 12 15.5 7 18.5 5.5M18 11L13.5 9.5M19 8.5L21.5 6.5" stroke={accentColor} strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M27 17C31.5 12 32.5 7 29.5 5.5M30 11L34.5 9.5M29 8.5L26.5 6.5" stroke={accentColor} strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
           </>
         ) : (
           <path d="M24 17V7.5M21.5 8.5L24 6.5L26.5 8.5" stroke={accentColor} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -243,6 +249,7 @@ export function InsectIllustration({
   if (shapeKind === 'beetle' || shapeKind === 'stinkbug' || shapeKind === 'firefly') {
     const isShield = shapeKind === 'stinkbug';
     const isFirefly = shapeKind === 'firefly';
+    const isBarkBeetle = speciesId === 'bo_vo_si_cay';
     return (
       <svg viewBox="0 0 48 48" fill="none" className={className}>
         <path d="M16 20L11 17M14.5 26L9.5 26.5M16 32L11.5 36M32 20L37 17M33.5 26L38.5 26.5M32 32L36.5 36" stroke="#363230" strokeWidth="1.7" strokeLinecap="round" />
@@ -255,6 +262,11 @@ export function InsectIllustration({
           <ellipse cx="24" cy="34" rx="5.6" ry="3.8" fill={accentColor} />
         ) : (
           <line x1="24" y1="20" x2="24" y2="38" stroke="#1E2C27" strokeWidth="1.4" />
+        )}
+        {isBarkBeetle && (
+          <>
+            <path d="M19 23.5V34.5M29 23.5V34.5" stroke={accentColor} strokeWidth="2.1" strokeLinecap="round" />
+          </>
         )}
         <circle cx="24" cy="15.5" r="3.8" fill={isFirefly ? '#D95436' : accentColor} stroke="#24302C" strokeWidth="1.3" />
         <path d="M22 12.2L19.5 8.5M26 12.2L28.5 8.5" stroke="#363230" strokeWidth="1.4" strokeLinecap="round" />

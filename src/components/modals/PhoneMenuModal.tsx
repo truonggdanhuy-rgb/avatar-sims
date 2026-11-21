@@ -2,27 +2,22 @@ import React, {useEffect, useState} from 'react';
 import {
   ArrowLeft,
   ArrowUp,
-  Backpack,
   BookOpen,
-  Check,
   ClipboardList,
   CloudSun,
   Coins,
   Database,
-  Fish,
   Gamepad2,
   Gift,
   Heart,
   Home,
-  Info,
   Moon,
-  Package,
   Send,
   Settings,
   Shirt,
-  Sparkles,
   Sun,
   UserCircle2,
+  Utensils,
   Volume2,
   VolumeX,
   Warehouse,
@@ -31,59 +26,23 @@ import {
 } from 'lucide-react';
 import {
   AvatarConfig,
-  BugNetState,
   DailyQuestProgress,
   FishDexRecord,
-  FishingRodState,
   FishWaterType,
   GameStats,
   InsectDexRecord,
   InsectSpeciesId,
-  OwnedPetState,
-  PetSupplies,
-  PetSupplyId,
   RiverFishSpeciesId,
   TimeOfDay,
-  WoodenBoatState,
   ZoneId,
 } from '../../types/game';
-import {
-  getPetXpForNextLevel,
-  MAX_PET_INTIMACY,
-  PET_CATALOG,
-  PET_FEED_HUNGER_THRESHOLD,
-  PET_PLAY_HAPPINESS_THRESHOLD,
-  PET_SUPPLY_LIST,
-} from '../../data/petCatalog';
-import {
-  RIVER_FISH_LIST,
-  WOODEN_ROD_MAX_DURABILITY,
-  WOODEN_ROD_PRICE,
-  getRodRepairCost,
-} from '../../data/fishingCatalog';
-import {
-  INSECT_HABITAT_LABELS,
-  INSECT_LIST,
-  WOODEN_NET_MAX_DURABILITY,
-  WOODEN_NET_PRICE,
-  getNetRepairCost,
-} from '../../data/insectCatalog';
+import {RIVER_FISH_LIST} from '../../data/fishingCatalog';
+import {INSECT_HABITAT_LABELS, INSECT_LIST} from '../../data/insectCatalog';
+import {HUNGER_HUNGRY_THRESHOLD} from '../../data/foodCatalog';
 import {soundFX} from '../../utils/sound';
 import {AvatarPreview3D} from '../AvatarPreview3D';
-import {
-  FishIllustration,
-  MountCarIcon,
-  PetCatFaceIcon,
-  RodAndNetIcon,
-  WoodenBoatIcon,
-  WoodenRodIcon,
-} from '../FishingIcons';
-import {
-  CreatureBookIcon,
-  InsectIllustration,
-  WoodenNetIcon,
-} from '../InsectIcons';
-import {BlingBlingBadge, PetSpeciesIcon, PetSupplyIcon} from '../PetIcons';
+import {FishIllustration} from '../FishingIcons';
+import {CreatureBookIcon, InsectIllustration} from '../InsectIcons';
 
 interface PhoneMenuModalProps {
   zone: ZoneId;
@@ -94,26 +53,14 @@ interface PhoneMenuModalProps {
   dailyQuests: DailyQuestProgress;
   storageUsed: number;
   storageCapacity: number;
-  fishingRod: FishingRodState;
-  bugNet: BugNetState;
-  woodenBoat: WoodenBoatState;
   fishDex: Partial<Record<RiverFishSpeciesId, FishDexRecord>>;
   insectDex: Partial<Record<InsectSpeciesId, InsectDexRecord>>;
-  ownedPets: OwnedPetState[];
-  activePetId: string | null;
-  petSupplies: PetSupplies;
   accountCreatedAt: number;
   accountId: string;
   showJoystick: boolean;
   showJumpButton: boolean;
   teleportCooldownSec: number;
-  initialTab?: 'menu' | 'account' | 'guide' | 'bag' | 'fishdex';
-  initialBagSubTab?: 'list' | 'tools' | 'pets' | 'boats' | 'mounts';
-  onToggleEquipRod: () => void;
-  onToggleEquipNet: () => void;
-  onToggleSummonPet: (petId: string) => void;
-  onRenamePet: (petId: string, newName: string) => void;
-  onUsePetSupply: (petId: string, supplyId: PetSupplyId) => {ok: boolean; message: string};
+  initialTab?: 'menu' | 'account' | 'guide' | 'fishdex';
   onToggleJoystick: () => void;
   onToggleJumpButton: () => void;
   onTeleportToPlaza: () => void;
@@ -127,8 +74,7 @@ interface PhoneMenuModalProps {
   onClose: () => void;
 }
 
-type PhoneTab = 'menu' | 'account' | 'guide' | 'bag' | 'fishdex';
-type BagSubTab = 'list' | 'tools' | 'pets' | 'boats' | 'mounts';
+type PhoneTab = 'menu' | 'account' | 'guide' | 'fishdex';
 
 const ZONE_LABELS: Record<ZoneId, string> = {
   town: 'Thị Trấn',
@@ -164,26 +110,14 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   dailyQuests,
   storageUsed,
   storageCapacity,
-  fishingRod,
-  bugNet,
-  woodenBoat,
   fishDex,
   insectDex,
-  ownedPets,
-  activePetId,
-  petSupplies,
   accountCreatedAt,
   accountId,
   showJoystick,
   showJumpButton,
   teleportCooldownSec,
   initialTab = 'menu',
-  initialBagSubTab = 'list',
-  onToggleEquipRod,
-  onToggleEquipNet,
-  onToggleSummonPet,
-  onRenamePet,
-  onUsePetSupply,
   onToggleJoystick,
   onToggleJumpButton,
   onTeleportToPlaza,
@@ -197,11 +131,6 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   onClose,
 }) => {
   const [tab, setTab] = useState<PhoneTab>(initialTab);
-  const [bagSubTab, setBagSubTab] = useState<BagSubTab>(initialBagSubTab);
-  const [petsSubView, setPetsSubView] = useState<'pets' | 'supplies'>('pets');
-  const [selectedPetInfoId, setSelectedPetInfoId] = useState<string | null>(null);
-  const [petRenameDraft, setPetRenameDraft] = useState('');
-  const [petActionFeedback, setPetActionFeedback] = useState<string | null>(null);
   const [dexCategory, setDexCategory] = useState<'fish' | 'insects'>('fish');
   const [fishDexWater, setFishDexWater] = useState<FishWaterType>('river');
   const [deviceTime, setDeviceTime] = useState<string>(() => formatDeviceTime());
@@ -300,11 +229,11 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 <div>
-                  <div className="mb-0.5 flex items-center justify-between text-[10px] font-bold text-[#5B422E]">
+                  <div className="mb-0.5 flex items-center justify-between text-[9px] font-bold text-[#5B422E]">
                     <span className="flex items-center gap-0.5">
-                      <Zap className="h-3 w-3 text-[#E59A32]" />
+                      <Zap className="h-2.5 w-2.5 text-[#E59A32]" />
                       <span>Năng lượng</span>
                     </span>
                     <span className="tabular-nums">{stats.energy}%</span>
@@ -318,9 +247,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 </div>
 
                 <div>
-                  <div className="mb-0.5 flex items-center justify-between text-[10px] font-bold text-[#5B422E]">
+                  <div className="mb-0.5 flex items-center justify-between text-[9px] font-bold text-[#5B422E]">
                     <span className="flex items-center gap-0.5">
-                      <Heart className="h-3 w-3 text-[#E0647A]" />
+                      <Heart className="h-2.5 w-2.5 text-[#E0647A]" />
                       <span>Vui vẻ</span>
                     </span>
                     <span className="tabular-nums">{stats.mood}%</span>
@@ -329,6 +258,34 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                     <div
                       className="h-full rounded-full bg-[#E88394] transition-all"
                       style={{width: `${Math.max(0, Math.min(100, stats.mood))}%`}}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-0.5 flex items-center justify-between text-[9px] font-bold text-[#5B422E]">
+                    <span className="flex items-center gap-0.5">
+                      <Utensils className="h-2.5 w-2.5 text-[#D97724]" />
+                      <span>Độ no</span>
+                    </span>
+                    <span
+                      className={`tabular-nums ${
+                        (stats.hunger ?? 100) < HUNGER_HUNGRY_THRESHOLD ? 'font-black text-[#C4422B]' : ''
+                      }`}
+                    >
+                      {Math.round(Math.max(0, Math.min(100, stats.hunger ?? 100)))}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#EFE4D3]">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        (stats.hunger ?? 100) < HUNGER_HUNGRY_THRESHOLD
+                          ? 'bg-[#D94F4F]'
+                          : (stats.hunger ?? 100) <= 15
+                            ? 'bg-[#E87A35]'
+                            : 'bg-[#F0A44B]'
+                      }`}
+                      style={{width: `${Math.max(0, Math.min(100, stats.hunger ?? 100))}%`}}
                     />
                   </div>
                 </div>
@@ -376,29 +333,6 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </div>
                   <span className="text-[11px] font-bold leading-tight text-[#4A3525]">
                     Tủ Đồ
-                  </span>
-                </button>
-
-                {/* 3. Túi Đồ (Cần & Vợt · Pets · Cưỡi) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFX.tap();
-                    setBagSubTab('list');
-                    setTab('bag');
-                  }}
-                  className="group relative flex flex-col items-center gap-1.5 transition-transform active:scale-95"
-                >
-                  {(fishingRod.equipped || bugNet.equipped) && (
-                    <span className="absolute -top-1 right-2 z-10 rounded-md bg-[#45A168] px-1.5 py-0.5 text-[9px] font-extrabold text-white shadow-xs">
-                      Đang cầm
-                    </span>
-                  )}
-                  <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#E5C9A8] bg-gradient-to-br from-[#FFF4E3] to-[#F2D8B6] text-[#9A5B25] shadow-sm transition-transform group-hover:-translate-y-0.5">
-                    <Backpack className="h-7 w-7" strokeWidth={2.1} />
-                  </div>
-                  <span className="text-[11px] font-bold leading-tight text-[#4A3525]">
-                    Túi Đồ
                   </span>
                 </button>
 
@@ -697,822 +631,6 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
             </div>
           )}
 
-          {tab === 'bag' && (
-            <div className="flex h-full flex-col space-y-3">
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFX.tap();
-                    if (bagSubTab !== 'list') {
-                      setBagSubTab('list');
-                    } else {
-                      setTab('menu');
-                    }
-                  }}
-                  className="flex min-h-[36px] items-center gap-1 rounded-xl bg-[#EFE0C9] px-2.5 py-1 text-xs font-bold text-[#5B422E] active:scale-95"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  <span>{bagSubTab === 'list' ? 'Quay lại' : 'Túi Đồ'}</span>
-                </button>
-                <span className="text-xs font-extrabold text-[#4A3525]">
-                  {bagSubTab === 'list'
-                    ? 'Túi Đồ'
-                    : bagSubTab === 'tools'
-                      ? 'Cần & Vợt'
-                      : bagSubTab === 'pets'
-                        ? 'Pets'
-                        : bagSubTab === 'boats'
-                          ? 'Thuyền'
-                          : 'Cưỡi'}
-                </span>
-                <span className="w-16" />
-              </div>
-
-              {bagSubTab === 'list' && (
-                <div className="space-y-3">
-                  <div className="rounded-2xl border border-[#E5D4BA] bg-white p-3.5">
-                    <div className="mb-3 text-[11px] font-bold text-[#7B6247]">
-                      Chọn mục trong túi đồ:
-                    </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {/* Icon 1: Combined Fishing Rod + Bug Net icon */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundFX.tap();
-                          setBagSubTab('tools');
-                        }}
-                        className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#3C95AD] active:scale-95"
-                      >
-                        {(fishingRod.equipped || bugNet.equipped) && (
-                          <span className="absolute -top-1.5 right-1 rounded-full bg-[#45A168] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
-                            Đang cầm
-                          </span>
-                        )}
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
-                          <RodAndNetIcon className="h-11 w-11" />
-                        </div>
-                        <span className="text-[11px] font-extrabold text-[#4A3525]">
-                          Cần &amp; Vợt
-                        </span>
-                      </button>
-
-                      {/* Icon 2: Pets (Cat Face Icon) */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundFX.tap();
-                          setSelectedPetInfoId(null);
-                          setPetsSubView('pets');
-                          setPetActionFeedback(null);
-                          setBagSubTab('pets');
-                        }}
-                        className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#E08A58] active:scale-95"
-                      >
-                        {activePetId && (
-                          <span className="absolute -top-1.5 right-1 rounded-full bg-[#DF7E5C] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
-                            Đang gọi
-                          </span>
-                        )}
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
-                          <PetCatFaceIcon className="h-10 w-10" />
-                        </div>
-                        <span className="text-[11px] font-extrabold text-[#4A3525]">
-                          Pets
-                        </span>
-                      </button>
-
-                      {/* Icon 3: Thuyền (Wooden Boat Icon) */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundFX.tap();
-                          setBagSubTab('boats');
-                        }}
-                        className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#2E82A8] active:scale-95"
-                      >
-                        {woodenBoat.owned && (
-                          <span className="absolute -top-1.5 right-1 rounded-full bg-[#2E82A8] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
-                            Đã có
-                          </span>
-                        )}
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
-                          <WoodenBoatIcon className="h-10 w-10" />
-                        </div>
-                        <span className="text-[11px] font-extrabold text-[#4A3525]">
-                          Thuyền
-                        </span>
-                      </button>
-
-                      {/* Icon 4: Cưỡi (Vehicle / Car Icon) */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundFX.tap();
-                          setBagSubTab('mounts');
-                        }}
-                        className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#4F8FB5] active:scale-95"
-                      >
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
-                          <MountCarIcon className="h-10 w-10" />
-                        </div>
-                        <span className="text-[11px] font-extrabold text-[#4A3525]">
-                          Cưỡi
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {bagSubTab === 'tools' && (
-                <div className="space-y-2.5">
-                  {/* Wooden Rod Item */}
-                  <div className="rounded-2xl border-2 border-[#E3D1B2] bg-white p-3.5 space-y-2.5">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#C7E4EE] bg-[#EAF6FA]">
-                        <WoodenRodIcon className="h-10 w-10" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-black text-[#3B2A1A]">
-                            Cần Câu Gỗ
-                          </span>
-                          {fishingRod.owned ? (
-                            <span
-                              className={`text-[11px] font-black ${
-                                fishingRod.durability <= 0
-                                  ? 'text-[#D64545]'
-                                  : 'text-[#3C8863]'
-                              }`}
-                            >
-                              Độ bền {fishingRod.durability}/{fishingRod.maxDurability}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] font-bold text-[#9C7D5A]">
-                              Chưa có
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] font-semibold text-[#7A6048]">
-                          {fishingRod.owned
-                            ? `Bấm để trang bị. Độ bền tối đa ${WOODEN_ROD_MAX_DURABILITY} lần câu.`
-                            : `Mua tại Sạp Câu Cá của anh Koi gần Hồ Câu (${WOODEN_ROD_PRICE} Xu).`}
-                        </p>
-                      </div>
-                    </div>
-
-                    {fishingRod.owned && (
-                      <>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFE4D1]">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              fishingRod.durability <= 0
-                                ? 'bg-[#E15252]'
-                                : fishingRod.durability <= 7
-                                  ? 'bg-[#E89B35]'
-                                  : 'bg-[#48A878]'
-                            }`}
-                            style={{
-                              width: `${Math.round(
-                                (fishingRod.durability /
-                                  Math.max(1, fishingRod.maxDurability)) *
-                                  100,
-                              )}%`,
-                            }}
-                          />
-                        </div>
-
-                        {fishingRod.durability <= 0 && (
-                          <div className="rounded-xl border border-[#F3C1C1] bg-[#FDECEC] px-2.5 py-2 text-[11px] font-bold text-[#B63535]">
-                            Cần câu đang hỏng! Hãy thả cần bên bờ hồ để sửa nhanh với giá{' '}
-                            <span className="font-black">
-                              {getRodRepairCost(
-                                fishingRod.durability,
-                                fishingRod.maxDurability,
-                              )}{' '}
-                              Xu
-                            </span>
-                            .
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            soundFX.tap();
-                            onToggleEquipRod();
-                          }}
-                          className={`w-full rounded-xl py-2.5 text-xs font-black transition active:scale-98 ${
-                            fishingRod.equipped
-                              ? 'bg-[#D67C3A] text-white hover:bg-[#BE692B]'
-                              : 'bg-[#3C95AD] text-white hover:bg-[#2F7D93]'
-                          }`}
-                        >
-                          {fishingRod.equipped
-                            ? 'Cất Cần Câu (Tháo trang bị)'
-                            : 'Trang Bị Cần Câu'}
-                        </button>
-
-                        <div className="text-center text-[10px] font-semibold text-[#8A7257]">
-                          Lưu ý: Khi cầm cần câu/vợt, món đồ cầm tay thời trang sẽ tự cất vào Tủ Đồ.
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Wooden Bug Net Item */}
-                  <div className="rounded-2xl border-2 border-[#E3D1B2] bg-white p-3.5 space-y-2.5">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#C3E5CC] bg-[#EBF7EE]">
-                        <WoodenNetIcon className="h-10 w-10" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-black text-[#3B2A1A]">
-                            Vợt Gỗ
-                          </span>
-                          {bugNet.owned ? (
-                            <span
-                              className={`text-[11px] font-black ${
-                                bugNet.durability <= 0
-                                  ? 'text-[#D64545]'
-                                  : 'text-[#3C8863]'
-                              }`}
-                            >
-                              Độ bền {bugNet.durability}/{bugNet.maxDurability}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] font-bold text-[#9C7D5A]">
-                              Chưa có
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] font-semibold text-[#7A6048]">
-                          {bugNet.owned
-                            ? `Bắt buộc bật Joystick để rón rén & vung vợt. Độ bền ${WOODEN_NET_MAX_DURABILITY}.`
-                            : `Mua tại Sạp Câu & Vợt của anh Koi gần Hồ Câu (${WOODEN_NET_PRICE} Xu).`}
-                        </p>
-                      </div>
-                    </div>
-
-                    {bugNet.owned && (
-                      <>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFE4D1]">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              bugNet.durability <= 0
-                                ? 'bg-[#E15252]'
-                                : bugNet.durability <= 7
-                                  ? 'bg-[#E89B35]'
-                                  : 'bg-[#48A878]'
-                            }`}
-                            style={{
-                              width: `${Math.round(
-                                (bugNet.durability / Math.max(1, bugNet.maxDurability)) * 100,
-                              )}%`,
-                            }}
-                          />
-                        </div>
-
-                        {bugNet.durability <= 0 && (
-                          <div className="rounded-xl border border-[#F3C1C1] bg-[#FDECEC] px-2.5 py-2 text-[11px] font-bold text-[#B63535]">
-                            Vợt gỗ đang hỏng! Bấm nút Bắt trong Thị Trấn để sửa với giá{' '}
-                            <span className="font-black">
-                              {getNetRepairCost(bugNet.durability, bugNet.maxDurability)} Xu
-                            </span>
-                            .
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            soundFX.tap();
-                            onToggleEquipNet();
-                          }}
-                          className={`w-full rounded-xl py-2.5 text-xs font-black transition active:scale-98 ${
-                            bugNet.equipped
-                              ? 'bg-[#D67C3A] text-white hover:bg-[#BE692B]'
-                              : 'bg-[#439A6C] text-white hover:bg-[#358059]'
-                          }`}
-                        >
-                          {bugNet.equipped ? 'Cất Vợt Gỗ (Tháo trang bị)' : 'Trang Bị Vợt Gỗ'}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {bagSubTab === 'pets' && (() => {
-                const infoPet = selectedPetInfoId
-                  ? ownedPets.find((p) => p.id === selectedPetInfoId) ?? null
-                  : null;
-                const activePetObj = activePetId
-                  ? ownedPets.find((p) => p.id === activePetId) ?? null
-                  : ownedPets[0] ?? null;
-
-                if (infoPet) {
-                  const spec = PET_CATALOG[infoPet.speciesId];
-                  const isMax = infoPet.intimacyLevel >= MAX_PET_INTIMACY;
-                  const reqXp = getPetXpForNextLevel(infoPet.intimacyLevel);
-                  const pct = isMax
-                    ? 100
-                    : Math.min(100, Math.round((infoPet.intimacyXp / Math.max(1, reqXp)) * 100));
-
-                  return (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            soundFX.tap();
-                            setSelectedPetInfoId(null);
-                            setPetActionFeedback(null);
-                          }}
-                          className="flex items-center gap-1 rounded-xl bg-[#EFE0C9] px-2.5 py-1.5 text-[11px] font-bold text-[#5B422E] active:scale-95"
-                        >
-                          <ArrowLeft className="h-3.5 w-3.5" />
-                          <span>Danh sách Pets</span>
-                        </button>
-                        <span className="text-[11px] font-extrabold text-[#7B6247]">
-                          Thông Tin Pet
-                        </span>
-                      </div>
-
-                      <div className="rounded-2xl border-2 border-[#E7CFAF] bg-white p-3.5 shadow-xs space-y-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[#EFE0C9] bg-[#FFF8EC]">
-                            <PetSpeciesIcon speciesId={infoPet.speciesId} className="h-11 w-11" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1 text-sm font-black text-[#4A3525]">
-                              {isMax && <BlingBlingBadge className="h-4 w-4" />}
-                              <span className="truncate">{infoPet.name}</span>
-                            </div>
-                            <div className="mt-0.5 text-[11px] font-bold text-[#7A6048]">
-                              Loài: {spec.name} · {spec.moveType === 'fly' ? 'Bay bên trái' : 'Đi bộ'}
-                            </div>
-                            <div className="mt-0.5 text-[10px] font-bold text-[#9C653C]">
-                              Tương tác: {spec.canHold ? (spec.holdMode === 'fly_orbit' ? 'Bay quanh người' : 'Đi quanh người') : 'Không hỗ trợ'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Intimacy & Health */}
-                        <div className="rounded-xl bg-[#FAF4EA] p-2.5 space-y-1.5">
-                          <div className="flex items-center justify-between text-[11px] font-black text-[#5A3E28]">
-                            <span className="inline-flex items-center gap-1">
-                              <Heart className="h-3.5 w-3.5 text-[#E56B8A] fill-current" />
-                              Độ thân mật: Lv.{infoPet.intimacyLevel}/{MAX_PET_INTIMACY}
-                            </span>
-                            <span
-                              className={`rounded px-1.5 py-0.5 text-[10px] font-extrabold ${
-                                infoPet.sick
-                                  ? 'bg-[#FCE4E8] text-[#C93B4B]'
-                                  : 'bg-[#E5F6EB] text-[#2B7344]'
-                              }`}
-                            >
-                              {infoPet.sick ? 'Đang bị bệnh' : 'Khỏe mạnh'}
-                            </span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-[#EAD9C0]">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-[#EE7394] to-[#F5AA4E] transition-all"
-                              style={{width: `${pct}%`}}
-                            />
-                          </div>
-                          <div className="text-[10px] font-bold text-[#7A6048]">
-                            {isMax
-                              ? 'Đã đạt cấp 10 — Tên pet hiển thị hiệu ứng bling bling!'
-                              : `Tiến độ lên cấp: ${infoPet.intimacyXp}/${reqXp}`}
-                          </div>
-                        </div>
-
-                        {/* Care Progress Bars: Hunger & Happiness */}
-                        {(() => {
-                          const hungerPct = Math.round(
-                            Math.max(0, Math.min(100, infoPet.hunger ?? 75)),
-                          );
-                          const happinessPct = Math.round(
-                            Math.max(0, Math.min(100, infoPet.happiness ?? 75)),
-                          );
-                          return (
-                            <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#FAF4EA] p-2.5">
-                              <div className="space-y-1">
-                                <div className="flex items-center justify-between text-[10px] font-black text-[#5A3E28]">
-                                  <span>Độ no</span>
-                                  <span className="tabular-nums text-[#B86A1B]">{hungerPct}%</span>
-                                </div>
-                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#EAD9C0]">
-                                  <div
-                                    className="h-full rounded-full bg-[#F0A44B] transition-all"
-                                    style={{width: `${hungerPct}%`}}
-                                  />
-                                </div>
-                                <div className="text-[9px] font-bold text-[#8A7058]">
-                                  {hungerPct < PET_FEED_HUNGER_THRESHOLD
-                                    ? 'Cho ăn (+1 thân mật)'
-                                    : 'Đang no'}
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex items-center justify-between text-[10px] font-black text-[#5A3E28]">
-                                  <span>Vui vẻ</span>
-                                  <span className="tabular-nums text-[#2E86B0]">{happinessPct}%</span>
-                                </div>
-                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#DCE9F2]">
-                                  <div
-                                    className="h-full rounded-full bg-[#47A9D8] transition-all"
-                                    style={{width: `${happinessPct}%`}}
-                                  />
-                                </div>
-                                <div className="text-[9px] font-bold text-[#678094]">
-                                  {happinessPct < PET_PLAY_HAPPINESS_THRESHOLD
-                                    ? 'Chơi (+1 thân mật)'
-                                    : 'Đang rất vui'}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* Rename Input */}
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            const trimmed = petRenameDraft.trim();
-                            if (!trimmed) return;
-                            soundFX.sparkle();
-                            onRenamePet(infoPet.id, trimmed);
-                            setPetActionFeedback(`Đã đổi tên thành "${trimmed}"!`);
-                          }}
-                          className="space-y-1.5"
-                        >
-                          <label className="block text-[11px] font-extrabold text-[#5A3E28]">
-                            Đổi tên thú cưng:
-                          </label>
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="text"
-                              value={petRenameDraft}
-                              onChange={(e) => setPetRenameDraft(e.target.value)}
-                              maxLength={18}
-                              placeholder="Nhập tên mới..."
-                              className="min-w-0 flex-1 rounded-xl border border-[#DECBB0] bg-[#FAF4EA] px-3 py-2 text-xs font-bold text-[#3B2A1A] focus:border-[#6F4E37] focus:outline-none"
-                            />
-                            <button
-                              type="submit"
-                              className="flex shrink-0 items-center gap-1 rounded-xl bg-[#6F4E37] px-3 py-2 text-xs font-black text-amber-50 active:scale-95"
-                            >
-                              <Check className="h-3.5 w-3.5" />
-                              Lưu
-                            </button>
-                          </div>
-                        </form>
-
-                        {/* Quick Use Pet Supplies on this Pet */}
-                        <div className="border-t border-[#F0E3D1] pt-2.5 space-y-1.5">
-                          <div className="text-[10px] font-extrabold text-[#7B6247]">
-                            Dùng đồ từ Túi &gt; Pets cho bé này:
-                          </div>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {PET_SUPPLY_LIST.map((sup) => {
-                              const count = petSupplies[sup.id] ?? 0;
-                              const isFull =
-                                sup.id === 'petFood' &&
-                                (infoPet.hunger ?? 75) >= PET_FEED_HUNGER_THRESHOLD;
-                              const disabled =
-                                count <= 0 ||
-                                isFull ||
-                                (sup.id === 'petMedicine' && !infoPet.sick) ||
-                                (sup.id === 'intimacyTest' && isMax);
-                              return (
-                                <button
-                                  key={sup.id}
-                                  type="button"
-                                  disabled={disabled}
-                                  onClick={() => {
-                                    const res = onUsePetSupply(infoPet.id, sup.id);
-                                    if (res.ok) soundFX.sparkle();
-                                    else soundFX.tap();
-                                    setPetActionFeedback(res.message);
-                                  }}
-                                  className="flex flex-col items-center gap-1 rounded-xl border border-[#E5D3B8] bg-[#FFF9F0] p-1.5 text-center transition active:scale-95 disabled:opacity-45"
-                                >
-                                  <PetSupplyIcon supplyId={sup.id} className="h-6 w-6" />
-                                  <span className="line-clamp-1 text-[9px] font-extrabold text-[#4A3525]">
-                                    {sup.id === 'intimacyTest'
-                                      ? 'Test Lv+'
-                                      : sup.id === 'petMedicine'
-                                        ? 'Thuốc'
-                                        : isFull
-                                          ? 'Đã no'
-                                          : 'Cho ăn'}
-                                  </span>
-                                  <span className="text-[9px] font-black text-[#9A5B25] tabular-nums">
-                                    x{count}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {petActionFeedback && (
-                          <div className="rounded-xl bg-[#EAF8EE] px-2.5 py-1.5 text-[11px] font-bold text-[#2A6E40]">
-                            {petActionFeedback}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="flex flex-1 flex-col space-y-2.5">
-                    {/* Sub-switcher: Pets List (default, ONLY pets!) vs Pet Supplies */}
-                    <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-[#EFE6D6] p-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundFX.tap();
-                          setPetsSubView('pets');
-                        }}
-                        className={`rounded-lg py-1.5 text-[11px] font-black transition ${
-                          petsSubView === 'pets'
-                            ? 'bg-[#DF7E5C] text-white shadow-xs'
-                            : 'text-[#6A5138]'
-                        }`}
-                      >
-                        Thú Cưng ({ownedPets.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundFX.tap();
-                          setPetsSubView('supplies');
-                        }}
-                        className={`flex items-center justify-center gap-1 rounded-lg py-1.5 text-[11px] font-black transition ${
-                          petsSubView === 'supplies'
-                            ? 'bg-[#49A58D] text-white shadow-xs'
-                            : 'text-[#6A5138]'
-                        }`}
-                      >
-                        <Package className="h-3 w-3" />
-                        Đồ Dùng Pets
-                      </button>
-                    </div>
-
-                    {petsSubView === 'pets' ? (
-                      ownedPets.length === 0 ? (
-                        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#E8CBB0] bg-[#FFF8F0] p-5 text-center">
-                          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#F0D9C2] bg-white shadow-xs">
-                            <PetCatFaceIcon className="h-12 w-12" />
-                          </div>
-                          <div className="text-sm font-black text-[#5C3D24]">
-                            Chưa có thú cưng nào
-                          </div>
-                          <p className="mt-1.5 text-xs leading-relaxed font-semibold text-[#7D6147]">
-                            Hãy ghé <strong className="text-[#B85B38]">Cửa Hàng Pets</strong> trong thị trấn để nhận nuôi bé Cún Nâu hoặc Chim Xanh nhé!
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2.5">
-                          {ownedPets.map((pet) => {
-                            const spec = PET_CATALOG[pet.speciesId];
-                            const isActive = activePetId === pet.id;
-                            const isMax = pet.intimacyLevel >= MAX_PET_INTIMACY;
-                            return (
-                              <div
-                                key={pet.id}
-                                className={`relative rounded-2xl border-2 bg-white p-3 shadow-xs transition ${
-                                  isActive
-                                    ? 'border-[#DF7E5C] bg-[#FFFDF9]'
-                                    : 'border-[#E6D4BC]'
-                                }`}
-                              >
-                                {/* 'i' Info Button at Top-Right of Pet Card */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    soundFX.tap();
-                                    setPetRenameDraft(pet.name);
-                                    setPetActionFeedback(null);
-                                    setSelectedPetInfoId(pet.id);
-                                  }}
-                                  aria-label={`Thông tin ${pet.name}`}
-                                  title="Thông tin & Đổi tên"
-                                  className="absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full border border-[#DECBB0] bg-[#FFF7EA] text-[#6F4E37] shadow-2xs transition hover:bg-[#F3E4CE] active:scale-90"
-                                >
-                                  <Info className="h-3.5 w-3.5" />
-                                </button>
-
-                                <div className="flex items-center gap-3 pr-8">
-                                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#EFE0C9] bg-[#FFF7EC]">
-                                    <PetSpeciesIcon speciesId={pet.speciesId} className="h-10 w-10" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1 text-xs font-black text-[#4A3525]">
-                                      {isMax && <BlingBlingBadge className="h-3.5 w-3.5" />}
-                                      <span className="truncate">{pet.name}</span>
-                                    </div>
-                                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-[#7A6048]">
-                                      <span>{spec.moveType === 'fly' ? 'Bay' : 'Đi bộ'}</span>
-                                      <span>·</span>
-                                      <span className="text-[#C84A6E]">
-                                        Thân mật Lv.{pet.intimacyLevel}
-                                      </span>
-                                      {pet.sick && (
-                                        <span className="rounded bg-[#FCE4E8] px-1 py-px text-[#C93B4B]">
-                                          Ốm
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                                      <div>
-                                        <div className="flex justify-between text-[9px] font-bold text-[#8B6232]">
-                                          <span>Độ no</span>
-                                          <span className="tabular-nums">
-                                            {Math.round(Math.max(0, Math.min(100, pet.hunger ?? 75)))}%
-                                          </span>
-                                        </div>
-                                        <div className="h-1 w-full overflow-hidden rounded-full bg-[#EFE2CC]">
-                                          <div
-                                            className="h-full rounded-full bg-[#EE9F42]"
-                                            style={{
-                                              width: `${Math.round(Math.max(0, Math.min(100, pet.hunger ?? 75)))}%`,
-                                            }}
-                                          />
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <div className="flex justify-between text-[9px] font-bold text-[#2E779A]">
-                                          <span>Vui vẻ</span>
-                                          <span className="tabular-nums">
-                                            {Math.round(Math.max(0, Math.min(100, pet.happiness ?? 75)))}%
-                                          </span>
-                                        </div>
-                                        <div className="h-1 w-full overflow-hidden rounded-full bg-[#DCEAF2]">
-                                          <div
-                                            className="h-full rounded-full bg-[#48A8D6]"
-                                            style={{
-                                              width: `${Math.round(Math.max(0, Math.min(100, pet.happiness ?? 75)))}%`,
-                                            }}
-                                          />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    soundFX.tap();
-                                    onToggleSummonPet(pet.id);
-                                  }}
-                                  className={`mt-2.5 w-full rounded-xl py-2 text-xs font-black transition active:scale-98 ${
-                                    isActive
-                                      ? 'bg-[#D67C3A] text-white'
-                                      : 'bg-[#439A6C] text-white'
-                                  }`}
-                                >
-                                  {isActive ? 'Thu Hồi Pet' : 'Gọi Pet Đồng Hành'}
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )
-                    ) : (
-                      <div className="space-y-2.5">
-                        {PET_SUPPLY_LIST.map((sup) => {
-                          const count = petSupplies[sup.id] ?? 0;
-                          const isTest = sup.id === 'intimacyTest';
-                          const targetPet = activePetObj;
-                          const isFullFood =
-                            Boolean(targetPet) &&
-                            sup.id === 'petFood' &&
-                            (targetPet!.hunger ?? 75) >= PET_FEED_HUNGER_THRESHOLD;
-                          const canUse = Boolean(
-                            targetPet &&
-                              count > 0 &&
-                              !isFullFood &&
-                              !(sup.id === 'petMedicine' && !targetPet.sick) &&
-                              !(sup.id === 'intimacyTest' && targetPet.intimacyLevel >= MAX_PET_INTIMACY),
-                          );
-                          return (
-                            <div
-                              key={sup.id}
-                              className="rounded-2xl border-2 border-[#E6D4BC] bg-white p-3 space-y-2"
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#EFE0C9] bg-[#FFF8EC]">
-                                  <PetSupplyIcon supplyId={sup.id} className="h-8 w-8" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="flex items-center gap-1 text-xs font-black text-[#4A3525]">
-                                      {isTest && <Sparkles className="h-3 w-3 text-[#D85A9E]" />}
-                                      {sup.name}
-                                    </span>
-                                    <span className="rounded bg-[#F3E9D8] px-1.5 py-0.5 text-[10px] font-black text-[#6B4E34] tabular-nums">
-                                      x{count}
-                                    </span>
-                                  </div>
-                                  <p className="mt-0.5 text-[10px] font-semibold text-[#7A6048]">
-                                    {sup.description}
-                                  </p>
-                                </div>
-                              </div>
-                              {targetPet && (
-                                <button
-                                  type="button"
-                                  disabled={!canUse}
-                                  onClick={() => {
-                                    const res = onUsePetSupply(targetPet.id, sup.id);
-                                    if (res.ok) soundFX.sparkle();
-                                    else soundFX.tap();
-                                    setPetActionFeedback(res.message);
-                                  }}
-                                  className="w-full rounded-xl bg-[#49A58D] py-1.5 text-[11px] font-black text-white transition active:scale-95 disabled:cursor-not-allowed disabled:bg-[#DDD5C9] disabled:text-[#8E8275]"
-                                >
-                                  {isFullFood
-                                    ? `Đã no (${targetPet.name})`
-                                    : `Dùng cho ${targetPet.name}`}
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {petActionFeedback && (
-                          <div className="rounded-xl bg-[#EAF8EE] px-2.5 py-2 text-[11px] font-bold text-[#2A6E40]">
-                            {petActionFeedback}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {bagSubTab === 'boats' && (
-                <div className="space-y-2.5">
-                  <div className="rounded-2xl border-2 border-[#BFE0EE] bg-white p-3.5 space-y-2.5">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#BFE0EE] bg-[#EAF6FA]">
-                        <WoodenBoatIcon className="h-11 w-11" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-black text-[#264B5E]">Thuyền Gỗ</span>
-                          {woodenBoat.owned ? (
-                            <span className="rounded-full bg-[#DCEFF8] px-2 py-0.5 text-[10px] font-black text-[#246A8A]">
-                              Đã sở hữu
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-[#F1E8D8] px-2 py-0.5 text-[10px] font-black text-[#8A7154]">
-                              Chưa có
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-0.5 text-[11px] font-bold text-[#467A94]">
-                          {woodenBoat.owned
-                            ? 'Bấm biển hiệu hình thuyền ở bến sông Khu Sinh Thái để chèo thuyền & câu cá!'
-                            : 'Ghé Sạp Thuyền của NPC Ship ở Khu Sinh Thái phía Tây (320 Xu) để mua.'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-[#DCEBF2] bg-[#F4FAFD] px-3 py-2 text-[11px] font-semibold leading-relaxed text-[#436D82]">
-                      Hiện tại dùng để chèo dọc sông Khu Sinh Thái (vừa đứng trên thuyền vừa quăng cần câu cá). Sau này sẽ mở khóa tính năng bơi thuyền ra <b>Biển</b>!
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {bagSubTab === 'mounts' && (
-                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#BBD6EA] bg-[#F2F8FC] p-5 text-center">
-                  <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-xs border border-[#CCE2F2]">
-                    <MountCarIcon className="h-12 w-12" />
-                  </div>
-                  <div className="text-sm font-black text-[#2C5370]">
-                    Phương Tiện Cưỡi &amp; Xe
-                  </div>
-                  <span className="mt-1 rounded-full bg-[#DCEEFB] px-2.5 py-0.5 text-[10px] font-extrabold text-[#2B6894]">
-                    Sắp ra mắt
-                  </span>
-                  <p className="mt-2 text-xs font-semibold leading-relaxed text-[#577994]">
-                    Các loại xe đạp, xe hơi mini và thú cưỡi sẽ được mở bán ở bản cập nhật sắp tới!
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
           {tab === 'fishdex' && (() => {
             const fishDiscovered = RIVER_FISH_LIST.filter(
               (s) => (fishDex[s.id]?.caughtCount ?? 0) > 0,
@@ -1711,7 +829,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                       Bộ Sưu Tập Cá Biển · Sắp Ra Mắt
                     </div>
                     <p className="mt-1.5 text-xs font-semibold leading-relaxed text-[#567996]">
-                      Các loài cá biển sẽ được mở rộng trong bản cập nhật tới. Hiện tại hãy sưu tầm đủ 8 loài Cá Sông nhé!
+                      Các loài cá biển sẽ được mở rộng trong bản cập nhật tới. Hiện tại hãy sưu tầm đủ {totalFish} loài Cá Sông nhé!
                     </p>
                   </div>
                 ) : (
@@ -1817,7 +935,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 setTab('menu');
               }}
               className={`flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-colors ${
-                tab === 'menu' || tab === 'account' || tab === 'bag' || tab === 'fishdex'
+                tab === 'menu' || tab === 'account' || tab === 'fishdex'
                   ? 'bg-[#6F4E37] text-amber-50 shadow-xs'
                   : 'bg-[#E9D9C3] text-[#5B422E]'
               }`}

@@ -17,6 +17,7 @@ export interface InsectAnchor {
   y: number;
   z: number;
   habitat: InsectHabitat;
+  clingAngle?: number;
 }
 
 export interface InsectCatchEvaluation {
@@ -61,7 +62,7 @@ interface ActiveInsect {
   animAccum: number;
 }
 
-const ACTIVE_INSECT_COUNT = 38;
+const ACTIVE_INSECT_COUNT = 44;
 const _cullSphere = new THREE.Sphere();
 
 function buildAlertBadge(
@@ -264,13 +265,13 @@ function createInsectMeshForSpecies(
     head.position.set(0, 0.032, 0.088);
     bodyGroup.add(shell, head);
 
-    if (spec.id === 'bo_kep_kim') {
-      const pGeo = getGeo('hb_pincer', () => new THREE.ConeGeometry(0.012, 0.078, 5));
+    if (spec.id === 'bo_kep_kim' || spec.id === 'bo_sung_huou_nui') {
+      const pGeo = getGeo('hb_pincer', () => new THREE.ConeGeometry(0.012, 0.082, 5));
       [-1, 1].forEach((s) => {
         const p = new THREE.Mesh(pGeo, accentMat);
         p.rotation.x = Math.PI / 2;
         p.rotation.z = s * 0.28;
-        p.position.set(s * 0.026, 0.038, 0.14);
+        p.position.set(s * 0.026, 0.038, 0.142);
         bodyGroup.add(p);
       });
     } else {
@@ -400,19 +401,50 @@ export class TownInsectManager {
     return this.pickAnchorForHabitat(habitat);
   }
 
+  private applyAnchorPosture(
+    root: THREE.Group,
+    bodyGroup: THREE.Group,
+    alertGroup: THREE.Group,
+    isFly: boolean,
+    anchor: InsectAnchor,
+    rotY: number,
+  ): number {
+    const isBarkCling =
+      !isFly && anchor.habitat === 'tree' && typeof anchor.clingAngle === 'number';
+    if (isBarkCling) {
+      // Back shell faces radially outward along clingAngle while head points upward (+Y)
+      bodyGroup.rotation.x = -Math.PI / 2;
+      const barkYaw = (anchor.clingAngle ?? 0) + Math.PI;
+      root.rotation.set(0, barkYaw, 0);
+      alertGroup.position.set(0, 0.28, -0.18);
+      return barkYaw;
+    }
+    bodyGroup.rotation.x = 0;
+    root.rotation.set(0, rotY, 0);
+    alertGroup.position.set(0, 0.36, 0);
+    return rotY;
+  }
+
   private spawnAtAnchor(species: InsectSpeciesDefinition, anchor: InsectAnchor): ActiveInsect {
     const built = createInsectMeshForSpecies(species, this.matCache, this.geoCache);
     const root = new THREE.Group();
     const alertGroup = buildAlertBadge(this.alertRedMat, this.alertWhiteMat);
-    alertGroup.position.set(0, 0.36, 0);
     root.add(built.bodyGroup, alertGroup);
 
     const isFly = built.isFlyingHover;
-    const baseY = anchor.y + (isFly ? 0.36 + Math.random() * 0.28 : 0.04);
+    const isBarkCling =
+      !isFly && anchor.habitat === 'tree' && typeof anchor.clingAngle === 'number';
+    const baseY = anchor.y + (isFly ? 0.36 + Math.random() * 0.28 : isBarkCling ? 0 : 0.04);
     const pos = new THREE.Vector3(anchor.x, baseY, anchor.z);
     root.position.copy(pos);
-    const rotY = Math.random() * Math.PI * 2;
-    root.rotation.y = rotY;
+    const rotY = this.applyAnchorPosture(
+      root,
+      built.bodyGroup,
+      alertGroup,
+      isFly,
+      anchor,
+      Math.random() * Math.PI * 2,
+    );
     this.parent.add(root);
 
     return {
@@ -478,8 +510,11 @@ export class TownInsectManager {
     const nextAnchor = this.pickDartAnchor(inst.pos, inst.species.habitat);
     inst.anchor = nextAnchor;
     inst.dartStart.copy(inst.pos);
-    const destY = nextAnchor.y + (inst.isFlyingHover ? 0.36 + Math.random() * 0.28 : 0.05);
+    const isNextBark =
+      !inst.isFlyingHover && nextAnchor.habitat === 'tree' && typeof nextAnchor.clingAngle === 'number';
+    const destY = nextAnchor.y + (inst.isFlyingHover ? 0.36 + Math.random() * 0.28 : isNextBark ? 0 : 0.05);
     inst.dartEnd.set(nextAnchor.x, destY, nextAnchor.z);
+    inst.bodyGroup.rotation.x = 0;
     inst.rotY = Math.atan2(inst.dartEnd.x - inst.dartStart.x, inst.dartEnd.z - inst.dartStart.z);
     inst.state = 'darting';
     inst.stateTimer = 0;
@@ -560,6 +595,14 @@ export class TownInsectManager {
         if (u >= 1) {
           inst.state = 'active';
           inst.stateTimer = 0;
+          inst.rotY = this.applyAnchorPosture(
+            inst.root,
+            inst.bodyGroup,
+            inst.alertGroup,
+            inst.isFlyingHover,
+            inst.anchor,
+            inst.rotY,
+          );
         }
         continue;
       }
@@ -615,6 +658,12 @@ export class TownInsectManager {
           const flap = Math.sin(elapsed * inst.wingSpeed + inst.phase) * 0.72;
           inst.leftWing.rotation.z = -flap;
           inst.rightWing.rotation.z = flap;
+        }
+      } else if (inst.anchor.habitat === 'tree' && typeof inst.anchor.clingAngle === 'number') {
+        if (!isFar) {
+          const climbMicro = Math.sin(elapsed * 1.8 + inst.phase) * 0.032;
+          inst.root.position.set(inst.pos.x, inst.pos.y + climbMicro, inst.pos.z);
+          inst.bodyGroup.rotation.y = Math.sin(elapsed * 1.1 + inst.phase) * 0.14;
         }
       } else {
         if (!isFar) {

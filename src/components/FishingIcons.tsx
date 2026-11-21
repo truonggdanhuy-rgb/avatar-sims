@@ -470,5 +470,83 @@ export function FishIllustration({
           <circle cx="16.4" cy="29.4" r="0.7" fill="#FFFFFF" />
         </svg>
       );
+
+    case 'ca_ro_dong':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Spiky dorsal fin */}
+          <path d="M22 23L27 15L31 20L36 14L41 21L46 17L47 25Z" fill="#7A8F58" stroke="#3D4C26" strokeWidth="1.8" strokeLinejoin="round" />
+          {/* Oval bronze-olive climbing perch body */}
+          <ellipse cx="32" cy="34" rx="19" ry="11.5" fill="#92A164" stroke="#3D4C26" strokeWidth="2.3" />
+          <path d="M50 34L59 25V43Z" fill="#7A8F58" stroke="#3D4C26" strokeWidth="2" strokeLinejoin="round" />
+          <path d="M24 27L24 39M31 26L31 40M38 27L38 39" stroke="#5E6E3B" strokeWidth="2" strokeLinecap="round" opacity="0.6" />
+          <circle cx="22" cy="32" r="2.5" fill="#3D4C26" opacity="0.45" />
+          <circle cx="18" cy="32" r="2.4" fill="#FFFDF5" />
+          <circle cx="17.5" cy="32" r="1.3" fill="#1F2937" />
+        </svg>
+      );
+
+    case 'ca_tre_vang':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Catfish barbels / whiskers */}
+          <path d="M12 33C6 29 5 24 8 21M12 36C6 39 5 44 9 47" stroke="#8C5E14" strokeWidth="2.2" strokeLinecap="round" />
+          {/* Elongated golden catfish body */}
+          <path d="M11 34C11 26 24 23 36 25C45 27 51 30 56 33L52 37C45 41 25 43 13 38C11.5 37 11 35.5 11 34Z" fill="#E6AE42" stroke="#8C5E14" strokeWidth="2.3" strokeLinejoin="round" />
+          {/* Tail & dorsal fin */}
+          <path d="M52 34L60 27V41Z" fill="#D4952C" stroke="#8C5E14" strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M22 25L27 17L32 25Z" fill="#D4952C" stroke="#8C5E14" strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M18 37Q31 41 44 37" stroke="#FFE599" strokeWidth="3" strokeLinecap="round" />
+          <circle cx="17" cy="31" r="2.1" fill="#1F2937" />
+          <circle cx="16.5" cy="30.4" r="0.7" fill="#FFFFFF" />
+        </svg>
+      );
+
+    case 'ca_tai_tuong_do':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Big sweeping red-orange fins */}
+          <path d="M23 20C31 11 45 12 49 23L42 27Z" fill="#E85A3F" stroke="#8C2A1A" strokeWidth="2" strokeLinejoin="round" />
+          <path d="M25 44C32 52 44 51 48 42L39 39Z" fill="#E85A3F" stroke="#8C2A1A" strokeWidth="2" strokeLinejoin="round" />
+          {/* Deep ivory-pink giant gourami body */}
+          <ellipse cx="32" cy="33" rx="19" ry="13.5" fill="#FCE5D2" stroke="#8C2A1A" strokeWidth="2.3" />
+          <path d="M49 33L59 23L57 33L59 43Z" fill="#EA654B" stroke="#8C2A1A" strokeWidth="2" strokeLinejoin="round" />
+          {/* Rosy blush & prominent gourami head bump */}
+          <path d="M14 31C14 23 20 20 26 21" stroke="#F4A088" strokeWidth="3" strokeLinecap="round" />
+          <path d="M26 36L20 42" stroke="#E85A3F" strokeWidth="2.6" strokeLinecap="round" />
+          <circle cx="19.5" cy="30.5" r="2.6" fill="#FFFFFF" stroke="#8C2A1A" strokeWidth="1.2" />
+          <circle cx="19" cy="30.5" r="1.4" fill="#1E293B" />
+        </svg>
+      );
+
+    case 'ca_rong_bac':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Silver Arowana barbels */}
+          <path d="M9 32L4 28M10 35L4 37" stroke="#5D7D94" strokeWidth="2" strokeLinecap="round" />
+          {/* Long sleek silver iridescent body */}
+          <path d="M10 31C18 22 40 22 52 29L58 24L56 33L58 41L50 37C39 42 18 41 10 31Z" fill="#E5EFF5" stroke="#4D6E85" strokeWidth="2.3" strokeLinejoin="round" />
+          {/* Dorsal & anal trailing fins */}
+          <path d="M36 24L51 21L49 27Z" fill="#9BC9E3" stroke="#4D6E85" strokeWidth="1.6" />
+          <path d="M35 39L50 43L48 37Z" fill="#9BC9E3" stroke="#4D6E85" strokeWidth="1.6" />
+          {/* Iridescent diamond scales */}
+          <path d="M23 29L27 32L23 35L19 32Z M31 28L35 32L31 36L27 32Z M39 29L43 32L39 35L35 32Z" stroke="#85B3CC" strokeWidth="1.4" fill="#F2FBFF" />
+          <circle cx="15" cy="30" r="2.2" fill="#FFE66D" stroke="#4D6E85" strokeWidth="1.2" />
+          <circle cx="14.7" cy="30" r="1.1" fill="#1E293B" />
+        </svg>
+      );
+
+    case 'ca_tam_song':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Sturgeon sharp snout & armored dorsal scutes */}
+          <path d="M6 34L17 28L47 28L58 21L53 33L57 42L45 36L16 38Z" fill="#6B7E8C" stroke="#2D3E4A" strokeWidth="2.3" strokeLinejoin="round" />
+          <path d="M20 27L23 22L26 27L29 22L32 27L35 22L38 27" stroke="#D1DEE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M18 36H44" stroke="#E2ECF2" strokeWidth="2.5" strokeDasharray="3 4" strokeLinecap="round" />
+          <path d="M10 36L8 41M13 36.5L12 41" stroke="#475A66" strokeWidth="1.6" strokeLinecap="round" />
+          <circle cx="17" cy="31.5" r="2.1" fill="#FFFDF5" />
+          <circle cx="16.6" cy="31.5" r="1.1" fill="#1E293B" />
+        </svg>
+      );
   }
 }

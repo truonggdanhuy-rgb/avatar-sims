@@ -3517,6 +3517,102 @@ export function buildSubzoneScene(
       group.add(plotGroup);
     });
 
+    // === 8. 2 GHẾ GỐC CÂY MỘC MẠC TRONG SÂN NÔNG TRẠI (TỈ LỆ CHUẨN GHẾ NGỒI, ZERO CLIPPING) ===
+    {
+      const stumpBarkMat = clayMat('#8A5A36', 0.84);
+      const stumpRingMat = clayMat('#E6C494', 0.72);
+      const stumpCoreMat = clayMat('#CE9F68', 0.76);
+      const sproutStemMat = clayMat('#5B8E42', 0.75);
+      const sproutLeafMat = clayMat('#72BC59', 0.68);
+      [
+        {
+          id: 'garden_stump_left',
+          sx: -3.8,
+          sz: 10.65,
+          sitRotY: Math.PI * 0.5,
+          tx: -2.92,
+          tz: 10.65,
+          sproutSide: -1,
+        },
+        {
+          id: 'garden_stump_right',
+          sx: 3.8,
+          sz: 10.65,
+          sitRotY: -Math.PI * 0.5,
+          tx: 2.92,
+          tz: 10.65,
+          sproutSide: 1,
+        },
+      ].forEach(({id, sx, sz, sitRotY, tx, tz, sproutSide}) => {
+        const stumpGroup = new THREE.Group();
+        stumpGroup.position.set(sx, 0, sz);
+
+        // Main carved tree-stump trunk & 4 subtle bark buttress roots
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.34, 0.41, 0.46, 12),
+          stumpBarkMat,
+        );
+        trunk.position.y = 0.23;
+        stumpGroup.add(trunk);
+
+        for (let r = 0; r < 4; r++) {
+          const ra = (r / 4) * Math.PI * 2 + 0.45;
+          const root = new THREE.Mesh(
+            new RoundedBoxGeometry(0.14, 0.16, 0.22, 2, 0.04),
+            stumpBarkMat,
+          );
+          root.position.set(Math.sin(ra) * 0.34, 0.08, Math.cos(ra) * 0.34);
+          root.rotation.y = ra;
+          stumpGroup.add(root);
+        }
+
+        // Smooth sawn wood seat face (top at y = 0.49 => hips sit cleanly at y = 0.245)
+        const sawnTop = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.335, 0.345, 0.04, 14),
+          stumpRingMat,
+        );
+        sawnTop.position.y = 0.47;
+        const woodHeart = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.17, 0.17, 0.044, 12),
+          stumpCoreMat,
+        );
+        woodHeart.position.y = 0.472;
+        stumpGroup.add(sawnTop, woodHeart);
+
+        // Tiny botanical sprout on the outer back side (keeps knees clear)
+        const twig = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.018, 0.024, 0.18, 6),
+          sproutStemMat,
+        );
+        twig.position.set(sproutSide * 0.34, 0.24, -0.08);
+        twig.rotation.z = sproutSide * -0.45;
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.065, 7, 6), sproutLeafMat);
+        leaf.scale.set(1.35, 0.42, 0.85);
+        leaf.position.set(sproutSide * 0.41, 0.31, -0.08);
+        stumpGroup.add(twig, leaf);
+
+        staticGardenGroup.add(stumpGroup);
+
+        addBoxProxy(
+          group,
+          [0.95, 0.85, 0.95],
+          [sx, 0.42, sz],
+          {
+            kind: 'bench',
+            tx,
+            tz,
+            seatX: sx,
+            seatZ: sz,
+            seatY: 0.49,
+            sitRotY,
+            colliderId: id,
+          },
+          clickTargets,
+        );
+        colliders.push({type: 'circle', id, x: sx, z: sz, r: 0.46});
+      });
+    }
+
     mergeStaticGroupByMaterial(
       staticGardenGroup,
       animatedMillWheel ? new Set([animatedMillWheel]) : undefined,
@@ -4305,43 +4401,64 @@ export function buildSubzoneScene(
     toyBall.position.set(4.15, 0.14, 0.65);
     group.add(bowlMesh, toyBall);
 
-    // Animated Cún Nâu & Chim Xanh happily playing together in the Pet Lounge!
-    const shopPuppyRig = buildPetModel('brown_puppy', {scale: 1.26, withShadow: true});
-    shopPuppyRig.root.position.set(3.82, 0, -0.05);
-    shopPuppyRig.root.rotation.y = -0.35;
+    // Animated Pets showcase (Cún Nâu, Chim Xanh, Cún Shiba Bé, Mèo Trung Hoa Trắng, Vẹt Tinh Nghịch)
+    const shopPuppyRig = buildPetModel('brown_puppy', {scale: 1.22, withShadow: true});
+    shopPuppyRig.root.position.set(3.52, 0, -0.32);
+    shopPuppyRig.root.rotation.y = -0.3;
     group.add(shopPuppyRig.root);
 
-    const shopBirdRig = buildPetModel('blue_bird', {scale: 1.28, withShadow: true});
-    shopBirdRig.root.position.set(4.72, 0.36, 0.15);
+    const shopShibaRig = buildPetModel('shiba_puppy', {scale: 1.24, withShadow: true});
+    shopShibaRig.root.position.set(4.18, 0, 0.34);
+    shopShibaRig.root.rotation.y = -0.58;
+    group.add(shopShibaRig.root);
+
+    const shopCatRig = buildPetModel('chinese_cat', {scale: 1.24, withShadow: true});
+    shopCatRig.root.position.set(4.82, 0, -0.45);
+    shopCatRig.root.rotation.y = -0.78;
+    group.add(shopCatRig.root);
+
+    const shopBirdRig = buildPetModel('blue_bird', {scale: 1.26, withShadow: true});
+    shopBirdRig.root.position.set(4.65, 0.42, 0.22);
     shopBirdRig.root.rotation.y = -0.82;
     group.add(shopBirdRig.root);
+
+    const shopParrotRig = buildPetModel('mischievous_parrot', {scale: 1.28, withShadow: true});
+    shopParrotRig.root.position.set(3.96, 0.48, -0.78);
+    shopParrotRig.root.rotation.y = -0.42;
+    group.add(shopParrotRig.root);
 
     colliders.push({type: 'circle', x: 4.15, z: 0.05, r: 0.85});
     addBoxProxy(
       group,
-      [2.5, 1.5, 2.2],
-      [4.25, 0.75, 0.1],
+      [2.65, 1.55, 2.35],
+      [4.22, 0.75, -0.05],
       {kind: 'open_pet_adopt', tx: 2.35, tz: 1.45},
       clickTargets,
     );
-    labelAnchors.push({
-      id: 'pet_adopt_spot',
-      label: 'Cún & Chim (Nhận Nuôi)',
-      worldPos: new THREE.Vector3(4.25, 1.48, 0.05),
-    });
 
     updateFn = (elapsed) => {
-      // Puppy playfully bounces and wags tail looking toward the blue bird & visitors
       const hop = Math.max(0, Math.sin(elapsed * 3.8)) * 0.08;
       shopPuppyRig.root.position.y = hop;
-      shopPuppyRig.root.rotation.y = -0.35 + Math.sin(elapsed * 1.4) * 0.22;
-      updatePetAnimation(shopPuppyRig, 'shop_play', elapsed, {baseScale: 1.26});
+      shopPuppyRig.root.rotation.y = -0.3 + Math.sin(elapsed * 1.4) * 0.22;
+      updatePetAnimation(shopPuppyRig, 'shop_play', elapsed, {baseScale: 1.22});
 
-      // Blue bird flutters happily in small arcs beside the puppy
-      shopBirdRig.root.position.x = 4.74 + Math.cos(elapsed * 2.1) * 0.18;
-      shopBirdRig.root.position.z = 0.12 + Math.sin(elapsed * 2.1) * 0.16;
-      shopBirdRig.root.rotation.y = -0.85 + Math.sin(elapsed * 2.1) * 0.35;
-      updatePetAnimation(shopBirdRig, 'shop_play', elapsed, {baseScale: 1.28});
+      const shibaHop = Math.max(0, Math.sin(elapsed * 4.2 + 1.2)) * 0.09;
+      shopShibaRig.root.position.y = shibaHop;
+      shopShibaRig.root.rotation.y = -0.58 + Math.sin(elapsed * 1.6 + 1.0) * 0.25;
+      updatePetAnimation(shopShibaRig, 'shop_play', elapsed, {baseScale: 1.24});
+
+      shopCatRig.root.rotation.y = -0.78 + Math.sin(elapsed * 1.1 + 0.4) * 0.18;
+      updatePetAnimation(shopCatRig, 'idle', elapsed, {baseScale: 1.24});
+
+      shopBirdRig.root.position.x = 4.65 + Math.cos(elapsed * 2.1) * 0.18;
+      shopBirdRig.root.position.z = 0.22 + Math.sin(elapsed * 2.1) * 0.16;
+      shopBirdRig.root.rotation.y = -0.82 + Math.sin(elapsed * 2.1) * 0.35;
+      updatePetAnimation(shopBirdRig, 'shop_play', elapsed, {baseScale: 1.26});
+
+      shopParrotRig.root.position.x = 3.96 + Math.sin(elapsed * 1.85) * 0.18;
+      shopParrotRig.root.position.z = -0.78 + Math.cos(elapsed * 1.85) * 0.15;
+      shopParrotRig.root.rotation.y = -0.42 + Math.cos(elapsed * 1.85) * 0.38;
+      updatePetAnimation(shopParrotRig, 'shop_play', elapsed, {baseScale: 1.28});
     };
 
     // Handsome NPC Ivan standing behind counter with a STATIC sculpted squirrel on his shoulder
@@ -4434,12 +4551,22 @@ export function buildSubzoneScene(
     colliders.push({type: 'circle', x: 0, z: -4.85, r: 0.45});
     labelAnchors.push({
       id: 'ivan_npc',
-      label: 'Ivan (Thức ăn & Thuốc)',
+      label: 'Ivan',
       worldPos: new THREE.Vector3(0, 2.22, -4.85),
     });
 
     group.add(createExitDoorway('Cửa Ra Phố', [0, 0, 6.25], '#E57F5E', clickTargets, labelAnchors));
-    mergeStaticGroupByMaterial(group, new Set([ivanRig.root, shopPuppyRig.root, shopBirdRig.root]));
+    mergeStaticGroupByMaterial(
+      group,
+      new Set([
+        ivanRig.root,
+        shopPuppyRig.root,
+        shopShibaRig.root,
+        shopCatRig.root,
+        shopBirdRig.root,
+        shopParrotRig.root,
+      ]),
+    );
   }
 
   return {

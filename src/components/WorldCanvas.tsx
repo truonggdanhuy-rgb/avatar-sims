@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {
   Anchor,
   Armchair,
+  Backpack,
   Bug,
   Building2,
   Check,
@@ -37,6 +38,13 @@ import {MAX_PET_INTIMACY, PET_CATALOG} from '../data/petCatalog';
 import {FishIllustration} from './FishingIcons';
 import {InsectIllustration} from './InsectIcons';
 import {BlingBlingBadge, PetSpeciesIcon} from './PetIcons';
+import {
+  BBQ_FOOD_CATALOG,
+  getMovementSpeedMultiplier,
+  HUNGER_HUNGRY_THRESHOLD,
+  HUNGER_NEAR_EMPTY_THRESHOLD,
+} from '../data/foodCatalog';
+import {HandheldFoodIcon} from './modals/VendingMachineModal';
 import {FURNITURE_BY_ID, isPointOnFurnitureSurface} from '../data/furnitureCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
 import {FishingVisualFrame} from '../three/fishingVisuals3d';
@@ -77,6 +85,7 @@ import {
 import {
   AvatarConfig,
   AvatarPose,
+  BbqFoodId,
   BugNetState,
   CoopKind,
   CoopTroughs,
@@ -141,6 +150,7 @@ interface WorldCanvasProps {
   onOpenSettings: () => void;
   onOpenDailyQuests: () => void;
   onOpenPhone: () => void;
+  onOpenBag: () => void;
   onOpenFurniture: () => void;
   onToggleEditFurniture: () => void;
   onSelectFurniture: (id: string | null) => void;
@@ -218,6 +228,12 @@ interface WorldCanvasProps {
   activePet: OwnedPetState | null;
   carriedPetId: string | null;
   petSupplies: PetSupplies;
+  equippedFoodId: BbqFoodId | null;
+  bbqFoods: Partial<Record<BbqFoodId, number>>;
+  onOpenBbqGrill: () => void;
+  onOpenVendingMachine: () => void;
+  onEatEquippedFood: () => {ok: boolean; message: string};
+  onUnequipFood: () => void;
   onOpenPetSupplyShop: () => void;
   onOpenPetAdopt: () => void;
   onHoldPet: (petId: string) => void;
@@ -1123,9 +1139,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onPondProximityChange,
   onAddCoins,
   onOpenPhone,
+  onOpenBag,
   activePet,
   carriedPetId,
   petSupplies,
+  equippedFoodId,
+  bbqFoods,
+  onOpenBbqGrill,
+  onOpenVendingMachine,
+  onEatEquippedFood,
+  onUnequipFood,
   onOpenPetSupplyShop,
   onOpenPetAdopt,
   onHoldPet,
@@ -1208,6 +1231,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     selectedFurnitureId,
     activePet,
     carriedPetId,
+    equippedFoodId,
   });
   stateRef.current = {
     zone,
@@ -1229,6 +1253,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     selectedFurnitureId,
     activePet,
     carriedPetId,
+    equippedFoodId,
   };
 
   const callbacksRef = useRef({
@@ -1271,6 +1296,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onAddCoins,
     onOpenPetSupplyShop,
     onOpenPetAdopt,
+    onOpenBbqGrill,
+    onOpenVendingMachine,
   });
   callbacksRef.current = {
     onChangeZone,
@@ -1312,6 +1339,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onAddCoins,
     onOpenPetSupplyShop,
     onOpenPetAdopt,
+    onOpenBbqGrill,
+    onOpenVendingMachine,
   };
 
   const rebuildSceneTriggerRef = useRef<(() => void) | null>(null);
@@ -1319,6 +1348,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     ((
       cfg: AvatarConfig,
       equippedTool: ToolId | null,
+      equippedFood: BbqFoodId | null,
       carryingPet: {speciesId: PetSpeciesId; sick?: boolean} | null,
     ) => void) | null
   >(null);
@@ -1480,7 +1510,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       : bugNet.equipped
         ? 'wooden_net'
         : null;
-    rebuildAvatarTriggerRef.current?.(avatar, equippedTool, carryingPet);
+    rebuildAvatarTriggerRef.current?.(avatar, equippedTool, equippedFoodId, carryingPet);
     syncPetCompanionRef.current?.();
     if (carryingPet || !activePet) {
       selectedPetRef.current = null;
@@ -1490,6 +1520,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     avatar,
     fishingRod.equipped,
     bugNet.equipped,
+    equippedFoodId,
     carriedPetId,
     activePet?.id,
     activePet?.speciesId,
@@ -1635,6 +1666,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         : stateRef.current.bugNet.equipped
           ? 'wooden_net'
           : null,
+      equippedFood: stateRef.current.equippedFoodId,
       carryingPet: initCarriedPet,
     });
     playerRig.root.position.set(playerPos.x, 0.14, playerPos.z);
@@ -1847,7 +1879,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const prevRotY = petCompanion.rotY;
         disposePetCompanion();
 
-        const petScale = curPet.speciesId === 'blue_bird' ? 1.35 : 1.34;
+        const petScale = PET_CATALOG[curPet.speciesId].moveType === 'fly' ? 1.35 : 1.34;
         const rig = buildPetModel(curPet.speciesId, {
           scale: petScale,
           sick: curPet.sick,
@@ -2105,6 +2137,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     rebuildAvatarTriggerRef.current = (
       cfg: AvatarConfig,
       equippedTool: ToolId | null,
+      equippedFood: BbqFoodId | null,
       carryingPet: {speciesId: PetSpeciesId; sick?: boolean} | null,
     ) => {
       scene.remove(playerRig.root);
@@ -2117,7 +2150,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           else m.material.dispose();
         }
       });
-      playerRig = buildAvatarRig(cfg, {equippedTool, carryingPet});
+      playerRig = buildAvatarRig(cfg, {equippedTool, equippedFood, carryingPet});
       const curY =
         stateRef.current.zone === 'town'
           ? mallElev.state === 'deck'
@@ -2886,7 +2919,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         while (obj && (!obj.userData || !obj.userData.kind)) {
           obj = obj.parent;
         }
-        if (obj && obj.userData.kind) {
+        // Prevent river water below a bridge/pier deck from hijacking clicks on top of the bridge/pier!
+        const waterUnderWalkableGround =
+          Boolean(obj && obj.userData?.isWaterMesh && currentGrounds.length > 0) &&
+          (() => {
+            const gPre = raycaster.intersectObjects(currentGrounds, false);
+            return gPre.length > 0 && gPre[0].distance < hits[0].distance - 0.02;
+          })();
+        if (obj && obj.userData.kind && !waterUnderWalkableGround) {
           const data = obj.userData;
           const kind = data.kind as string;
 
@@ -2894,7 +2934,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             soundFX.sparkle();
             const s = stateRef.current.stats;
             showBubble(
-              `${s.coins} Xu · Năng lượng ${s.energy}% · Vui vẻ ${s.mood}%`,
+              `${s.coins} Xu · Năng lượng ${s.energy}% · Độ no ${Math.round(s.hunger ?? 100)}% · Vui vẻ ${s.mood}%`,
               playerPos.x,
               playerRig.root.position.y + 2.05,
               playerPos.z,
@@ -2908,15 +2948,51 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'bench') {
             soundFX.tap();
-            const seatInfo: SeatTarget = {
+            const slots = Array.isArray(data.seatSlots)
+              ? (data.seatSlots as Array<{
+                  seatX: number;
+                  seatZ: number;
+                  seatY?: number;
+                  sitRotY?: number;
+                  tx: number;
+                  tz: number;
+                }>)
+              : null;
+            let chosen = {
               seatX: data.seatX as number,
               seatZ: data.seatZ as number,
               seatY: (data.seatY as number) || 0.52,
-              rotY: (data.sitRotY as number) ?? 0,
-              standX: data.tx as number,
-              standZ: data.tz as number,
+              sitRotY: (data.sitRotY as number) ?? 0,
+              tx: data.tx as number,
+              tz: data.tz as number,
             };
-            startWalkTo(data.tx as number, data.tz as number, 'sit', seatInfo, () =>
+            if (slots && slots.length > 0) {
+              const hitPt = hits[0].point;
+              let bestDist = Infinity;
+              for (const slot of slots) {
+                const d = Math.hypot(slot.seatX - hitPt.x, slot.seatZ - hitPt.z);
+                if (d < bestDist) {
+                  bestDist = d;
+                  chosen = {
+                    seatX: slot.seatX,
+                    seatZ: slot.seatZ,
+                    seatY: slot.seatY ?? ((data.seatY as number) || 0.52),
+                    sitRotY: slot.sitRotY ?? ((data.sitRotY as number) ?? 0),
+                    tx: slot.tx,
+                    tz: slot.tz,
+                  };
+                }
+              }
+            }
+            const seatInfo: SeatTarget = {
+              seatX: chosen.seatX,
+              seatZ: chosen.seatZ,
+              seatY: chosen.seatY,
+              rotY: chosen.sitRotY,
+              standX: chosen.tx,
+              standZ: chosen.tz,
+            };
+            startWalkTo(chosen.tx, chosen.tz, 'sit', seatInfo, () =>
               soundFX.sparkle(),
             );
             return;
@@ -3521,6 +3597,25 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
+          if (kind === 'campsite_bbq') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenBbqGrill();
+            });
+            return;
+          }
+
+          if (kind === 'mall_vending_machine') {
+            if (stateRef.current.zone === 'town' && mallElev.state === 'deck') return;
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenVendingMachine();
+            });
+            return;
+          }
+
           if (kind === 'river_boat_board') {
             soundFX.tap();
             if (boatState.active) {
@@ -3903,6 +3998,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let lastTagPush = 0;
     let lastHadTags = false;
     let lastTagSnapshot: ProjectedTag[] = [];
+    let bbqLabelArmed = true;
+    let bbqLabelHideAtMs = 0;
     let biteAlertShown = false;
     let lastBiteAlertX = -9999;
     let lastBiteAlertY = -9999;
@@ -4265,9 +4362,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             stateRef.current.bugNet.equipped &&
             joyMag <= 0.58 &&
             !isAirborne;
-          const speed = isCreepingNow
-            ? 0.68
-            : (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : 3.6) * Math.min(1, joyMag);
+          // Apply hunger slowdown uniformly (also apply hungerSpeedMult to future mounts)
+          const hungerSpeedMult = getMovementSpeedMultiplier(stateRef.current.stats);
+          const speed =
+            (isCreepingNow
+              ? 0.68
+              : (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : 3.6) * Math.min(1, joyMag)) *
+            hungerSpeedMult;
           const stepLen = speed * delta;
           const rawX = playerPos.x + (moveDirX / moveLen) * stepLen;
           const rawZ = playerPos.z + (moveDirZ / moveLen) * stepLen;
@@ -4329,7 +4430,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const dx = wp.x - playerPos.x;
             const dz = wp.z - playerPos.z;
             const dist = Math.hypot(dx, dz);
-            const speed = z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : 3.6;
+            // Apply hunger slowdown uniformly (also apply hungerSpeedMult to future mounts)
+            const hungerSpeedMult = getMovementSpeedMultiplier(stateRef.current.stats);
+            const speed = (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : 3.6) * hungerSpeedMult;
 
             if (isFinalWp && dist < 0.16) {
               if (activeTarget.seat && !isAirborne) {
@@ -4885,7 +4988,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       );
 
       // Keep walking orbit pet cleanly grounded on hills, plaza, Skydeck, or elevator floor
-      if (playerRig.heldPetRig?.speciesId === 'brown_puppy') {
+      if (playerRig.heldPetRig && PET_CATALOG[playerRig.heldPetRig.speciesId].moveType === 'walk') {
         let petGy = 0.02;
         if (boatState.active && z === 'town') {
           petGy = groundOffset;
@@ -4915,7 +5018,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       // Update active 3D Companion Pet (walk or left-side fly, keeping safe distance from player)
       if (petCompanion.rig && petCompanion.speciesId) {
         const isFly = PET_CATALOG[petCompanion.speciesId].moveType === 'fly';
-        const companionScale = petCompanion.speciesId === 'blue_bird' ? 1.35 : 1.34;
+        const companionScale = isFly ? 1.35 : 1.34;
         const minSafeDist = isFly ? 1.32 : 1.22;
         let petMovedSpeed = 0;
 
@@ -5111,6 +5214,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const isEditingHome = z === 'home' && stateRef.current.editFurnitureMode;
 
       if (z === 'town') {
+        const distToBbq = Math.hypot(playerPos.x - -107.6, playerPos.z - 34.4);
+        const distToCamp = Math.hypot(playerPos.x - -113.5, playerPos.z - 36.2);
+        if (distToCamp > 21.0) {
+          bbqLabelArmed = true;
+          bbqLabelHideAtMs = 0;
+        } else if (bbqLabelArmed && distToBbq <= 3.8) {
+          bbqLabelArmed = false;
+          bbqLabelHideAtMs = performance.now() + 4000;
+        }
         activeTown?.updateFishingVisuals?.(fishVisualFrame, elapsed);
         const insectEvents = activeTown?.updateInsects?.(
           playerPos.x,
@@ -5140,6 +5252,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
         activeTown?.update(elapsed, tod, _frustum, camera.position);
       } else {
+        bbqLabelArmed = true;
+        bbqLabelHideAtMs = 0;
         if (z === 'garden' || z === 'fishing') {
           activeSubzone?.updateFishingVisuals?.(fishVisualFrame, elapsed);
         }
@@ -5184,10 +5298,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (curPetTag && !isEditingHome && (isCarryingTag || petCompanion.rig)) {
             if (isCarryingTag && playerRig.heldPetRig) {
               playerRig.heldPetRig.root.getWorldPosition(_petAnchorVec);
-              _petAnchorVec.y += curPetTag.speciesId === 'blue_bird' ? 0.58 : 0.72;
+              _petAnchorVec.y += PET_CATALOG[curPetTag.speciesId].moveType === 'fly' ? 0.58 : 0.72;
             } else if (petCompanion.rig) {
               petCompanion.rig.root.getWorldPosition(_petAnchorVec);
-              _petAnchorVec.y += curPetTag.speciesId === 'blue_bird' ? 0.66 : 0.84;
+              _petAnchorVec.y += PET_CATALOG[curPetTag.speciesId].moveType === 'fly' ? 0.66 : 0.84;
             }
             const camDistPet = camera.position.distanceTo(_petAnchorVec);
             const petAlpha =
@@ -5264,7 +5378,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
         if (currentAnchors.length > 0) {
           const nextTags: ProjectedTag[] = [];
+          const nowMs = performance.now();
           for (const a of currentAnchors) {
+            if (a.id === 'campsite_bbq_tag' && (z !== 'town' || nowMs >= bbqLabelHideAtMs)) {
+              continue;
+            }
             _projVec.copy(a.worldPos).project(camera);
             if (_projVec.z <= 1) {
               nextTags.push({
@@ -5706,7 +5824,28 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </button>
       )}
 
-      {/* Top-Left Release Pet ('X') Button beside Phone when hugging / shoulder-perching a pet */}
+      {/* Top-Left Standalone Backpack ('Túi Đồ') Button beside Phone */}
+      {!miniActive && !(zone === 'home' && editFurnitureMode) && (
+        <button
+          type="button"
+          onClick={() => {
+            soundFX.tap();
+            onOpenBag();
+          }}
+          aria-label="Mở Túi Đồ"
+          title="Túi Đồ"
+          className="phone-ui absolute top-2.5 left-[62px] z-30 flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-[#3C3128] bg-[#FFF4E3]/95 text-[#8F5320] shadow-lg transition-transform hover:scale-105 active:scale-95"
+        >
+          <Backpack className="h-5 w-5" strokeWidth={2.2} />
+          {(fishingRod.equipped ||
+            bugNet.equipped ||
+            Boolean(equippedFoodId && (bbqFoods[equippedFoodId] ?? 0) > 0)) && (
+            <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-[#FFF9EF] bg-[#45A168]" />
+          )}
+        </button>
+      )}
+
+      {/* Top-Left Release Pet ('X') Button beside Backpack when hugging / shoulder-perching a pet */}
       {carriedPetId && activePet && !miniActive && !(zone === 'home' && editFurnitureMode) && (
         <button
           type="button"
@@ -5714,9 +5853,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             soundFX.tap();
             onReleasePet();
           }}
-          aria-label={activePet.speciesId === 'blue_bird' ? 'Dừng bay quanh' : 'Dừng đi quanh'}
-          title={activePet.speciesId === 'blue_bird' ? 'Dừng bay quanh' : 'Dừng đi quanh'}
-          className="phone-ui anim-pop absolute top-2.5 left-[62px] z-30 flex h-11 items-center gap-1.5 rounded-2xl border-2 border-[#3C3128] bg-[#FFF2EA]/95 px-2.5 text-[#3B2B1E] shadow-lg transition-transform hover:scale-105 active:scale-95"
+          aria-label={
+            PET_CATALOG[activePet.speciesId].moveType === 'fly'
+              ? 'Dừng bay quanh'
+              : 'Dừng đi quanh'
+          }
+          title={
+            PET_CATALOG[activePet.speciesId].moveType === 'fly'
+              ? 'Dừng bay quanh'
+              : 'Dừng đi quanh'
+          }
+          className="phone-ui anim-pop absolute top-2.5 left-[118px] z-30 flex h-11 items-center gap-1.5 rounded-2xl border-2 border-[#3C3128] bg-[#FFF2EA]/95 px-2.5 text-[#3B2B1E] shadow-lg transition-transform hover:scale-105 active:scale-95"
         >
           <PetSpeciesIcon speciesId={activePet.speciesId} className="h-6 w-6 shrink-0" />
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#DF5E56] text-white shadow-xs">
@@ -5724,6 +5871,63 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           </span>
         </button>
       )}
+
+      {/* Compact Top-Left Held Food/Drink Quick-Eat Pill & Low-Hunger (<5%) Speed Warning */}
+      {!miniActive &&
+        !(zone === 'home' && editFurnitureMode) &&
+        ((equippedFoodId && (bbqFoods[equippedFoodId] ?? 0) > 0) ||
+          (stats.hunger ?? 100) < HUNGER_HUNGRY_THRESHOLD) && (
+          <div className="phone-ui absolute top-[62px] left-2.5 z-30 flex max-w-[calc(100vw-20px)] flex-col items-start gap-1.5">
+            {equippedFoodId && (bbqFoods[equippedFoodId] ?? 0) > 0 && (() => {
+              const heldDef = BBQ_FOOD_CATALOG[equippedFoodId];
+              const verb = heldDef?.kind === 'drink' ? 'Uống' : 'Ăn';
+              return (
+                <div className="anim-pop flex max-w-full flex-wrap items-center gap-1 rounded-2xl border-2 border-[#3C3128] bg-[#FFF8EB]/95 p-1 pr-1.5 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const res = onEatEquippedFood();
+                      if (res.ok) {
+                        soundFX.sparkle();
+                      } else {
+                        soundFX.tap();
+                      }
+                      showBubble(res.message);
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl bg-[#D96B38] px-2.5 py-1 text-[11px] font-black text-white shadow-xs transition active:scale-95"
+                  >
+                    <HandheldFoodIcon foodId={equippedFoodId} className="h-4 w-4 shrink-0" />
+                    <span>
+                      {verb} {heldDef.name} (x{bbqFoods[equippedFoodId] ?? 0})
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFX.tap();
+                      onUnequipFood();
+                    }}
+                    title="Cất xuống"
+                    className="rounded-lg bg-[#EFE0C9] px-2 py-1 text-[10px] font-extrabold text-[#5B422E] transition active:scale-95"
+                  >
+                    Cất
+                  </button>
+                </div>
+              );
+            })()}
+
+            {(stats.hunger ?? 100) < HUNGER_HUNGRY_THRESHOLD && (
+              <div className="anim-pop flex max-w-full items-center gap-1.5 rounded-xl border border-[#D86A3B] bg-[#FFF0E8]/95 px-2.5 py-1 text-[11px] leading-snug font-extrabold text-[#B53D1E] shadow-md">
+                <Utensils className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  {(stats.hunger ?? 100) < HUNGER_NEAR_EMPTY_THRESHOLD
+                    ? `Đói gần cạn (${Math.round(stats.hunger ?? 0)}%) · Đi chậm! Hãy mở Túi đồ ăn thức ăn`
+                    : `Đang đói (${Math.round(stats.hunger ?? 0)}%) · Đi chậm`}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
       {/* Compact collapsible top-right arrow toolbar inside House */}
       {zone === 'home' && (

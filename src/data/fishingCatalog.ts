@@ -8,10 +8,10 @@ import {
   WoodenBoatState,
 } from '../types/game';
 
-export const WOODEN_ROD_PRICE = 100;
+export const WOODEN_ROD_PRICE = 75;
 export const WOODEN_ROD_MAX_DURABILITY = 25;
-export const WOODEN_ROD_FULL_REPAIR_COST = 36;
-export const WOODEN_BOAT_PRICE = 320;
+export const WOODEN_ROD_FULL_REPAIR_COST = 22;
+export const WOODEN_BOAT_PRICE = 220;
 
 export function createInitialWoodenBoat(): WoodenBoatState {
   return {
@@ -93,10 +93,9 @@ export function rollRodDurabilityLoss(
 }
 
 /**
- * Cá sông:
- * - Cá thường (~84%): giá bán 2-5 Xu sau cân nặng
- * - Cá hiếm (~16%): giá bán 9-14 Xu
- * Cân bằng chống lạm phát Xu, giữ Nông Trại + Chế Biến là nguồn thu nhập chủ lực.
+ * Cá sông (cân bằng ấm cúng cho gia đình):
+ * - Cá thường: giá bán 5-12 Xu sau cân nặng
+ * - Cá hiếm: giá bán 16-32 Xu
  */
 export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinition> = {
   ca_com: {
@@ -106,9 +105,9 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'common',
     minKg: 0.05,
     maxKg: 0.25,
-    basePrice: 2,
-    pricePerKg: 5,
-    dropWeight: 20,
+    basePrice: 4,
+    pricePerKg: 8,
+    dropWeight: 18,
     description: 'Nhỏ nhắn ánh bạc, hay bơi thành đàn gần bờ hồ nước ngọt.',
   },
   tom_cang_xanh: {
@@ -118,10 +117,22 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'common',
     minKg: 0.15,
     maxKg: 0.65,
-    basePrice: 2,
-    pricePerKg: 3.5,
-    dropWeight: 18,
+    basePrice: 5,
+    pricePerKg: 6,
+    dropWeight: 16,
     description: 'Đôi càng xanh ngọc khỏe khoắn, rất chuộng vùng bùn cát đáy sông.',
+  },
+  ca_ro_dong: {
+    id: 'ca_ro_dong',
+    name: 'Cá Rô Đồng',
+    waterType: 'river',
+    rarity: 'common',
+    minKg: 0.18,
+    maxKg: 0.72,
+    basePrice: 5,
+    pricePerKg: 5.5,
+    dropWeight: 15,
+    description: 'Cá rô đồng vây gai khỏe khoắn ánh nâu đồng, quen thuộc dọc bờ lau sậy.',
   },
   ca_chep: {
     id: 'ca_chep',
@@ -130,10 +141,22 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'common',
     minKg: 0.6,
     maxKg: 2.8,
-    basePrice: 2,
-    pricePerKg: 1.0,
-    dropWeight: 17,
+    basePrice: 5,
+    pricePerKg: 1.8,
+    dropWeight: 14,
     description: 'Thân tròn vảy vàng óng, quen thuộc dưới những tán lá sen xanh.',
+  },
+  ca_tre_vang: {
+    id: 'ca_tre_vang',
+    name: 'Cá Trê Vàng',
+    waterType: 'river',
+    rarity: 'common',
+    minKg: 0.45,
+    maxKg: 2.1,
+    basePrice: 6,
+    pricePerKg: 2.2,
+    dropWeight: 13,
+    description: 'Thân trơn mượt ánh vàng nghệ với bộ râu dài đặc trưng vùng nước lặng.',
   },
   ca_loc: {
     id: 'ca_loc',
@@ -142,9 +165,9 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'common',
     minKg: 0.5,
     maxKg: 2.4,
-    basePrice: 3,
-    pricePerKg: 1.0,
-    dropWeight: 15,
+    basePrice: 6,
+    pricePerKg: 1.9,
+    dropWeight: 13,
     description: 'Săn mồi nhanh nhẹn ở vùng nước lặng có nhiều cỏ thủy sinh.',
   },
   ca_chinh: {
@@ -154,9 +177,9 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'common',
     minKg: 0.7,
     maxKg: 3.0,
-    basePrice: 3,
-    pricePerKg: 1.1,
-    dropWeight: 14,
+    basePrice: 7,
+    pricePerKg: 2.0,
+    dropWeight: 11,
     description: 'Thân dài trơn láng, thường ẩn mình dưới rễ cây và bờ đá.',
   },
   ca_lia_thia_3_duoi: {
@@ -166,9 +189,9 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'rare',
     minKg: 0.08,
     maxKg: 0.38,
-    basePrice: 8,
-    pricePerKg: 10,
-    dropWeight: 7,
+    basePrice: 14,
+    pricePerKg: 18,
+    dropWeight: 6.5,
     description: 'Hiếm gặp với bộ vây ba thùy thướt tha rực rỡ sắc màu.',
   },
   ca_la_han: {
@@ -178,10 +201,22 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'rare',
     minKg: 0.5,
     maxKg: 2.2,
-    basePrice: 9,
-    pricePerKg: 2.5,
+    basePrice: 15,
+    pricePerKg: 4.0,
     dropWeight: 5.5,
     description: 'Chú cá quý mang chiếc gù tròn may mắn cùng hàng châu lấp lánh.',
+  },
+  ca_tai_tuong_do: {
+    id: 'ca_tai_tuong_do',
+    name: 'Cá Tai Tượng Đỏ',
+    waterType: 'river',
+    rarity: 'rare',
+    minKg: 1.4,
+    maxKg: 5.2,
+    basePrice: 16,
+    pricePerKg: 2.6,
+    dropWeight: 4.5,
+    description: 'Thân lớn màu ngà điểm vây cam đỏ rực rỡ, hay bơi gần ghềnh đá thác nước.',
   },
   ca_heo_nuoc_ngot: {
     id: 'ca_heo_nuoc_ngot',
@@ -190,10 +225,34 @@ export const RIVER_FISH_CATALOG: Record<RiverFishSpeciesId, FishSpeciesDefinitio
     rarity: 'rare',
     minKg: 1.2,
     maxKg: 4.2,
-    basePrice: 11,
-    pricePerKg: 1.8,
+    basePrice: 18,
+    pricePerKg: 2.8,
     dropWeight: 3.5,
     description: 'Loài cá sông quý hiếm có vây đỏ cam rực rỡ và sọc vằn đặc trưng.',
+  },
+  ca_rong_bac: {
+    id: 'ca_rong_bac',
+    name: 'Cá Rồng Bạc',
+    waterType: 'river',
+    rarity: 'rare',
+    minKg: 1.8,
+    maxKg: 6.5,
+    basePrice: 20,
+    pricePerKg: 2.6,
+    dropWeight: 2.8,
+    description: 'Huyền thoại sông nước với vảy bạc óng ánh ánh cầu vồng và râu uy nghiêm.',
+  },
+  ca_tam_song: {
+    id: 'ca_tam_song',
+    name: 'Cá Tầm Sông',
+    waterType: 'river',
+    rarity: 'rare',
+    minKg: 2.5,
+    maxKg: 8.8,
+    basePrice: 22,
+    pricePerKg: 2.2,
+    dropWeight: 2.2,
+    description: 'Chú cá cổ đại mõm nhọn, hàng vây giáp sắc sảo sống nơi dòng chảy xiết.',
   },
 };
 
@@ -203,15 +262,20 @@ export const RIVER_FISH_LIST: FishSpeciesDefinition[] = [
   RIVER_FISH_CATALOG.ca_chep,
   RIVER_FISH_CATALOG.ca_com,
   RIVER_FISH_CATALOG.ca_chinh,
+  RIVER_FISH_CATALOG.ca_ro_dong,
+  RIVER_FISH_CATALOG.ca_tre_vang,
   RIVER_FISH_CATALOG.ca_lia_thia_3_duoi,
   RIVER_FISH_CATALOG.ca_la_han,
+  RIVER_FISH_CATALOG.ca_tai_tuong_do,
   RIVER_FISH_CATALOG.ca_heo_nuoc_ngot,
+  RIVER_FISH_CATALOG.ca_rong_bac,
+  RIVER_FISH_CATALOG.ca_tam_song,
 ];
 
 export function computeFishSellPrice(speciesId: RiverFishSpeciesId, weightKg: number): number {
   const spec = RIVER_FISH_CATALOG[speciesId];
-  if (!spec) return 5;
-  return Math.max(4, Math.round(spec.basePrice + weightKg * spec.pricePerKg));
+  if (!spec) return 6;
+  return Math.max(5, Math.round(spec.basePrice + weightKg * spec.pricePerKg));
 }
 
 export function rollRandomRiverFish(): {

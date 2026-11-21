@@ -333,6 +333,27 @@ export interface GameStats {
   coins: number;
   energy: number; // 0..100
   mood: number; // 0..100
+  hunger: number; // 0..100 (satiety / độ no)
+}
+
+export type BbqFoodId =
+  | 'bbq_meat_skewer'
+  | 'bbq_grilled_fish'
+  | 'bbq_corn_sausage'
+  | 'drink_water'
+  | 'drink_strawberry_milk'
+  | 'drink_matcha_can'
+  | 'drink_cola';
+
+export interface BbqFoodDefinition {
+  id: BbqFoodId;
+  name: string;
+  price: number;
+  hungerRestore: number;
+  holdable: true;
+  kind?: 'food' | 'drink';
+  accentColor: string;
+  description: string;
 }
 
 export interface DailyQuestProgress {
@@ -471,9 +492,14 @@ export type RiverFishSpeciesId =
   | 'ca_chep'
   | 'ca_com'
   | 'ca_chinh'
+  | 'ca_ro_dong'
+  | 'ca_tre_vang'
   | 'ca_la_han'
   | 'ca_lia_thia_3_duoi'
-  | 'ca_heo_nuoc_ngot';
+  | 'ca_heo_nuoc_ngot'
+  | 'ca_tai_tuong_do'
+  | 'ca_rong_bac'
+  | 'ca_tam_song';
 
 export interface FishSpeciesDefinition {
   id: RiverFishSpeciesId;
@@ -530,6 +556,10 @@ export type InsectSpeciesId =
   | 'chuon_chuon_ot'
   | 'chuon_chuon_tre'
   | 've_sau'
+  | 've_sau_kim'
+  | 'bo_vo_si_cay'
+  | 'bo_sung_huou_nui'
+  | 'ngai_vo_cay'
   | 'bo_xit_xanh'
   | 'chau_chau_dong'
   | 'bo_ngua_xanh'
@@ -575,7 +605,12 @@ export type PetMoveType = 'walk' | 'fly';
 
 export type PetHoldMode = 'walk_orbit' | 'fly_orbit';
 
-export type PetSpeciesId = 'brown_puppy' | 'blue_bird';
+export type PetSpeciesId =
+  | 'brown_puppy'
+  | 'blue_bird'
+  | 'shiba_puppy'
+  | 'chinese_cat'
+  | 'mischievous_parrot';
 
 export interface PetSpeciesDefinition {
   id: PetSpeciesId;

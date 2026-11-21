@@ -84,11 +84,111 @@ export const BlueBirdIcon: React.FC<{className?: string}> = ({
   </svg>
 );
 
+export const ShibaPuppyIcon: React.FC<{className?: string}> = ({
+  className = 'h-10 w-10',
+}) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none">
+    {/* Upright Shiba triangular ears */}
+    <path d="M12 20L10.5 7.5L21 14.5Z" fill="#E38938" stroke="#8C481A" strokeWidth="1.6" strokeLinejoin="round" />
+    <path d="M36 20L37.5 7.5L27 14.5Z" fill="#E38938" stroke="#8C481A" strokeWidth="1.6" strokeLinejoin="round" />
+    <path d="M13 18L12.5 10.5L19 15Z" fill="#FFF1DA" />
+    <path d="M35 18L35.5 10.5L29 15Z" fill="#FFF1DA" />
+    {/* Fox-orange plump Shiba puppy head */}
+    <ellipse cx="24" cy="23.5" rx="13.5" ry="11.2" fill="#EB9642" stroke="#8C481A" strokeWidth="1.6" />
+    {/* Cream urajiro cheeks & muzzle mask */}
+    <path
+      d="M11 25C12.5 29.8 18 33.5 24 33.5C30 33.5 35.5 29.8 37 25C33.5 25 30 22.8 24 22.8C18 22.8 14.5 25 11 25Z"
+      fill="#FFF5E2"
+    />
+    <ellipse cx="24" cy="27.2" rx="6" ry="4.5" fill="#FFFBF2" />
+    {/* Cream Shiba eyebrow pips */}
+    <ellipse cx="18.2" cy="17.8" rx="2.1" ry="1.2" transform="rotate(-12 18.2 17.8)" fill="#FFF5E2" />
+    <ellipse cx="29.8" cy="17.8" rx="2.1" ry="1.2" transform="rotate(12 29.8 17.8)" fill="#FFF5E2" />
+    {/* Sparkling puppy eyes */}
+    <circle cx="18.6" cy="21.5" r="2.2" fill="#231915" />
+    <circle cx="29.4" cy="21.5" r="2.2" fill="#231915" />
+    <circle cx="19.3" cy="20.7" r="0.85" fill="#FFFFFF" />
+    <circle cx="30.1" cy="20.7" r="0.85" fill="#FFFFFF" />
+    {/* Blush */}
+    <ellipse cx="14.5" cy="25.2" rx="2.2" ry="1.3" fill="#F59B91" opacity="0.7" />
+    <ellipse cx="33.5" cy="25.2" rx="2.2" ry="1.3" fill="#F59B91" opacity="0.7" />
+    {/* Nose & joyful Shiba smile */}
+    <ellipse cx="24" cy="25.2" rx="2.3" ry="1.6" fill="#2F1C14" />
+    <path d="M21.6 28Q24 30.2 26.4 28" stroke="#5B3322" strokeWidth="1.6" strokeLinecap="round" />
+    {/* Lucky red bandana & gold bell */}
+    <path d="M14.5 33L24 41L33.5 33Z" fill="#DF4E48" stroke="#962824" strokeWidth="1.4" strokeLinejoin="round" />
+    <circle cx="24" cy="36.2" r="2.5" fill="#FFD15C" stroke="#C5821A" strokeWidth="1" />
+  </svg>
+);
+
+export const ChineseCatIcon: React.FC<{className?: string}> = ({
+  className = 'h-10 w-10',
+}) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none">
+    {/* Crisp white cat ears with rosy pink lining */}
+    <path d="M12.5 21L11 8L22 14.5Z" fill="#FFFFFF" stroke="#B7C0CC" strokeWidth="1.6" strokeLinejoin="round" />
+    <path d="M35.5 21L37 8L26 14.5Z" fill="#FFFFFF" stroke="#B7C0CC" strokeWidth="1.6" strokeLinejoin="round" />
+    <path d="M14 19L13.3 11.2L20 15.2Z" fill="#F7A7B8" />
+    <path d="M34 19L34.7 11.2L28 15.2Z" fill="#F7A7B8" />
+    {/* Snowy rounded white cat face */}
+    <ellipse cx="24" cy="23.5" rx="13.2" ry="11.2" fill="#FFFFFF" stroke="#C5CCD6" strokeWidth="1.6" />
+    {/* Expressive jade-amber eyes */}
+    <ellipse cx="18.6" cy="21.5" rx="2.4" ry="2.6" fill="#3B8776" />
+    <ellipse cx="29.4" cy="21.5" rx="2.4" ry="2.6" fill="#3B8776" />
+    <circle cx="18.6" cy="21.7" r="1.4" fill="#182226" />
+    <circle cx="29.4" cy="21.7" r="1.4" fill="#182226" />
+    <circle cx="19.3" cy="20.4" r="0.85" fill="#FFFFFF" />
+    <circle cx="30.1" cy="20.4" r="0.85" fill="#FFFFFF" />
+    {/* Delicate blush & ':3' mouth */}
+    <ellipse cx="14.2" cy="25" rx="2.2" ry="1.3" fill="#F7A1B3" opacity="0.72" />
+    <ellipse cx="33.8" cy="25" rx="2.2" ry="1.3" fill="#F7A1B3" opacity="0.72" />
+    <polygon points="24,25.8 22,23.8 26,23.8" fill="#F2839B" />
+    <path d="M21 27.2Q22.5 29.2 24 26.8Q25.5 29.2 27 27.2" stroke="#7A6572" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    {/* Whiskers */}
+    <path d="M12.5 24.2L7 23.2M12.5 26.5L7 27.5M35.5 24.2L41 23.2M35.5 26.5L41 27.5" stroke="#B6BFC9" strokeWidth="1.3" strokeLinecap="round" />
+    {/* Crimson Chinese silk collar + jade charm & gold bell */}
+    <rect x="14.5" y="33.2" width="19" height="4" rx="2" fill="#D93D43" stroke="#8F1F24" strokeWidth="1.2" />
+    <circle cx="24" cy="38.2" r="2.8" fill="#FFD15C" stroke="#B87A18" strokeWidth="1" />
+    <circle cx="24" cy="35.2" r="1.5" fill="#52C49B" />
+  </svg>
+);
+
+export const MischievousParrotIcon: React.FC<{className?: string}> = ({
+  className = 'h-10 w-10',
+}) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none">
+    {/* Colorful tropical fanned tail peeking bottom */}
+    <path d="M20 35L17 44L22 42L24 45L27 42L31 44L28 35Z" fill="#2A7CE0" stroke="#184C96" strokeWidth="1.2" strokeLinejoin="round" />
+    {/* Cheeky scarlet crest */}
+    <path d="M22 6.5C20 9.5 22.5 12 24 13C25.8 10.5 28.5 8 26.5 5.5C25 6.8 23.5 7 22 6.5Z" fill="#E83F38" stroke="#9C1D1A" strokeWidth="1.1" strokeLinejoin="round" />
+    <path d="M26.5 8.2C27.2 10.5 26 12.2 25 13C27.2 12 29.5 10.5 29.2 8.2Z" fill="#FFD03B" />
+    {/* Plump ruby-red parrot body + emerald/blue layered wings */}
+    <ellipse cx="11.5" cy="27" rx="5.5" ry="9" transform="rotate(-14 11.5 27)" fill="#40B262" stroke="#1E6B38" strokeWidth="1.4" />
+    <ellipse cx="36.5" cy="27" rx="5.5" ry="9" transform="rotate(14 36.5 27)" fill="#3484E0" stroke="#1C4E91" strokeWidth="1.4" />
+    <ellipse cx="12.5" cy="23.5" rx="3.4" ry="4.5" transform="rotate(-14 12.5 23.5)" fill="#FFD147" />
+    <ellipse cx="35.5" cy="23.5" rx="3.4" ry="4.5" transform="rotate(14 35.5 23.5)" fill="#FFD147" />
+    <ellipse cx="24" cy="25" rx="11.8" ry="12.2" fill="#EC4B40" stroke="#9C231B" strokeWidth="1.5" />
+    {/* White macaw facial mask */}
+    <ellipse cx="24" cy="22" rx="9" ry="6.2" fill="#FFFDF7" />
+    {/* Mischievous bright eyes */}
+    <circle cx="18.8" cy="21" r="2.2" fill="#1C2029" />
+    <circle cx="29.2" cy="21" r="2.2" fill="#1C2029" />
+    <circle cx="19.4" cy="20.2" r="0.85" fill="#FFFFFF" />
+    <circle cx="29.8" cy="20.2" r="0.85" fill="#FFFFFF" />
+    {/* Curved hooked parrot beak */}
+    <path d="M21 23C21 20.8 27 20.8 27 23C27 26 25 28.5 24 29.5C23 28 21 25.8 21 23Z" fill="#F7C752" stroke="#9C6D14" strokeWidth="1.2" strokeLinejoin="round" />
+    <path d="M22.2 26.5C23 28 25 28 25.8 26.5" fill="#3B322C" />
+  </svg>
+);
+
 export const PetSpeciesIcon: React.FC<{
   speciesId: PetSpeciesId;
   className?: string;
 }> = ({speciesId, className}) => {
   if (speciesId === 'blue_bird') return <BlueBirdIcon className={className} />;
+  if (speciesId === 'shiba_puppy') return <ShibaPuppyIcon className={className} />;
+  if (speciesId === 'chinese_cat') return <ChineseCatIcon className={className} />;
+  if (speciesId === 'mischievous_parrot') return <MischievousParrotIcon className={className} />;
   return <BrownPuppyIcon className={className} />;
 };
 

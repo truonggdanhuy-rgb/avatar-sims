@@ -15,7 +15,7 @@ export const PET_CATALOG: Record<PetSpeciesId, PetSpeciesDefinition> = {
     id: 'brown_puppy',
     name: 'Cún Nâu',
     moveType: 'walk',
-    price: 350,
+    price: 260,
     canHold: true,
     holdMode: 'walk_orbit',
     description:
@@ -27,13 +27,49 @@ export const PET_CATALOG: Record<PetSpeciesId, PetSpeciesDefinition> = {
     id: 'blue_bird',
     name: 'Chim Xanh',
     moveType: 'fly',
-    price: 450,
+    price: 340,
     canHold: true,
     holdMode: 'fly_orbit',
     description:
       'Chú chim xanh nhỏ nhắn bay lượn êm ái bên trái bạn, thích bay lượn quanh người hoặc đáp xuống nhảy múa khi chơi đùa.',
     primaryColor: '#4BA8DF',
     accentColor: '#FFF5DA',
+  },
+  shiba_puppy: {
+    id: 'shiba_puppy',
+    name: 'Cún Shiba Bé',
+    moveType: 'walk',
+    price: 660,
+    canHold: true,
+    holdMode: 'walk_orbit',
+    description:
+      'Cún con Shiba Inu dáng chuẩn mập mạp, má kem urajiro rõ nét, đuôi cuộn tròn như bánh donut và đeo khăn quàng đỏ may mắn.',
+    primaryColor: '#D96B27',
+    accentColor: '#FFF9EE',
+  },
+  chinese_cat: {
+    id: 'chinese_cat',
+    name: 'Mèo Trung Hoa Trắng',
+    moveType: 'walk',
+    price: 680,
+    canHold: true,
+    holdMode: 'walk_orbit',
+    description:
+      'Tiểu miêu tuyết trắng tinh khôi mang vòng cổ lụa đỏ thắt nút cát tường cùng chuông vàng ngọc bích thanh tao.',
+    primaryColor: '#FFFFFF',
+    accentColor: '#D94343',
+  },
+  mischievous_parrot: {
+    id: 'mischievous_parrot',
+    name: 'Vẹt Tinh Nghịch',
+    moveType: 'fly',
+    price: 820,
+    canHold: true,
+    holdMode: 'fly_orbit',
+    description:
+      'Chú vẹt nhỏ bộ lông đỏ - lục - vàng - xanh rực rỡ với chiếc mào tinh quái, bay lượn ríu rít bên vai và lượn vòng quanh bạn.',
+    primaryColor: '#E6463D',
+    accentColor: '#FFD14D',
   },
 };
 

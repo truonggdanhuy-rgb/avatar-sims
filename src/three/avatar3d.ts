@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import {AvatarConfig, AvatarPose, PetSpeciesId, ToolId} from '../types/game';
+import {PET_CATALOG} from '../data/petCatalog';
+import {AvatarConfig, AvatarPose, BbqFoodId, PetSpeciesId, ToolId} from '../types/game';
 import {
   buildCharacterHair,
   createHairClayMaterial,
@@ -965,6 +966,7 @@ export function buildAvatarRig(
   config: AvatarConfig,
   options?: {
     equippedTool?: ToolId | null;
+    equippedFood?: BbqFoodId | null;
     carryingPet?: {speciesId: PetSpeciesId; sick?: boolean} | null;
   },
 ): AvatarRig {
@@ -1793,21 +1795,24 @@ export function buildAvatarRig(
   const isSleeveless = config.top === 'sundress';
   const carryingPet = options?.carryingPet ?? null;
   const equippedTool = options?.equippedTool ?? null;
+  const equippedFood = !equippedTool ? (options?.equippedFood ?? null) : null;
   const handheld =
-    !equippedTool && config.handheld && config.handheld !== 'none'
+    !equippedTool && !equippedFood && config.handheld && config.handheld !== 'none'
       ? config.handheld
       : null;
   const holdPose: HoldPose = equippedTool
     ? equippedTool === 'wooden_net'
       ? 'carry_net'
       : 'carry_front'
-    : !handheld
-      ? 'none'
-      : handheld === 'tote_bag'
-        ? 'carry_bag'
-        : handheld === 'mini_umbrella'
-          ? 'carry_umbrella'
-          : 'carry_front';
+    : equippedFood
+      ? 'carry_front'
+      : !handheld
+        ? 'none'
+        : handheld === 'tote_bag'
+          ? 'carry_bag'
+          : handheld === 'mini_umbrella'
+            ? 'carry_umbrella'
+            : 'carry_front';
 
   const makeArm = (side: -1 | 1) => {
     // Relaxed natural A-pose seated flush on shoulder corner with breathing room beside waist/hips
@@ -1907,7 +1912,8 @@ export function buildAvatarRig(
     handGroup.position.set(0, -0.16, 0);
     elbowPivot.add(handGroup);
 
-    const isGripping = side === 1 && (Boolean(handheld) || Boolean(equippedTool));
+    const isGripping =
+      side === 1 && (Boolean(handheld) || Boolean(equippedTool) || Boolean(equippedFood));
     const palm = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 12), skinMat);
     palm.scale.set(0.92, 1.06, isGripping ? 0.86 : 0.88);
     if (isGripping) palm.position.set(0, 0, -0.004);
@@ -1957,7 +1963,7 @@ export function buildAvatarRig(
   let rodBobberObj: THREE.Object3D | undefined;
   let rodLineObj: THREE.Object3D | undefined;
 
-  if (handheld || equippedTool) {
+  if (handheld || equippedTool || equippedFood) {
     const hColor = config.handheldColor || '#E8B84B';
     const poseCfg = HAND_POSES[holdPose];
     const hoodieClearZ = isHoodie ? 0.06 : 0;
@@ -2366,6 +2372,215 @@ export function buildAvatarRig(
       tip.position.set(0, 1.405, 0);
 
       handAnchor.add(stick, hook, runner, canopy, edgeTrim, tip);
+    } else if (equippedFood === 'bbq_meat_skewer') {
+      const skewerGroup = new THREE.Group();
+      skewerGroup.rotation.x = 0.24;
+      skewerGroup.rotation.z = -0.08;
+      const stickMat = clayMat('#D9B47E', 0.72);
+      const meatMat = glossyClayMat('#B94E28', 0.36);
+      const searMat = clayMat('#4C2615', 0.78);
+      const redPepMat = glossyClayMat('#E34D3C', 0.38);
+      const yelPepMat = glossyClayMat('#F4B93D', 0.42);
+      const grnPepMat = glossyClayMat('#63AD48', 0.44);
+
+      const stick = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.009, 0.011, 0.44, 8),
+        stickMat,
+      );
+      stick.position.set(0, 0.14, 0);
+      skewerGroup.add(stick);
+
+      [
+        {y: 0.08, geo: new THREE.SphereGeometry(0.036, 9, 8), scale: [1.1, 0.72, 1.0], mat: grnPepMat},
+        {y: 0.14, geo: new RoundedBoxGeometry(0.072, 0.062, 0.068, 2, 0.018), scale: [1, 1, 1], mat: meatMat},
+        {y: 0.20, geo: new RoundedBoxGeometry(0.066, 0.034, 0.064, 2, 0.01), scale: [1, 1, 1], mat: yelPepMat},
+        {y: 0.255, geo: new RoundedBoxGeometry(0.074, 0.062, 0.068, 2, 0.018), scale: [1, 1, 1], mat: meatMat},
+        {y: 0.31, geo: new RoundedBoxGeometry(0.062, 0.032, 0.062, 2, 0.01), scale: [1, 1, 1], mat: redPepMat},
+      ].forEach((chunk, ci) => {
+        const m = new THREE.Mesh(chunk.geo, chunk.mat);
+        m.position.set(0, chunk.y, 0);
+        m.scale.set(chunk.scale[0], chunk.scale[1], chunk.scale[2]);
+        m.rotation.y = ci * 0.42;
+        skewerGroup.add(m);
+        if (chunk.mat === meatMat) {
+          const charBar = new THREE.Mesh(
+            new RoundedBoxGeometry(0.078, 0.012, 0.072, 1, 0.004),
+            searMat,
+          );
+          charBar.position.set(0, chunk.y, 0);
+          charBar.rotation.y = ci * 0.42;
+          skewerGroup.add(charBar);
+        }
+      });
+      handAnchor.add(skewerGroup);
+    } else if (equippedFood === 'bbq_grilled_fish') {
+      const fishPlateGroup = new THREE.Group();
+      fishPlateGroup.position.set(0.01, 0.03, 0.02);
+      fishPlateGroup.rotation.x = -0.35;
+      fishPlateGroup.rotation.z = -0.14;
+
+      const bambooMat = clayMat('#D8B37C', 0.72);
+      const leafMat = clayMat('#529446', 0.62);
+      const fishSkinMat = glossyClayMat('#DF8E3A', 0.36);
+      const fishCharMat = clayMat('#5C3116', 0.76);
+      const lemonMat = glossyClayMat('#F9DC5C', 0.38);
+
+      const handleStick = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.011, 0.012, 0.24, 8),
+        bambooMat,
+      );
+      handleStick.position.set(0, 0.03, 0);
+
+      const leafTray = new THREE.Mesh(
+        new RoundedBoxGeometry(0.16, 0.024, 0.28, 2, 0.012),
+        leafMat,
+      );
+      leafTray.position.set(0, 0.14, 0.04);
+
+      const fishBody = new THREE.Mesh(new THREE.SphereGeometry(0.068, 12, 10), fishSkinMat);
+      fishBody.scale.set(0.75, 0.56, 1.55);
+      fishBody.position.set(0, 0.175, 0.03);
+
+      const fishTail = new THREE.Mesh(new THREE.ConeGeometry(0.044, 0.075, 6), fishSkinMat);
+      fishTail.rotation.x = Math.PI / 2;
+      fishTail.scale.set(0.38, 1, 1.0);
+      fishTail.position.set(0, 0.175, 0.155);
+
+      [-0.03, 0.02, 0.07].forEach((fz) => {
+        const mark = new THREE.Mesh(
+          new RoundedBoxGeometry(0.088, 0.012, 0.014, 1, 0.004),
+          fishCharMat,
+        );
+        mark.position.set(0, 0.205, fz);
+        mark.rotation.y = 0.24;
+        fishPlateGroup.add(mark);
+      });
+
+      const lemon = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.028, 0.028, 0.012, 10),
+        lemonMat,
+      );
+      lemon.position.set(0.042, 0.162, -0.03);
+      fishPlateGroup.add(handleStick, leafTray, fishBody, fishTail, lemon);
+      handAnchor.add(fishPlateGroup);
+    } else if (equippedFood === 'bbq_corn_sausage') {
+      const comboGroup = new THREE.Group();
+      comboGroup.rotation.x = 0.2;
+      comboGroup.rotation.z = -0.06;
+
+      const stickMat = clayMat('#D8B37C', 0.72);
+      const cornMat = glossyClayMat('#F6C93E', 0.42);
+      const butterMat = glossyClayMat('#FFF199', 0.3);
+      const sausageMat = glossyClayMat('#C94933', 0.32);
+      const searMat = clayMat('#522414', 0.76);
+
+      const stick = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.009, 0.011, 0.42, 8),
+        stickMat,
+      );
+      stick.position.set(0, 0.13, 0);
+
+      const cornCob = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.042, 0.038, 0.14, 12),
+        cornMat,
+      );
+      cornCob.position.set(-0.026, 0.21, 0);
+      cornCob.rotation.z = 0.12;
+
+      const butterPat = new THREE.Mesh(
+        new RoundedBoxGeometry(0.034, 0.018, 0.034, 1, 0.005),
+        butterMat,
+      );
+      butterPat.position.set(-0.028, 0.25, 0.034);
+
+      const sausage = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.03, 0.115, 6, 10),
+        sausageMat,
+      );
+      sausage.position.set(0.034, 0.21, 0.008);
+      sausage.rotation.z = -0.1;
+
+      [-0.03, 0.0, 0.03].forEach((sy) => {
+        const notch = new THREE.Mesh(
+          new RoundedBoxGeometry(0.056, 0.009, 0.056, 1, 0.003),
+          searMat,
+        );
+        notch.position.set(0.034, 0.21 + sy, 0.008);
+        notch.rotation.z = 0.16;
+        comboGroup.add(notch);
+      });
+
+      comboGroup.add(stick, cornCob, butterPat, sausage);
+      handAnchor.add(comboGroup);
+    } else if (equippedFood === 'drink_water') {
+      const bottleGroup = new THREE.Group();
+      bottleGroup.rotation.x = 0.16;
+      bottleGroup.rotation.z = -0.05;
+      const plasticMat = new THREE.MeshStandardMaterial({
+        color: '#CBEFFF',
+        roughness: 0.18,
+        metalness: 0.05,
+        transparent: true,
+        opacity: 0.86,
+      });
+      const capMat = glossyClayMat('#2A7FB2', 0.28);
+      const labelMat = glossyClayMat('#4AB1E6', 0.34);
+
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.165, 12), plasticMat);
+      body.position.y = 0.11;
+      const label = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.068, 12), labelMat);
+      label.position.y = 0.11;
+      const shoulder = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.038, 0.04, 12), plasticMat);
+      shoulder.position.y = 0.212;
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.028, 10), capMat);
+      cap.position.y = 0.244;
+      bottleGroup.add(body, label, shoulder, cap);
+      handAnchor.add(bottleGroup);
+    } else if (equippedFood === 'drink_strawberry_milk') {
+      const milkGroup = new THREE.Group();
+      milkGroup.rotation.x = 0.18;
+      milkGroup.rotation.z = -0.06;
+      const cartonMat = clayMat('#FFB2CE', 0.56);
+      const bandMat = clayMat('#FFF8FA', 0.62);
+      const berryMat = glossyClayMat('#EB4876', 0.32);
+      const strawMat = glossyClayMat('#F45886', 0.3);
+
+      const carton = new THREE.Mesh(
+        new RoundedBoxGeometry(0.086, 0.135, 0.072, 2, 0.01),
+        cartonMat,
+      );
+      carton.position.y = 0.1;
+      const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.058, 0.042, 4), cartonMat);
+      roof.rotation.y = Math.PI / 4;
+      roof.position.y = 0.186;
+      const band = new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.048, 0.076, 1, 0.005), bandMat);
+      band.position.y = 0.1;
+      const berry = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 8), berryMat);
+      berry.position.set(0, 0.1, 0.04);
+      const strawStem = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.075, 6), strawMat);
+      strawStem.position.set(0.018, 0.21, 0);
+      strawStem.rotation.z = -0.24;
+      milkGroup.add(carton, roof, band, berry, strawStem);
+      handAnchor.add(milkGroup);
+    } else if (equippedFood === 'drink_matcha_can' || equippedFood === 'drink_cola') {
+      const canGroup = new THREE.Group();
+      canGroup.rotation.x = 0.16;
+      canGroup.rotation.z = -0.06;
+      const isMatcha = equippedFood === 'drink_matcha_can';
+      const bodyMat = glossyClayMat(isMatcha ? '#62B36E' : '#EB6834', 0.26);
+      const labelMat = glossyClayMat(isMatcha ? '#E8F7E3' : '#FFF4D8', 0.36);
+      const rimMat = glossyClayMat('#DCE4EC', 0.18);
+
+      const canBody = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.138, 14), bodyMat);
+      canBody.position.y = 0.105;
+      const canLabel = new THREE.Mesh(new THREE.CylinderGeometry(0.0375, 0.0375, 0.062, 14), labelMat);
+      canLabel.position.y = 0.105;
+      const topRim = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.036, 0.014, 14), rimMat);
+      topRim.position.y = 0.178;
+      const botRim = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.032, 0.012, 14), rimMat);
+      botRim.position.y = 0.034;
+      canGroup.add(canBody, canLabel, topRim, botRim);
+      handAnchor.add(canGroup);
     }
   }
 
@@ -2929,24 +3144,25 @@ export function buildAvatarRig(
 
   let heldPetRig: PetRig | undefined;
   if (carryingPet) {
-    if (carryingPet.speciesId === 'brown_puppy') {
-      heldPetRig = buildPetModel('brown_puppy', {
-        scale: 1.08,
-        sick: carryingPet.sick,
-        withShadow: true,
-      });
-      // Orbit smoothly around the player on ground level in root space
-      heldPetRig.root.position.set(0.85, 0, 0);
-      heldPetRig.root.rotation.y = 0;
-      root.add(heldPetRig.root);
-    } else if (carryingPet.speciesId === 'blue_bird') {
-      heldPetRig = buildPetModel('blue_bird', {
+    const carryMoveType = PET_CATALOG[carryingPet.speciesId]?.moveType ?? 'walk';
+    if (carryMoveType === 'fly') {
+      heldPetRig = buildPetModel(carryingPet.speciesId, {
         scale: 1.08,
         sick: carryingPet.sick,
         withShadow: false,
       });
       // Orbit smoothly around the player's body in root space
       heldPetRig.root.position.set(0.72, 1.06, 0);
+      heldPetRig.root.rotation.y = 0;
+      root.add(heldPetRig.root);
+    } else {
+      heldPetRig = buildPetModel(carryingPet.speciesId, {
+        scale: 1.08,
+        sick: carryingPet.sick,
+        withShadow: true,
+      });
+      // Orbit smoothly around the player on ground level in root space
+      heldPetRig.root.position.set(0.85, 0, 0);
       heldPetRig.root.rotation.y = 0;
       root.add(heldPetRig.root);
     }
@@ -3419,7 +3635,8 @@ export function updateAvatarRigAnimation(
 
   if (rig.heldPetRig) {
     const orbitAngle = elapsed * 2.15;
-    if (rig.heldPetRig.speciesId === 'blue_bird') {
+    const isFlyPet = (PET_CATALOG[rig.heldPetRig.speciesId]?.moveType ?? 'walk') === 'fly';
+    if (isFlyPet) {
       const orbitRadius = 0.72;
       const orbitY = 1.05 + Math.sin(elapsed * 3.0) * 0.11;
       rig.heldPetRig.root.position.set(
