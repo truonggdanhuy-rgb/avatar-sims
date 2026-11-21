@@ -582,7 +582,7 @@ export function updatePetAnimation(
       }
     } else if (isPlayingJump) {
       const p = extra?.playProgress ?? 0;
-      const bounce = Math.abs(Math.sin(p * Math.PI * 3));
+      const bounce = Math.abs(Math.sin(p * Math.PI * 6));
       rig.bodyPivot.position.y = bounce * 0.34;
       rig.bodyPivot.rotation.x = -bounce * 0.18;
       rig.headPivot.rotation.x = -0.12 - bounce * 0.12;
@@ -640,7 +640,7 @@ export function updatePetAnimation(
     if (isPlayJump) {
       // Lands on ground in front of player and hops joyfully while fluttering wings
       const p = extra?.playProgress ?? 0;
-      const hop = Math.abs(Math.sin(p * Math.PI * 4));
+      const hop = Math.abs(Math.sin(p * Math.PI * 7));
       rig.bodyPivot.position.y = hop * 0.24;
       rig.bodyPivot.rotation.x = -hop * 0.14;
       rig.bodyPivot.rotation.z = 0;

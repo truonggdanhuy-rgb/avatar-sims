@@ -65,6 +65,26 @@ export function clampPointToMallDeck(x: number, z: number): {x: number; z: numbe
   if (nx < -46.85 && Math.abs(nz - MALL_ELEVATOR_CAB_POS.z) < 1.25) {
     nx = -46.85;
   }
+  // Keep player cleanly around the Skydeck umbrella café table (-43.9, -0.25) and telescope (-41.56, -3.94)
+  const deckObstacles: [number, number, number][] = [
+    [-43.9, -0.25, 0.78],
+    [-41.56, -3.94, 0.48],
+  ];
+  for (let i = 0; i < deckObstacles.length; i++) {
+    const [ox, oz, minR] = deckObstacles[i];
+    const odx = nx - ox;
+    const odz = nz - oz;
+    const od = Math.hypot(odx, odz);
+    if (od < minR) {
+      if (od > 0.0001) {
+        nx = ox + (odx / od) * minR;
+        nz = oz + (odz / od) * minR;
+      } else {
+        nx = ox;
+        nz = oz + minR;
+      }
+    }
+  }
   return {x: nx, z: nz};
 }
 
@@ -89,6 +109,13 @@ export function getTownGroundHeight(
       return THREE.MathUtils.lerp(0.02, 0.24, u);
     }
     return 0.24;
+  }
+  // Raised May Mall Travertine Forecourt Terrace (prevents ground grass Z-fighting)
+  if (x >= -61.45 && x <= -44.05 && z >= -10.55 && z <= 5.55) {
+    return 0.21;
+  }
+  if (x >= -61.85 && x <= -43.65 && z >= -10.95 && z <= 5.95) {
+    return 0.12;
   }
   const dh = Math.hypot(x - HILL_CENTER.x, z - HILL_CENTER.z);
   if (dh < HILL_RADIUS) {
@@ -1780,7 +1807,7 @@ export function buildTownScene(): TownWorld {
     group.add(windmill);
   }
 
-  // ========== DISTRICT 3: TIỆM THỜI TRANG (Parisian Pastel Boutique) ==========
+  // ========== DISTRICT 3: TIỆM THỜI TRANG (Multi-Story Parisian Atelier Boutique) ==========
   {
     const shop = new THREE.Group();
     shop.position.set(-32, 0, 18.0);
@@ -1789,47 +1816,45 @@ export function buildTownScene(): TownWorld {
 
     const stoneStepMat = getMat('#EDE0D8', 0.78);
     const bodyMat = getMat('#FFEAF0', 0.65);
-    const pilasterMat = getMat('#FFF8FA', 0.6);
-    const mansardMat = getMat('#CC6079', 0.56);
-    const roofTrimMat = getMat('#A8445B', 0.56);
+    const upperBodyMat = getMat('#FFF3F6', 0.62);
+    const pilasterMat = getMat('#FFF9FA', 0.58);
+    const mansardMat = getMat('#C85872', 0.54);
+    const roofTrimMat = getMat('#9F3D54', 0.56);
+    const ironRailMat = getMat('#4E4047', 0.45, 0.35);
     const goldMat = glossyClayMat('#FFD166', 0.22);
 
+    // 1. Two-Tier Stone Porch Plinth
     const plinth = new THREE.Mesh(
-      new RoundedBoxGeometry(4.85, 0.34, 3.85, 2, 0.08),
+      new RoundedBoxGeometry(4.95, 0.34, 3.92, 2, 0.08),
       stoneStepMat,
     );
     plinth.position.y = 0.17;
+    const stepFront = new THREE.Mesh(
+      new RoundedBoxGeometry(2.15, 0.16, 0.46, 2, 0.04),
+      stoneStepMat,
+    );
+    stepFront.position.set(1.08, 0.08, 2.08);
 
-    const body = new THREE.Mesh(new RoundedBoxGeometry(4.4, 2.7, 3.35, 3, 0.12), bodyMat);
-    body.position.y = 1.68;
+    // 2. Ground Storefront Story (y = 0.34..2.98)
+    const body = new THREE.Mesh(new RoundedBoxGeometry(4.44, 2.66, 3.38, 3, 0.1), bodyMat);
+    body.position.y = 1.67;
 
-    // Corner decorative pilasters + cornice band
+    // Ground Corner Decorative Pilasters + Waist Belt Cornice
     [
-      [-2.14, 1.62],
-      [2.14, 1.62],
-      [-2.14, -1.62],
-      [2.14, -1.62],
+      [-2.16, 1.64],
+      [2.16, 1.64],
+      [-2.16, -1.64],
+      [2.16, -1.64],
     ].forEach(([px, pz]) => {
-      const pil = new THREE.Mesh(new RoundedBoxGeometry(0.24, 2.72, 0.24, 2, 0.04), pilasterMat);
-      pil.position.set(px, 1.68, pz);
+      const pil = new THREE.Mesh(new RoundedBoxGeometry(0.24, 2.7, 0.24, 2, 0.04), pilasterMat);
+      pil.position.set(px, 1.67, pz);
       shop.add(pil);
     });
     const cornice = new THREE.Mesh(
-      new RoundedBoxGeometry(4.65, 0.2, 3.6, 2, 0.04),
+      new RoundedBoxGeometry(4.78, 0.22, 3.68, 2, 0.04),
       pilasterMat,
     );
-    cornice.position.y = 3.05;
-
-    const mansard = new THREE.Mesh(
-      new RoundedBoxGeometry(4.55, 1.05, 3.5, 3, 0.16),
-      mansardMat,
-    );
-    mansard.position.y = 3.55;
-    const roofCap = new THREE.Mesh(
-      new RoundedBoxGeometry(3.65, 0.45, 2.65, 2, 0.08),
-      roofTrimMat,
-    );
-    roofCap.position.y = 4.22;
+    cornice.position.y = 3.02;
 
     // 7-Stripe Scalloped Storefront Awning
     for (let i = 0; i < 7; i++) {
@@ -1837,36 +1862,47 @@ export function buildTownScene(): TownWorld {
         new RoundedBoxGeometry(0.58, 0.22, 1.12, 2, 0.05),
         getMat(i % 2 === 0 ? '#E86B82' : '#FFFDF9', 0.55),
       );
-      stripe.position.set(-1.74 + i * 0.58, 2.32, 2.02);
+      stripe.position.set(-1.74 + i * 0.58, 2.38, 2.04);
       stripe.rotation.x = 0.38;
       shop.add(stripe);
     }
 
     // Large Framed Boutique Display Window + 2 Dress Forms inside
     const showWinFrame = new THREE.Mesh(
-      new RoundedBoxGeometry(1.92, 1.48, 0.16, 2, 0.05),
+      new RoundedBoxGeometry(1.96, 1.52, 0.22, 2, 0.05),
       pilasterMat,
     );
-    showWinFrame.position.set(-0.82, 1.32, 1.68);
-    const showWin = new THREE.Mesh(new THREE.BoxGeometry(1.68, 1.24, 0.18), makeWinMat());
-    showWin.position.set(-0.82, 1.32, 1.7);
-
+    showWinFrame.position.set(-0.82, 1.32, 1.7);
+    const showWin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.26, 0.24), makeWinMat());
+    showWin.position.set(-0.82, 1.32, 1.72);
     const dress1 = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.82, 10), getMat('#F9A8BE', 0.5));
-    dress1.position.set(-1.14, 1.12, 1.48);
+    dress1.position.set(-1.14, 1.12, 1.5);
     const dress2 = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.76, 10), getMat('#A7D8F0', 0.5));
-    dress2.position.set(-0.5, 1.1, 1.48);
+    dress2.position.set(-0.5, 1.1, 1.5);
 
-    // Tall Double Boutique Doors + Gold Handles
+    // Tall Arched Double Boutique Doors + Gold Handles
     const doorFrame = new THREE.Mesh(
-      new RoundedBoxGeometry(1.26, 1.78, 0.18, 2, 0.05),
+      new RoundedBoxGeometry(1.3, 1.84, 0.2, 2, 0.05),
       pilasterMat,
     );
-    doorFrame.position.set(1.08, 1.18, 1.68);
+    doorFrame.position.set(1.08, 1.2, 1.7);
     const door = new THREE.Mesh(
-      new RoundedBoxGeometry(1.08, 1.64, 0.2, 2, 0.05),
+      new RoundedBoxGeometry(1.1, 1.68, 0.22, 2, 0.05),
       getMat('#9E4B5D', 0.58),
     );
-    door.position.set(1.08, 1.14, 1.7);
+    door.position.set(1.08, 1.15, 1.72);
+    const doorArch = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.62, 0.62, 0.2, 16, 1, false, 0, Math.PI),
+      pilasterMat,
+    );
+    doorArch.rotation.x = Math.PI / 2;
+    doorArch.rotation.z = Math.PI / 2;
+    doorArch.position.set(1.08, 2.02, 1.7);
+    [0.98, 1.18].forEach((hx) => {
+      const handle = new THREE.Mesh(new RoundedBoxGeometry(0.04, 0.24, 0.06, 2, 0.02), goldMat);
+      handle.position.set(hx, 1.12, 1.85);
+      shop.add(handle);
+    });
 
     // Potted Topiary Trees flanking the boutique entrance
     const potMat = getMat('#F5E6D3', 0.72);
@@ -1879,15 +1915,151 @@ export function buildTownScene(): TownWorld {
       shop.add(pot, ball);
     });
 
-    // Sculpted 3D Gold Ribbon Bow Crest on Roof
-    const bowCenter = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 10), goldMat);
-    bowCenter.position.set(0, 3.65, 1.82);
-    [-0.4, 0.4].forEach((bx, idx) => {
-      const wing = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.64, 10), goldMat);
+    // 3. Second-Story Atelier Tier (Stepped-back Parisian upper floor y = 3.12..5.04)
+    const upperBody = new THREE.Mesh(
+      new RoundedBoxGeometry(4.06, 1.92, 3.06, 3, 0.09),
+      upperBodyMat,
+    );
+    upperBody.position.y = 4.08;
+    [
+      [-1.98, 1.48],
+      [1.98, 1.48],
+      [-1.98, -1.48],
+      [1.98, -1.48],
+    ].forEach(([px, pz]) => {
+      const uPil = new THREE.Mesh(new RoundedBoxGeometry(0.2, 1.94, 0.2, 2, 0.03), pilasterMat);
+      uPil.position.set(px, 4.08, pz);
+      shop.add(uPil);
+    });
+
+    // Upper Story Arched French Windows + Shutters
+    [-1.24, 0, 1.24].forEach((wx, idx) => {
+      const uw = buildFramedWindow(
+        idx === 1 ? 0.96 : 0.76,
+        idx === 1 ? 1.26 : 1.08,
+        pilasterMat,
+        makeWinMat(),
+        idx === 1 ? undefined : mansardMat,
+      );
+      uw.position.set(wx, idx === 1 ? 4.04 : 4.08, 1.54);
+      shop.add(uw);
+    });
+
+    // Projecting Center Juliette Balcony with Wrought-Iron Rail + Flower Box
+    const balcSlab = new THREE.Mesh(
+      new RoundedBoxGeometry(1.64, 0.12, 0.52, 2, 0.04),
+      pilasterMat,
+    );
+    balcSlab.position.set(0, 3.24, 1.72);
+    const balcTopRail = new THREE.Mesh(
+      new RoundedBoxGeometry(1.6, 0.06, 0.06, 2, 0.02),
+      ironRailMat,
+    );
+    balcTopRail.position.set(0, 3.68, 1.94);
+    [-0.76, -0.45, -0.15, 0.15, 0.45, 0.76].forEach((bx) => {
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.42, 6), ironRailMat);
+      bar.position.set(bx, 3.47, 1.94);
+      shop.add(bar);
+    });
+    const balcPlanter = new THREE.Mesh(
+      new RoundedBoxGeometry(1.1, 0.16, 0.22, 2, 0.03),
+      stoneStepMat,
+    );
+    balcPlanter.position.set(0, 3.36, 1.88);
+    [-0.36, 0, 0.36].forEach((fx, fi) => {
+      const bloom = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 7, 7),
+        getMat(fi === 1 ? '#FFD166' : '#FF7B9C', 0.65),
+      );
+      bloom.position.set(fx, 3.48, 1.9);
+      shop.add(bloom);
+    });
+    shop.add(balcSlab, balcTopRail, balcPlanter);
+
+    // Side windows on Ground + 2nd Story so all angles look rich
+    [-1, 1].forEach((side) => {
+      const gw = buildFramedWindow(0.86, 1.0, pilasterMat, makeWinMat(), mansardMat);
+      gw.rotation.y = (side * Math.PI) / 2;
+      gw.position.set(side * 2.23, 1.65, 0);
+      const uwSide = buildFramedWindow(0.74, 0.94, pilasterMat, makeWinMat(), mansardMat);
+      uwSide.rotation.y = (side * Math.PI) / 2;
+      uwSide.position.set(side * 2.04, 4.08, 0);
+      shop.add(gw, uwSide);
+    });
+
+    // Upper Crown Cornice (y = 5.08)
+    const upperCornice = new THREE.Mesh(
+      new RoundedBoxGeometry(4.46, 0.22, 3.42, 2, 0.05),
+      pilasterMat,
+    );
+    upperCornice.position.y = 5.08;
+
+    // 4. True Tapered Sloped Parisian Mansard Roof + Gable Clock Pediment + Golden Cupola Crown (up to ~11.5m world!)
+    const mansardSlope = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.62, 2.65, 1.18, 4),
+      mansardMat,
+    );
+    mansardSlope.rotation.y = Math.PI / 4;
+    mansardSlope.scale.set(1.16, 1, 0.89);
+    mansardSlope.position.y = 5.76;
+
+    const mansardDeck = new THREE.Mesh(
+      new RoundedBoxGeometry(2.68, 0.16, 2.04, 2, 0.04),
+      roofTrimMat,
+    );
+    mansardDeck.position.y = 6.38;
+
+    // Central Ornate Gable Pediment + Sculpted 3D Gold Ribbon Bow Crest
+    const gableBack = new THREE.Mesh(
+      new RoundedBoxGeometry(1.24, 1.02, 0.56, 2, 0.08),
+      pilasterMat,
+    );
+    gableBack.position.set(0, 5.66, 1.44);
+    const gableCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.68, 0.68, 0.62, 16, 1, false, 0, Math.PI),
+      roofTrimMat,
+    );
+    gableCap.rotation.x = Math.PI / 2;
+    gableCap.rotation.z = Math.PI / 2;
+    gableCap.position.set(0, 6.14, 1.46);
+
+    const bowCenter = new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 10), goldMat);
+    bowCenter.position.set(0, 5.72, 1.78);
+    [-0.35, 0.35].forEach((bx, idx) => {
+      const wing = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.56, 10), goldMat);
       wing.rotation.z = idx === 0 ? -Math.PI / 2 : Math.PI / 2;
-      wing.position.set(bx, 3.65, 1.82);
+      wing.position.set(bx, 5.72, 1.78);
       shop.add(wing);
     });
+
+    // Flanking Cute Mansard Dormer Windows
+    [-1.12, 1.12].forEach((dx) => {
+      const dormerBox = new THREE.Mesh(
+        new RoundedBoxGeometry(0.56, 0.62, 0.44, 2, 0.05),
+        pilasterMat,
+      );
+      dormerBox.position.set(dx, 5.62, 1.38);
+      const dormerWin = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.4, 0.08), makeWinMat());
+      dormerWin.position.set(dx, 5.6, 1.6);
+      const dormerCap = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.34, 4), roofTrimMat);
+      dormerCap.rotation.y = Math.PI / 4;
+      dormerCap.position.set(dx, 6.06, 1.38);
+      shop.add(dormerBox, dormerWin, dormerCap);
+    });
+
+    // Sculpted Gold Cupola Spire Crown on Mansard Peak
+    const cupolaBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.46, 0.58, 0.24, 12),
+      pilasterMat,
+    );
+    cupolaBase.position.y = 6.54;
+    const cupolaDome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.6),
+      roofTrimMat,
+    );
+    cupolaDome.position.y = 6.62;
+    const cupolaFinial = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 10), goldMat);
+    cupolaFinial.position.y = 7.08;
 
     // Partial dainty picket fence wings beside the boutique porch
     const shopFenceMat = getMat('#FFFDF7', 0.72);
@@ -1903,25 +2075,34 @@ export function buildTownScene(): TownWorld {
 
     shop.add(
       plinth,
+      stepFront,
       body,
       cornice,
-      mansard,
-      roofCap,
+      upperBody,
+      upperCornice,
+      mansardSlope,
+      mansardDeck,
+      gableBack,
+      gableCap,
       showWinFrame,
       showWin,
       dress1,
       dress2,
       doorFrame,
       door,
+      doorArch,
       bowCenter,
+      cupolaBase,
+      cupolaDome,
+      cupolaFinial,
       sFenceL,
       sFenceLSide,
       sFenceRSide,
     );
     addInteractionProxy(
       shop,
-      [5.0, 4.7, 4.4],
-      2.2,
+      [5.0, 6.8, 4.4],
+      3.4,
       {
         kind: 'zone',
         zone: 'boutique' as ZoneId,
@@ -1935,7 +2116,7 @@ export function buildTownScene(): TownWorld {
     group.add(shop);
   }
 
-  // ========== DISTRICT 4: TIỆM MINIGAME (Large Flat-Roofed Game House + Upright 3D GAME Sign on Roof) ==========
+  // ========== DISTRICT 4: TIỆM MINIGAME (Multi-Tier Retro-Modern Arcade Palace + Crown GAME Marquee) ==========
   {
     const arcade = new THREE.Group();
     arcade.position.set(32, 0, 17.5);
@@ -1945,6 +2126,7 @@ export function buildTownScene(): TownWorld {
     const stonePlinthMat = getMat('#CFC8E2', 0.76);
     const stepMat = getMat('#DFDAEC', 0.74);
     const wallCreamMat = getMat('#F7F1FE', 0.66);
+    const upperWallMat = getMat('#EDE4FA', 0.62);
     const trimIndigoMat = getMat('#4B3D78', 0.56);
     const trimLilacMat = getMat('#6E5DA8', 0.58);
     const roofDeckMat = getMat('#3A2F63', 0.64);
@@ -2007,63 +2189,88 @@ export function buildTownScene(): TownWorld {
       arcade.add(railPostFront, bollardGlow, railBar);
     });
 
-    // 2. Large Architectural Game Building Body + Wainscot + Recessed Side/Back Neon Trim (never slicing front glass doors!)
+    // 2. Ground Hall Body + Wainscot + Sculpted Projecting Corner Pylon Turrets
     const body = new THREE.Mesh(
-      new RoundedBoxGeometry(5.95, 3.45, 4.18, 3, 0.12),
+      new RoundedBoxGeometry(5.92, 3.42, 4.16, 3, 0.12),
       wallCreamMat,
     );
-    body.position.y = 2.08;
+    body.position.y = 2.06;
 
     const wainscot = new THREE.Mesh(
-      new RoundedBoxGeometry(6.05, 0.76, 4.28, 2, 0.05),
+      new RoundedBoxGeometry(6.04, 0.74, 4.26, 2, 0.05),
       trimIndigoMat,
     );
-    wainscot.position.y = 0.74;
+    wainscot.position.y = 0.72;
 
     const neonBelt = new THREE.Group();
-    [-3.01, 3.01].forEach((sx) => {
+    [-3.0, 3.0].forEach((sx) => {
       const sideTrim = new THREE.Mesh(
-        new RoundedBoxGeometry(0.08, 0.1, 3.96, 2, 0.025),
+        new RoundedBoxGeometry(0.08, 0.1, 3.94, 2, 0.025),
         tealNeonMat,
       );
-      sideTrim.position.set(sx, 1.16, -0.05);
+      sideTrim.position.set(sx, 1.15, -0.05);
       neonBelt.add(sideTrim);
     });
     const backTrim = new THREE.Mesh(
-      new RoundedBoxGeometry(6.08, 0.1, 0.08, 2, 0.025),
+      new RoundedBoxGeometry(6.06, 0.1, 0.08, 2, 0.025),
       tealNeonMat,
     );
-    backTrim.position.set(0, 1.16, -2.11);
+    backTrim.position.set(0, 1.15, -2.1);
     neonBelt.add(backTrim);
 
-    // 4 Sculpted Corner Framing Columns + Center Entry Columns
+    // 4 Tall Projecting Corner Pylon Turrets with Vertical Neon Light Fins (rising past 2nd floor!)
     [
-      [-2.9, 2.02],
-      [2.9, 2.02],
-      [-2.9, -2.02],
-      [2.9, -2.02],
-      [-1.08, 2.04],
-      [1.08, 2.04],
+      [-2.94, 2.02],
+      [2.94, 2.02],
+      [-2.94, -2.02],
+      [2.94, -2.02],
     ].forEach(([px, pz]) => {
-      const col = new THREE.Mesh(
-        new RoundedBoxGeometry(0.32, 3.48, 0.32, 2, 0.05),
+      const turret = new THREE.Mesh(
+        new RoundedBoxGeometry(0.56, 5.75, 0.56, 2, 0.08),
         trimIndigoMat,
       );
-      col.position.set(px, 2.08, pz);
+      turret.position.set(px, 3.22, pz);
+      const turretCap = new THREE.Mesh(
+        new RoundedBoxGeometry(0.68, 0.26, 0.68, 2, 0.06),
+        coralMat,
+      );
+      turretCap.position.set(px, 6.18, pz);
+      const turretOrb = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), tealNeonMat);
+      turretOrb.position.set(px, 6.52, pz);
+      const fin = new THREE.Mesh(
+        new RoundedBoxGeometry(0.1, 4.4, 0.12, 2, 0.03),
+        tealNeonMat,
+      );
+      fin.position.set(px + (px > 0 ? 0.28 : -0.28), 3.35, pz + (pz > 0 ? 0.24 : -0.24));
+      arcade.add(turret, turretCap, turretOrb, fin);
+    });
+
+    // Center Entry Columns
+    [-1.08, 1.08].forEach((px) => {
+      const col = new THREE.Mesh(
+        new RoundedBoxGeometry(0.32, 3.45, 0.32, 2, 0.05),
+        trimIndigoMat,
+      );
+      col.position.set(px, 2.06, 2.04);
       const capBand = new THREE.Mesh(
         new RoundedBoxGeometry(0.38, 0.14, 0.38, 2, 0.03),
         coralMat,
       );
-      capBand.position.set(px, 3.66, pz);
+      capBand.position.set(px, 3.64, 2.04);
       arcade.add(col, capBand);
     });
 
-    // Upper horizontal frieze cornice below the flat roof
+    // Upper Mezzanine Frieze Cornice + Glowing Trim Belt
     const upperFrieze = new THREE.Mesh(
-      new RoundedBoxGeometry(6.12, 0.34, 4.34, 2, 0.04),
+      new RoundedBoxGeometry(6.24, 0.32, 4.42, 2, 0.05),
       trimLilacMat,
     );
-    upperFrieze.position.y = 3.62;
+    upperFrieze.position.y = 3.74;
+    const upperNeonTrim = new THREE.Mesh(
+      new RoundedBoxGeometry(6.3, 0.08, 4.48, 2, 0.02),
+      tealNeonMat,
+    );
+    upperNeonTrim.position.y = 3.88;
 
     // 3. Center Double Glass Entry + Illuminated Canopy Marquee + Star Crest
     const doorRecess = new THREE.Mesh(
@@ -2092,7 +2299,6 @@ export function buildTownScene(): TownWorld {
       arcade.add(leaf, handle);
     });
 
-    // Jutting Flat Illuminated Entrance Canopy + Pixel Console Crest
     const entryCanopy = new THREE.Mesh(
       new RoundedBoxGeometry(2.38, 0.24, 0.92, 2, 0.06),
       trimIndigoMat,
@@ -2128,7 +2334,7 @@ export function buildTownScene(): TownWorld {
       arcade.add(sconce);
     });
 
-    // 4. Left & Right Panoramic Glass Showcase Bays (with miniature arcade cabinets visible inside!)
+    // 4. Left & Right Panoramic Glass Showcase Bays
     [-1.96, 1.96].forEach((bx, bayIdx) => {
       const bayFrame = new THREE.Mesh(
         new RoundedBoxGeometry(1.56, 1.66, 0.22, 2, 0.05),
@@ -2146,7 +2352,6 @@ export function buildTownScene(): TownWorld {
       );
       bayGlass.position.set(bx, 2.08, 2.15);
 
-      // Cute Striped Mini Canopy over each side window
       for (let s = 0; s < 4; s++) {
         const stripe = new THREE.Mesh(
           new RoundedBoxGeometry(0.38, 0.11, 0.56, 2, 0.03),
@@ -2157,7 +2362,6 @@ export function buildTownScene(): TownWorld {
         arcade.add(stripe);
       }
 
-      // Tiny miniature arcade & claw machines displayed inside the glass bay
       [-0.32, 0.32].forEach((mx, mIdx) => {
         const cabCol = bayIdx === 0
           ? mIdx === 0 ? '#FF6B78' : '#4ECDC4'
@@ -2175,7 +2379,6 @@ export function buildTownScene(): TownWorld {
         arcade.add(cab, crt);
       });
 
-      // Decorative pastel flower/star planter box beneath each bay
       const fbox = new THREE.Mesh(
         new RoundedBoxGeometry(1.48, 0.24, 0.34, 2, 0.04),
         trimIndigoMat,
@@ -2193,9 +2396,9 @@ export function buildTownScene(): TownWorld {
       arcade.add(bayFrame, bayInterior, bayGlass, fbox);
     });
 
-    // Side & Back Architectural Windows so all angles look finished
+    // Side & Back Windows on Ground Floor
     [-1, 1].forEach((side) => {
-      [-0.9, 0.9].forEach((wz) => {
+      [-0.85, 0.85].forEach((wz) => {
         const sw = buildFramedWindow(0.95, 0.95, trimLilacMat, makeWinMat());
         sw.rotation.y = (side * Math.PI) / 2;
         sw.position.set(side * 2.98, 2.15, wz);
@@ -2209,48 +2412,82 @@ export function buildTownScene(): TownWorld {
       arcade.add(bw);
     });
 
-    // 5. FLAT ROOF DECK (MÁI PHẲNG) + Parapet Walls + Recessed Rooftop Terrace
+    // 5. Stepped Second-Story Arcade Mezzanine Hall (y = 3.92..5.65)
+    const upperHall = new THREE.Mesh(
+      new RoundedBoxGeometry(4.92, 1.72, 3.34, 3, 0.1),
+      upperWallMat,
+    );
+    upperHall.position.y = 4.76;
+
+    // 3 Tall Arched Neon Clerestory Windows on Front Facade + Side Clerestory Bays
+    [-1.45, 0, 1.45].forEach((ux, idx) => {
+      const winW = idx === 1 ? 1.15 : 0.92;
+      const uwFrame = new THREE.Mesh(
+        new RoundedBoxGeometry(winW + 0.2, 1.16, 0.16, 2, 0.04),
+        trimIndigoMat,
+      );
+      uwFrame.position.set(ux, 4.78, 1.68);
+      const uwGlass = new THREE.Mesh(
+        new RoundedBoxGeometry(winW, 0.96, 0.1, 2, 0.02),
+        idx === 1 ? glassShowcaseMat : makeWinMat(),
+      );
+      uwGlass.position.set(ux, 4.78, 1.73);
+      const uwCap = new THREE.Mesh(
+        new THREE.CylinderGeometry(winW * 0.5, winW * 0.5, 0.16, 14, 1, false, 0, Math.PI),
+        coralMat,
+      );
+      uwCap.rotation.x = Math.PI / 2;
+      uwCap.rotation.z = Math.PI / 2;
+      uwCap.position.set(ux, 5.26, 1.68);
+      arcade.add(uwFrame, uwGlass, uwCap);
+    });
+    [-1, 1].forEach((side) => {
+      const sideUpperWin = buildFramedWindow(1.65, 0.85, trimLilacMat, makeWinMat());
+      sideUpperWin.rotation.y = (side * Math.PI) / 2;
+      sideUpperWin.position.set(side * 2.48, 4.78, 0);
+      arcade.add(sideUpperWin);
+    });
+
+    // 6. Sculpted Crown Penthouse Terrace + Arched Neon Backboard (y = 5.62..7.55 -> ~11.5m world!)
     const roofSlab = new THREE.Mesh(
-      new RoundedBoxGeometry(6.34, 0.28, 4.54, 2, 0.06),
+      new RoundedBoxGeometry(5.36, 0.28, 3.74, 2, 0.06),
       roofBorderMat,
     );
-    roofSlab.position.y = 3.92;
+    roofSlab.position.y = 5.64;
 
     const roofTerraceFloor = new THREE.Mesh(
-      new RoundedBoxGeometry(5.86, 0.08, 4.08, 2, 0.02),
+      new RoundedBoxGeometry(4.88, 0.08, 3.28, 2, 0.02),
       roofDeckMat,
     );
-    roofTerraceFloor.position.y = 4.06;
+    roofTerraceFloor.position.y = 5.78;
 
-    // Parapet border walls framing the flat rooftop
     const parapetFront = new THREE.Mesh(
-      new RoundedBoxGeometry(6.32, 0.26, 0.24, 2, 0.04),
+      new RoundedBoxGeometry(5.34, 0.24, 0.22, 2, 0.04),
       roofBorderMat,
     );
-    parapetFront.position.set(0, 4.14, 2.14);
+    parapetFront.position.set(0, 5.86, 1.74);
     const parapetBack = parapetFront.clone();
-    parapetBack.position.z = -2.14;
+    parapetBack.position.z = -1.74;
     const parapetLeft = new THREE.Mesh(
-      new RoundedBoxGeometry(0.24, 0.26, 4.52, 2, 0.04),
+      new RoundedBoxGeometry(0.22, 0.24, 3.72, 2, 0.04),
       roofBorderMat,
     );
-    parapetLeft.position.set(-3.04, 4.14, 0);
+    parapetLeft.position.set(-2.56, 5.86, 0);
     const parapetRight = parapetLeft.clone();
-    parapetRight.position.x = 3.04;
+    parapetRight.position.x = 2.56;
 
-    // Rooftop detail props on rear flat roof deck (skylight & exhaust unit)
+    const crownPenthouse = new THREE.Mesh(
+      new RoundedBoxGeometry(3.2, 0.56, 1.6, 2, 0.08),
+      trimIndigoMat,
+    );
+    crownPenthouse.position.set(0, 6.06, -0.58);
     const skyLight = new THREE.Mesh(
-      new RoundedBoxGeometry(2.0, 0.2, 1.15, 2, 0.05),
+      new RoundedBoxGeometry(1.9, 0.24, 0.96, 2, 0.06),
       glassShowcaseMat,
     );
-    skyLight.position.set(-0.6, 4.16, -0.75);
-    const roofUnit = new THREE.Mesh(
-      new RoundedBoxGeometry(0.95, 0.42, 0.72, 2, 0.05),
-      stonePlinthMat,
-    );
-    roofUnit.position.set(1.85, 4.26, -0.95);
+    skyLight.position.set(0, 6.38, -0.58);
 
-    // 6. LARGE UPRIGHT 3D SCULPTED "G A M E" SIGN STANDING ON THE FLAT ROOF
+    // 7. LARGE UPRIGHT 3D SCULPTED "G A M E" CROWN MARQUEE ON TOP TIER
     const buildGameLetterGeo = (char: 'G' | 'A' | 'M' | 'E') => {
       const s = new THREE.Shape();
       if (char === 'G') {
@@ -2326,28 +2563,37 @@ export function buildTownScene(): TownWorld {
     };
 
     const signPlinthBeam = new THREE.Mesh(
-      new RoundedBoxGeometry(4.95, 0.2, 0.44, 2, 0.04),
+      new RoundedBoxGeometry(4.85, 0.22, 0.48, 2, 0.04),
       trimIndigoMat,
     );
-    signPlinthBeam.position.set(0, 4.18, 1.38);
-    arcade.add(signPlinthBeam);
+    signPlinthBeam.position.set(0, 5.9, 1.15);
+    const signBackArch = new THREE.Mesh(
+      new RoundedBoxGeometry(4.62, 1.48, 0.18, 3, 0.08),
+      trimIndigoMat,
+    );
+    signBackArch.position.set(0, 6.68, 0.96);
+    const signArchNeon = new THREE.Mesh(
+      new RoundedBoxGeometry(4.74, 1.56, 0.1, 3, 0.08),
+      tealNeonMat,
+    );
+    signArchNeon.position.set(0, 6.68, 0.92);
+    arcade.add(signPlinthBeam, signBackArch, signArchNeon);
 
-    // Steel support struts holding the upright GAME roof sign
     [-1.95, -0.65, 0.65, 1.95].forEach((sx) => {
       const strut = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.045, 0.055, 0.72, 6),
+        new THREE.CylinderGeometry(0.045, 0.055, 0.78, 6),
         trimIndigoMat,
       );
-      strut.position.set(sx, 4.46, 1.06);
-      strut.rotation.x = 0.68;
+      strut.position.set(sx, 6.18, 0.72);
+      strut.rotation.x = 0.62;
       arcade.add(strut);
     });
 
     const gameLetters: {ch: 'G' | 'A' | 'M' | 'E'; x: number; col: string; em: string}[] = [
-      {ch: 'G', x: -1.74, col: '#FF6B78', em: '#E03E52'},
-      {ch: 'A', x: -0.58, col: '#FFD166', em: '#E5A229'},
-      {ch: 'M', x: 0.62, col: '#55DEC8', em: '#26B59F'},
-      {ch: 'E', x: 1.78, col: '#8E9BFF', em: '#5B6BE6'},
+      {ch: 'G', x: -1.72, col: '#FF6B78', em: '#E03E52'},
+      {ch: 'A', x: -0.57, col: '#FFD166', em: '#E5A229'},
+      {ch: 'M', x: 0.61, col: '#55DEC8', em: '#26B59F'},
+      {ch: 'E', x: 1.76, col: '#8E9BFF', em: '#5B6BE6'},
     ];
     gameLetters.forEach(({ch, x, col, em}) => {
       const letterMat = new THREE.MeshStandardMaterial({
@@ -2358,11 +2604,11 @@ export function buildTownScene(): TownWorld {
       });
       windowMeshes.push(letterMat);
       const letterMesh = new THREE.Mesh(buildGameLetterGeo(ch), letterMat);
-      letterMesh.position.set(x, 4.86, 1.38);
+      letterMesh.position.set(x, 6.66, 1.18);
       arcade.add(letterMesh);
     });
 
-    // 7. Outdoor Gacha Machine + Pixel Token Standee
+    // 8. Outdoor Gacha Machine + Pixel Token Standee
     const gachaBase = new THREE.Mesh(
       new RoundedBoxGeometry(0.5, 0.62, 0.5, 2, 0.05),
       getMat('#FF758F', 0.45),
@@ -2393,6 +2639,8 @@ export function buildTownScene(): TownWorld {
       wainscot,
       neonBelt,
       upperFrieze,
+      upperNeonTrim,
+      upperHall,
       doorRecess,
       doorFrameOuter,
       entryCanopy,
@@ -2405,8 +2653,8 @@ export function buildTownScene(): TownWorld {
       parapetBack,
       parapetLeft,
       parapetRight,
+      crownPenthouse,
       skyLight,
-      roofUnit,
       gachaBase,
       gachaGlobe,
       tokenPost,
@@ -2414,8 +2662,8 @@ export function buildTownScene(): TownWorld {
     );
     addInteractionProxy(
       arcade,
-      [6.8, 5.8, 5.4],
-      2.65,
+      [6.8, 7.2, 5.4],
+      3.5,
       {
         kind: 'zone',
         zone: 'arcade' as ZoneId,
@@ -3029,7 +3277,7 @@ export function buildTownScene(): TownWorld {
   {
     const STALL_X = -16.8;
     const STALL_Z = 37.2;
-    const STALL_ROT_Y = Math.PI + 0.35;
+    const STALL_ROT_Y = Math.PI;
     const stall = new THREE.Group();
     stall.position.set(STALL_X, 0.02, STALL_Z);
     stall.rotation.y = STALL_ROT_Y;
@@ -3262,7 +3510,7 @@ export function buildTownScene(): TownWorld {
       stall,
       [3.65, 3.0, 2.55],
       1.45,
-      {kind: 'koi_shop', tx: -17.6, tz: 35.15},
+      {kind: 'koi_shop', tx: -16.8, tz: 35.15},
       clickTargets,
     );
 
@@ -3745,68 +3993,126 @@ export function buildTownScene(): TownWorld {
       side: THREE.DoubleSide,
     });
 
-    // 1. Mall Travertine Forecourt Plaza (x: -61.5..-43.8, z: -10.8..+5.8)
+    // 1. Two-Step Travertine Forecourt Terrace (raised cleanly above green terrain to eliminate Z-fighting)
+    const forecourtStep = new THREE.Mesh(
+      new RoundedBoxGeometry(18.2, 0.14, 17.0, 2, 0.03),
+      champagneMat,
+    );
+    forecourtStep.position.set(-52.75, 0.05, -2.5);
     const forecourtPad = new THREE.Mesh(
-      new RoundedBoxGeometry(17.6, 0.1, 16.4, 2, 0.04),
+      new RoundedBoxGeometry(17.4, 0.14, 16.0, 2, 0.03),
       stonePlazaMat,
     );
-    forecourtPad.position.set(-52.7, 0.04, -2.5);
-    mallStatic.add(forecourtPad);
+    forecourtPad.position.set(-52.75, 0.14, -2.5);
+    mallStatic.add(forecourtStep, forecourtPad);
 
-    // 2. Two-Story Grand Mall Podium Base (x: -60.4..-49.0, z: -10.0..+5.0, height 7.2m)
+    // 2. Two-Story Grand Mall Podium Base (x: -60.4..-49.0, z: -10.0..+5.0, top y = 7.40m)
     const podiumBase = new THREE.Mesh(
       new RoundedBoxGeometry(11.4, 7.2, 15.0, 3, 0.18),
       podiumCreamMat,
     );
-    podiumBase.position.set(-54.7, 3.62, -2.5);
+    podiumBase.position.set(-54.7, 3.8, -2.5);
     const podiumPlinth = new THREE.Mesh(
-      new RoundedBoxGeometry(11.8, 0.65, 15.4, 2, 0.08),
+      new RoundedBoxGeometry(11.8, 0.56, 15.4, 2, 0.06),
       champagneMat,
     );
-    podiumPlinth.position.set(-54.7, 0.34, -2.5);
+    podiumPlinth.position.set(-54.7, 0.48, -2.5);
     const podiumRoofBand = new THREE.Mesh(
-      new RoundedBoxGeometry(11.9, 0.48, 15.5, 2, 0.08),
+      new RoundedBoxGeometry(12.0, 0.44, 15.6, 2, 0.07),
       silverSteelMat,
     );
-    podiumRoofBand.position.set(-54.7, 7.22, -2.5);
+    podiumRoofBand.position.set(-54.7, 7.44, -2.5);
     mallStatic.add(podiumBase, podiumPlinth, podiumRoofBand);
 
     // Warm Wood Architectural Louvers & Display Windows around Podium
     const sideStoreWinGeo = new THREE.BoxGeometry(0.18, 2.55, 3.8);
-    [-6.6, 1.6].forEach((wz) => {
+    [1.6].forEach((wz) => {
       const storeWin = new THREE.Mesh(sideStoreWinGeo, towerGlassMat);
-      storeWin.position.set(-48.96, 1.95, wz);
+      storeWin.position.set(-48.96, 2.1, wz);
       const upperWin = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.0, 3.8), towerGlassMat);
-      upperWin.position.set(-48.96, 5.15, wz);
+      upperWin.position.set(-48.96, 5.25, wz);
       mallStatic.add(storeWin, upperWin);
     });
+    const upperEntranceWin = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.0, 3.8), towerGlassMat);
+    upperEntranceWin.position.set(-48.96, 5.25, -6.5);
+    mallStatic.add(upperEntranceWin);
+
     for (let s = 0; s < 5; s++) {
       const slat = new THREE.Mesh(new THREE.BoxGeometry(0.16, 6.4, 0.18), warmWoodMat);
-      slat.position.set(-48.92, 3.8, -8.8 + s * 0.42);
+      slat.position.set(-48.92, 3.95, -9.2 + s * 0.42);
       const slatR = slat.clone();
       slatR.position.z = 2.6 + s * 0.42;
       mallStatic.add(slat, slatR);
     }
 
-    // Main East Mall Entrance Canopy & Glass Double Doors (at z = -6.5)
+    // Polished Main East Mall Entrance Door & Glowing Lobby Portal (at z = -6.5)
+    const lobbyGlowMat = new THREE.MeshStandardMaterial({
+      color: '#FFF1D4',
+      emissive: '#FFD088',
+      emissiveIntensity: 0.48,
+      roughness: 0.4,
+    });
+    lampBulbs.push(lobbyGlowMat);
     const canopy = new THREE.Mesh(
-      new RoundedBoxGeometry(2.4, 0.28, 4.4, 2, 0.05),
+      new RoundedBoxGeometry(2.55, 0.28, 4.4, 2, 0.05),
       silverSteelMat,
     );
-    canopy.position.set(-47.9, 3.55, -6.5);
+    canopy.position.set(-47.82, 3.65, -6.5);
+    const canopyGoldTrim = new THREE.Mesh(
+      new RoundedBoxGeometry(2.6, 0.08, 4.44, 2, 0.02),
+      goldAccentMat,
+    );
+    canopyGoldTrim.position.set(-47.82, 3.53, -6.5);
+    const doorPortalFrame = new THREE.Mesh(
+      new RoundedBoxGeometry(0.32, 3.05, 3.16, 2, 0.05),
+      champagneMat,
+    );
+    doorPortalFrame.position.set(-48.92, 1.72, -6.5);
     const doorFrame = new THREE.Mesh(
-      new RoundedBoxGeometry(0.24, 2.85, 2.8, 2, 0.04),
+      new RoundedBoxGeometry(0.26, 2.86, 2.82, 2, 0.04),
       darkSteelMat,
     );
-    doorFrame.position.set(-48.94, 1.5, -6.5);
-    const doorGlass = new THREE.Mesh(
-      new THREE.BoxGeometry(0.28, 2.58, 2.46),
-      towerGlassMat,
+    doorFrame.position.set(-48.88, 1.66, -6.5);
+    const doorWarmLobby = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 2.56, 2.48),
+      lobbyGlowMat,
     );
-    doorGlass.position.set(-48.94, 1.44, -6.5);
-    const doorMullion = new THREE.Mesh(new THREE.BoxGeometry(0.32, 2.6, 0.08), silverSteelMat);
-    doorMullion.position.set(-48.94, 1.44, -6.5);
-    mallStatic.add(canopy, doorFrame, doorGlass, doorMullion);
+    doorWarmLobby.position.set(-48.93, 1.6, -6.5);
+    const doorGlass = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 2.58, 2.48),
+      skyGlassMat,
+    );
+    doorGlass.position.set(-48.83, 1.6, -6.5);
+    const doorMullion = new THREE.Mesh(new THREE.BoxGeometry(0.24, 2.6, 0.08), silverSteelMat);
+    doorMullion.position.set(-48.82, 1.6, -6.5);
+    [-6.26, -6.74].forEach((hz) => {
+      const dHandle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.48, 0.06), goldAccentMat);
+      dHandle.position.set(-48.7, 1.42, hz);
+      mallStatic.add(dHandle);
+    });
+    // Flanking Mall Entrance Topiary Planters
+    [-8.35, -4.65].forEach((pz) => {
+      const planter = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.22, 0.44, 10),
+        champagneMat,
+      );
+      planter.position.set(-48.3, 0.43, pz);
+      const foliage = new THREE.Mesh(
+        new THREE.SphereGeometry(0.34, 10, 8),
+        getMat('#5DA865', 0.72),
+      );
+      foliage.position.set(-48.3, 0.88, pz);
+      mallStatic.add(planter, foliage);
+    });
+    mallStatic.add(
+      canopy,
+      canopyGoldTrim,
+      doorPortalFrame,
+      doorFrame,
+      doorWarmLobby,
+      doorGlass,
+      doorMullion,
+    );
 
     // Crisp Signboard "MAY MALL" over East Entrance Canopy (facing +X)
     const signCanvas = document.createElement('canvas');
@@ -3831,47 +4137,46 @@ export function buildTownScene(): TownWorld {
       new THREE.PlaneGeometry(3.5, 0.88),
       new THREE.MeshBasicMaterial({map: mallSignTex}),
     );
-    mallSignBoard.position.set(-46.66, 4.18, -6.5);
+    mallSignBoard.position.set(-46.52, 4.26, -6.5);
     mallSignBoard.rotation.y = Math.PI / 2;
     group.add(mallSignBoard);
 
     const entranceHit = new THREE.Mesh(
-      new THREE.BoxGeometry(2.6, 3.6, 3.8),
+      new THREE.BoxGeometry(1.9, 3.1, 3.0),
       new THREE.MeshBasicMaterial({visible: false}),
     );
-    entranceHit.position.set(-48.4, 1.8, -6.5);
+    entranceHit.position.set(-48.45, 1.75, -6.5);
     entranceHit.userData = {
       kind: 'mall_entrance',
-      tx: -46.5,
+      tx: -46.3,
       tz: -6.5,
     };
     group.add(entranceHit);
     clickTargets.push(entranceHit);
 
-    // 3. Bitexco-Inspired Tapered Glass Skyscraper Tower (Flat East +X Spine at world x = -49.0, rising to 35.6m!)
+    // 3. Bitexco-Inspired Tapered Glass Skyscraper Tower (Starts cleanly ABOVE podium at y = 7.45, spine recessed at x = -49.08 so NO podium Z-fighting!)
+    const TOWER_BASE_Y = 7.45;
     const TOWER_H = 33.4;
-    const RINGS = 28;
+    const RINGS = 24;
     const SEGS = 40;
-    const FLAT_LOCAL_X = 5.2; // World x = -54.2 + 5.2 = -49.0 (completely flat vertical spine for glass elevator!)
+    const FLAT_LOCAL_X = 5.12; // World x = -54.2 + 5.12 = -49.08 (recessed cleanly behind podium wall x = -49.0)
     const positions: number[] = [];
     const indices: number[] = [];
 
     for (let r = 0; r <= RINGS; r++) {
       const v = r / RINGS;
-      const rx = THREE.MathUtils.lerp(5.65, 2.45, Math.pow(v, 0.86));
-      const rz = THREE.MathUtils.lerp(6.45, 2.95, Math.pow(v, 0.86));
-      const shiftX = v * 0.45;
+      const rx = THREE.MathUtils.lerp(5.2, 2.45, Math.pow(v, 0.88));
+      const rz = THREE.MathUtils.lerp(6.05, 2.95, Math.pow(v, 0.88));
+      const shiftX = v * 0.42;
       for (let s = 0; s <= SEGS; s++) {
         const theta = (s / SEGS) * Math.PI * 2;
         let lx = Math.cos(theta) * rx + shiftX;
         const lz = Math.sin(theta) * rz;
-        // Flatten East (+X) side into a crisp architectural spine wall facing the Town
         if (lx > FLAT_LOCAL_X) {
           lx = FLAT_LOCAL_X;
         }
-        // Iconic Bitexco diagonal upward lotus crown slope toward West
         const maxTopY = TOWER_H + (FLAT_LOCAL_X - lx) * 0.48;
-        const ly = 2.0 + v * (maxTopY - 2.0);
+        const ly = TOWER_BASE_Y + v * (maxTopY - TOWER_BASE_Y);
         positions.push(MALL_CENTER.x + lx, ly, MALL_CENTER.z + lz);
       }
     }
@@ -3892,7 +4197,17 @@ export function buildTownScene(): TownWorld {
     const towerHull = new THREE.Mesh(towerHullGeo, towerGlassMat);
     mallStatic.add(towerHull);
 
-    // Slanted Glass Crown Cap + Sleek Architectural Spire Fin (reaching y = 36.2m)
+    // Architectural Vertical Spine & Curtain Mullion Fins on Tower
+    [-3.15, -1.65, 1.65, 3.15].forEach((mz) => {
+      const eastFin = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 24.4, 0.14),
+        silverSteelMat,
+      );
+      eastFin.position.set(MALL_CENTER.x + FLAT_LOCAL_X + 0.04, 19.8, MALL_CENTER.z + mz);
+      mallStatic.add(eastFin);
+    });
+
+    // Slanted Glass Crown Cap + Sleek Architectural Spire Fin (reaching y = 38.5m)
     const crownCapGeo = new THREE.CylinderGeometry(2.65, 2.75, 0.34, 28);
     const crownCap = new THREE.Mesh(crownCapGeo, silverSteelMat);
     crownCap.position.set(MALL_CENTER.x + 1.2, 34.45, MALL_CENTER.z);
@@ -3914,14 +4229,15 @@ export function buildTownScene(): TownWorld {
     spireBeacon.position.set(MALL_CENTER.x - 0.85, 38.55, MALL_CENTER.z);
     mallStatic.add(crownCap, crownSpire, spireBeacon);
 
-    // Sleek Metallic Horizontal Floor Rings wrapping the Bitexco silhouette every 2.8m
-    for (let lvl = 1; lvl <= 10; lvl++) {
-      const y = 7.2 + lvl * 2.55;
+    // Sleek Metallic Horizontal Floor Rings (skipping Skydeck junction 24.15..25.65 so rings never bleed onto white deck!)
+    for (let lvl = 1; lvl <= 9; lvl++) {
+      const y = 7.65 + lvl * 2.55;
       if (y > 31.8) break;
-      const v = (y - 2.0) / (TOWER_H - 2.0);
-      const rx = THREE.MathUtils.lerp(5.65, 2.45, Math.pow(v, 0.86)) + 0.08;
-      const rz = THREE.MathUtils.lerp(6.45, 2.95, Math.pow(v, 0.86)) + 0.08;
-      const shiftX = v * 0.45;
+      if (y >= MALL_DECK_Y - 0.85 && y <= MALL_DECK_Y + 0.65) continue;
+      const v = (y - TOWER_BASE_Y) / (TOWER_H - TOWER_BASE_Y);
+      const rx = THREE.MathUtils.lerp(5.2, 2.45, Math.pow(v, 0.88)) + 0.08;
+      const rz = THREE.MathUtils.lerp(6.05, 2.95, Math.pow(v, 0.88)) + 0.08;
+      const shiftX = v * 0.42;
       const bandShape = new THREE.Shape();
       for (let s = 0; s <= 36; s++) {
         const theta = (s / 36) * Math.PI * 2;
@@ -3932,7 +4248,7 @@ export function buildTownScene(): TownWorld {
         else bandShape.lineTo(bx, -bz);
       }
       const bandGeo = new THREE.ExtrudeGeometry(bandShape, {
-        depth: 0.18,
+        depth: 0.16,
         bevelEnabled: false,
       });
       bandGeo.rotateX(-Math.PI / 2);
@@ -3941,39 +4257,63 @@ export function buildTownScene(): TownWorld {
       mallStatic.add(bandMesh);
     }
 
-    // 4. Cantilevered Circular Bitexco Skydeck Observation Platform at y = 25.0 (Center -45.4, -2.5)
+    // 4. Cantilevered Circular Bitexco Skydeck Observation Platform at y = 25.0 (Clipped cleanly at x >= -49.05 so NO overlap with tower!)
     const DECK_R = 5.35;
+    const createClippedDeckGeo = (radius: number, height: number, minLocalX: number) => {
+      const shape = new THREE.Shape();
+      const segs = 48;
+      for (let i = 0; i <= segs; i++) {
+        const a = (i / segs) * Math.PI * 2;
+        const sx = Math.max(minLocalX, Math.cos(a) * radius);
+        const sy = Math.sin(a) * radius;
+        if (i === 0) shape.moveTo(sx, sy);
+        else shape.lineTo(sx, sy);
+      }
+      const geo = new THREE.ExtrudeGeometry(shape, {depth: height, bevelEnabled: false});
+      geo.rotateX(-Math.PI / 2);
+      return geo;
+    };
+
     const deckUnderFrame = new THREE.Mesh(
-      new THREE.CylinderGeometry(DECK_R + 0.05, DECK_R * 0.72, 0.62, 36),
+      createClippedDeckGeo(DECK_R + 0.06, 0.56, -3.65),
       silverSteelMat,
     );
-    deckUnderFrame.position.set(MALL_DECK_CENTER.x, MALL_DECK_Y - 0.38, MALL_DECK_CENTER.z);
+    deckUnderFrame.position.set(MALL_DECK_CENTER.x, MALL_DECK_Y - 0.70, MALL_DECK_CENTER.z);
 
     // 4 Sweeping Diagonal Structural Support Struts under Cantilevered Skydeck
     [-3.1, -1.0, 1.0, 3.1].forEach((zOff) => {
       const strut = new THREE.Mesh(
-        new THREE.BoxGeometry(5.6, 0.34, 0.34),
+        new THREE.BoxGeometry(5.5, 0.34, 0.34),
         silverSteelMat,
       );
-      strut.position.set(-46.8, MALL_DECK_Y - 1.95, MALL_DECK_CENTER.z + zOff * 0.75);
+      strut.position.set(-46.85, MALL_DECK_Y - 2.02, MALL_DECK_CENTER.z + zOff * 0.75);
       strut.rotation.z = 0.56;
       mallStatic.add(strut);
     });
 
-    const deckLedRim = new THREE.Mesh(
-      new THREE.TorusGeometry(DECK_R + 0.04, 0.09, 8, 40),
-      deckRimGlowMat,
-    );
-    deckLedRim.rotation.x = Math.PI / 2;
-    deckLedRim.position.set(MALL_DECK_CENTER.x, MALL_DECK_Y - 0.04, MALL_DECK_CENTER.z);
-    mallStatic.add(deckUnderFrame, deckLedRim);
+    // Rim LED Trim Segments around outer East/North/South edge of Skydeck (clipped cleanly clear of tower)
+    const RIM_SEGS = 28;
+    for (let i = 0; i < RIM_SEGS; i++) {
+      const a0 = (i / RIM_SEGS) * Math.PI * 2;
+      const a1 = ((i + 1) / RIM_SEGS) * Math.PI * 2;
+      const aMid = (a0 + a1) * 0.5;
+      const rx = MALL_DECK_CENTER.x + Math.cos(aMid) * (DECK_R + 0.04);
+      if (rx < -48.92) continue;
+      const rz = MALL_DECK_CENTER.z + Math.sin(aMid) * (DECK_R + 0.04);
+      const segLen = 2 * (DECK_R + 0.04) * Math.sin(Math.PI / RIM_SEGS) + 0.04;
+      const rimSeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, segLen), deckRimGlowMat);
+      rimSeg.position.set(rx, MALL_DECK_Y - 0.07, rz);
+      rimSeg.rotation.y = -aMid;
+      mallStatic.add(rimSeg);
+    }
+    mallStatic.add(deckUnderFrame);
 
     // Walkable Skydeck Floor Surface (kept unmerged for crisp raycasting in pierWalkableMeshes)
     const deckFloor = new THREE.Mesh(
-      new THREE.CylinderGeometry(DECK_R, DECK_R, 0.14, 40),
+      createClippedDeckGeo(DECK_R, 0.14, -3.65),
       stonePlazaMat,
     );
-    deckFloor.position.set(MALL_DECK_CENTER.x, MALL_DECK_Y - 0.07, MALL_DECK_CENTER.z);
+    deckFloor.position.set(MALL_DECK_CENTER.x, MALL_DECK_Y - 0.14, MALL_DECK_CENTER.z);
     deckFloor.userData = {kind: 'ground', isMallDeck: true};
     group.add(deckFloor);
     pierWalkableMeshes.push(deckFloor);
@@ -3986,7 +4326,7 @@ export function buildTownScene(): TownWorld {
       const aMid = (a0 + a1) * 0.5;
       const mx = MALL_DECK_CENTER.x + Math.cos(aMid) * (DECK_R - 0.18);
       const mz = MALL_DECK_CENTER.z + Math.sin(aMid) * (DECK_R - 0.18);
-      // Leave landing passage open beside the West elevator cab (x < -46.8, |z + 2.5| < 1.25)
+      if (mx < -48.8) continue;
       if (mx < -46.8 && Math.abs(mz - MALL_ELEVATOR_CAB_POS.z) < 1.32) continue;
 
       const segLen = 2 * (DECK_R - 0.18) * Math.sin(Math.PI / RAIL_SEGMENTS) + 0.04;
@@ -4004,56 +4344,274 @@ export function buildTownScene(): TownWorld {
       railTop.position.set(mx, MALL_DECK_Y + 1.0, mz);
       railTop.rotation.y = -aMid;
 
-      const railPost = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.045, 1.04, 8),
-        silverSteelMat,
-      );
-      railPost.position.set(
-        MALL_DECK_CENTER.x + Math.cos(a0) * (DECK_R - 0.18),
-        MALL_DECK_Y + 0.52,
-        MALL_DECK_CENTER.z + Math.sin(a0) * (DECK_R - 0.18),
-      );
+      const postX = MALL_DECK_CENTER.x + Math.cos(a0) * (DECK_R - 0.18);
+      if (postX >= -48.85) {
+        const railPost = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.04, 0.045, 1.04, 8),
+          silverSteelMat,
+        );
+        railPost.position.set(
+          postX,
+          MALL_DECK_Y + 0.52,
+          MALL_DECK_CENTER.z + Math.sin(a0) * (DECK_R - 0.18),
+        );
+        mallStatic.add(railPost);
+      }
       group.add(railPanel);
-      mallStatic.add(railTop, railPost);
+      mallStatic.add(railTop);
     }
 
-    // Two Scenic Brass Telescopes & Lounge Sky-Benches around Deck Perimeter (r = 4.65)
-    [-0.55, 0.65].forEach((ang) => {
-      const tx = MALL_DECK_CENTER.x + Math.cos(ang) * 4.55;
-      const tz = MALL_DECK_CENTER.z + Math.sin(ang) * 4.55;
+    // Rooftop Furnishing 1: ONE Interactive Scenic Brass Telescope facing skyline
+    {
+      const teleAng = -0.36;
+      const teleX = MALL_DECK_CENTER.x + Math.cos(teleAng) * 4.1;
+      const teleZ = MALL_DECK_CENTER.z + Math.sin(teleAng) * 4.1;
+      const teleWalkX = MALL_DECK_CENTER.x + Math.cos(teleAng) * 3.15;
+      const teleWalkZ = MALL_DECK_CENTER.z + Math.sin(teleAng) * 3.15;
+      const teleFaceRot = Math.atan2(teleX - teleWalkX, teleZ - teleWalkZ);
+
+      const teleGroup = new THREE.Group();
+      teleGroup.position.set(teleX, MALL_DECK_Y, teleZ);
+      teleGroup.rotation.y = -teleAng;
+
+      const baseRing = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.28, 0.1, 14),
+        darkSteelMat,
+      );
+      baseRing.position.y = 0.05;
       const stand = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.06, 0.14, 1.08, 10),
+        new THREE.CylinderGeometry(0.055, 0.12, 1.06, 12),
         silverSteelMat,
       );
-      stand.position.set(tx, MALL_DECK_Y + 0.54, tz);
+      stand.position.y = 0.58;
+      const mountYoke = new THREE.Mesh(
+        new RoundedBoxGeometry(0.16, 0.16, 0.18, 2, 0.03),
+        darkSteelMat,
+      );
+      mountYoke.position.y = 1.14;
       const barrel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.08, 0.11, 0.62, 12),
+        new THREE.CylinderGeometry(0.095, 0.055, 0.72, 14),
         goldAccentMat,
       );
-      barrel.rotation.z = Math.PI / 2 - 0.18;
-      barrel.rotation.y = -ang;
-      barrel.position.set(tx, MALL_DECK_Y + 1.16, tz);
-      mallStatic.add(stand, barrel);
-    });
-
-    [-1.65, 1.65].forEach((ang) => {
-      const bx = MALL_DECK_CENTER.x + Math.cos(ang) * 4.25;
-      const bz = MALL_DECK_CENTER.z + Math.sin(ang) * 4.25;
-      const skyBench = new THREE.Mesh(
-        new RoundedBoxGeometry(1.7, 0.42, 0.58, 2, 0.06),
-        warmWoodMat,
+      barrel.rotation.z = -(Math.PI / 2 - 0.24);
+      barrel.position.set(0.04, 1.24, 0);
+      const lensRim = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.11, 0.08, 14),
+        darkSteelMat,
       );
-      skyBench.position.set(bx, MALL_DECK_Y + 0.24, bz);
-      skyBench.rotation.y = -ang + Math.PI / 2;
-      mallStatic.add(skyBench);
-    });
+      lensRim.rotation.z = -(Math.PI / 2 - 0.24);
+      lensRim.position.set(0.39, 1.32, 0);
+      const lensGlass = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.085, 0.085, 0.04, 12),
+        towerGlassMat,
+      );
+      lensGlass.rotation.z = -(Math.PI / 2 - 0.24);
+      lensGlass.position.set(0.42, 1.33, 0);
 
-    // 5. Exposed Exterior Glass Observation Elevator Shaft + Animated Panoramic Cabin (y = 0.02 <-> 25.02)
+      teleGroup.add(baseRing, stand, mountYoke, barrel, lensRim, lensGlass);
+      mallStatic.add(teleGroup);
+
+      const teleHit = new THREE.Mesh(
+        new THREE.BoxGeometry(0.95, 1.55, 0.95),
+        new THREE.MeshBasicMaterial({visible: false}),
+      );
+      teleHit.position.set(teleX, MALL_DECK_Y + 0.78, teleZ);
+      teleHit.userData = {
+        kind: 'outdoor_telescope',
+        tx: teleWalkX,
+        tz: teleWalkZ,
+        faceRotY: teleFaceRot,
+      };
+      group.add(teleHit);
+      clickTargets.push(teleHit);
+    }
+
+    // Rooftop Furnishing 2: ONE Skydeck Café Table + 2 Cushioned Chairs with Food & Sun Umbrella (Dù Che)
+    {
+      const cafeX = -43.9;
+      const cafeZ = -0.25;
+      const cafeGroup = new THREE.Group();
+      cafeGroup.position.set(cafeX, MALL_DECK_Y, cafeZ);
+
+      // Marble Bistro Table + Pedestal
+      const tblBase = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.34, 0.08, 16),
+        darkSteelMat,
+      );
+      tblBase.position.y = 0.04;
+      const tblStem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.055, 0.075, 0.68, 12),
+        darkSteelMat,
+      );
+      tblStem.position.y = 0.4;
+      const tblTop = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.58, 0.56, 0.07, 24),
+        podiumCreamMat,
+      );
+      tblTop.position.y = 0.74;
+      const tblRim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.57, 0.025, 8, 28),
+        goldAccentMat,
+      );
+      tblRim.rotation.x = Math.PI / 2;
+      tblRim.position.y = 0.74;
+      cafeGroup.add(tblBase, tblStem, tblTop, tblRim);
+
+      // Tall Striped Sun Umbrella (Dù che) rising cleanly above seated head height
+      const poleMat = champagneMat;
+      const umbrellaPole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.032, 0.038, 1.72, 10),
+        poleMat,
+      );
+      umbrellaPole.position.y = 1.62;
+      cafeGroup.add(umbrellaPole);
+
+      const UMB_Y = 2.42;
+      const canopyAquaMat = getMat('#4BA8C8', 0.52);
+      const canopyCreamMat = getMat('#FFFDF7', 0.56);
+      const umbBaseCanopy = new THREE.Mesh(
+        new THREE.ConeGeometry(1.42, 0.44, 8),
+        canopyCreamMat,
+      );
+      umbBaseCanopy.position.y = UMB_Y;
+      cafeGroup.add(umbBaseCanopy);
+      for (let w = 0; w < 4; w++) {
+        const wedge = new THREE.Mesh(
+          new THREE.ConeGeometry(1.435, 0.442, 2, 1, false, 0, Math.PI / 4),
+          canopyAquaMat,
+        );
+        wedge.rotation.y = (w / 4) * Math.PI * 2;
+        wedge.position.y = UMB_Y + 0.008;
+        cafeGroup.add(wedge);
+      }
+      const umbTrimRing = new THREE.Mesh(
+        new THREE.TorusGeometry(1.42, 0.032, 6, 16),
+        goldAccentMat,
+      );
+      umbTrimRing.rotation.x = Math.PI / 2;
+      umbTrimRing.position.y = UMB_Y - 0.22;
+      const umbFinial = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), goldAccentMat);
+      umbFinial.position.y = UMB_Y + 0.25;
+      cafeGroup.add(umbTrimRing, umbFinial);
+
+      // Delicious Food & Drinks on the Table (Plate of pastries/croissant + 2 berry drinks)
+      const plate = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22, 0.18, 0.03, 16),
+        getMat('#FFFDF9', 0.35),
+      );
+      plate.position.set(0, 0.79, -0.06);
+      const croissant = new THREE.Mesh(
+        new THREE.TorusGeometry(0.075, 0.032, 8, 12, Math.PI * 1.15),
+        getMat('#D98B42', 0.65),
+      );
+      croissant.rotation.x = Math.PI / 2;
+      croissant.rotation.z = 0.4;
+      croissant.position.set(-0.04, 0.82, -0.07);
+      const tartCrust = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.065, 0.055, 0.045, 10),
+        getMat('#E5AC63', 0.65),
+      );
+      tartCrust.position.set(0.08, 0.82, -0.03);
+      const tartBerry = new THREE.Mesh(
+        new THREE.SphereGeometry(0.038, 8, 8),
+        getMat('#E04E66', 0.45),
+      );
+      tartBerry.position.set(0.08, 0.85, -0.03);
+      cafeGroup.add(plate, croissant, tartCrust, tartBerry);
+
+      [
+        [-0.28, 0.16, '#FF7B8E'],
+        [0.28, 0.16, '#64C7B5'],
+      ].forEach(([gx, gz, drinkCol]) => {
+        const coaster = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.075, 0.075, 0.015, 12),
+          champagneMat,
+        );
+        coaster.position.set(gx as number, 0.78, gz as number);
+        const cup = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.052, 0.042, 0.13, 10),
+          getMat(drinkCol as string, 0.25),
+        );
+        cup.position.set(gx as number, 0.85, gz as number);
+        const straw = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.008, 0.16, 6),
+          getMat('#FFFFFF', 0.35),
+        );
+        straw.position.set((gx as number) + 0.015, 0.92, gz as number);
+        straw.rotation.z = -0.22;
+        cafeGroup.add(coaster, cup, straw);
+      });
+
+      mallStatic.add(cafeGroup);
+
+      // 2 Interactive Cushioned Café Chairs flanking the table
+      [
+        {ox: -0.96, oz: 0.12, standOx: -0.96, standOz: 0.82},
+        {ox: 0.96, oz: 0.12, standOx: 0.96, standOz: 0.82},
+      ].forEach(({ox, oz, standOx, standOz}) => {
+        const chairX = cafeX + ox;
+        const chairZ = cafeZ + oz;
+        const chairRotY = Math.atan2(-ox, -oz);
+        const chairGroup = new THREE.Group();
+        chairGroup.position.set(chairX, MALL_DECK_Y, chairZ);
+        chairGroup.rotation.y = chairRotY;
+
+        const seatFrame = new THREE.Mesh(
+          new RoundedBoxGeometry(0.52, 0.07, 0.5, 2, 0.02),
+          warmWoodMat,
+        );
+        seatFrame.position.y = 0.42;
+        const cushion = new THREE.Mesh(
+          new RoundedBoxGeometry(0.46, 0.08, 0.44, 2, 0.03),
+          getMat('#F9E3C6', 0.72),
+        );
+        cushion.position.y = 0.48;
+        const backRest = new THREE.Mesh(
+          new RoundedBoxGeometry(0.5, 0.44, 0.07, 2, 0.025),
+          warmWoodMat,
+        );
+        backRest.position.set(0, 0.68, -0.21);
+        backRest.rotation.x = -0.1;
+        [
+          [-0.2, -0.19],
+          [0.2, -0.19],
+          [-0.2, 0.19],
+          [0.2, 0.19],
+        ].forEach(([lx, lz]) => {
+          const leg = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.026, 0.022, 0.42, 7),
+            darkSteelMat,
+          );
+          leg.position.set(lx, 0.21, lz);
+          chairGroup.add(leg);
+        });
+        chairGroup.add(seatFrame, cushion, backRest);
+        mallStatic.add(chairGroup);
+
+        const chairHit = new THREE.Mesh(
+          new THREE.BoxGeometry(0.68, 0.95, 0.68),
+          new THREE.MeshBasicMaterial({visible: false}),
+        );
+        chairHit.position.set(chairX, MALL_DECK_Y + 0.48, chairZ);
+        chairHit.userData = {
+          kind: 'bench',
+          tx: cafeX + standOx,
+          tz: cafeZ + standOz,
+          seatX: chairX,
+          seatZ: chairZ,
+          seatY: MALL_DECK_Y + 0.50,
+          sitRotY: chairRotY,
+        };
+        group.add(chairHit);
+        clickTargets.push(chairHit);
+      });
+    }
+
+    // 5. Exposed Exterior Glass Observation Elevator Shaft + Animated Panoramic Cabin (y = 0.04 <-> 25.0)
     const SHAFT_H = 28.4;
     const cabX = MALL_ELEVATOR_CAB_POS.x;
     const cabZ = MALL_ELEVATOR_CAB_POS.z;
 
-    // 4 Vertical Steel Structural Guide Columns flanking the panoramic glass elevator
     [
       [-0.95, -1.15],
       [0.95, -1.15],
@@ -4068,7 +4626,6 @@ export function buildTownScene(): TownWorld {
       mallStatic.add(col);
     });
 
-    // Horizontal Tie Braces & Vertical Glass Back Curtain Screen against Flat East Spine
     for (let y = 3.2; y < SHAFT_H; y += 3.5) {
       const braceL = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.12, 0.12), darkSteelMat);
       braceL.position.set(cabX, y, cabZ - 1.15);
@@ -4086,7 +4643,7 @@ export function buildTownScene(): TownWorld {
     shaftCap.position.set(cabX, SHAFT_H + 0.2, cabZ);
     mallStatic.add(shaftCap);
 
-    // Call Kiosks at Ground Level (x = -46.2, z = -1.1) and Skydeck Level (x = -46.9, z = -1.0)
+    // Compact Call Kiosks at Ground Level and Skydeck Level (tightened hit boxes to stop accidental elevator rides)
     const makeElevatorKiosk = (kx: number, ky: number, kz: number) => {
       const post = new THREE.Mesh(
         new RoundedBoxGeometry(0.32, 1.25, 0.36, 2, 0.04),
@@ -4105,15 +4662,15 @@ export function buildTownScene(): TownWorld {
       mallStatic.add(post, btnUp);
 
       const kioskHit = new THREE.Mesh(
-        new THREE.BoxGeometry(1.8, 2.2, 1.8),
+        new THREE.BoxGeometry(0.95, 1.65, 0.95),
         new THREE.MeshBasicMaterial({visible: false}),
       );
-      kioskHit.position.set(kx, ky + 1.0, kz);
+      kioskHit.position.set(kx, ky + 0.82, kz);
       kioskHit.userData = {kind: 'mall_elevator'};
       group.add(kioskHit);
       clickTargets.push(kioskHit);
     };
-    makeElevatorKiosk(-46.5, 0.04, -1.05);
+    makeElevatorKiosk(-46.5, 0.21, -1.05);
     makeElevatorKiosk(-47.15, MALL_DECK_Y, -1.05);
 
     // Animated Panoramic Glass Elevator Cabin
@@ -4152,10 +4709,10 @@ export function buildTownScene(): TownWorld {
     cabGlassFrontArchR.position.z = 0.94;
 
     const cabHit = new THREE.Mesh(
-      new THREE.BoxGeometry(2.4, 2.8, 2.6),
+      new THREE.BoxGeometry(1.4, 2.1, 1.5),
       new THREE.MeshBasicMaterial({visible: false}),
     );
-    cabHit.position.y = 1.25;
+    cabHit.position.y = 1.15;
     cabHit.userData = {kind: 'mall_elevator'};
     clickTargets.push(cabHit);
 
@@ -4171,16 +4728,6 @@ export function buildTownScene(): TownWorld {
       cabHit,
     );
     group.add(mallElevatorCabin);
-
-    // Tall Glass Shaft Interaction Proxy so tapping anywhere on the glass tower shaft rides elevator
-    const shaftClickProxy = new THREE.Mesh(
-      new THREE.BoxGeometry(2.5, 27.0, 2.8),
-      new THREE.MeshBasicMaterial({visible: false}),
-    );
-    shaftClickProxy.position.set(cabX, 13.5, cabZ);
-    shaftClickProxy.userData = {kind: 'mall_elevator'};
-    group.add(shaftClickProxy);
-    clickTargets.push(shaftClickProxy);
 
     // Colliders on Ground Level for Mall Podium & Elevator Shaft
     colliders.push({type: 'box', id: 'mall_podium', x: -54.7, z: -2.5, hw: 5.95, hd: 7.75, rotY: 0});
@@ -4223,9 +4770,9 @@ export function buildTownScene(): TownWorld {
       }
     };
 
-    // East-West Main Trail (z = 0) + Scenic Mall Spur leading to May Mall Forecourt & Elevator
+    // East-West Main Trail (z = 0) + Scenic Mall Spur stopping cleanly at May Mall Forecourt Steps
     addSteppingTrail(-35.5, 0, -8.8, 0);
-    addSteppingTrail(-45.2, -2.5, -36.0, -0.3);
+    addSteppingTrail(-43.2, -2.5, -36.0, -0.3);
     addSteppingTrail(8.8, 0, 35.5, 0);
 
     // Center North-South Spine (stops well short of Hill in North, flows south into meadow)

@@ -17,9 +17,9 @@ export const PET_CATALOG: Record<PetSpeciesId, PetSpeciesDefinition> = {
     moveType: 'walk',
     price: 350,
     canHold: true,
-    holdMode: 'arms',
+    holdMode: 'walk_orbit',
     description:
-      'Chú cún con bé bỏng lông nâu ấm áp, thích lon ton chạy theo bạn và luôn quẩy đuôi khi được bế trên tay.',
+      'Chú cún con bé bỏng lông nâu ấm áp, thích lon ton chạy theo bạn và đi quanh quẩn bên chân bạn đầy thân thiết.',
     primaryColor: '#B8723E',
     accentColor: '#FFF0D6',
   },
@@ -29,7 +29,7 @@ export const PET_CATALOG: Record<PetSpeciesId, PetSpeciesDefinition> = {
     moveType: 'fly',
     price: 450,
     canHold: true,
-    holdMode: 'shoulder',
+    holdMode: 'fly_orbit',
     description:
       'Chú chim xanh nhỏ nhắn bay lượn êm ái bên trái bạn, thích bay lượn quanh người hoặc đáp xuống nhảy múa khi chơi đùa.',
     primaryColor: '#4BA8DF',

@@ -1330,13 +1330,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       carriedPetId && activePet && activePet.id === carriedPetId
         ? {speciesId: activePet.speciesId, sick: activePet.sick}
         : null;
-    const equippedTool: ToolId | null = carryingPet
-      ? null
-      : fishingRod.equipped
-        ? 'wooden_rod'
-        : bugNet.equipped
-          ? 'wooden_net'
-          : null;
+    const equippedTool: ToolId | null = fishingRod.equipped
+      ? 'wooden_rod'
+      : bugNet.equipped
+        ? 'wooden_net'
+        : null;
     rebuildAvatarTriggerRef.current?.(avatar, equippedTool, carryingPet);
     syncPetCompanionRef.current?.();
     if (carryingPet || !activePet) {
@@ -1428,9 +1426,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     controls.rotateSpeed = 0.68;
     controls.zoomSpeed = 0.85;
     controls.minDistance = 4.6;
-    controls.maxDistance = 42;
-    controls.minPolarAngle = Math.PI * 0.16;
-    controls.maxPolarAngle = Math.PI * 0.43;
+    controls.maxDistance = 54;
+    controls.minPolarAngle = Math.PI * 0.12;
+    controls.maxPolarAngle = Math.PI * 0.68;
     controls.update();
 
     let cameraTransitionActive = false;
@@ -1487,13 +1485,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
         : null;
     let playerRig: AvatarRig = buildAvatarRig(stateRef.current.avatar, {
-      equippedTool: initCarriedPet
-        ? null
-        : stateRef.current.fishingRod.equipped
-          ? 'wooden_rod'
-          : stateRef.current.bugNet.equipped
-            ? 'wooden_net'
-            : null,
+      equippedTool: stateRef.current.fishingRod.equipped
+        ? 'wooden_rod'
+        : stateRef.current.bugNet.equipped
+          ? 'wooden_net'
+          : null,
       carryingPet: initCarriedPet,
     });
     playerRig.root.position.set(playerPos.x, 0.14, playerPos.z);
@@ -1538,7 +1534,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       z: 2.0,
       rotY: 0,
       playTimer: 0,
-      playDuration: 2.2,
+      playDuration: 4.5,
       playKind: 'none' as 'none' | 'jump' | 'circle',
       playOrbitAngle: 0,
     };
@@ -1699,8 +1695,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (petCompanion.petId !== petId || !petCompanion.rig || !petCompanion.speciesId) return;
       // Both walking and flying pets come land/stand in front of the player & hop playfully!
       petCompanion.playKind = 'jump';
-      petCompanion.playDuration = 2.2;
-      petCompanion.playTimer = 2.2;
+      petCompanion.playDuration = 4.5;
+      petCompanion.playTimer = 4.5;
       petCompanion.playOrbitAngle = Math.atan2(
         petCompanion.z - playerPos.z,
         petCompanion.x - playerPos.x,
@@ -1723,7 +1719,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           playerPos.z = activeSeat.standZ;
           activeSeat = null;
         }
-        playPetTimer = 2.2;
+        playPetTimer = 4.5;
       }
     };
 
@@ -1767,7 +1763,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       if (z === 'town') {
         controls.minDistance = 4.6;
-        controls.maxDistance = 42;
+        controls.maxDistance = 54;
+        controls.minPolarAngle = Math.PI * 0.12;
+        controls.maxPolarAngle = Math.PI * 0.68;
         activeTown = buildTownScene();
         activeTownRef.current = activeTown;
         activeTown.setFishingState?.(legacyFs);
@@ -1825,6 +1823,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         if (zoneChanged) playPetTimer = 0;
         controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : 4.5;
         controls.maxDistance = z === 'garden' || z === 'home' ? 26 : z === 'petshop' ? 22 : 18;
+        controls.minPolarAngle = Math.PI * 0.16;
+        controls.maxPolarAngle = Math.PI * 0.45;
         activeSubzone = buildSubzoneScene(z, {
           plots: pl,
           fishingState: legacyFs,
@@ -2566,7 +2566,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'outdoor_telescope') {
             soundFX.tap();
+            const faceRot = data.faceRotY as number | undefined;
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              if (typeof faceRot === 'number') {
+                playerPos.rotY = faceRot;
+              }
               soundFX.sparkle();
               callbacksRef.current.onBoostMood();
               const isNightNow = stateRef.current.timeOfDay === 'night';
@@ -3044,7 +3048,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.tap();
               showBubble(
-                'Khu mua sắm bên trong May Mall sắp khai trương! Đi thang máy kính bên cạnh lên Sân Thượng nhé!',
+                'Cửa vào May Mall (Map bên trong sắp ra mắt)! Hiện bạn có thể đi thang máy kính lên Sân Thượng.',
               );
             });
             return;
@@ -3666,12 +3670,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       let groundOffset = 0.02;
       if (isRidingMallElevator) {
         groundOffset = mallElev.y + 0.06;
-      } else if (isOnMallDeck) {
-        groundOffset = MALL_DECK_Y;
       } else if ((playerPos.pose === 'sit' || playerPos.pose === 'bath') && activeSeat) {
         groundOffset = activeSeat.seatY - 0.245;
       } else if (playerPos.pose === 'sleep' && activeSeat?.isBed) {
         groundOffset = activeSeat.seatY - 0.65;
+      } else if (isOnMallDeck) {
+        groundOffset = MALL_DECK_Y;
       } else if (z === 'town') {
         if (isPointOnPlazaFlowerBed(playerPos.x, playerPos.z) && prevGroundY + jumpY >= 0.82) {
           groundOffset = 0.98;
@@ -3717,6 +3721,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
 
       controls.update();
+      if (z === 'town' && !cameraTransitionActive) {
+        const camGround = Math.max(
+          TOWN_LAKE_WATER_Y + 0.35,
+          getTownGroundHeight(camera.position.x, camera.position.z, currentPlazaRadius),
+        );
+        const minCamY = camGround + 0.55;
+        if (camera.position.y < minCamY) {
+          camera.position.y = minCamY;
+        }
+      }
       camera.updateMatrixWorld();
       _projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       _frustum.setFromProjectionMatrix(_projScreenMatrix);
@@ -4075,6 +4089,32 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         av.eyeStyle === 'happy_arc',
         avatarPoseProgress,
       );
+
+      // Keep walking orbit pet cleanly grounded on hills, plaza, Skydeck, or elevator floor
+      if (playerRig.heldPetRig?.speciesId === 'brown_puppy') {
+        let petGy = 0.02;
+        if (isRidingMallElevator) {
+          petGy = mallElev.y + 0.06;
+        } else if (isOnMallDeck) {
+          petGy = MALL_DECK_Y;
+        } else if (z === 'town') {
+          const lx = playerRig.heldPetRig.root.position.x;
+          const lz = playerRig.heldPetRig.root.position.z;
+          const cosR = Math.cos(playerPos.rotY);
+          const sinR = Math.sin(playerPos.rotY);
+          const petWx = playerPos.x + lx * cosR + lz * sinR;
+          const petWz = playerPos.z - lx * sinR + lz * cosR;
+          petGy = getTownGroundHeight(petWx, petWz, currentPlazaRadius);
+        } else if (
+          z === 'garden' &&
+          playerPos.x > 9.35 &&
+          playerPos.x < 15.9 &&
+          Math.abs(playerPos.z - 3.0) < 0.98
+        ) {
+          petGy = 0.36;
+        }
+        playerRig.heldPetRig.root.position.y = petGy - (groundOffset + jumpY);
+      }
 
       // Update active 3D Companion Pet (walk or left-side fly, keeping safe distance from player)
       if (petCompanion.rig && petCompanion.speciesId) {
@@ -4823,8 +4863,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             soundFX.tap();
             onReleasePet();
           }}
-          aria-label="Thả thú cưng ra"
-          title="Thả thú cưng ra"
+          aria-label={activePet.speciesId === 'blue_bird' ? 'Dừng bay quanh' : 'Dừng đi quanh'}
+          title={activePet.speciesId === 'blue_bird' ? 'Dừng bay quanh' : 'Dừng đi quanh'}
           className="phone-ui anim-pop absolute top-2.5 left-[62px] z-30 flex h-11 items-center gap-1.5 rounded-2xl border-2 border-[#3C3128] bg-[#FFF2EA]/95 px-2.5 text-[#3B2B1E] shadow-lg transition-transform hover:scale-105 active:scale-95"
         >
           <PetSpeciesIcon speciesId={activePet.speciesId} className="h-6 w-6 shrink-0" />

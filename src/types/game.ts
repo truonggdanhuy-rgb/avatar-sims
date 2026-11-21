@@ -568,7 +568,7 @@ export interface InsectDexRecord {
 
 export type PetMoveType = 'walk' | 'fly';
 
-export type PetHoldMode = 'arms' | 'shoulder';
+export type PetHoldMode = 'walk_orbit' | 'fly_orbit';
 
 export type PetSpeciesId = 'brown_puppy' | 'blue_bird';
 

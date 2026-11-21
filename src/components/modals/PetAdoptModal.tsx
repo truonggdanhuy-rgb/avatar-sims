@@ -101,7 +101,7 @@ export const PetAdoptModal: React.FC<PetAdoptModalProps> = ({
                       </span>
                       <span className="inline-flex items-center gap-1 rounded-lg bg-[#FDF0F5] px-2 py-0.5 text-[10px] font-extrabold text-[#A8385E]">
                         <Sparkles className="h-3 w-3" />
-                        {spec.holdMode === 'shoulder' ? 'Bay quanh người' : 'Ôm trên tay'}
+                        {spec.holdMode === 'fly_orbit' ? 'Bay quanh người' : 'Đi quanh người'}
                       </span>
                     </div>
 

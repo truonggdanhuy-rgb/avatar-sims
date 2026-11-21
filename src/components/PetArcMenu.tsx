@@ -88,10 +88,10 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
     {
       key: 'hold',
       title: !spec.canHold
-        ? 'Thú cưng này không thể ôm'
-        : spec.holdMode === 'shoulder'
+        ? 'Thú cưng này không hỗ trợ đi quanh'
+        : spec.holdMode === 'fly_orbit'
           ? 'Bay lượn quanh người'
-          : 'Ôm thú cưng',
+          : 'Đi quanh người',
       bgClass: !spec.canHold
         ? 'bg-[#DDD6CB] text-[#857A6E]'
         : 'bg-[#5FA86B] text-white',
@@ -99,9 +99,9 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
       slash: !spec.canHold,
       badge: !spec.canHold
         ? 'Không'
-        : spec.holdMode === 'shoulder'
+        : spec.holdMode === 'fly_orbit'
           ? 'Bay quanh'
-          : 'Ôm',
+          : 'Đi quanh',
       badgeClass: !spec.canHold
         ? 'border-[#B8AFA3]/60 bg-[#F2EDE4]/95 text-[#7D7368]'
         : 'border-[#5FA86B]/60 bg-[#F2FBF4]/95 text-[#286335]',

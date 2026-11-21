@@ -1028,7 +1028,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                               Loài: {spec.name} · {spec.moveType === 'fly' ? 'Bay bên trái' : 'Đi bộ'}
                             </div>
                             <div className="mt-0.5 text-[10px] font-bold text-[#9C653C]">
-                              Tương tác: {spec.canHold ? (spec.holdMode === 'shoulder' ? 'Bay quanh người' : 'Ôm trên tay') : 'Không thể ôm'}
+                              Tương tác: {spec.canHold ? (spec.holdMode === 'fly_orbit' ? 'Bay quanh người' : 'Đi quanh người') : 'Không hỗ trợ'}
                             </div>
                           </div>
                         </div>
