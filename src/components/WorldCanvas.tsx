@@ -4,7 +4,6 @@ import {
   Armchair,
   ArrowDown,
   Backpack,
-  Bug,
   Building2,
   Check,
   ChevronLeft,
@@ -37,7 +36,8 @@ import {
 } from '../data/fishingCatalog';
 import {getNetRepairCost} from '../data/insectCatalog';
 import {MAX_PET_INTIMACY, PET_CATALOG} from '../data/petCatalog';
-import {FishIllustration} from './FishingIcons';
+import {getMountDefinition} from '../data/mountCatalog';
+import {BicycleMountIcon, FishIllustration, SkateboardMountIcon} from './FishingIcons';
 import {InsectIllustration} from './InsectIcons';
 import {BlingBlingBadge, PetSpeciesIcon} from './PetIcons';
 import {
@@ -48,7 +48,13 @@ import {
 } from '../data/foodCatalog';
 import {HandheldFoodIcon} from './modals/VendingMachineModal';
 import {FURNITURE_BY_ID, isPointOnFurnitureSurface} from '../data/furnitureCatalog';
-import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
+import {
+  AvatarMountAnimParams,
+  AvatarRig,
+  buildAvatarRig,
+  updateAvatarRigAnimation,
+} from '../three/avatar3d';
+import {buildMountRig, MountRig, updateMountAnimation} from '../three/mounts3d';
 import {FishingVisualFrame} from '../three/fishingVisuals3d';
 import {buildPetModel, PetRig, updatePetAnimation} from '../three/pets3d';
 import {
@@ -111,6 +117,8 @@ import {
   InsectRarity,
   InsectSpeciesId,
   LivestockAnimalState,
+  MountId,
+  OwnedMountsState,
   OwnedPetState,
   PetSpeciesId,
   PetSupplies,
@@ -150,15 +158,16 @@ interface WorldCanvasProps {
   editFurnitureMode: boolean;
   selectedFurnitureId: string | null;
   homeSpotRef: React.MutableRefObject<{x: number; z: number}>;
-  showJoystick: boolean;
-  showJumpButton: boolean;
-  onEnableJoystick: () => void;
+  ownedMounts: OwnedMountsState;
   teleportToPlazaPulse: number;
   onChangeZone: (next: ZoneId) => void;
   onOpenWardrobe: () => void;
   onOpenShop: () => void;
   onOpenKoiShop: () => void;
   onOpenShipShop: () => void;
+  onOpenTunShop: () => void;
+  onToggleMount: (mountId: MountId) => void;
+  onDismountMount: () => void;
   onOpenFurnitureShop: () => void;
   onOpenSettings: () => void;
   onOpenDailyQuests: () => void;
@@ -1154,15 +1163,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   editFurnitureMode,
   selectedFurnitureId,
   homeSpotRef,
-  showJoystick,
-  showJumpButton,
-  onEnableJoystick,
+  ownedMounts,
   teleportToPlazaPulse,
   onChangeZone,
   onOpenWardrobe,
   onOpenShop,
   onOpenKoiShop,
   onOpenShipShop,
+  onOpenTunShop,
+  onToggleMount,
+  onDismountMount,
   onOpenFurnitureShop,
   onOpenSettings,
   onOpenDailyQuests,
@@ -1272,6 +1282,27 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [confirmPondFeed, setConfirmPondFeed] = useState(false);
   const [homeToolsOpen, setHomeToolsOpen] = useState(false);
   const [webglError, setWebglError] = useState(false);
+  const [jumpIdleDimmed, setJumpIdleDimmed] = useState(false);
+  const jumpDimTimerRef = useRef<number | null>(null);
+
+  const bumpJumpButtonVisibility = () => {
+    setJumpIdleDimmed(false);
+    if (jumpDimTimerRef.current) {
+      clearTimeout(jumpDimTimerRef.current);
+    }
+    jumpDimTimerRef.current = window.setTimeout(() => {
+      setJumpIdleDimmed(true);
+    }, 5000);
+  };
+
+  useEffect(() => {
+    bumpJumpButtonVisibility();
+    return () => {
+      if (jumpDimTimerRef.current) {
+        clearTimeout(jumpDimTimerRef.current);
+      }
+    };
+  }, [zone, miniActive, editFurnitureMode, isParachutingHud]);
 
   const stateRef = useRef({
     zone,
@@ -1287,7 +1318,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     fishingRod,
     woodenBoat,
     bugNet,
-    showJoystick,
+    ownedMounts,
     placedFurniture,
     editFurnitureMode,
     selectedFurnitureId,
@@ -1309,7 +1340,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     fishingRod,
     woodenBoat,
     bugNet,
-    showJoystick,
+    ownedMounts,
     placedFurniture,
     editFurnitureMode,
     selectedFurnitureId,
@@ -1320,11 +1351,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
   const callbacksRef = useRef({
     onChangeZone,
-    onEnableJoystick,
     onOpenWardrobe,
     onOpenShop,
     onOpenKoiShop,
     onOpenShipShop,
+    onOpenTunShop,
+    onDismountMount,
     onOpenFurnitureShop,
     onOpenSettings,
     onOpenDailyQuests,
@@ -1363,11 +1395,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   });
   callbacksRef.current = {
     onChangeZone,
-    onEnableJoystick,
     onOpenWardrobe,
     onOpenShop,
     onOpenKoiShop,
     onOpenShipShop,
+    onOpenTunShop,
+    onDismountMount,
     onOpenFurnitureShop,
     onOpenSettings,
     onOpenDailyQuests,
@@ -1414,6 +1447,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       carryingPet: {speciesId: PetSpeciesId; sick?: boolean} | null,
     ) => void) | null
   >(null);
+  const syncMountRigTriggerRef = useRef<((mountId: MountId | null) => void) | null>(null);
   const syncPetCompanionRef = useRef<(() => void) | null>(null);
   const triggerPetPlayRef = useRef<((petId: string) => void) | null>(null);
   const farmPondFishActionRef = useRef<(() => void) | null>(null);
@@ -1507,16 +1541,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   }, [farmPondFishPulse]);
 
   useEffect(() => {
-    if (!showJoystick) {
-      joystickInputRef.current = {x: 0, y: 0, active: false};
-      joystickOriginRef.current.pointerId = null;
-      if (joystickBaseRef.current) {
-        joystickBaseRef.current.style.opacity = '0';
-      }
-    }
-  }, [showJoystick]);
-
-  useEffect(() => {
     if (teleportToPlazaPulse <= 0) return;
     pendingPlazaSpawnRef.current = true;
     teleportPlazaActionRef.current?.();
@@ -1590,6 +1614,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     activePet?.speciesId,
     activePet?.sick,
   ]);
+
+  useEffect(() => {
+    syncMountRigTriggerRef.current?.(ownedMounts.activeMountId);
+  }, [ownedMounts.activeMountId]);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -1735,6 +1763,49 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     });
     playerRig.root.position.set(playerPos.x, 0.14, playerPos.z);
     scene.add(playerRig.root);
+
+    let mountRig: MountRig | null = null;
+    let skateMoveSec = 0;
+    let skateIdleBlend = 1;
+    let bikeWheelAngle = 0;
+    let bikeCrankAngle = 0.35;
+    let bikeSteerAngle = 0;
+    let bikeIdleBlend = 1;
+    let bikeLeanAngle = 0;
+    let prevPlayerRotForSteer = playerPos.rotY;
+    const _mountZeroVec = new THREE.Vector3(0, 0, 0);
+
+    const syncMountRig = (mountId: MountId | null) => {
+      if (!mountId) {
+        if (mountRig) {
+          playerRig.root.remove(mountRig.root);
+          mountRig.dispose();
+          mountRig = null;
+        }
+        skateMoveSec = 0;
+        skateIdleBlend = 1;
+        bikeIdleBlend = 1;
+        bikeLeanAngle = 0;
+        return;
+      }
+      if (!mountRig || mountRig.mountId !== mountId) {
+        if (mountRig) {
+          playerRig.root.remove(mountRig.root);
+          mountRig.dispose();
+        }
+        mountRig = buildMountRig(mountId);
+        skateMoveSec = 0;
+        skateIdleBlend = 1;
+        bikeSteerAngle = 0;
+        bikeIdleBlend = 1;
+        bikeLeanAngle = 0;
+        playerRig.root.add(mountRig.root);
+      } else if (mountRig.root.parent !== playerRig.root) {
+        playerRig.root.add(mountRig.root);
+      }
+    };
+    syncMountRigTriggerRef.current = syncMountRig;
+    syncMountRig(stateRef.current.ownedMounts.activeMountId);
 
     let playPetTimer = 0;
     const mallElev = {
@@ -2340,6 +2411,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       playerRig.root.position.set(playerPos.x, curY, playerPos.z);
       playerRig.root.rotation.y = playerPos.rotY;
       playerRig.root.add(playerProxy);
+      if (mountRig) {
+        playerRig.root.add(mountRig.root);
+      }
       scene.add(playerRig.root);
     };
 
@@ -2843,11 +2917,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (stateRef.current.zone !== 'town' || boatState.active || parachuteCtrl.active) return;
       const net = stateRef.current.bugNet;
       if (!net.owned || !net.equipped) return;
-      if (!stateRef.current.showJoystick) {
-        soundFX.tap();
-        showBubble('Vào Menu Điện Thoại (góc trên trái) → Bật Joystick để bắt côn trùng!');
-        return;
-      }
       if (net.durability <= 0) {
         soundFX.tap();
         setBrokenNetPrompt({
@@ -2924,6 +2993,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       if (mallElev.state === 'ground') {
         const boardUp = () => {
+          callbacksRef.current.onDismountMount();
           mallElev.state = 'riding_up';
           mallElev.progress = 0;
           activeTarget = null;
@@ -2999,8 +3069,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       playerPos.rotY = Math.PI * 0.42;
       playerPos.pose = 'parachute';
 
+      callbacksRef.current.onDismountMount();
       setIsParachutingHud(true);
-      callbacksRef.current.onEnableJoystick();
       soundFX.sparkle();
       showBubble('Bung dù rồi! Dùng Joystick để chọn nơi đáp đất nhé!');
     };
@@ -3882,12 +3952,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               boatState.targetX = null;
               boatState.targetZ = null;
               boatState.moving = false;
+              callbacksRef.current.onDismountMount();
               activeTown?.setRiverBoatPose?.(true, boatState.x, boatState.z, boatState.rotY, false, 0);
               setIsBoatingHud(true);
-              callbacksRef.current.onEnableJoystick();
               soundFX.splash();
               showBubble(
-                'Đã xuống Thuyền Gỗ! Kéo Joystick (đã tự bật) hoặc chạm mặt nước để chèo, cầm Cần Câu chạm nước để câu cá sông!',
+                'Đã xuống Thuyền Gỗ! Kéo Joystick hoặc chạm mặt nước để chèo, cầm Cần Câu chạm nước để câu cá sông!',
               );
             };
             const distBoard = Math.hypot(
@@ -4085,6 +4155,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             }
             startWalkTo(lane.approachX, lane.approachZ, 'idle', undefined, () => {
               if (mallState.ridingLane || mallState.floor !== lane.startFloor) return;
+              callbacksRef.current.onDismountMount();
               soundFX.tap();
               mallState.ridingLane = lane;
               mallState.progress = 0;
@@ -4099,18 +4170,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (kind === 'npc_tun') {
             soundFX.tap();
             if (stateRef.current.zone === 'mall' && mallState.floor === 2) {
-              showBubble('Hãy xuống thang cuốn về Tầng 1 để trò chuyện với Tun nhé!');
+              showBubble('Hãy xuống thang cuốn về Tầng 1 để gặp Tun mua Ván Trượt & Xe Đạp nhé!');
               return;
             }
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
-              playerPos.rotY = Math.atan2(-1.45 - playerPos.x, 0.25 - playerPos.z);
-              showBubble(
-                'Xin chào! Mình là Tun, nhân viên May Mall. Xe hơi mini, xe đạp & ván trượt thú cưỡi sắp mở bán sớm nhé!',
-                -1.45,
-                2.25,
-                0.25,
-              );
+              playerPos.rotY = Math.atan2(-2.65 - playerPos.x, 0.95 - playerPos.z);
+              callbacksRef.current.onOpenTunShop();
             });
             return;
           }
@@ -4121,7 +4187,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
               showBubble(
-                'Siêu xe mini tương lai mui trần 1 chỗ ngồi màu xanh dương — sắp mở bán tại May Mall!',
+                'Siêu xe mini tương lai Hạng S siêu tốc — sắp mở bán tại Kumo Motors May Mall!',
               );
             });
             return;
@@ -4132,7 +4198,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             if (stateRef.current.zone === 'mall' && mallState.floor === 2) return;
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
-              showBubble('Xe đạp thể thao trưng bày tại sảnh chính — hiện chưa mở bán!');
+              callbacksRef.current.onOpenTunShop();
             });
             return;
           }
@@ -4142,7 +4208,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             if (stateRef.current.zone === 'mall' && mallState.floor === 2) return;
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
-              showBubble('Quầy 2 ván trượt năng động — sắp mở bán tại sảnh May Mall!');
+              callbacksRef.current.onOpenTunShop();
             });
             return;
           }
@@ -4870,14 +4936,19 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             stateRef.current.bugNet.equipped &&
             joyMag <= 0.58 &&
             !isAirborne;
-          // Apply hunger slowdown uniformly (also apply hungerSpeedMult to future mounts)
+          // Apply hunger slowdown & equipped mount speed boost uniformly
           const hungerSpeedMult = getMovementSpeedMultiplier(stateRef.current.stats);
+          const mountDefJoy = !isCreepingNow
+            ? getMountDefinition(stateRef.current.ownedMounts.activeMountId)
+            : null;
+          const mountSpeedMult = mountDefJoy ? mountDefJoy.speedMultiplier : 1;
           const speed =
             (isCreepingNow
               ? 0.68
               : (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : z === 'mall' ? 4.8 : 3.6) *
                 Math.min(1, joyMag)) *
-            hungerSpeedMult;
+            hungerSpeedMult *
+            mountSpeedMult;
           const stepLen = speed * delta;
           const rawX = playerPos.x + (moveDirX / moveLen) * stepLen;
           const rawZ = playerPos.z + (moveDirZ / moveLen) * stepLen;
@@ -4944,14 +5015,18 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const dx = wp.x - playerPos.x;
             const dz = wp.z - playerPos.z;
             const dist = Math.hypot(dx, dz);
-              // Apply hunger slowdown uniformly (also apply hungerSpeedMult to future mounts)
+            // Apply hunger slowdown & equipped mount speed boost uniformly
             const hungerSpeedMult = getMovementSpeedMultiplier(stateRef.current.stats);
+            const mountDefWalk = getMountDefinition(stateRef.current.ownedMounts.activeMountId);
+            const mountSpeedMult = mountDefWalk ? mountDefWalk.speedMultiplier : 1;
             const speed =
               (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : z === 'mall' ? 4.8 : 3.6) *
-              hungerSpeedMult;
+              hungerSpeedMult *
+              mountSpeedMult;
 
             if (isFinalWp && dist < 0.16) {
               if (activeTarget.seat && !isAirborne) {
+                callbacksRef.current.onDismountMount();
                 activeSeat = activeTarget.seat;
                 playerPos.x = activeTarget.seat.seatX;
                 playerPos.z = activeTarget.seat.seatZ;
@@ -5091,6 +5166,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const lane = MALL_ESCALATOR_LANES[i];
             if (lane.startFloor !== mallState.floor) continue;
             if (Math.hypot(playerPos.x - lane.approachX, playerPos.z - lane.approachZ) < 0.85) {
+              callbacksRef.current.onDismountMount();
               soundFX.tap();
               mallState.ridingLane = lane;
               mallState.progress = 0;
@@ -5583,12 +5659,152 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
+      let mountAnimParams: AvatarMountAnimParams | undefined;
+      const curActiveMountId = stateRef.current.ownedMounts.activeMountId;
+      const curMountDef = getMountDefinition(curActiveMountId);
+      const ridingMountActive = Boolean(
+        curMountDef &&
+          mountRig &&
+          mountRig.mountId === curMountDef.id &&
+          !boatState.active &&
+          !parachuteCtrl.active &&
+          !isRidingMallElevator &&
+          !isRidingEscalator &&
+          !activeSeat &&
+          !netSwingCtrl.active &&
+          fishCtrl.phase === 'idle' &&
+          !swingPose,
+      );
+      if (mountRig) {
+        mountRig.root.visible = ridingMountActive;
+      }
+      if (ridingMountActive && curMountDef && mountRig) {
+        if (curMountDef.kind === 'skateboard') {
+          const wheelRadius = 0.05;
+          mountRig.root.position.lerp(_mountZeroVec, Math.min(1, delta * 18));
+          if (moveHorizSpeed > 0.28 && !isAirborne) {
+            skateMoveSec += delta;
+            bikeWheelAngle += (moveHorizSpeed * delta) / wheelRadius;
+          } else if (moveHorizSpeed <= 0.28 && !isAirborne) {
+            skateMoveSec = 0;
+          }
+
+          if (isAirborne) {
+            skateIdleBlend = THREE.MathUtils.damp(skateIdleBlend, 0, 14, delta);
+            playerPos.pose = 'skate_ride';
+            mountAnimParams = {idlePop: 0, idleBlend: skateIdleBlend};
+            updateMountAnimation(mountRig, {
+              pose: 'skate_ride',
+              elapsed,
+              speed: moveHorizSpeed,
+              wheelAngle: bikeWheelAngle,
+              crankAngle: 0,
+              steerAngle: 0,
+              wheelRadius,
+              idlePop: 0,
+              idleBlend: skateIdleBlend,
+            });
+          } else if (moveHorizSpeed > 0.28) {
+            skateIdleBlend = THREE.MathUtils.damp(skateIdleBlend, 0, 14, delta);
+            // Long travel (> 2s): drop rear push foot to kick backward smoothly then return onto deck
+            let poseMount: 'skate_ride' | 'skate_push' = 'skate_ride';
+            let pushPhase = 0;
+            if (skateMoveSec > 2.0) {
+              const cycle = (skateMoveSec - 2.0) % 3.1;
+              if (cycle < 0.78) {
+                poseMount = 'skate_push';
+                pushPhase = cycle / 0.78;
+              }
+            }
+            playerPos.pose = poseMount;
+            mountAnimParams = {pushPhase, idleBlend: skateIdleBlend};
+            updateMountAnimation(mountRig, {
+              pose: poseMount,
+              elapsed,
+              speed: moveHorizSpeed,
+              wheelAngle: bikeWheelAngle,
+              crankAngle: 0,
+              steerAngle: 0,
+              wheelRadius,
+              idlePop: 0,
+              idleBlend: skateIdleBlend,
+            });
+          } else {
+            skateIdleBlend = THREE.MathUtils.damp(skateIdleBlend, 1, 10, delta);
+            playerPos.pose = 'skate_idle';
+            mountAnimParams = {idlePop: 0, idleBlend: skateIdleBlend};
+            updateMountAnimation(mountRig, {
+              pose: 'skate_idle',
+              elapsed,
+              speed: 0,
+              wheelAngle: bikeWheelAngle,
+              crankAngle: 0,
+              steerAngle: 0,
+              wheelRadius,
+              idlePop: 0,
+              idleBlend: skateIdleBlend,
+            });
+          }
+        } else {
+          const wheelRadius = 0.355;
+          mountRig.root.position.lerp(_mountZeroVec, Math.min(1, delta * 18));
+          let rotDelta = playerPos.rotY - prevPlayerRotForSteer;
+          while (rotDelta > Math.PI) rotDelta -= Math.PI * 2;
+          while (rotDelta < -Math.PI) rotDelta += Math.PI * 2;
+          const targetSteer = THREE.MathUtils.clamp(
+            (rotDelta / Math.max(0.001, delta)) * 0.14,
+            -0.45,
+            0.45,
+          );
+          bikeSteerAngle = THREE.MathUtils.damp(bikeSteerAngle, targetSteer, 11, delta);
+
+          const isBikeMoving = moveHorizSpeed > 0.22 && !isAirborne;
+          const isBikeIdle = !isBikeMoving && !isAirborne;
+          bikeIdleBlend = THREE.MathUtils.damp(bikeIdleBlend, isBikeIdle ? 1 : 0, 9.5, delta);
+          bikeLeanAngle = 0;
+
+          if (isBikeMoving) {
+            bikeWheelAngle += (moveHorizSpeed * delta) / wheelRadius;
+            // Realistic relaxed pedaling cadence (~1.0 - 1.2 rev/sec max, never supersonic!)
+            const crankOmega = THREE.MathUtils.clamp(moveHorizSpeed * 1.05, 1.8, 7.6);
+            bikeCrankAngle += crankOmega * delta;
+            playerPos.pose = 'bike_ride';
+          } else {
+            playerPos.pose = isAirborne ? 'bike_ride' : 'bike_idle';
+          }
+          mountAnimParams = {
+            crankAngle: bikeCrankAngle,
+            steerAngle: bikeSteerAngle,
+            idleBlend: bikeIdleBlend,
+            leanAngle: bikeLeanAngle,
+          };
+          updateMountAnimation(mountRig, {
+            pose: playerPos.pose === 'bike_ride' ? 'bike_ride' : 'bike_idle',
+            elapsed,
+            speed: moveHorizSpeed,
+            wheelAngle: bikeWheelAngle,
+            crankAngle: bikeCrankAngle,
+            steerAngle: bikeSteerAngle,
+            wheelRadius,
+            idleBlend: bikeIdleBlend,
+            leanAngle: bikeLeanAngle,
+          });
+        }
+      } else {
+        skateMoveSec = 0;
+        skateIdleBlend = 1;
+        bikeIdleBlend = 1;
+        bikeLeanAngle = 0;
+      }
+      prevPlayerRotForSteer = playerPos.rotY;
+
       updateAvatarRigAnimation(
         playerRig,
         playerPos.pose,
         elapsed,
         av.eyeStyle === 'happy_arc',
         avatarPoseProgress,
+        mountAnimParams,
       );
 
       // Keep walking orbit pet cleanly grounded on hills, plaza, Skydeck, or elevator floor
@@ -6177,6 +6393,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       document.removeEventListener('fullscreenchange', handleResize);
       document.removeEventListener('webkitfullscreenchange', handleResize);
       disposePetCompanion();
+      if (mountRig) {
+        playerRig.root.remove(mountRig.root);
+        mountRig.dispose();
+        mountRig = null;
+      }
       playerRig.heldPetRig?.dispose();
       activeTown?.dispose();
       activeSubzone?.dispose();
@@ -6506,6 +6727,45 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           </span>
         </button>
       )}
+
+      {/* Top-Left Quick Mount / Dismount Button when player owns any mount */}
+      {ownedMounts.ownedIds.length > 0 &&
+        !miniActive &&
+        !(zone === 'home' && editFurnitureMode) &&
+        (() => {
+          const quickId =
+            ownedMounts.activeMountId ?? ownedMounts.lastMountId ?? ownedMounts.ownedIds[0];
+          const quickDef = getMountDefinition(quickId);
+          if (!quickDef) return null;
+          const isMountedHud = ownedMounts.activeMountId !== null;
+          return (
+            <button
+              type="button"
+              onClick={() => {
+                soundFX.tap();
+                onToggleMount(quickId);
+              }}
+              aria-label={isMountedHud ? `Xuống ${quickDef.name}` : `Cưỡi ${quickDef.name}`}
+              title={isMountedHud ? `Xuống ${quickDef.name}` : `Cưỡi ${quickDef.name}`}
+              className={`phone-ui anim-pop absolute top-2.5 z-30 flex h-11 items-center gap-1.5 rounded-2xl border-2 px-2.5 shadow-lg transition-transform hover:scale-105 active:scale-95 ${
+                carriedPetId && activePet ? 'left-[220px]' : 'left-[118px]'
+              } ${
+                isMountedHud
+                  ? 'border-[#2E7D55] bg-[#EAF9F0]/95 text-[#1F5E3F]'
+                  : 'border-[#3C3128] bg-[#FFF8EB]/95 text-[#4A3525]'
+              }`}
+            >
+              {quickDef.kind === 'skateboard' ? (
+                <SkateboardMountIcon className="h-6 w-6 shrink-0" />
+              ) : (
+                <BicycleMountIcon className="h-6 w-6 shrink-0" />
+              )}
+              <span className="text-[11px] font-black leading-none whitespace-nowrap">
+                {isMountedHud ? 'Xuống' : 'Cưỡi'}
+              </span>
+            </button>
+          );
+        })()}
 
       {/* Compact Top-Left Held Food/Drink Quick-Eat Pill & Low-Hunger (<5%) Speed Warning */}
       {!miniActive &&
@@ -7192,8 +7452,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {/* Dynamic Hidden Touch Joystick (Bottom-Left) — appears only while touching */}
-      {showJoystick && !miniActive && !(zone === 'home' && editFurnitureMode) && (
+      {/* Fixed Dynamic Touch Joystick (Bottom-Left) — always enabled */}
+      {!miniActive && !(zone === 'home' && editFurnitureMode) && (
         <div
           className="phone-ui absolute bottom-2 left-2 z-30 h-44 w-44 touch-none select-none"
           onPointerDown={(e) => {
@@ -7275,29 +7535,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {/* Mandatory Joystick Guide when holding Bug Net with Joystick turned off */}
-      {zone === 'town' && bugNet.equipped && !showJoystick && !miniActive && (
-        <div className="phone-ui pointer-events-auto absolute bottom-6 left-1/2 z-30 flex max-w-[92vw] -translate-x-1/2 items-center gap-2.5 rounded-2xl border-2 border-[#7CC79D] bg-[#F5FFF9]/95 px-4 py-2.5 text-xs font-bold text-[#21593A] shadow-lg">
-          <Bug className="h-4 w-4 shrink-0 text-[#2E8F5B]" />
-          <span>
-            Cầm vợt bắt côn trùng cần bật Joystick! Vào{' '}
-            <button
-              type="button"
-              onClick={() => {
-                soundFX.tap();
-                onOpenPhone();
-              }}
-              className="font-black underline decoration-2 underline-offset-2 text-[#1B6E43]"
-            >
-              Menu Điện Thoại
-            </button>{' '}
-            → bật <b>Joystick</b> để đi rón rén và bắt bọ.
-          </span>
-        </div>
-      )}
-
       {/* FPS-Style Catch Bug Button (Right Beside Jump Button when holding Bug Net) */}
-      {zone === 'town' && bugNet.equipped && showJoystick && !miniActive && (
+      {zone === 'town' && bugNet.equipped && !miniActive && (
         <button
           type="button"
           onPointerDown={(e) => {
@@ -7331,16 +7570,19 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </button>
       )}
 
-      {/* Right-Side FPS-Style Jump Button (Moved inward, higher up, softer colors) */}
-      {showJumpButton && !miniActive && !isParachutingHud && !(zone === 'home' && editFurnitureMode) && (
+      {/* Fixed Right-Side Jump Button — fades slightly after 5s idle while remaining clickable */}
+      {!miniActive && !isParachutingHud && !(zone === 'home' && editFurnitureMode) && (
         <button
           type="button"
           onPointerDown={(e) => {
             e.stopPropagation();
+            bumpJumpButtonVisibility();
             jumpActionRef.current?.();
           }}
           aria-label="Nhảy lên"
-          className="phone-ui absolute right-9 bottom-12 z-30 flex h-[64px] w-[64px] items-center justify-center rounded-full border-[2.5px] border-[#6BB2C7]/65 bg-[#FFFDF8]/68 text-[#2C7489]/80 shadow-md transition-transform active:scale-90 sm:right-12 sm:bottom-14"
+          className={`phone-ui absolute right-9 bottom-12 z-30 flex h-[64px] w-[64px] items-center justify-center rounded-full border-[2.5px] border-[#6BB2C7]/65 bg-[#FFFDF8]/80 text-[#2C7489]/90 shadow-md transition-[opacity,transform] duration-500 active:scale-90 sm:right-12 sm:bottom-14 ${
+            jumpIdleDimmed ? 'opacity-30 hover:opacity-85' : 'opacity-100'
+          }`}
         >
           <svg
             viewBox="0 0 24 24"

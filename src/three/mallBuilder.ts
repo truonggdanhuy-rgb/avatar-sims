@@ -166,45 +166,516 @@ function addMallProxy(
   targets.push(proxy);
 }
 
-function createDirectionArrowTexture(dir: 'up' | 'down'): THREE.CanvasTexture {
+const MALL_SIGN_FONT = '"Plus Jakarta Sans", "Segoe UI", "Roboto", Arial, sans-serif';
+
+function makeMallSignTexture(
+  w: number,
+  h: number,
+  draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void,
+  disposables: THREE.Texture[],
+  isDisposed?: () => boolean,
+): THREE.CanvasTexture {
   const c = document.createElement('canvas');
-  c.width = 128;
-  c.height = 128;
+  c.width = w;
+  c.height = h;
   const ctx = c.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = dir === 'up' ? '#1E8268' : '#2C6A9E';
-    ctx.beginPath();
-    ctx.roundRect(6, 6, 116, 116, 22);
-    ctx.fill();
-    ctx.strokeStyle = dir === 'up' ? '#8CF2CE' : '#96DAFF';
-    ctx.lineWidth = 6;
-    ctx.stroke();
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    if (dir === 'up') {
-      ctx.moveTo(64, 24);
-      ctx.lineTo(100, 66);
-      ctx.lineTo(78, 66);
-      ctx.lineTo(78, 102);
-      ctx.lineTo(50, 102);
-      ctx.lineTo(50, 66);
-      ctx.lineTo(28, 66);
-    } else {
-      ctx.moveTo(64, 104);
-      ctx.lineTo(100, 62);
-      ctx.lineTo(78, 62);
-      ctx.lineTo(78, 26);
-      ctx.lineTo(50, 26);
-      ctx.lineTo(50, 62);
-      ctx.lineTo(28, 62);
-    }
-    ctx.closePath();
-    ctx.fill();
+    draw(ctx, w, h);
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  disposables.push(tex);
+
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    void document.fonts.ready.then(() => {
+      if (isDisposed?.()) return;
+      const c2 = c.getContext('2d');
+      if (!c2) return;
+      c2.clearRect(0, 0, w, h);
+      draw(c2, w, h);
+      tex.needsUpdate = true;
+    });
+  }
   return tex;
+}
+
+function createWelcomeMallBannerTexture(
+  disposables: THREE.Texture[],
+  isDisposed: () => boolean,
+): THREE.CanvasTexture {
+  return makeMallSignTexture(
+    1024,
+    256,
+    (ctx, w, h) => {
+      // Soft creamy-ivory pastel gradient with zero harsh stripes
+      const bg = ctx.createLinearGradient(0, 0, 0, h);
+      bg.addColorStop(0, '#FFFDF8');
+      bg.addColorStop(1, '#FFF3E4');
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.roundRect(4, 4, w - 8, h - 8, 44);
+      ctx.fill();
+
+      // Gentle pastel double scalloped-feel inner border
+      ctx.strokeStyle = '#FF9EAA';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.roundRect(14, 14, w - 28, h - 28, 36);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#F7D27A';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(24, 24, w - 48, h - 48, 28);
+      ctx.stroke();
+
+      // Soft decorative pastel bokeh dots on left & right margins
+      const dotColors = ['#FFD6DE', '#CBEFFF', '#FFE8A3', '#CFF3E4'];
+      [
+        [68, 72, 16, 0],
+        [96, 182, 11, 1],
+        [114, 62, 8, 2],
+        [w - 68, 72, 16, 1],
+        [w - 96, 182, 11, 0],
+        [w - 114, 62, 8, 3],
+      ].forEach(([dx, dy, dr, ci]) => {
+        ctx.fillStyle = dotColors[ci];
+        ctx.beginPath();
+        ctx.arc(dx, dy, dr, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Crisp clean Vietnamese main title (weight 700 matches Plus Jakarta Sans cleanly!)
+      ctx.fillStyle = '#2B3553';
+      ctx.font = `700 56px ${MALL_SIGN_FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('CHÀO MỪNG ĐẾN MÂY MALL', w * 0.5, 96);
+
+      // Soft pastel pill badge underneath for general mall categories
+      const pillW = 590;
+      const pillH = 54;
+      ctx.fillStyle = '#FFE4EA';
+      ctx.beginPath();
+      ctx.roundRect((w - pillW) * 0.5, 152, pillW, pillH, 27);
+      ctx.fill();
+      ctx.strokeStyle = '#FFB6C6';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#B8415E';
+      ctx.font = `700 29px ${MALL_SIGN_FONT}`;
+      ctx.fillText('Ăn uống  •  Mua sắm  •  Giải trí', w * 0.5, 180);
+    },
+    disposables,
+    isDisposed,
+  );
+}
+
+function createStorefrontSignTexture(
+  shopName: string,
+  accentHex: string,
+  pillHex: string,
+  textHex: string,
+  disposables: THREE.Texture[],
+  isDisposed: () => boolean,
+): THREE.CanvasTexture {
+  return makeMallSignTexture(
+    512,
+    128,
+    (ctx, w, h) => {
+      ctx.fillStyle = '#FFFDF7';
+      ctx.beginPath();
+      ctx.roundRect(4, 4, w - 8, h - 8, 32);
+      ctx.fill();
+
+      ctx.fillStyle = pillHex;
+      ctx.beginPath();
+      ctx.roundRect(14, 14, w - 28, h - 28, 24);
+      ctx.fill();
+
+      ctx.strokeStyle = accentHex;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+
+      // Cute flanking pastel dots
+      [48, w - 48].forEach((dx) => {
+        ctx.fillStyle = accentHex;
+        ctx.beginPath();
+        ctx.arc(dx, h * 0.5, 9, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.fillStyle = textHex;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `700 44px ${MALL_SIGN_FONT}`;
+      ctx.fillText(shopName, w * 0.5, h * 0.5 + 2);
+    },
+    disposables,
+    isDisposed,
+  );
+}
+
+function buildSculptedCloud(scale: number, mat: THREE.Material): THREE.Group {
+  const cloud = new THREE.Group();
+  const puffs: [number, number, number, number][] = [
+    [0, 0.08, 0, 0.34],
+    [-0.28, 0, 0.02, 0.25],
+    [0.28, 0.01, -0.02, 0.26],
+    [-0.14, -0.05, 0.08, 0.22],
+    [0.14, -0.05, 0.08, 0.22],
+  ];
+  puffs.forEach(([x, y, z, r]) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), mat);
+    m.scale.set(1.06, 0.88, 0.72);
+    m.position.set(x, y, z);
+    cloud.add(m);
+  });
+  cloud.scale.setScalar(scale);
+  return cloud;
+}
+
+function buildSculptedStar(outerR: number, depth: number, mat: THREE.Material): THREE.Mesh {
+  const shape = new THREE.Shape();
+  const innerR = outerR * 0.48;
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const a = (i * Math.PI) / 5 - Math.PI / 2;
+    const px = Math.cos(a) * r;
+    const py = -Math.sin(a) * r;
+    if (i === 0) shape.moveTo(px, py);
+    else shape.lineTo(px, py);
+  }
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelThickness: depth * 0.28,
+    bevelSize: outerR * 0.08,
+    bevelSegments: 2,
+  });
+  geo.center();
+  return new THREE.Mesh(geo, mat);
+}
+
+function buildSculptedBow(mat: THREE.Material, scale = 1): THREE.Group {
+  const bow = new THREE.Group();
+  [-1, 1].forEach((side) => {
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.055, 10, 18), mat);
+    loop.scale.set(1.25, 0.82, 0.75);
+    loop.position.set(side * 0.16, 0.04, 0);
+    loop.rotation.z = side * -0.25;
+    const tail = new THREE.Mesh(new RoundedBoxGeometry(0.1, 0.24, 0.04, 2, 0.015), mat);
+    tail.position.set(side * 0.11, -0.14, 0.01);
+    tail.rotation.z = side * 0.32;
+    bow.add(loop, tail);
+  });
+  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 10), mat);
+  knot.scale.set(1, 0.9, 0.85);
+  bow.add(knot);
+  bow.scale.setScalar(scale);
+  return bow;
+}
+
+type MallIconKind = 'boba' | 'bag' | 'gift' | 'cloud_star' | 'fashion' | 'mart';
+
+function buildSculptedMallIcon(kind: MallIconKind, scale = 1): THREE.Group {
+  const g = new THREE.Group();
+  const creamMat = glossyClayMat('#FFF9EE', 0.35);
+  const goldMat = glossyClayMat('#FFD166', 0.25);
+  const berryMat = glossyClayMat('#FF7A9C', 0.32);
+  const mintMat = glossyClayMat('#6ED6BD', 0.34);
+  const skyMat = glossyClayMat('#78C7FF', 0.34);
+  const chocoMat = clayMat('#4C342B', 0.55);
+
+  if (kind === 'boba') {
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.17, 0.44, 16), creamMat);
+    cup.position.y = -0.06;
+    const teaBand = new THREE.Mesh(new THREE.CylinderGeometry(0.225, 0.19, 0.22, 16), berryMat);
+    teaBand.position.y = -0.09;
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.245, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), creamMat);
+    lid.position.y = 0.15;
+    const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.34, 8), mintMat);
+    straw.position.set(0.06, 0.3, 0);
+    straw.rotation.z = -0.2;
+    g.add(cup, teaBand, lid, straw);
+    [-0.08, 0, 0.08].forEach((px, idx) => {
+      const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.038, 8, 8), chocoMat);
+      pearl.position.set(px, -0.21 + (idx % 2) * 0.035, 0.17);
+      g.add(pearl);
+    });
+  } else if (kind === 'bag') {
+    const bag = new THREE.Mesh(new RoundedBoxGeometry(0.46, 0.44, 0.18, 3, 0.05), skyMat);
+    bag.position.y = -0.08;
+    const cuff = new THREE.Mesh(new RoundedBoxGeometry(0.48, 0.1, 0.19, 2, 0.03), creamMat);
+    cuff.position.y = 0.11;
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.028, 8, 16, Math.PI), goldMat);
+    handle.position.set(0, 0.16, 0);
+    const badge = buildSculptedStar(0.11, 0.04, goldMat);
+    badge.position.set(0, -0.09, 0.11);
+    g.add(bag, cuff, handle, badge);
+  } else if (kind === 'gift') {
+    const box = new THREE.Mesh(new RoundedBoxGeometry(0.44, 0.36, 0.24, 3, 0.045), creamMat);
+    box.position.y = -0.08;
+    const lid = new THREE.Mesh(new RoundedBoxGeometry(0.49, 0.11, 0.27, 2, 0.035), berryMat);
+    lid.position.y = 0.11;
+    const ribV = new THREE.Mesh(new RoundedBoxGeometry(0.08, 0.44, 0.28, 1, 0.015), berryMat);
+    ribV.position.y = -0.04;
+    const bow = buildSculptedBow(goldMat, 0.72);
+    bow.position.set(0, 0.22, 0);
+    g.add(box, lid, ribV, bow);
+  } else if (kind === 'cloud_star') {
+    const cloud = buildSculptedCloud(0.75, creamMat);
+    cloud.position.set(-0.04, -0.06, 0);
+    const star = buildSculptedStar(0.15, 0.05, goldMat);
+    star.position.set(0.16, 0.14, 0.08);
+    star.rotation.z = 0.25;
+    g.add(cloud, star);
+  } else if (kind === 'fashion') {
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.29, 0.04, 18), berryMat);
+    brim.position.y = -0.04;
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), berryMat);
+    dome.scale.set(1.15, 0.65, 1.05);
+    dome.position.y = 0.06;
+    const ribbon = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.024, 8, 18), creamMat);
+    ribbon.rotation.x = Math.PI / 2;
+    ribbon.position.y = 0.0;
+    const pip = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.06, 8), goldMat);
+    pip.position.y = 0.19;
+    g.add(brim, dome, ribbon, pip);
+  } else {
+    const basket = new THREE.Mesh(new RoundedBoxGeometry(0.48, 0.28, 0.24, 3, 0.04), glossyClayMat('#DDA86D', 0.45));
+    basket.position.y = -0.1;
+    const apple = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), berryMat);
+    apple.position.set(-0.1, 0.08, 0.02);
+    const citrus = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), goldMat);
+    citrus.position.set(0.1, 0.07, -0.01);
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), mintMat);
+    leaf.scale.set(1.4, 0.6, 0.7);
+    leaf.position.set(0.02, 0.18, 0.02);
+    g.add(basket, apple, citrus, leaf);
+  }
+
+  g.scale.setScalar(scale);
+  return g;
+}
+
+function buildSculptedHangingRibbonBanner(cfg: {
+  x: number;
+  y: number;
+  z: number;
+  ribbonHex: string;
+  trimHex: string;
+  icon: MallIconKind;
+  goldMat: THREE.Material;
+  silverMat: THREE.Material;
+}): THREE.Group {
+  const banner = new THREE.Group();
+  banner.position.set(cfg.x, cfg.y, cfg.z);
+
+  const ribbonMat = glossyClayMat(cfg.ribbonHex, 0.44);
+  const trimMat = glossyClayMat(cfg.trimHex, 0.42);
+  const creamMat = glossyClayMat('#FFFBF2', 0.42);
+
+  // Sculpted swallowtail pennant body using extruded custom silhouette!
+  const w = 1.95;
+  const h = 3.15;
+  const notch = 0.48;
+  const shape = new THREE.Shape();
+  shape.moveTo(-w * 0.5, h * 0.5);
+  shape.lineTo(w * 0.5, h * 0.5);
+  shape.lineTo(w * 0.5, -h * 0.5);
+  shape.lineTo(0, -h * 0.5 + notch);
+  shape.lineTo(-w * 0.5, -h * 0.5);
+  shape.closePath();
+
+  const bodyGeo = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.08,
+    bevelEnabled: true,
+    bevelThickness: 0.035,
+    bevelSize: 0.035,
+    bevelSegments: 2,
+  });
+  bodyGeo.center();
+  const bodyMesh = new THREE.Mesh(bodyGeo, ribbonMat);
+  banner.add(bodyMesh);
+
+  // Cute pastel inner scallop/rounded frame plate on BOTH front & back (never blank or backwards!)
+  [-0.065, 0.065].forEach((fz) => {
+    const innerPad = new THREE.Mesh(new RoundedBoxGeometry(1.54, 2.08, 0.04, 3, 0.16), creamMat);
+    innerPad.position.set(0, 0.14, fz);
+    const halo = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.04, 24), trimMat);
+    halo.rotation.x = Math.PI / 2;
+    halo.position.set(0, 0.16, fz + (fz > 0 ? 0.025 : -0.025));
+    banner.add(innerPad, halo);
+
+    const iconGroup = buildSculptedMallIcon(cfg.icon, 1.32);
+    iconGroup.position.set(0, 0.16, fz + (fz > 0 ? 0.14 : -0.14));
+    if (fz < 0) iconGroup.rotation.y = Math.PI;
+    banner.add(iconGroup);
+  });
+
+  // Gold top dowel rod with cute sphere finials & hanging wire
+  const dowel = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 2.38, 10), cfg.goldMat);
+  dowel.rotation.z = Math.PI / 2;
+  dowel.position.set(0, h * 0.5 + 0.06, 0);
+  banner.add(dowel);
+  [-1.22, 1.22].forEach((fx) => {
+    const finial = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), cfg.goldMat);
+    finial.position.set(fx, h * 0.5 + 0.06, 0);
+    banner.add(finial);
+  });
+
+  const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.25, 6), cfg.silverMat);
+  wire.position.set(0, h * 0.5 + 0.72, 0);
+  banner.add(wire);
+
+  // Cute sculpted 3D ribbon bow perched on top & dangling star charm below!
+  const topBow = buildSculptedBow(trimMat, 1.15);
+  topBow.position.set(0, h * 0.5 + 0.14, 0.08);
+  const bottomCharm = buildSculptedStar(0.24, 0.07, cfg.goldMat);
+  bottomCharm.position.set(0, -h * 0.5 + notch - 0.34, 0);
+  const charmCord = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.28, 6), cfg.goldMat);
+  charmCord.position.set(0, -h * 0.5 + notch - 0.14, 0);
+  banner.add(topBow, bottomCharm, charmCord);
+
+  return banner;
+}
+
+function buildSculptedShadowboxRelief(
+  kind: 'tun' | 'car' | 'bike' | 'skate',
+  cedarMat: THREE.Material,
+  darkWoodMat: THREE.Material,
+): THREE.Group {
+  const box = new THREE.Group();
+  const shojiCream = clayMat('#FFF8EC', 0.74);
+  const goldMat = glossyClayMat('#FFD166', 0.25);
+
+  const outerFrame = new THREE.Mesh(new RoundedBoxGeometry(1.78, 2.12, 0.14, 3, 0.045), darkWoodMat);
+  const innerTrim = new THREE.Mesh(new RoundedBoxGeometry(1.62, 1.96, 0.15, 2, 0.03), cedarMat);
+  const matBoard = new THREE.Mesh(new RoundedBoxGeometry(1.48, 1.82, 0.16, 2, 0.02), shojiCream);
+  box.add(outerFrame, innerTrim, matBoard);
+
+  const haloHex =
+    kind === 'tun'
+      ? '#FFE2EA'
+      : kind === 'car'
+        ? '#D9F0FF'
+        : kind === 'bike'
+          ? '#D6F5EA'
+          : '#FFE8D6';
+  const halo = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.56, 0.56, 0.03, 28),
+    clayMat(haloHex, 0.65),
+  );
+  halo.rotation.x = Math.PI / 2;
+  halo.position.set(0, 0.12, 0.085);
+  box.add(halo);
+
+  // Cute wooden nameplate strip at bottom (zero Japanese text, clean minimal emblem bar)
+  const pillColor =
+    kind === 'tun' ? '#E85D75' : kind === 'car' ? '#3B8CE0' : kind === 'bike' ? '#35A88F' : '#F0714D';
+  const badgeBar = new THREE.Mesh(
+    new RoundedBoxGeometry(0.98, 0.16, 0.045, 2, 0.04),
+    glossyClayMat(pillColor, 0.36),
+  );
+  badgeBar.position.set(0, -0.64, 0.095);
+  box.add(badgeBar);
+  [-0.36, 0.36].forEach((sx) => {
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), goldMat);
+    dot.position.set(sx, -0.64, 0.12);
+    box.add(dot);
+  });
+
+  // Sculpted 3D miniature relief inside frame
+  const relief = new THREE.Group();
+  relief.position.set(0, 0.12, 0.13);
+
+  if (kind === 'tun') {
+    const cloud = buildSculptedCloud(1.05, glossyClayMat('#FFFFFF', 0.36));
+    cloud.position.set(0, -0.06, 0);
+    const star = buildSculptedStar(0.24, 0.06, goldMat);
+    star.position.set(0.24, 0.22, 0.06);
+    star.rotation.z = 0.22;
+    const miniHeart = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 10), glossyClayMat('#FF7A9C', 0.3));
+    miniHeart.position.set(-0.26, 0.18, 0.05);
+    relief.add(cloud, star, miniHeart);
+  } else if (kind === 'car') {
+    const blueMat = glossyClayMat('#47A8FF', 0.24);
+    const cabinMat = glossyClayMat('#C2EEFF', 0.22);
+    const tireMat = clayMat('#242B36', 0.78);
+    const body = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.26, 0.14, 3, 0.09), blueMat);
+    body.position.y = -0.05;
+    const roof = new THREE.Mesh(new RoundedBoxGeometry(0.52, 0.2, 0.12, 3, 0.07), cabinMat);
+    roof.position.set(-0.02, 0.12, -0.01);
+    relief.add(body, roof);
+    [-0.27, 0.27].forEach((wx) => {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.14, 16), tireMat);
+      wheel.rotation.x = Math.PI / 2;
+      wheel.position.set(wx, -0.18, 0.02);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.15, 12), goldMat);
+      hub.rotation.x = Math.PI / 2;
+      hub.position.set(wx, -0.18, 0.025);
+      relief.add(wheel, hub);
+    });
+  } else if (kind === 'bike') {
+    const mintMat = glossyClayMat('#38C2A6', 0.28);
+    const tireMat = clayMat('#2C333E', 0.78);
+    const wickerMat = clayMat('#D8A368', 0.65);
+    [-0.28, 0.28].forEach((wx) => {
+      const tire = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.032, 10, 20), tireMat);
+      tire.position.set(wx, -0.13, 0);
+      relief.add(tire);
+    });
+    const topBar = new THREE.Mesh(new RoundedBoxGeometry(0.42, 0.04, 0.05, 1, 0.015), mintMat);
+    topBar.position.set(0, 0.06, 0.01);
+    const downBar = new THREE.Mesh(new RoundedBoxGeometry(0.44, 0.04, 0.05, 1, 0.015), mintMat);
+    downBar.position.set(0.03, -0.05, 0.01);
+    downBar.rotation.z = 0.56;
+    const seatPost = new THREE.Mesh(new RoundedBoxGeometry(0.04, 0.3, 0.05, 1, 0.015), mintMat);
+    seatPost.position.set(-0.16, 0.02, 0.01);
+    seatPost.rotation.z = 0.22;
+    const basket = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.14, 0.09, 2, 0.02), wickerMat);
+    basket.position.set(0.32, 0.12, 0.03);
+    const saddle = new THREE.Mesh(new RoundedBoxGeometry(0.14, 0.045, 0.07, 2, 0.015), clayMat('#8F5230', 0.6));
+    saddle.position.set(-0.19, 0.17, 0.02);
+    relief.add(topBar, downBar, seatPost, basket, saddle);
+  } else {
+    const deckMat = glossyClayMat('#FF6F61', 0.3);
+    const tealMat = glossyClayMat('#3BC4B2', 0.3);
+    const deckGroup = new THREE.Group();
+    deckGroup.rotation.z = 0.42;
+    const deck = new THREE.Mesh(new RoundedBoxGeometry(0.86, 0.2, 0.06, 3, 0.09), deckMat);
+    const stripe = new THREE.Mesh(new RoundedBoxGeometry(0.28, 0.205, 0.068, 2, 0.01), tealMat);
+    deckGroup.add(deck, stripe);
+    [-0.24, 0.24].forEach((wx) => {
+      const wheel = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 10), goldMat);
+      wheel.position.set(wx, -0.12, 0.03);
+      deckGroup.add(wheel);
+    });
+    const starA = buildSculptedStar(0.11, 0.035, goldMat);
+    starA.position.set(-0.34, 0.26, 0.03);
+    relief.add(deckGroup, starA);
+  }
+
+  box.add(relief);
+  return box;
+}
+
+function buildShopWindowDisplay(kind: MallIconKind): THREE.Group {
+  const display = new THREE.Group();
+  const standMat = clayMat('#FFF8ED', 0.55);
+  [-1.4, 0, 1.4].forEach((ox, idx) => {
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.4, 0.32 + (idx === 1 ? 0.18 : 0), 14), standMat);
+    ped.position.set(ox, 0.16 + (idx === 1 ? 0.09 : 0), 0);
+    const item = buildSculptedMallIcon(kind, idx === 1 ? 0.92 : 0.72);
+    item.position.set(ox, 0.52 + (idx === 1 ? 0.18 : 0), 0);
+    item.rotation.y = (idx - 1) * 0.25;
+    display.add(ped, item);
+  });
+  return display;
 }
 
 function buildFuturisticMiniConvertible(): THREE.Group {
@@ -630,6 +1101,8 @@ export function buildMallInteriorScene(): SubzoneWorld {
   const labelAnchors: TownAnchor[] = [];
   const colliders: WorldCollider[] = [];
   const disposables: THREE.Texture[] = [];
+  let disposed = false;
+  const isDisposed = () => disposed;
 
   // Shared materials
   const pearlWallMat = clayMat('#FAF6EE', 0.72);
@@ -847,14 +1320,69 @@ export function buildMallInteriorScene(): SubzoneWorld {
     });
   }
 
-  // Ground Storefront Alcoves + Floor 2 Clerestory Windows (clean staggered Z offsets — ZERO Z-fighting!)
-  [-24, -12, 0, 12, 24].forEach((bx) => {
-    // North Floor 1 Future-Shop Windows
+  // Ground Storefront Alcoves, Cute Rounded Shop Signs, Pastel Awnings & 3D Window Displays
+  const northShops: {
+    bx: number;
+    name: string;
+    accent: string;
+    pill: string;
+    fg: string;
+    awningA: string;
+    awningB: string;
+    icon: MallIconKind;
+  }[] = [
+    {bx: -24, name: 'THỜI TRANG', accent: '#F28CA3', pill: '#FFEAF0', fg: '#9A3150', awningA: '#F59BB0', awningB: '#FFF9FB', icon: 'fashion'},
+    {bx: -12, name: 'TRÀ SỮA', accent: '#4EB8A2', pill: '#E6FAF5', fg: '#1D6B5B', awningA: '#62C7B2', awningB: '#FFFDF8', icon: 'boba'},
+    {bx: 0, name: 'XE CỘ MÂY', accent: '#549EE0', pill: '#E9F4FF', fg: '#1F5588', awningA: '#6AB2EC', awningB: '#FFFFFF', icon: 'cloud_star'},
+    {bx: 12, name: 'QUÀ TẶNG', accent: '#EE8B60', pill: '#FFF0E6', fg: '#9E4020', awningA: '#F49D72', awningB: '#FFF9F4', icon: 'gift'},
+    {bx: 24, name: 'SIÊU THỊ', accent: '#6B8AD6', pill: '#EDF2FF', fg: '#2C4685', awningA: '#809EE2', awningB: '#FFFFFF', icon: 'mart'},
+  ];
+
+  northShops.forEach(({bx, name, accent, pill, fg, awningA, awningB, icon}) => {
     const bayFrame = new THREE.Mesh(new RoundedBoxGeometry(9.4, 4.4, 0.18, 2, 0.04), creamTrimMat);
     bayFrame.position.set(bx, 2.35, -MALL_HALF_D + 0.22);
     const bayPane = new THREE.Mesh(new THREE.BoxGeometry(8.5, 3.6, 0.08), skyAccentMat);
     bayPane.position.set(bx, 2.35, -MALL_HALF_D + 0.36);
-    shellGroup.add(bayFrame, bayPane);
+
+    const shopTex = createStorefrontSignTexture(name, accent, pill, fg, disposables, isDisposed);
+    const shopSignFrame = new THREE.Mesh(
+      new RoundedBoxGeometry(6.85, 1.56, 0.2, 4, 0.28),
+      glossyClayMat(accent, 0.42),
+    );
+    shopSignFrame.position.set(bx, 5.55, -MALL_HALF_D + 0.34);
+    const shopSignMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(6.45, 1.3),
+      new THREE.MeshBasicMaterial({map: shopTex}),
+    );
+    shopSignMesh.position.set(bx, 5.55, -MALL_HALF_D + 0.46);
+
+    // Cute 3D sculpted emblem flanking the left end of each boutique sign
+    const signBadge = buildSculptedMallIcon(icon, 1.05);
+    signBadge.position.set(bx - 3.65, 5.55, -MALL_HALF_D + 0.56);
+    group.add(signBadge);
+
+    // Soft rounded pastel boutique awning scallops
+    for (let s = 0; s < 6; s++) {
+      const awStripe = new THREE.Mesh(
+        new RoundedBoxGeometry(1.46, 0.24, 1.12, 2, 0.08),
+        clayMat(s % 2 === 0 ? awningA : awningB, 0.52),
+      );
+      awStripe.position.set(bx - 3.65 + s * 1.46, 4.38, -MALL_HALF_D + 0.72);
+      awStripe.rotation.x = 0.26;
+      shellGroup.add(awStripe);
+    }
+
+    // Storefront window display pad + cute 3D miniature showcase items
+    const winMannequinPad = new THREE.Mesh(
+      new RoundedBoxGeometry(5.8, 0.42, 0.42, 2, 0.06),
+      clayMat(awningA, 0.5),
+    );
+    winMannequinPad.position.set(bx, 0.8, -MALL_HALF_D + 0.62);
+    const winItems = buildShopWindowDisplay(icon);
+    winItems.position.set(bx, 1.01, -MALL_HALF_D + 0.64);
+
+    shellGroup.add(bayFrame, bayPane, shopSignFrame, winMannequinPad);
+    group.add(shopSignMesh, winItems);
 
     // North Floor 2 Upper Clerestory Windows
     const f2WinFrameN = new THREE.Mesh(new RoundedBoxGeometry(9.2, 3.6, 0.16, 2, 0.04), creamTrimMat);
@@ -870,6 +1398,92 @@ export function buildMallInteriorScene(): SubzoneWorld {
     f2WinPaneS.position.set(bx, MALL_UPPER_Y + 4.8, MALL_HALF_D - 0.33);
     shellGroup.add(f2WinFrameS, f2WinPaneS);
   });
+
+  // Grand Suspended Sculpted 3D Atrium Welcome Banner ("CHÀO MỪNG ĐẾN MÂY MALL" + "Ăn uống · Mua sắm · Giải trí")
+  const welcomeTex = createWelcomeMallBannerTexture(disposables, isDisposed);
+  const welcomeBannerGroup = new THREE.Group();
+  const wbWidth = 13.4;
+  const wbHeight = 2.75;
+  const wbY = 6.25;
+  const wbZ = -MALL_ATRIUM_HALF_D + 0.42;
+
+  const wbFrame = new THREE.Mesh(
+    new RoundedBoxGeometry(wbWidth + 0.5, wbHeight + 0.45, 0.24, 4, 0.42),
+    glossyClayMat('#FFA3B5', 0.36),
+  );
+  wbFrame.position.set(0, wbY, wbZ);
+  const wbFront = new THREE.Mesh(
+    new THREE.PlaneGeometry(wbWidth, wbHeight),
+    new THREE.MeshBasicMaterial({map: welcomeTex}),
+  );
+  wbFront.position.set(0, wbY, wbZ + 0.13);
+  const wbBack = new THREE.Mesh(
+    new THREE.PlaneGeometry(wbWidth, wbHeight),
+    new THREE.MeshBasicMaterial({map: welcomeTex}),
+  );
+  wbBack.position.set(0, wbY, wbZ - 0.13);
+  wbBack.rotation.y = Math.PI;
+  welcomeBannerGroup.add(wbFrame, wbFront, wbBack);
+
+  // Cute sculpted 3D puffy clouds, pastel bow & golden stars framing the welcome board
+  const cloudWhiteMat = glossyClayMat('#FFFFFF', 0.34);
+  [-1, 1].forEach((side) => {
+    const cloudCorner = buildSculptedCloud(1.85, cloudWhiteMat);
+    cloudCorner.position.set(side * (wbWidth * 0.5 + 0.18), wbY + 0.15, wbZ + 0.12);
+    const starTop = buildSculptedStar(0.32, 0.09, goldMat);
+    starTop.position.set(side * (wbWidth * 0.36), wbY + wbHeight * 0.5 + 0.25, wbZ + 0.14);
+    starTop.rotation.z = side * -0.2;
+    welcomeBannerGroup.add(cloudCorner, starTop);
+  });
+  const centerBow = buildSculptedBow(glossyClayMat('#FF7A9C', 0.34), 1.45);
+  centerBow.position.set(0, wbY + wbHeight * 0.5 + 0.3, wbZ + 0.14);
+  welcomeBannerGroup.add(centerBow);
+
+  [-5.2, 0, 5.2].forEach((rx) => {
+    const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 1.85, 6), silverMat);
+    cable.position.set(rx, wbY + wbHeight * 0.5 + 0.9, wbZ);
+    welcomeBannerGroup.add(cable);
+  });
+  group.add(welcomeBannerGroup);
+
+  // 4 Cute Sculpted 3D Pastel Hanging Mall Ribbon Banners (no backwards text, 3D icons on both faces!)
+  const hangingBannerSpecs: {
+    x: number;
+    y: number;
+    z: number;
+    ribbonHex: string;
+    trimHex: string;
+    icon: MallIconKind;
+  }[] = [
+    {x: -12.6, y: 5.75, z: -MALL_ATRIUM_HALF_D + 0.45, ribbonHex: '#FF9EB5', trimHex: '#FFE2EA', icon: 'boba'},
+    {x: 12.6, y: 5.75, z: -MALL_ATRIUM_HALF_D + 0.45, ribbonHex: '#7BCDF5', trimHex: '#E0F5FF', icon: 'bag'},
+    {x: -10.5, y: 5.75, z: MALL_ATRIUM_HALF_D - 0.45, ribbonHex: '#F9CF6B', trimHex: '#FFF5D6', icon: 'gift'},
+    {x: 10.5, y: 5.75, z: MALL_ATRIUM_HALF_D - 0.45, ribbonHex: '#7DD6BA', trimHex: '#E0FAF1', icon: 'cloud_star'},
+  ];
+  hangingBannerSpecs.forEach((cfg) => {
+    const banner = buildSculptedHangingRibbonBanner({
+      ...cfg,
+      goldMat,
+      silverMat,
+    });
+    group.add(banner);
+  });
+
+  // Soft Pastel Rounded Bunting Garland Along Atrium Ceiling Rim
+  const buntingColors = ['#FF9EAA', '#FFD87D', '#7ED6C2', '#89C8F5', '#F7B2D9'];
+  for (let i = -14; i <= 14; i += 2) {
+    if (Math.abs(i) < 7) continue;
+    const flagColor = buntingColors[Math.abs(i) % buntingColors.length];
+    const flagMesh = new THREE.Mesh(
+      new RoundedBoxGeometry(0.46, 0.52, 0.06, 2, 0.14),
+      clayMat(flagColor, 0.52),
+    );
+    flagMesh.rotation.z = Math.PI / 4;
+    flagMesh.position.set(i * 0.96, 7.66, -MALL_ATRIUM_HALF_D + 0.35);
+    const bead = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), goldMat);
+    bead.position.set(i * 0.96, 7.98, -MALL_ATRIUM_HALF_D + 0.35);
+    shellGroup.add(flagMesh, bead);
+  }
 
   // Fully Enclosed Coffered Ceiling across ENTIRE 64m x 52m Interior (Zero open skylight or stray bands!)
   const mainCeiling = new THREE.Mesh(
@@ -923,11 +1537,6 @@ export function buildMallInteriorScene(): SubzoneWorld {
 
   // ========== 5. ANIMATED LEFT & RIGHT FIXED ESCALATORS (1 UP + 1 DOWN PER SIDE) ==========
   const escStatic = new THREE.Group();
-  const arrowUpTex = createDirectionArrowTexture('up');
-  const arrowDownTex = createDirectionArrowTexture('down');
-  disposables.push(arrowUpTex, arrowDownTex);
-  const arrowUpMat = new THREE.MeshBasicMaterial({map: arrowUpTex});
-  const arrowDownMat = new THREE.MeshBasicMaterial({map: arrowDownTex});
 
   interface EscalatorAnimMeta {
     lane: MallEscalatorLane;
@@ -974,23 +1583,7 @@ export function buildMallInteriorScene(): SubzoneWorld {
       escStatic.add(glassWall, handRail);
     });
 
-    // Illuminated Fixed-Direction Arrow Pads at Boarding & Exit Ends (zero floating text!)
-    const padTexMat = lane.dir === 'up' ? arrowUpMat : arrowDownMat;
-    const arrowPadStart = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96), padTexMat);
-    arrowPadStart.rotation.x = -Math.PI / 2;
-    arrowPadStart.rotation.z = lane.side === 'left' ? Math.PI / 2 : -Math.PI / 2;
-    if (lane.startFloor === 1) {
-      arrowPadStart.position.set(lane.approachX + (lane.side === 'left' ? -0.32 : 0.32), 0.03, zMid);
-    } else {
-      arrowPadStart.position.set(
-        lane.approachX + (lane.side === 'left' ? 0.32 : -0.32),
-        MALL_UPPER_Y + 0.03,
-        zMid,
-      );
-    }
-    group.add(arrowPadStart);
-
-    // Click proxy along escalator lane & entry pad
+    // Click proxy along escalator lane
     const hitSlope = new THREE.Mesh(
       new THREE.BoxGeometry(diagLen + 1.8, 2.1, 1.75),
       new THREE.MeshBasicMaterial({visible: false}),
@@ -1043,14 +1636,14 @@ export function buildMallInteriorScene(): SubzoneWorld {
   );
   daisTop.position.set(daisX, 0.165, daisZ);
 
-  // Circular Spotlight Plinth directly under the Futuristic Blue Convertible Car
+  // Circular Spotlight Plinth directly under the Futuristic Blue Convertible Car (flush on daisTop y = 0.195)
   const carX = -0.35;
   const carZ = -1.1;
   const turntablePad = new THREE.Mesh(
     new THREE.CylinderGeometry(1.75, 1.85, 0.11, 32),
     clayMat('#DCEFFF', 0.32),
   );
-  turntablePad.position.set(carX, 0.245, carZ);
+  turntablePad.position.set(carX, 0.25, carZ);
   const turntableRim = new THREE.Mesh(
     new THREE.TorusGeometry(1.78, 0.032, 8, 40),
     new THREE.MeshStandardMaterial({
@@ -1061,12 +1654,83 @@ export function buildMallInteriorScene(): SubzoneWorld {
     }),
   );
   turntableRim.rotation.x = Math.PI / 2;
-  turntableRim.position.set(carX, 0.295, carZ);
+  turntableRim.position.set(carX, 0.3, carZ);
   showcaseGroup.add(daisBase, daisTop, turntablePad, turntableRim);
+
+  // Japanese-Style Tun Motors Showroom Backdrop Behind Dais (Hinoki cedar beams + Red Lanterns + 4 Sculpted 3D Relief Shadowboxes)
+  const jpBackdropZ = daisZ - 2.35;
+  const cedarMat = clayMat('#B87B46', 0.68);
+  const charcoalWoodMat = clayMat('#2B2624', 0.64);
+  const redLacquerMat = clayMat('#C83E35', 0.42);
+  const norenIndigoMat = clayMat('#223E5C', 0.78);
+  const lanternGlowMat = new THREE.MeshStandardMaterial({
+    color: '#FFE5B4',
+    emissive: '#FF9E44',
+    emissiveIntensity: 0.78,
+    roughness: 0.45,
+  });
+
+  // Architectural Japanese Showroom Archway & Cedar Slatted Wall Screen
+  [-4.4, 6.0].forEach((px) => {
+    const pillar = new THREE.Mesh(new RoundedBoxGeometry(0.34, 4.15, 0.34, 2, 0.04), charcoalWoodMat);
+    pillar.position.set(px, 2.08, jpBackdropZ);
+    const pillarBase = new THREE.Mesh(new RoundedBoxGeometry(0.54, 0.3, 0.54, 2, 0.04), cedarMat);
+    pillarBase.position.set(px, 0.15, jpBackdropZ);
+    showcaseGroup.add(pillar, pillarBase);
+  });
+
+  const archBeam = new THREE.Mesh(new RoundedBoxGeometry(11.6, 0.44, 0.46, 2, 0.05), charcoalWoodMat);
+  archBeam.position.set(daisX, 4.05, jpBackdropZ);
+  const archTopLip = new THREE.Mesh(new RoundedBoxGeometry(12.2, 0.18, 0.58, 2, 0.04), redLacquerMat);
+  archTopLip.position.set(daisX, 4.3, jpBackdropZ);
+  const slatPanel = new THREE.Mesh(new RoundedBoxGeometry(10.1, 3.05, 0.14, 2, 0.02), clayMat('#F4ECDC', 0.72));
+  slatPanel.position.set(daisX, 2.15, jpBackdropZ - 0.16);
+  showcaseGroup.add(archBeam, archTopLip, slatPanel);
+
+  // Vertical Cedar Lattice Slats & Indigo Japanese Noren Curtains with Cute Sculpted Cloud Emblems
+  for (let sx = -4.0; sx <= 5.6; sx += 0.48) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(0.08, 3.05, 0.08), cedarMat);
+    slat.position.set(sx, 2.15, jpBackdropZ - 0.06);
+    showcaseGroup.add(slat);
+  }
+  const norenCloudMat = clayMat('#FFF8EE', 0.6);
+  for (let ni = 0; ni < 5; ni++) {
+    const nx = -2.6 + ni * 1.7;
+    const noren = new THREE.Mesh(new RoundedBoxGeometry(1.42, 0.58, 0.06, 2, 0.025), norenIndigoMat);
+    noren.position.set(nx, 3.55, jpBackdropZ + 0.18);
+    const norenCloud = buildSculptedCloud(0.42, norenCloudMat);
+    norenCloud.position.set(nx, 3.54, jpBackdropZ + 0.22);
+    showcaseGroup.add(noren, norenCloud);
+  }
+
+  // Hanging Traditional Japanese Chochin Paper Lanterns at Left & Right Pillars
+  [-4.4, 6.0].forEach((lx) => {
+    const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 12), lanternGlowMat);
+    lantern.scale.set(0.92, 1.28, 0.92);
+    lantern.position.set(lx, 3.25, jpBackdropZ + 0.42);
+    const capT = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.08, 12), charcoalWoodMat);
+    capT.position.set(lx, 3.6, jpBackdropZ + 0.42);
+    const capB = capT.clone();
+    capB.position.y = 2.9;
+    showcaseGroup.add(lantern, capT, capB);
+  });
+
+  // 4 Sculpted 3D Hinoki Wooden Wall Relief Shadowboxes (Zero text / zero Japanese characters!)
+  const shadowboxSpecs: {x: number; y: number; z: number; kind: 'tun' | 'car' | 'bike' | 'skate'}[] = [
+    {x: -2.5, y: 2.15, z: jpBackdropZ + 0.08, kind: 'tun'},
+    {x: -0.35, y: 2.15, z: jpBackdropZ + 0.08, kind: 'car'},
+    {x: 2.15, y: 2.15, z: jpBackdropZ + 0.08, kind: 'bike'},
+    {x: 4.55, y: 2.15, z: jpBackdropZ + 0.08, kind: 'skate'},
+  ];
+  shadowboxSpecs.forEach(({x, y, z, kind}) => {
+    const sb = buildSculptedShadowboxRelief(kind, cedarMat, charcoalWoodMat);
+    sb.position.set(x, y, z);
+    showcaseGroup.add(sb);
+  });
 
   // Hero Prop 1: Futuristic Cute 1-Seater Blue Luxury Convertible Car
   const carGroup = buildFuturisticMiniConvertible();
-  carGroup.position.set(carX, 0.3, carZ);
+  carGroup.position.set(carX, 0.305, carZ);
   carGroup.rotation.y = 0.42;
   group.add(carGroup);
   addMallProxy(
@@ -1078,11 +1742,11 @@ export function buildMallInteriorScene(): SubzoneWorld {
   );
   colliders.push({type: 'circle', id: 'mall_f1_car', x: carX, z: carZ, r: 1.55});
 
-  // Hero Prop 2: Stylized Showroom Bicycle beside Tun & Car
+  // Hero Prop 2: Stylized Showroom Bicycle sitting flush on daisTop (0.195)
   const bikeX = 2.45;
   const bikeZ = -0.65;
   const bikeGroup = buildShowroomBicycle();
-  bikeGroup.position.set(bikeX, 0.2, bikeZ);
+  bikeGroup.position.set(bikeX, 0.195, bikeZ);
   bikeGroup.rotation.y = -0.52;
   showcaseGroup.add(bikeGroup);
   addMallProxy(
@@ -1094,11 +1758,11 @@ export function buildMallInteriorScene(): SubzoneWorld {
   );
   colliders.push({type: 'circle', id: 'mall_f1_bike', x: bikeX, z: bikeZ, r: 0.85});
 
-  // Hero Prop 3: Dynamic Display Rack Holding 2 Sporty Skateboards
+  // Hero Prop 3: Dynamic Display Rack Holding 2 Sporty Skateboards flush on daisTop (0.195)
   const skateX = 4.65;
   const skateZ = -1.1;
   const skateRackGroup = buildSkateboardRack();
-  skateRackGroup.position.set(skateX, 0.2, skateZ);
+  skateRackGroup.position.set(skateX, 0.195, skateZ);
   skateRackGroup.rotation.y = -0.34;
   showcaseGroup.add(skateRackGroup);
   addMallProxy(
@@ -1113,15 +1777,17 @@ export function buildMallInteriorScene(): SubzoneWorld {
   mergeStaticGroupByMaterial(showcaseGroup);
   group.add(showcaseGroup);
 
-  // Collider guard around Showroom Dais rear/sides (keeping front walking space comfortable)
+  // Collider guard around Showroom Dais & Japanese Backdrop Screen (keeping front walking space comfortable)
   colliders.push({type: 'box', id: 'mall_f1_dais', x: daisX, z: daisZ, hw: 5.1, hd: 2.1});
+  colliders.push({type: 'box', id: 'mall_f1_jp_backdrop', x: daisX, z: jpBackdropZ, hw: 5.4, hd: 0.45});
 
-  // NPC Tun standing warmly beside the futuristic blue car in the Grand Lobby
+  // NPC Tun standing 100% flush atop daisTop (top = 0.165 + 0.03 = 0.195) beside the futuristic blue car
   // CRITICAL: Label "Tun" ONLY appears when player walks very close (enforced in WorldCanvas)!
   const TUN_X = -2.65;
   const TUN_Z = 0.95;
+  const TUN_BASE_Y = 0.195;
   const tunRig = buildAvatarRig(TUN_AVATAR);
-  tunRig.root.position.set(TUN_X, 0, TUN_Z);
+  tunRig.root.position.set(TUN_X, TUN_BASE_Y, TUN_Z);
   tunRig.root.rotation.y = 0.38;
   group.add(tunRig.root);
   addMallProxy(
@@ -1135,7 +1801,7 @@ export function buildMallInteriorScene(): SubzoneWorld {
   labelAnchors.push({
     id: 'npc_tun',
     label: 'Tun',
-    worldPos: new THREE.Vector3(TUN_X, 2.25, TUN_Z),
+    worldPos: new THREE.Vector3(TUN_X, TUN_BASE_Y + 2.25, TUN_Z),
   });
 
   // ========== 7. ATRIUM LOUNGE BENCHES & POTTED PLANTS ON FLOOR 1 PERIMETER ==========
@@ -1258,13 +1924,12 @@ export function buildMallInteriorScene(): SubzoneWorld {
     windowPaneMat.emissive.set(isNight ? '#3B6DA6' : '#8ED8F8');
     windowPaneMat.emissiveIntensity = isNight ? 0.28 : 0.16;
 
-    // Smoothly scroll all 4 escalator lanes in 1 shared InstancedMesh
+    // Smoothly scroll all 4 escalator lanes in 1 shared InstancedMesh (UP moves 0->UPPER, DOWN moves UPPER->0!)
     let instIdx = 0;
     const speedCyclesPerSec = 0.14;
     for (let li = 0; li < escAnimList.length; li++) {
       const {lane, stepCount} = escAnimList[li];
-      const travelSign = lane.dir === 'up' ? 1 : -1;
-      const offset = (elapsed * speedCyclesPerSec * travelSign) % 1;
+      const offset = (elapsed * speedCyclesPerSec) % 1;
       for (let s = 0; s < stepCount; s++) {
         let u = (s / stepCount + offset) % 1;
         if (u < 0) u += 1;
@@ -1288,6 +1953,7 @@ export function buildMallInteriorScene(): SubzoneWorld {
     colliders,
     update,
     dispose: () => {
+      disposed = true;
       disposables.forEach((t) => t.dispose());
       group.traverse((obj) => {
         if ((obj as THREE.Mesh).isMesh) {

@@ -248,6 +248,72 @@ export function MountCarIcon({className = 'w-11 h-11'}: {className?: string}) {
 }
 
 /**
+ * Stylized Skateboard Icon for Tun's Shop, Backpack & Quick Mount HUD
+ */
+export function SkateboardMountIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Tilted skateboard maple deck */}
+      <g transform="rotate(-18 32 34)">
+        <rect
+          x="10"
+          y="29"
+          width="44"
+          height="8"
+          rx="4"
+          fill="#E85D4A"
+          stroke="#7A281E"
+          strokeWidth="2.3"
+        />
+        <rect x="13" y="27.5" width="38" height="3.2" rx="1.6" fill="#2B303A" />
+        {/* Teal center stripe & cream badge */}
+        <rect x="22" y="31.5" width="20" height="3" rx="1.5" fill="#2DB5A3" />
+        <circle cx="32" cy="33" r="2.2" fill="#FFF3D9" />
+        {/* Trucks & yellow urethane wheels */}
+        <rect x="18" y="37" width="4" height="4" rx="1" fill="#CBD5E1" stroke="#475569" strokeWidth="1.2" />
+        <rect x="42" y="37" width="4" height="4" rx="1" fill="#CBD5E1" stroke="#475569" strokeWidth="1.2" />
+        <circle cx="20" cy="44" r="5" fill="#FFD166" stroke="#8C5E14" strokeWidth="2" />
+        <circle cx="20" cy="44" r="1.9" fill="#E85D4A" />
+        <circle cx="44" cy="44" r="5" fill="#FFD166" stroke="#8C5E14" strokeWidth="2" />
+        <circle cx="44" cy="44" r="1.9" fill="#E85D4A" />
+      </g>
+      {/* Dynamic speed swoosh lines */}
+      <path d="M8 48 H20 M12 53 H28" stroke="#53AFC9" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Retro Cruiser Bicycle Icon for Tun's Shop, Backpack & Quick Mount HUD
+ */
+export function BicycleMountIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Rear & Front Tires */}
+      <circle cx="17" cy="43" r="10.5" fill="#E8F5FA" fillOpacity="0.45" stroke="#2B303A" strokeWidth="3" />
+      <circle cx="17" cy="43" r="3" fill="#CBD5E1" stroke="#475569" strokeWidth="1.4" />
+      <circle cx="47" cy="43" r="10.5" fill="#E8F5FA" fillOpacity="0.45" stroke="#2B303A" strokeWidth="3" />
+      <circle cx="47" cy="43" r="3" fill="#CBD5E1" stroke="#475569" strokeWidth="1.4" />
+      {/* Retro Turquoise Diamond Frame */}
+      <path
+        d="M17 43 L29 43 L40 27 L25 27 Z M25 27 L29 43 M47 43 L38 22"
+        stroke="#3DA5B8"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Leather Saddle & Handlebar */}
+      <path d="M21 23.5 H28.5" stroke="#C97B44" strokeWidth="3.6" strokeLinecap="round" />
+      <path d="M35 21 H42.5" stroke="#C97B44" strokeWidth="3" strokeLinecap="round" />
+      {/* Front Wicker Basket */}
+      <rect x="43" y="23.5" width="9" height="7" rx="1.8" fill="#D7A96D" stroke="#8A5629" strokeWidth="1.8" />
+      {/* Crank Center */}
+      <circle cx="29" cy="43" r="3.4" fill="#FFD166" stroke="#8C5E14" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+/**
  * Handcrafted Wooden Rowboat icon for Ship's shop & Bag Thuyền tab
  */
 export function WoodenBoatIcon({className = 'w-11 h-11'}: {className?: string}) {

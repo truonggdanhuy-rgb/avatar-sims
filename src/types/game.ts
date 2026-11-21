@@ -102,7 +102,12 @@ export type AvatarPose =
   | 'fish_pull'
   | 'net_swing'
   | 'play_pet'
-  | 'parachute';
+  | 'parachute'
+  | 'skate_idle'
+  | 'skate_ride'
+  | 'skate_push'
+  | 'bike_idle'
+  | 'bike_ride';
 
 export interface AvatarConfig {
   name: string;
@@ -645,6 +650,37 @@ export interface PetSupplies {
   petFood: number;
   petMedicine: number;
   intimacyTest: number;
+}
+
+export type MountRank = 'B' | 'S';
+
+export type MountKind = 'skateboard' | 'bicycle';
+
+export type MountId = 'skateboard_classic' | 'bicycle_classic';
+
+export interface MountSkinPalette {
+  primary: string;
+  secondary: string;
+  accent: string;
+  trim: string;
+  wheelOrTire: string;
+}
+
+export interface MountDefinition {
+  id: MountId;
+  kind: MountKind;
+  rank: MountRank;
+  name: string;
+  price: number;
+  speedMultiplier: number;
+  description: string;
+  palette: MountSkinPalette;
+}
+
+export interface OwnedMountsState {
+  ownedIds: MountId[];
+  activeMountId: MountId | null;
+  lastMountId: MountId | null;
 }
 
 

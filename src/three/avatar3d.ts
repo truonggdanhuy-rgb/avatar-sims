@@ -27,10 +27,20 @@ const HAND_POSES: Record<HoldPose, {armX: number; armZ: number; elbowX: number; 
   carry_net: {armX: -1.16, armZ: 0.24, elbowX: -1.24, elbowZ: -0.18},
 };
 
+export interface AvatarMountAnimParams {
+  pushPhase?: number;
+  idlePop?: number;
+  idleBlend?: number;
+  leanAngle?: number;
+  crankAngle?: number;
+  steerAngle?: number;
+}
+
 export interface SkirtDeformPair {
   mesh: THREE.Mesh;
   standGeo: THREE.BufferGeometry;
   sitGeo: THREE.BufferGeometry;
+  bikeGeo: THREE.BufferGeometry;
 }
 
 export interface AvatarRig {
@@ -886,6 +896,78 @@ function createSeatedSkirtDrapeGeometry(
   return sitGeo;
 }
 
+/**
+ * Tailored cycling skirt/hem deformer: arches fabric smoothly forward & outward over straddling
+ * thighs while keeping the lower hem tucked cleanly over the bike saddle without clipping legs or frame.
+ */
+function createBicycleSkirtDrapeGeometry(
+  standGeo: THREE.BufferGeometry,
+  meshOffsetY: number,
+  meshRotX = 0,
+): THREE.BufferGeometry {
+  const bikeGeo = standGeo.clone();
+  const posAttr = bikeGeo.attributes.position as THREE.BufferAttribute;
+
+  const cosR = Math.cos(meshRotX);
+  const sinR = Math.sin(meshRotX);
+  let maxDrop = 0.22;
+  for (let i = 0; i < posAttr.count; i++) {
+    const ly = posAttr.getY(i);
+    const lz = posAttr.getZ(i);
+    const sy = ly * cosR - lz * sinR + meshOffsetY;
+    if (-sy > maxDrop) maxDrop = -sy;
+  }
+
+  for (let i = 0; i < posAttr.count; i++) {
+    const lx = posAttr.getX(i);
+    const ly = posAttr.getY(i);
+    const lz = posAttr.getZ(i);
+
+    const sx = lx;
+    const sy = ly * cosR - lz * sinR + meshOffsetY;
+    const sz = ly * sinR + lz * cosR;
+
+    const drop = Math.max(0, -sy);
+    const v = THREE.MathUtils.clamp(drop / maxDrop, 0, 1);
+    const radial = Math.hypot(sx, sz) || 0.001;
+    const frontAmt = THREE.MathUtils.clamp(sz / radial, 0, 1);
+    const backAmt = THREE.MathUtils.clamp(-sz / radial, 0, 1);
+    const sideAmt = THREE.MathUtils.clamp(Math.abs(sx) / radial, 0, 1);
+
+    // Widen subtly over straddling thighs & saddle while keeping waistband seamless
+    const nx = sx * (1 + (0.18 + 0.1 * frontAmt) * v);
+    // Drape generously forward over raised thighs starting early near upper hip so knees never poke out
+    const lapPush = frontAmt * (0.075 + 0.175 * Math.pow(v, 0.58));
+    const backTuck = backAmt * (0.04 * v);
+    const nz = sz + lapPush - backTuck;
+
+    // Gentle saddle relief only toward the rear/center saddle seam, while front drapes smoothly downward over thighs
+    const rearSaddleRelief = backAmt * (1 - sideAmt) * 0.032 * v;
+    const frontKneeCover = frontAmt * 0.025 * Math.pow(v, 0.85);
+    const longSkirtHold = Math.max(0, drop - 0.23) * 0.42;
+    let ny = THREE.MathUtils.lerp(
+      sy,
+      sy * 0.92 + rearSaddleRelief - frontKneeCover + longSkirtHold,
+      v,
+    );
+    if (v < 0.06) {
+      ny = THREE.MathUtils.lerp(sy, ny, v / 0.06);
+    }
+
+    const dy = ny - meshOffsetY;
+    posAttr.setXYZ(
+      i,
+      nx,
+      dy * cosR + nz * sinR,
+      -dy * sinR + nz * cosR,
+    );
+  }
+
+  posAttr.needsUpdate = true;
+  bikeGeo.computeVertexNormals();
+  return bikeGeo;
+}
+
 function createTorsoProfilePoints(scaleOffset = 0, yMin = -0.195, yMax = 0.21): THREE.Vector2[] {
   const basePts: [number, number][] = [
     [0.01, yMin],
@@ -1032,69 +1114,66 @@ export function buildAvatarRig(
     legPivot.add(kneeCap);
 
     if (config.bottom === 'wide_trousers') {
+      // Exact 1:1 joint spheres concentric with hip (y=0) & knee (y=KNEE_Y) + openEnded sleeves -> zero creases/jagged caps at 0°..120° bend!
       const hipPantCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.1, 14, 12),
+        new THREE.SphereGeometry(0.104, 16, 14),
         bottomMat,
       );
-      hipPantCap.scale.set(1, 0.88, 1);
       const thighPant = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.094, 0.105, 0.22, 18),
+        new THREE.CylinderGeometry(0.103, 0.105, 0.218, 20, 1, true),
         bottomMat,
       );
-      thighPant.position.y = -0.108;
+      thighPant.position.y = -0.109;
       const kneeTrouserCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.103, 14, 12),
+        new THREE.SphereGeometry(0.106, 16, 14),
         bottomMat,
       );
-      kneeTrouserCap.scale.set(1, 0.92, 1);
       kneeTrouserCap.position.y = KNEE_Y;
       legPivot.add(hipPantCap, thighPant, kneeTrouserCap);
     } else if (config.bottom === 'office_trousers') {
-      // Handsome tailored straight-leg dress slacks (suông gọn, không loe!)
+      // Watertight tailored straight-leg dress slacks (1:1 spheres + openEnded cylinders, recessed crease inside knee radius!)
       const hipPantCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.095, 14, 12),
+        new THREE.SphereGeometry(0.097, 16, 14),
         bottomMat,
       );
-      hipPantCap.scale.set(1, 0.88, 0.96);
       const thighPant = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.092, 0.086, 0.22, 18),
+        new THREE.CylinderGeometry(0.096, 0.086, 0.218, 20, 1, true),
         bottomMat,
       );
-      thighPant.position.y = -0.108;
+      thighPant.position.y = -0.109;
       const thighCrease = new THREE.Mesh(
-        new RoundedBoxGeometry(0.014, 0.18, 0.012, 2, 0.004),
+        new RoundedBoxGeometry(0.012, 0.118, 0.008, 2, 0.003),
         bottomLightMat,
       );
       thighCrease.position.set(0, -0.11, 0.086);
       const kneeTrouserCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.085, 14, 12),
+        new THREE.SphereGeometry(0.086, 16, 14),
         bottomMat,
       );
-      kneeTrouserCap.scale.set(1, 0.9, 0.96);
       kneeTrouserCap.position.y = KNEE_Y;
       legPivot.add(hipPantCap, thighPant, thighCrease, kneeTrouserCap);
     } else if (config.bottom === 'denim_shorts') {
       const hipShortCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.105, 14, 12),
+        new THREE.SphereGeometry(0.106, 16, 14),
         bottomMat,
       );
-      hipShortCap.scale.set(1, 0.84, 1);
       const shortMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.106, 0.102, 0.165, 16),
+        new THREE.CylinderGeometry(0.105, 0.102, 0.16, 20, 1, true),
         bottomMat,
       );
       shortMesh.position.y = -0.08;
       legPivot.add(hipShortCap, shortMesh);
 
       const hem = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.106, 0.107, 0.026, 16),
+        new THREE.TorusGeometry(0.102, 0.011, 8, 20),
         bottomLightMat,
       );
+      hem.rotation.x = Math.PI / 2;
       hem.position.y = -0.16;
       legPivot.add(hem);
     }
 
-    // Lower leg (shin + socks + shoes) pivoted at KNEE_Y so knees bend naturally when sitting/walking
+    // Lower leg (shin + socks + shoes) pivoted at KNEE_Y so knees bend naturally when sitting/cycling
     const kneePivot = new THREE.Group();
     kneePivot.position.set(0, KNEE_Y, 0);
     legPivot.add(kneePivot);
@@ -1108,14 +1187,14 @@ export function buildAvatarRig(
 
     if (config.bottom === 'wide_trousers') {
       const shinPant = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.105, 0.114, 0.195, 18),
+        new THREE.CylinderGeometry(0.105, 0.114, 0.195, 20, 1, true),
         bottomMat,
       );
-      shinPant.position.y = -0.095;
+      shinPant.position.y = -0.097;
       kneePivot.add(shinPant);
 
       const cuff = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.118, 0.12, 0.044, 18),
+        new THREE.CylinderGeometry(0.117, 0.119, 0.044, 20),
         bottomDarkMat,
       );
       cuff.position.y = -0.18;
@@ -1123,17 +1202,17 @@ export function buildAvatarRig(
     } else if (config.bottom === 'office_trousers') {
       // Straight tapered tailored slacks ending cleanly above dress shoes
       const shinPant = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.085, 0.078, 0.21, 18),
+        new THREE.CylinderGeometry(0.085, 0.078, 0.206, 20, 1, true),
         bottomMat,
       );
-      shinPant.position.y = -0.104;
+      shinPant.position.y = -0.103;
       const shinCrease = new THREE.Mesh(
-        new RoundedBoxGeometry(0.013, 0.185, 0.012, 2, 0.004),
+        new RoundedBoxGeometry(0.011, 0.12, 0.008, 2, 0.003),
         bottomLightMat,
       );
-      shinCrease.position.set(0, -0.102, 0.079);
+      shinCrease.position.set(0, -0.116, 0.077);
       const tailoredHem = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.08, 0.079, 0.022, 18),
+        new THREE.CylinderGeometry(0.08, 0.079, 0.022, 20),
         bottomDarkMat,
       );
       tailoredHem.position.y = -0.196;
@@ -1239,6 +1318,33 @@ export function buildAvatarRig(
   const leftKnee = leftLegRig.kneePivot;
   const rightKnee = rightLegRig.kneePivot;
   bodyPivot.add(leftLeg, rightLeg);
+
+  // Seamless sculpted pelvis / groin bridge uniting left & right hips cleanly when sitting or cycling
+  const isSkirtBottom =
+    config.bottom === 'pleated_skirt' ||
+    config.bottom === 'midi_skirt' ||
+    config.bottom === 'office_skirt';
+  const pelvisBridgeMat = isSkirtBottom ? bottomDarkMat : bottomMat;
+  const pelvisBarR =
+    config.bottom === 'office_trousers' ? 0.094 : isSkirtBottom ? 0.086 : 0.103;
+  const pelvisBridge = new THREE.Mesh(
+    new THREE.CylinderGeometry(pelvisBarR, pelvisBarR, 0.24, 16),
+    pelvisBridgeMat,
+  );
+  pelvisBridge.rotation.z = Math.PI / 2;
+  pelvisBridge.position.set(0, 0.525, -0.004);
+  const pelvisCollar = new THREE.Mesh(
+    new THREE.CylinderGeometry(
+      config.top === 'office_female' ? 0.168 : 0.195,
+      isSkirtBottom ? 0.155 : 0.195,
+      0.095,
+      20,
+    ),
+    pelvisBridgeMat,
+  );
+  pelvisCollar.scale.set(1, 1, 0.72);
+  pelvisCollar.position.set(0, 0.558, -0.004);
+  bodyPivot.add(pelvisBridge, pelvisCollar);
 
   // ========== TORSO & SCULPTED CLOTHING ==========
   const torsoGroup = new THREE.Group();
@@ -1698,19 +1804,31 @@ export function buildAvatarRig(
     );
     const skirtOffsetY = isMidi ? -0.182 : -0.13;
     const skirtSitGeo = createSeatedSkirtDrapeGeometry(skirtGeo, skirtOffsetY, 0);
+    const skirtBikeGeo = createBicycleSkirtDrapeGeometry(skirtGeo, skirtOffsetY, 0);
     const skirtMesh = new THREE.Mesh(skirtGeo, bottomMat);
     skirtMesh.position.set(0, skirtOffsetY, 0);
     skirtPivot.add(skirtMesh);
-    skirtDeformMeshes.push({mesh: skirtMesh, standGeo: skirtGeo, sitGeo: skirtSitGeo});
+    skirtDeformMeshes.push({
+      mesh: skirtMesh,
+      standGeo: skirtGeo,
+      sitGeo: skirtSitGeo,
+      bikeGeo: skirtBikeGeo,
+    });
 
     const hemStandGeo = new THREE.TorusGeometry(isMidi ? 0.322 : 0.282, 0.012, 8, 32);
     const hemOffsetY = isMidi ? -0.332 : -0.23;
     const hemSitGeo = createSeatedSkirtDrapeGeometry(hemStandGeo, hemOffsetY, Math.PI / 2);
+    const hemBikeGeo = createBicycleSkirtDrapeGeometry(hemStandGeo, hemOffsetY, Math.PI / 2);
     const hemRing = new THREE.Mesh(hemStandGeo, bottomLightMat);
     hemRing.rotation.x = Math.PI / 2;
     hemRing.position.set(0, hemOffsetY, 0);
     skirtPivot.add(hemRing);
-    skirtDeformMeshes.push({mesh: hemRing, standGeo: hemStandGeo, sitGeo: hemSitGeo});
+    skirtDeformMeshes.push({
+      mesh: hemRing,
+      standGeo: hemStandGeo,
+      sitGeo: hemSitGeo,
+      bikeGeo: hemBikeGeo,
+    });
   } else if (config.bottom === 'office_skirt') {
     // High-waisted chic office pencil skirt hugging waist smoothly with slim belt & gold buckle
     const skirtWaistR = isOfficeFemale ? 0.168 : 0.215;
@@ -1742,19 +1860,31 @@ export function buildAvatarRig(
     );
     const skirtOffsetY = -skirtH * 0.5 - 0.012;
     const skirtSitGeo = createSeatedSkirtDrapeGeometry(skirtGeo, skirtOffsetY, 0);
+    const skirtBikeGeo = createBicycleSkirtDrapeGeometry(skirtGeo, skirtOffsetY, 0);
     const skirtMesh = new THREE.Mesh(skirtGeo, bottomMat);
     skirtMesh.position.set(0, skirtOffsetY, 0);
     skirtPivot.add(skirtMesh);
-    skirtDeformMeshes.push({mesh: skirtMesh, standGeo: skirtGeo, sitGeo: skirtSitGeo});
+    skirtDeformMeshes.push({
+      mesh: skirtMesh,
+      standGeo: skirtGeo,
+      sitGeo: skirtSitGeo,
+      bikeGeo: skirtBikeGeo,
+    });
 
     const hemStandGeo = new THREE.TorusGeometry(isOfficeFemale ? 0.204 : 0.218, 0.01, 8, 32);
     const hemOffsetY = -skirtH - 0.008;
     const hemSitGeo = createSeatedSkirtDrapeGeometry(hemStandGeo, hemOffsetY, Math.PI / 2);
+    const hemBikeGeo = createBicycleSkirtDrapeGeometry(hemStandGeo, hemOffsetY, Math.PI / 2);
     const hemRing = new THREE.Mesh(hemStandGeo, bottomDarkMat);
     hemRing.rotation.x = Math.PI / 2;
     hemRing.position.set(0, hemOffsetY, 0);
     skirtPivot.add(hemRing);
-    skirtDeformMeshes.push({mesh: hemRing, standGeo: hemStandGeo, sitGeo: hemSitGeo});
+    skirtDeformMeshes.push({
+      mesh: hemRing,
+      standGeo: hemStandGeo,
+      sitGeo: hemSitGeo,
+      bikeGeo: hemBikeGeo,
+    });
   } else if (config.bottom === 'office_trousers') {
     const waistR = isOfficeFemale ? 0.194 : 0.22;
     const beltMat = clayMat('#241B17', 0.42, 0.1);
@@ -3286,6 +3416,7 @@ export function updateAvatarRigAnimation(
   elapsed: number,
   isCozyEyes = false,
   poseProgress = 0,
+  mountAnim?: AvatarMountAnimParams,
 ): void {
   const isNaturalBlink = !isCozyEyes && !rig.skipNaturalBlink && elapsed % 4.5 > 4.38;
   const eyesClosed = pose === 'sleep' || isNaturalBlink;
@@ -3311,8 +3442,28 @@ export function updateAvatarRigAnimation(
   }
 
   const hold = rig.holdPose || 'none';
+  const isBikePose = pose === 'bike_idle' || pose === 'bike_ride';
+  const isSkatePose = pose === 'skate_idle' || pose === 'skate_ride' || pose === 'skate_push';
 
-  if (pose !== 'sit') {
+  // Reset shared mount/sit offsets cleanly on every pose transition
+  rig.bodyPivot.position.x = 0;
+  rig.bodyPivot.position.z = 0;
+  rig.bodyPivot.rotation.y = 0;
+  rig.headPivot.rotation.y = 0;
+  rig.leftArm.position.z = 0;
+  rig.rightArm.position.z = 0;
+  rig.leftArm.rotation.y = 0;
+  rig.rightArm.rotation.y = 0;
+  if (rig.leftElbow) {
+    rig.leftElbow.rotation.y = 0;
+    rig.leftElbow.rotation.z = -HAND_POSES.none.elbowZ;
+  }
+  if (rig.rightElbow) {
+    rig.rightElbow.rotation.y = 0;
+    rig.rightElbow.rotation.z = HAND_POSES[hold].elbowZ;
+  }
+
+  if (pose !== 'sit' && pose !== 'bath' && !isBikePose) {
     rig.leftLeg.position.z = 0;
     rig.rightLeg.position.z = 0;
     if (rig.skirtPivot) {
@@ -3328,9 +3479,25 @@ export function updateAvatarRigAnimation(
         }
       }
     }
+  } else if (isBikePose) {
+    rig.leftLeg.position.z = 0.008;
+    rig.rightLeg.position.z = 0.008;
+    if (rig.skirtPivot) {
+      rig.skirtPivot.rotation.x = 0;
+      rig.skirtPivot.position.set(0, -0.158, 0);
+      rig.skirtPivot.scale.set(1, 1, 1);
+    }
+    if (rig.skirtDeformMeshes) {
+      for (let i = 0; i < rig.skirtDeformMeshes.length; i++) {
+        const pair = rig.skirtDeformMeshes[i];
+        if (pair.mesh.geometry !== pair.bikeGeo) {
+          pair.mesh.geometry = pair.bikeGeo;
+        }
+      }
+    }
   }
 
-  if (pose !== 'parachute') {
+  if (pose !== 'parachute' && !isSkatePose && !isBikePose) {
     rig.bodyPivot.rotation.z = 0;
     rig.leftArm.rotation.z =
       (rig.leftArm.userData.baseZ as number | undefined) ?? -HAND_POSES.none.armZ;
@@ -3544,10 +3711,9 @@ export function updateAvatarRigAnimation(
     const breath01 = 0.5 + 0.5 * sitBreath;
 
     // Unified natural sitting posture across all skirts, shorts, and trousers:
-    // level horizontal thighs resting squarely on bench, knees bent cleanly downward,
-    // and skirt meshes swapped to seated-drape geometry instead of tilting a stiff cone
-    rig.leftLeg.position.z = 0.036;
-    rig.rightLeg.position.z = 0.036;
+    // keep hip spheres docked cleanly inside pelvis bridge (z = 0.008) so no staircase lip forms at waist
+    rig.leftLeg.position.z = 0.008;
+    rig.rightLeg.position.z = 0.008;
     rig.leftLeg.rotation.x = -1.38;
     rig.rightLeg.rotation.x = -1.38;
     rig.leftLeg.rotation.z = -0.02;
@@ -3599,8 +3765,8 @@ export function updateAvatarRigAnimation(
     const bathBreath = Math.sin(elapsed * 1.65);
     const breath01 = 0.5 + 0.5 * bathBreath;
 
-    rig.leftLeg.position.z = 0.036;
-    rig.rightLeg.position.z = 0.036;
+    rig.leftLeg.position.z = 0.008;
+    rig.rightLeg.position.z = 0.008;
     rig.leftLeg.rotation.x = -1.46;
     rig.rightLeg.rotation.x = -1.46;
     rig.leftLeg.rotation.z = -0.02;
@@ -3687,6 +3853,154 @@ export function updateAvatarRigAnimation(
     if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
     rig.headPivot.position.y = HEAD_PIVOT_Y;
     rig.headPivot.rotation.set(0.08, 0, -sway * 0.4);
+  } else if (pose === 'skate_idle') {
+    // Cool standing stance beside upright forward-facing skateboard: left hand rests lightly on top nose!
+    const breath = Math.sin(elapsed * 2.1);
+
+    rig.bodyPivot.position.set(0.06, -0.002 + breath * 0.004, -0.02);
+    rig.bodyPivot.rotation.set(0.02, -0.24, 0);
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.headPivot.rotation.set(0.02 + breath * 0.015, 0.22, -0.02);
+
+    // Left hand (-X side) rests behind/atop the upright skateboard rim with zero cuff/palm poking through front face
+    rig.leftArm.rotation.set(-1.16, 0, -0.2);
+    if (rig.leftElbow) rig.leftElbow.rotation.set(-0.34, 0, 0.05);
+
+    rig.rightArm.rotation.set(0.18, 0, 0.36);
+    if (rig.rightElbow) rig.rightElbow.rotation.set(-0.9, 0, -0.05);
+
+    rig.leftLeg.rotation.set(-0.08, 0, -0.04);
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.1;
+    rig.rightLeg.rotation.set(0.06, 0, 0.05);
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.04;
+  } else if (pose === 'skate_ride' || pose === 'skate_push') {
+    const pushPhase = pose === 'skate_push' ? THREE.MathUtils.clamp(mountAnim?.pushPhase ?? 0, 0, 1) : 0;
+    const isPushing = pose === 'skate_push' && pushPhase > 0.001;
+    const carveSway = Math.sin(elapsed * 4.2) * 0.04;
+    // Smooth curve: 0..0.24 crouch & drop push foot beside deck, 0.24..0.72 kick backward (-Z), 0.72..1 lift back onto deck
+    let pushSwing = 0;
+    let pushDrop = 0;
+    if (isPushing) {
+      if (pushPhase < 0.24) {
+        const t = pushPhase / 0.24;
+        pushDrop = Math.sin(t * (Math.PI * 0.5));
+        pushSwing = THREE.MathUtils.lerp(0, 0.45, t);
+      } else if (pushPhase < 0.72) {
+        const t = (pushPhase - 0.24) / 0.48;
+        pushDrop = 1 - Math.max(0, (t - 0.8) / 0.2) * 0.35;
+        pushSwing = THREE.MathUtils.lerp(0.45, -0.52, Math.sin(t * (Math.PI * 0.5)));
+      } else {
+        const t = (pushPhase - 0.72) / 0.28;
+        pushDrop = THREE.MathUtils.lerp(0.65, 0, t);
+        pushSwing = THREE.MathUtils.lerp(-0.52, 0, t);
+      }
+    }
+
+    const crouchBounce = Math.sin(elapsed * 6.4) * 0.006;
+    const bodyY = THREE.MathUtils.lerp(0.104, 0.042, pushDrop) + crouchBounce;
+    rig.bodyPivot.position.set(0, bodyY, 0);
+    rig.bodyPivot.rotation.set(0.015 + pushDrop * 0.035, -1.36, carveSway);
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.headPivot.rotation.set(-0.03, 1.24, -carveSway * 0.6);
+
+    // Front (+Z world) foot stays planted flush on deck; during push, knee bends deeper as body lowers
+    rig.rightLeg.rotation.set(
+      THREE.MathUtils.lerp(-0.32, -0.82, pushDrop),
+      0,
+      THREE.MathUtils.lerp(0.16, 0.24, pushDrop),
+    );
+    if (rig.rightKnee) {
+      rig.rightKnee.rotation.x = THREE.MathUtils.lerp(0.62, 1.26, pushDrop);
+    }
+
+    if (isPushing) {
+      // With rotY = -1.36, -rotation.x steps foot off deck onto -X side; +rotation.z sweeps leg backward along -Z travel!
+      rig.leftLeg.rotation.set(
+        THREE.MathUtils.lerp(-0.32, -0.28, pushDrop),
+        0,
+        THREE.MathUtils.lerp(-0.16, -0.04 + pushSwing * 0.65, pushDrop),
+      );
+      if (rig.leftKnee) {
+        rig.leftKnee.rotation.x = THREE.MathUtils.lerp(
+          0.62,
+          0.04 + Math.max(0, -pushSwing) * 0.16,
+          pushDrop,
+        );
+      }
+    } else {
+      rig.leftLeg.rotation.set(-0.32, 0, -0.16);
+      if (rig.leftKnee) rig.leftKnee.rotation.x = 0.62;
+    }
+
+    const armPump = isPushing ? pushSwing * 0.44 : Math.sin(elapsed * 4.2) * 0.08;
+    rig.leftArm.rotation.set(-0.18 - armPump, 0, -0.58 - carveSway * 0.8);
+    rig.rightArm.rotation.set(-0.28 + armPump, 0, 0.55 - carveSway * 0.8);
+    if (rig.leftElbow) rig.leftElbow.rotation.set(-0.4, 0, 0.1);
+    if (rig.rightElbow) rig.rightElbow.rotation.set(-0.38, 0, -0.1);
+  } else if (pose === 'bike_idle' || pose === 'bike_ride') {
+    const crankAngle = mountAnim?.crankAngle ?? 0.35;
+    const steerAngle = mountAnim?.steerAngle ?? 0;
+    const idleBlend = THREE.MathUtils.clamp(
+      mountAnim?.idleBlend ?? (pose === 'bike_idle' ? 1 : 0),
+      0,
+      1,
+    );
+
+    const bodyPitch = 0.19;
+    const bodyY = 0.19;
+    const bodyZ = -0.21;
+    const rollZ = steerAngle * 0.14 * (1 - idleBlend);
+    const breath = idleBlend > 0.01 ? Math.sin(elapsed * 2.0) * 0.004 * idleBlend : 0;
+
+    rig.bodyPivot.position.set(0, bodyY + breath, bodyZ);
+    rig.bodyPivot.rotation.set(bodyPitch, 0, rollZ);
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.headPivot.rotation.set(-bodyPitch * 0.75 + breath * 1.5, steerAngle * 0.34, -rollZ * 0.45);
+
+    // Hands smoothly grip enlarged cruiser leather handlebar sleeves cleanly
+    rig.leftArm.rotation.set(-0.84 + steerAngle * 0.22, 0, -0.04);
+    rig.rightArm.rotation.set(-0.84 - steerAngle * 0.22, 0, 0.04);
+    if (rig.leftElbow) rig.leftElbow.rotation.set(-0.42, 0, 0.05);
+    if (rig.rightElbow) rig.rightElbow.rotation.set(-0.42, 0, -0.05);
+
+    // 2-bone IK from hip to exact pedal coordinates (CRANK_Y = 0.28, CRANK_Z = -0.01, CRANK_R = 0.075)
+    const L1 = 0.215;
+    const L2 = 0.286;
+    const hipY = bodyY + breath + 0.52 * Math.cos(bodyPitch);
+    const hipZ = bodyZ + 0.52 * Math.sin(bodyPitch) + 0.008 * Math.cos(bodyPitch);
+    const solvePedalLeg = (
+      legGroup: THREE.Group,
+      kneeGroup: THREE.Group | undefined,
+      targetY: number,
+      targetZ: number,
+      splayZ: number,
+    ) => {
+      const dy = targetY + 0.01 - hipY;
+      const dz = targetZ - 0.036 - hipZ;
+      const d = THREE.MathUtils.clamp(Math.hypot(dy, dz), 0.14, L1 + L2 - 0.008);
+      const phiTarget = Math.atan2(dz, -dy);
+      const cosA = THREE.MathUtils.clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -0.985, 0.985);
+      const phiThigh = phiTarget + Math.acos(cosA);
+      const cosB = THREE.MathUtils.clamp((L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2), -0.985, 0.985);
+      const kneeFlex = Math.PI - Math.acos(cosB);
+      legGroup.rotation.set(-(phiThigh + bodyPitch), 0, splayZ);
+      if (kneeGroup) kneeGroup.rotation.x = kneeFlex;
+    };
+
+    const CRANK_Y = 0.28;
+    const CRANK_Z = -0.01;
+    const CRANK_R = 0.075;
+    const p1Y = CRANK_Y + CRANK_R * Math.cos(crankAngle);
+    const p1Z = CRANK_Z + CRANK_R * Math.sin(crankAngle);
+    const p2Y = CRANK_Y - CRANK_R * Math.cos(crankAngle);
+    const p2Z = CRANK_Z - CRANK_R * Math.sin(crankAngle);
+
+    // Keep both feet comfortably seated on their pedals in both ride and kickstand-parked idle!
+    solvePedalLeg(rig.rightLeg, rig.rightKnee, p1Y, p1Z, 0.04);
+    solvePedalLeg(rig.leftLeg, rig.leftKnee, p2Y, p2Z, -0.04);
   } else {
     // Gentle breathing Idle: subtle body bob & soft breathing rhythm
     const breathPhase = elapsed * 2.15;

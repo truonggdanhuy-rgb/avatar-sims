@@ -1,13 +1,11 @@
 import React, {useEffect, useState} from 'react';
 import {
   ArrowLeft,
-  ArrowUp,
   BookOpen,
   ClipboardList,
   CloudSun,
   Coins,
   Database,
-  Gamepad2,
   Gift,
   Heart,
   Home,
@@ -57,12 +55,8 @@ interface PhoneMenuModalProps {
   insectDex: Partial<Record<InsectSpeciesId, InsectDexRecord>>;
   accountCreatedAt: number;
   accountId: string;
-  showJoystick: boolean;
-  showJumpButton: boolean;
   teleportCooldownSec: number;
   initialTab?: 'menu' | 'account' | 'guide' | 'fishdex';
-  onToggleJoystick: () => void;
-  onToggleJumpButton: () => void;
   onTeleportToPlaza: () => void;
   onOpenWardrobe: () => void;
   onOpenDailyQuests: () => void;
@@ -115,12 +109,8 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   insectDex,
   accountCreatedAt,
   accountId,
-  showJoystick,
-  showJumpButton,
   teleportCooldownSec,
   initialTab = 'menu',
-  onToggleJoystick,
-  onToggleJumpButton,
   onTeleportToPlaza,
   onOpenWardrobe,
   onOpenDailyQuests,
@@ -469,46 +459,6 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                       <VolumeX className="h-3.5 w-3.5 text-[#8A7562]" />
                     )}
                     <span>{soundEnabled ? 'Âm Bật' : 'Âm Tắt'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundFX.tap();
-                      onToggleJoystick();
-                    }}
-                    className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border px-2 py-1.5 text-[11px] font-bold transition-transform active:scale-95 ${
-                      showJoystick
-                        ? 'border-[#54A773] bg-[#EAF7EF] text-[#25603B]'
-                        : 'border-[#E0CEB6] bg-white text-[#7A6652]'
-                    }`}
-                  >
-                    <Gamepad2
-                      className={`h-3.5 w-3.5 ${
-                        showJoystick ? 'text-[#398E59]' : 'text-[#9A846E]'
-                      }`}
-                    />
-                    <span>{showJoystick ? 'Joystick: Bật' : 'Ẩn joystick'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundFX.tap();
-                      onToggleJumpButton();
-                    }}
-                    className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border px-2 py-1.5 text-[11px] font-bold transition-transform active:scale-95 ${
-                      showJumpButton
-                        ? 'border-[#3C95AD] bg-[#E8F6FA] text-[#1E5D70]'
-                        : 'border-[#E0CEB6] bg-white text-[#7A6652]'
-                    }`}
-                  >
-                    <ArrowUp
-                      className={`h-3.5 w-3.5 ${
-                        showJumpButton ? 'text-[#2E8299]' : 'text-[#9A846E]'
-                      }`}
-                    />
-                    <span>{showJumpButton ? 'Nút Nhảy: Bật' : 'Ẩn nhảy'}</span>
                   </button>
                 </div>
               </div>

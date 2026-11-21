@@ -13,12 +13,15 @@ import {
   BbqFoodId,
   BugNetState,
   FishingRodState,
+  MountId,
+  OwnedMountsState,
   OwnedPetState,
   PetSupplies,
   PetSupplyId,
   RecipeId,
   WoodenBoatState,
 } from '../../types/game';
+import {MOUNT_CATALOG, MOUNT_RANK_META} from '../../data/mountCatalog';
 import {
   getPetXpForNextLevel,
   isPetTooHungry,
@@ -45,9 +48,11 @@ import {BBQ_FOOD_LIST, VENDING_DRINK_LIST} from '../../data/foodCatalog';
 import {HandheldFoodIcon} from './VendingMachineModal';
 import {soundFX} from '../../utils/sound';
 import {
+  BicycleMountIcon,
   MountCarIcon,
   PetCatFaceIcon,
   RodAndNetIcon,
+  SkateboardMountIcon,
   WoodenBoatIcon,
   WoodenRodIcon,
 } from '../FishingIcons';
@@ -60,6 +65,7 @@ interface BackpackModalProps {
   fishingRod: FishingRodState;
   bugNet: BugNetState;
   woodenBoat: WoodenBoatState;
+  ownedMounts: OwnedMountsState;
   ownedPets: OwnedPetState[];
   activePetId: string | null;
   petSupplies: PetSupplies;
@@ -70,6 +76,7 @@ interface BackpackModalProps {
   onToggleEquipRod: () => void;
   onToggleEquipNet: () => void;
   onToggleEquipFood: (foodId: BbqFoodId) => void;
+  onToggleMount: (mountId: MountId) => void;
   onToggleSummonPet: (petId: string) => void;
   onRenamePet: (petId: string, newName: string) => void;
   onUsePetSupply: (petId: string, supplyId: PetSupplyId) => {ok: boolean; message: string};
@@ -80,6 +87,7 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
   fishingRod,
   bugNet,
   woodenBoat,
+  ownedMounts,
   ownedPets,
   activePetId,
   petSupplies,
@@ -90,6 +98,7 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
   onToggleEquipRod,
   onToggleEquipNet,
   onToggleEquipFood,
+  onToggleMount,
   onToggleSummonPet,
   onRenamePet,
   onUsePetSupply,
@@ -239,8 +248,17 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                     }}
                     className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-3 transition hover:border-[#4F8FB5] active:scale-95"
                   >
+                    {ownedMounts.activeMountId ? (
+                      <span className="absolute -top-1.5 right-1 rounded-full bg-[#2E9467] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
+                        Đang cưỡi
+                      </span>
+                    ) : ownedMounts.ownedIds.length > 0 ? (
+                      <span className="absolute -top-1.5 right-1 rounded-full bg-[#2E82A8] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
+                        {ownedMounts.ownedIds.length} xe
+                      </span>
+                    ) : null}
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
-                      <MountCarIcon className="h-10 w-10" />
+                      <SkateboardMountIcon className="h-10 w-10" />
                     </div>
                     <span className="text-xs font-extrabold text-[#4A3525]">Cưỡi</span>
                   </button>
@@ -1144,17 +1162,95 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
           })()}
 
           {bagSubTab === 'mounts' && (
-            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#BBD6EA] bg-[#F2F8FC] p-5 text-center">
-              <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#CCE2F2] bg-white shadow-xs">
-                <MountCarIcon className="h-12 w-12" />
+            <div className="space-y-2.5">
+              {ownedMounts.ownedIds.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#BBD6EA] bg-[#F2F8FC] p-5 text-center">
+                  <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#CCE2F2] bg-white shadow-xs">
+                    <SkateboardMountIcon className="h-12 w-12" />
+                  </div>
+                  <div className="text-sm font-black text-[#2C5370]">Chưa Có Phương Tiện Cưỡi</div>
+                  <p className="mt-1.5 text-xs font-semibold leading-relaxed text-[#577994]">
+                    Ghé <b>May Mall (Tầng 1)</b> gặp <b>Tun</b> để mua <b>Ván Trượt Mây (Hạng B ·
+                    220 Xu)</b> hoặc <b>Xe Đạp Cổ Điển (Hạng B · 320 Xu)</b> chạy nhanh hơn đi bộ!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {ownedMounts.ownedIds.map((mid) => {
+                    const def = MOUNT_CATALOG[mid];
+                    if (!def) return null;
+                    const rankMeta = MOUNT_RANK_META[def.rank];
+                    const isActive = ownedMounts.activeMountId === mid;
+                    return (
+                      <div
+                        key={mid}
+                        className={`rounded-2xl border-2 p-3.5 space-y-2.5 transition ${
+                          isActive
+                            ? 'border-[#3CA374] bg-[#F4FFF8]'
+                            : 'border-[#E3D1B2] bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-13 w-13 shrink-0 items-center justify-center rounded-xl border border-[#DCEBF5] bg-[#F4F9FD]">
+                            {def.kind === 'skateboard' ? (
+                              <SkateboardMountIcon className="h-11 w-11" />
+                            ) : (
+                              <BicycleMountIcon className="h-11 w-11" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-sm font-black text-[#3B2A1A]">{def.name}</span>
+                              <span
+                                className={`rounded-md border px-1.5 py-0.5 text-[9px] font-black ${rankMeta.badgeBg} ${rankMeta.badgeText} ${rankMeta.badgeBorder}`}
+                              >
+                                Hạng {rankMeta.shortTag}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-[11px] font-semibold text-[#6F583E]">
+                              Tốc độ x{def.speedMultiplier.toFixed(2)} đi bộ · {def.description}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFX.tap();
+                            onToggleMount(mid);
+                            if (!isActive) {
+                              onClose();
+                            }
+                          }}
+                          className={`w-full rounded-xl py-2.5 text-xs font-black text-white transition active:scale-98 ${
+                            isActive
+                              ? 'bg-[#6F7B86] hover:bg-[#5B6670]'
+                              : 'bg-[#2E9467] hover:bg-[#247953]'
+                          }`}
+                        >
+                          {isActive ? 'Xuống phương tiện (Cất vào túi)' : 'Lấy ra cưỡi ngay'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2.5 rounded-2xl border border-[#ECD39B] bg-[#FFF8E6] p-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#F0D59A] bg-white">
+                  <MountCarIcon className="h-8 w-8" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-[#69320E]">
+                    <span>Siêu Xe &amp; Thú Cưỡi Hạng S</span>
+                    <span className="rounded border border-[#E68A1E] bg-[#FFE596] px-1.5 py-0.5 text-[9px] font-black text-[#5C2507]">
+                      Hạng S
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-semibold text-[#8A5A2B]">
+                    Tốc độ siêu nhanh — đang trưng bày xem trước tại sảnh May Mall, sắp mở bán!
+                  </p>
+                </div>
               </div>
-              <div className="text-sm font-black text-[#2C5370]">Phương Tiện Cưỡi &amp; Xe</div>
-              <span className="mt-1 rounded-full bg-[#DCEEFB] px-2.5 py-0.5 text-[10px] font-extrabold text-[#2B6894]">
-                Sắp ra mắt
-              </span>
-              <p className="mt-2 text-xs font-semibold leading-relaxed text-[#577994]">
-                Các loại xe đạp, xe hơi mini và thú cưỡi sẽ được mở bán ở bản cập nhật sắp tới!
-              </p>
             </div>
           )}
         </div>

@@ -15,11 +15,13 @@ import {PetAdoptModal} from './components/modals/PetAdoptModal';
 import {PetSupplyShopModal} from './components/modals/PetSupplyShopModal';
 import {SettingsModal} from './components/modals/SettingsModal';
 import {ShipShopModal} from './components/modals/ShipShopModal';
+import {TunShopModal} from './components/modals/TunShopModal';
 import {WardrobeModal} from './components/modals/WardrobeModal';
 import {KoiShopModal} from './components/modals/KoiShopModal';
 import {BbqGrillModal} from './components/modals/BbqGrillModal';
 import {VendingMachineModal} from './components/modals/VendingMachineModal';
 import {WorldCanvas} from './components/WorldCanvas';
+import {createInitialOwnedMounts, MOUNT_CATALOG} from './data/mountCatalog';
 import {DEFAULT_AVATAR, SHOP_ITEMS, STARTER_OWNED_IDS} from './data/avatarCatalog';
 import {
   BBQ_FOOD_CATALOG,
@@ -133,6 +135,8 @@ import {
   KitchenLevel,
   LivestockAnimalState,
   MillJob,
+  MountId,
+  OwnedMountsState,
   OwnedPetState,
   PetSpeciesId,
   PetSupplies,
@@ -351,6 +355,7 @@ export default function App() {
   const [farmShopOpen, setFarmShopOpen] = useState(false);
   const [koiShopOpen, setKoiShopOpen] = useState(false);
   const [shipShopOpen, setShipShopOpen] = useState(false);
+  const [tunShopOpen, setTunShopOpen] = useState(false);
   const [petSupplyShopOpen, setPetSupplyShopOpen] = useState(false);
   const [petAdoptOpen, setPetAdoptOpen] = useState(false);
   const [bbqGrillOpen, setBbqGrillOpen] = useState(false);
@@ -1039,30 +1044,40 @@ export default function App() {
     return base;
   });
 
-  const [showJoystick, setShowJoystick] = useState<boolean>(() => {
+  const [ownedMounts, setOwnedMounts] = useState<OwnedMountsState>(() => {
+    const base = createInitialOwnedMounts();
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.showJoystick === true;
+        if (parsed.ownedMounts && typeof parsed.ownedMounts === 'object') {
+          const rawOwned = Array.isArray(parsed.ownedMounts.ownedIds)
+            ? parsed.ownedMounts.ownedIds.filter(
+                (id: unknown): id is MountId => typeof id === 'string' && id in MOUNT_CATALOG,
+              )
+            : [];
+          const dedupOwned = Array.from(new Set(rawOwned)) as MountId[];
+          const active =
+            typeof parsed.ownedMounts.activeMountId === 'string' &&
+            dedupOwned.includes(parsed.ownedMounts.activeMountId as MountId)
+              ? (parsed.ownedMounts.activeMountId as MountId)
+              : null;
+          const last =
+            typeof parsed.ownedMounts.lastMountId === 'string' &&
+            dedupOwned.includes(parsed.ownedMounts.lastMountId as MountId)
+              ? (parsed.ownedMounts.lastMountId as MountId)
+              : (dedupOwned[0] ?? null);
+          return {
+            ownedIds: dedupOwned,
+            activeMountId: active,
+            lastMountId: last,
+          };
+        }
       }
     } catch {
       // ignore storage errors
     }
-    return false;
-  });
-
-  const [showJumpButton, setShowJumpButton] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.showJumpButton === true;
-      }
-    } catch {
-      // ignore storage errors
-    }
-    return false;
+    return base;
   });
 
   const [redeemedCodes, setRedeemedCodes] = useState<string[]>(() => {
@@ -1544,8 +1559,7 @@ export default function App() {
             insectDex,
             accountCreatedAt,
             accountId,
-            showJoystick,
-            showJumpButton,
+            ownedMounts,
             redeemedCodes,
             ownedPets,
             activePetId,
@@ -1596,8 +1610,7 @@ export default function App() {
     insectDex,
     accountCreatedAt,
     accountId,
-    showJoystick,
-    showJumpButton,
+    ownedMounts,
     redeemedCodes,
     ownedPets,
     activePetId,
@@ -1637,6 +1650,9 @@ export default function App() {
     if (next !== 'town') {
       setShipShopOpen(false);
       setBbqGrillOpen(false);
+    }
+    if (next !== 'mall') {
+      setTunShopOpen(false);
     }
     if (next !== 'petshop') {
       setPetSupplyShopOpen(false);
@@ -2359,6 +2375,46 @@ export default function App() {
     });
   };
 
+  const handleBuyMount = (mountId: MountId) => {
+    const def = MOUNT_CATALOG[mountId];
+    if (!def || ownedMounts.ownedIds.includes(mountId) || stats.coins < def.price) return;
+    soundFX.sparkle();
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - def.price,
+      mood: Math.min(100, prev.mood + 8),
+    }));
+    setOwnedMounts((prev) => ({
+      ownedIds: prev.ownedIds.includes(mountId) ? prev.ownedIds : [...prev.ownedIds, mountId],
+      activeMountId: mountId,
+      lastMountId: mountId,
+    }));
+    setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    setEquippedFoodId(null);
+    setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
+  };
+
+  const handleToggleMount = (mountId: MountId) => {
+    if (!ownedMounts.ownedIds.includes(mountId)) return;
+    const willMount = ownedMounts.activeMountId !== mountId;
+    setOwnedMounts((prev) => ({
+      ...prev,
+      activeMountId: willMount ? mountId : null,
+      lastMountId: mountId,
+    }));
+    if (willMount) {
+      setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setEquippedFoodId(null);
+      setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
+    }
+  };
+
+  const handleDismountMount = () => {
+    setOwnedMounts((prev) => (prev.activeMountId ? {...prev, activeMountId: null} : prev));
+  };
+
   const handleRepairFishingRod = () => {
     if (!fishingRod.owned || fishingRod.durability >= fishingRod.maxDurability) return false;
     const cost = getRodRepairCost(fishingRod.durability, fishingRod.maxDurability);
@@ -2379,10 +2435,11 @@ export default function App() {
     if (!fishingRod.owned) return;
     const nextEquipped = !fishingRod.equipped;
     setFishingRod((prev) => ({...prev, equipped: nextEquipped}));
-    // Stowing bug net, handheld food & fashion item back when equipping fishing rod
+    // Stowing bug net, handheld food, mount & fashion item back when equipping fishing rod
     if (nextEquipped) {
       setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
       setEquippedFoodId(null);
+      setOwnedMounts((prev) => (prev.activeMountId ? {...prev, activeMountId: null} : prev));
       setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
     }
   };
@@ -2564,6 +2621,7 @@ export default function App() {
     if (nextEquipped) {
       setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
       setEquippedFoodId(null);
+      setOwnedMounts((prev) => (prev.activeMountId ? {...prev, activeMountId: null} : prev));
       setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
     }
   };
@@ -2728,6 +2786,7 @@ export default function App() {
     }
     setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
     setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    setOwnedMounts((prev) => (prev.activeMountId ? {...prev, activeMountId: null} : prev));
     setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
     setEquippedFoodId(foodId);
   };
@@ -3214,9 +3273,7 @@ export default function App() {
         editFurnitureMode={editFurnitureMode}
         selectedFurnitureId={selectedFurnitureId}
         homeSpotRef={homeSpotRef}
-        showJoystick={showJoystick}
-        showJumpButton={showJumpButton}
-        onEnableJoystick={() => setShowJoystick(true)}
+        ownedMounts={ownedMounts}
         teleportToPlazaPulse={teleportToPlazaPulse}
         activePet={activePet}
         carriedPetId={effectiveCarriedPetId}
@@ -3236,6 +3293,9 @@ export default function App() {
         onOpenShop={() => setBoutiqueOpen(true)}
         onOpenKoiShop={() => setKoiShopOpen(true)}
         onOpenShipShop={() => setShipShopOpen(true)}
+        onOpenTunShop={() => setTunShopOpen(true)}
+        onToggleMount={handleToggleMount}
+        onDismountMount={handleDismountMount}
         onOpenFurnitureShop={() => setFurnitureShopOpen(true)}
         onOpenPetSupplyShop={() => setPetSupplyShopOpen(true)}
         onOpenPetAdopt={() => setPetAdoptOpen(true)}
@@ -3472,6 +3532,21 @@ export default function App() {
         />
       )}
 
+      {zone === 'mall' && tunShopOpen && (
+        <TunShopModal
+          coins={stats.coins}
+          ownedMounts={ownedMounts}
+          onBuyMount={handleBuyMount}
+          onToggleMount={handleToggleMount}
+          onOpenBagMounts={() => {
+            setTunShopOpen(false);
+            setBagInitialSubTab('mounts');
+            setBagOpen(true);
+          }}
+          onClose={() => setTunShopOpen(false)}
+        />
+      )}
+
       {boutiqueOpen && (
         <BoutiqueModal
           avatar={avatar}
@@ -3506,6 +3581,7 @@ export default function App() {
           fishingRod={fishingRod}
           bugNet={bugNet}
           woodenBoat={woodenBoat}
+          ownedMounts={ownedMounts}
           ownedPets={ownedPets}
           activePetId={activePetId}
           petSupplies={petSupplies}
@@ -3516,6 +3592,7 @@ export default function App() {
           onToggleEquipRod={handleToggleEquipRod}
           onToggleEquipNet={handleToggleEquipNet}
           onToggleEquipFood={handleToggleEquipFood}
+          onToggleMount={handleToggleMount}
           onToggleSummonPet={handleToggleSummonPet}
           onRenamePet={handleRenamePet}
           onUsePetSupply={handleUsePetSupply}
@@ -3537,12 +3614,8 @@ export default function App() {
           insectDex={insectDex}
           accountCreatedAt={accountCreatedAt}
           accountId={accountId}
-          showJoystick={showJoystick}
-          showJumpButton={showJumpButton}
           teleportCooldownSec={teleportCooldownSec}
           initialTab={phoneInitialTab}
-          onToggleJoystick={() => setShowJoystick((prev) => !prev)}
-          onToggleJumpButton={() => setShowJumpButton((prev) => !prev)}
           onTeleportToPlaza={handleTeleportToPlaza}
           onOpenWardrobe={() => {
             setPhoneOpen(false);
