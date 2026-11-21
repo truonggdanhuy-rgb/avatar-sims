@@ -59,6 +59,7 @@ export interface AvatarRig {
   rodBobber?: THREE.Object3D;
   rodLine?: THREE.Object3D;
   heldPetRig?: PetRig;
+  headTopAbovePivot: number;
 }
 
 function shadeHex(hex: string, factor: number): THREE.Color {
@@ -2966,6 +2967,12 @@ export function buildAvatarRig(
     }
   }
 
+  root.updateMatrixWorld(true);
+  const headBounds = new THREE.Box3().setFromObject(headPivot);
+  const headTopAbovePivot = Number.isFinite(headBounds.max.y)
+    ? Math.max(0.28, headBounds.max.y - HEAD_PIVOT_Y)
+    : 0.42;
+
   makeShadowed(root, true, true);
   shadowDisc.castShadow = false;
 
@@ -2997,6 +3004,7 @@ export function buildAvatarRig(
     rodBobber: rodBobberObj,
     rodLine: rodLineObj,
     heldPetRig,
+    headTopAbovePivot,
   };
 }
 
@@ -3373,6 +3381,34 @@ export function updateAvatarRigAnimation(
     rig.bodyPivot.rotation.x = -Math.PI / 2;
     rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = 0;
+  } else if (pose === 'play_pet') {
+    const wave = Math.sin(elapsed * 11);
+    const waveOpp = Math.sin(elapsed * 11 + Math.PI * 0.85);
+    rig.leftLeg.rotation.x = -0.1;
+    rig.rightLeg.rotation.x = 0.08;
+    rig.leftLeg.rotation.z = 0;
+    rig.rightLeg.rotation.z = 0;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.16;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.14;
+
+    if (hold === 'carry_pet_arms') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_pet_arms.armX + wave * 0.05;
+      rig.rightArm.rotation.x = HAND_POSES.carry_pet_arms.armX + wave * 0.05;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_pet_arms.elbowX;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_pet_arms.elbowX;
+    } else {
+      rig.leftArm.rotation.x = -0.84 + wave * 0.24;
+      rig.rightArm.rotation.x = -0.84 + waveOpp * 0.24;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = -0.58 + Math.cos(elapsed * 11) * 0.26;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = -0.58 - Math.cos(elapsed * 11) * 0.26;
+    }
+
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.bodyPivot.position.y = -0.025 + Math.abs(Math.sin(elapsed * 5.5)) * 0.014;
+    rig.bodyPivot.rotation.x = 0.16;
+    rig.headPivot.rotation.x = 0.12 + Math.sin(elapsed * 5.5) * 0.035;
+    rig.headPivot.rotation.z = Math.sin(elapsed * 3.5) * 0.045;
   } else {
     // Gentle breathing Idle: subtle body bob & soft breathing rhythm
     const breathPhase = elapsed * 2.15;

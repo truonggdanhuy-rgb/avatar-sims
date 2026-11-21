@@ -27,7 +27,7 @@ export interface PetRig {
   dispose: () => void;
 }
 
-function makeClay(hex: string, roughness = 0.7): THREE.MeshStandardMaterial {
+function makeClay(hex: string, roughness = 0.68): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     color: hex,
     roughness,
@@ -41,6 +41,100 @@ function makeGlossy(hex: string, roughness = 0.14): THREE.MeshStandardMaterial {
     roughness,
     metalness: 0.08,
   });
+}
+
+function createTeardropEarGeometry(): THREE.ExtrudeGeometry {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.014);
+  shape.bezierCurveTo(0.036, 0.012, 0.056, -0.032, 0.052, -0.088);
+  shape.bezierCurveTo(0.048, -0.132, 0.02, -0.15, 0, -0.146);
+  shape.bezierCurveTo(-0.024, -0.142, -0.044, -0.106, -0.038, -0.052);
+  shape.bezierCurveTo(-0.034, -0.012, -0.018, 0.014, 0, 0.014);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.018,
+    bevelEnabled: true,
+    bevelThickness: 0.008,
+    bevelSize: 0.008,
+    bevelSegments: 3,
+    curveSegments: 14,
+  });
+  geo.center();
+  return geo;
+}
+
+function createFeatherBladeGeometry(
+  length: number,
+  width: number,
+  thickness = 0.006,
+): THREE.ExtrudeGeometry {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.bezierCurveTo(width * 0.72, -length * 0.14, width * 0.92, -length * 0.62, width * 0.18, -length);
+  shape.bezierCurveTo(0, -length * 1.04, -width * 0.2, -length * 0.96, -width * 0.34, -length * 0.66);
+  shape.bezierCurveTo(-width * 0.42, -length * 0.3, -width * 0.25, -length * 0.06, 0, 0);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelThickness: thickness * 0.55,
+    bevelSize: thickness * 0.45,
+    bevelSegments: 2,
+    curveSegments: 10,
+  });
+  return geo;
+}
+
+function createSongbirdWing(
+  side: -1 | 1,
+  primaryMat: THREE.Material,
+  midMat: THREE.Material,
+  covertMat: THREE.Material,
+  accentMat: THREE.Material,
+  trackGeo: <T extends THREE.BufferGeometry>(g: T) => T,
+): THREE.Group {
+  const wingPivot = new THREE.Group();
+  wingPivot.position.set(side * 0.118, 0.182, 0.02);
+
+  // Smooth anatomical airfoil shoulder & upper covert base
+  const shoulderCap = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.052, 14, 12)), covertMat);
+  shoulderCap.scale.set(0.55, 0.78, 1.32);
+  shoulderCap.position.set(side * 0.018, 0.006, -0.022);
+  wingPivot.add(shoulderCap);
+
+  // Wing arm group pitched backward cleanly in flight & tucked at rest
+  const bladeCluster = new THREE.Group();
+  bladeCluster.rotation.x = Math.PI * 0.52;
+  bladeCluster.rotation.z = side * -0.14;
+  wingPivot.add(bladeCluster);
+
+  // Subtle pale sky wingbar stripe near upper edge
+  const barGeo = trackGeo(createFeatherBladeGeometry(0.115, 0.036, 0.005));
+  barGeo.rotateY(side * (Math.PI / 2));
+  const wingBar = new THREE.Mesh(barGeo, accentMat);
+  wingBar.position.set(side * 0.032, 0.01, -0.012);
+  wingBar.rotation.y = side * 0.18;
+  wingBar.rotation.x = 0.06;
+  bladeCluster.add(wingBar);
+
+  // Layered primary + secondary flight feathers fanning gracefully outward & back
+  const featherSpecs = [
+    {len: 0.145, w: 0.042, spread: 0.08, sweep: 0.12, yOff: 0.0, zOff: -0.006, mat: midMat},
+    {len: 0.175, w: 0.044, spread: 0.24, sweep: 0.04, yOff: -0.004, zOff: -0.01, mat: midMat},
+    {len: 0.198, w: 0.043, spread: 0.42, sweep: -0.04, yOff: -0.008, zOff: -0.014, mat: primaryMat},
+    {len: 0.212, w: 0.039, spread: 0.62, sweep: -0.12, yOff: -0.012, zOff: -0.018, mat: primaryMat},
+    {len: 0.195, w: 0.034, spread: 0.82, sweep: -0.18, yOff: -0.014, zOff: -0.022, mat: primaryMat},
+  ];
+
+  featherSpecs.forEach((f) => {
+    const geo = trackGeo(createFeatherBladeGeometry(f.len, f.w, 0.0045));
+    geo.rotateY(side * (Math.PI / 2));
+    const mesh = new THREE.Mesh(geo, f.mat);
+    mesh.position.set(side * (0.022 + Math.abs(f.yOff)), f.yOff, f.zOff);
+    mesh.rotation.z = side * -f.spread;
+    mesh.rotation.y = side * f.sweep;
+    bladeCluster.add(mesh);
+  });
+
+  return wingPivot;
 }
 
 export function buildPetModel(
@@ -87,7 +181,7 @@ export function buildPetModel(
     );
     shadowDisc = new THREE.Mesh(
       trackGeo(
-        new THREE.CircleGeometry((speciesId === 'blue_bird' ? 0.19 : 0.25) * scale, 20),
+        new THREE.CircleGeometry((speciesId === 'blue_bird' ? 0.2 : 0.26) * scale, 20),
       ),
       shMat,
     );
@@ -100,285 +194,319 @@ export function buildPetModel(
   bodyPivot.scale.setScalar(scale);
 
   if (speciesId === 'brown_puppy') {
-    const furMat = trackMat(makeClay('#C98249', 0.68));
-    const darkFurMat = trackMat(makeClay('#8F4E26', 0.72));
-    const creamMat = trackMat(makeClay('#FFF3DC', 0.72));
-    const collarMat = trackMat(makeClay('#E45B56', 0.52));
+    const furMat = trackMat(makeClay('#C77E43', 0.68));
+    const darkFurMat = trackMat(makeClay('#874822', 0.72));
+    const softTanMat = trackMat(makeClay('#DEA067', 0.7));
+    const creamMat = trackMat(makeClay('#FFF4DF', 0.72));
+    const collarMat = trackMat(makeClay('#E25652', 0.5));
     const bellMat = trackMat(makeGlossy('#F8CA44', 0.2));
-    const noseMat = trackMat(makeGlossy('#391E14', 0.16));
-    const eyeMat = trackMat(makeGlossy('#1C1411', 0.08));
+    const noseMat = trackMat(makeGlossy('#2F1810', 0.14));
+    const eyeMat = trackMat(makeGlossy('#19120F', 0.06));
     const glintMat = trackMat(new THREE.MeshBasicMaterial({color: '#FFFFFF'}));
     const blushMat = trackMat(makeClay('#F4978E', 0.78));
-    const tongueMat = trackMat(makeClay('#F27885', 0.6));
+    const tongueMat = trackMat(makeClay('#F27885', 0.58));
 
-    // Plump, rounded chibi torso & cozy hips
-    const torso = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.155, 20, 16)), furMat);
-    torso.scale.set(0.96, 0.92, 1.28);
-    torso.position.set(0, 0.22, -0.02);
+    // Sculpted Lathe torso for cohesive chest -> waist -> rounded rump profile
+    const torsoPts = [
+      new THREE.Vector2(0.001, -0.175),
+      new THREE.Vector2(0.088, -0.16),
+      new THREE.Vector2(0.132, -0.1),
+      new THREE.Vector2(0.136, 0.0),
+      new THREE.Vector2(0.142, 0.095),
+      new THREE.Vector2(0.116, 0.158),
+      new THREE.Vector2(0.001, 0.178),
+    ];
+    const torsoGeo = trackGeo(new THREE.LatheGeometry(torsoPts, 24));
+    torsoGeo.rotateX(Math.PI / 2);
+    const torso = new THREE.Mesh(torsoGeo, furMat);
+    torso.scale.set(0.98, 0.94, 1.06);
+    torso.position.set(0, 0.228, -0.015);
     bodyPivot.add(torso);
 
-    // Fluffy cloud-like chest ruff
-    const chestCenter = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.105, 16, 12)), creamMat);
-    chestCenter.scale.set(0.88, 0.96, 0.75);
-    chestCenter.position.set(0, 0.215, 0.092);
-    const chestFluffL = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.055, 12, 10)), creamMat);
-    chestFluffL.position.set(-0.048, 0.238, 0.125);
-    const chestFluffR = chestFluffL.clone();
-    chestFluffR.position.x = 0.048;
-    bodyPivot.add(chestCenter, chestFluffL, chestFluffR);
+    // Smooth neck bridge blending chest cleanly up into the puppy head
+    const neckBridge = new THREE.Mesh(
+      trackGeo(new THREE.CylinderGeometry(0.088, 0.108, 0.11, 18)),
+      furMat,
+    );
+    neckBridge.position.set(0, 0.305, 0.108);
+    neckBridge.rotation.x = 0.28;
+    bodyPivot.add(neckBridge);
 
-    // Cozy coral collar + shiny gold bell
+    // Soft contoured cream chest bib
+    const chestBib = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.094, 18, 14)), creamMat);
+    chestBib.scale.set(0.92, 1.08, 0.72);
+    chestBib.position.set(0, 0.228, 0.106);
+    const bellyPatch = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.102, 16, 12)), softTanMat);
+    bellyPatch.scale.set(0.84, 0.65, 1.25);
+    bellyPatch.position.set(0, 0.168, -0.005);
+    bodyPivot.add(chestBib, bellyPatch);
+
+    // Coral collar + golden bell tucked smoothly around neck bridge
     const collar = new THREE.Mesh(
-      trackGeo(new THREE.TorusGeometry(0.106, 0.022, 12, 24)),
+      trackGeo(new THREE.TorusGeometry(0.098, 0.02, 12, 24)),
       collarMat,
     );
-    collar.rotation.x = Math.PI / 2 - 0.36;
-    collar.position.set(0, 0.295, 0.09);
+    collar.rotation.x = Math.PI / 2 - 0.32;
+    collar.position.set(0, 0.312, 0.102);
     bodyPivot.add(collar);
 
     const bellRing = new THREE.Mesh(
-      trackGeo(new THREE.TorusGeometry(0.015, 0.005, 8, 14)),
+      trackGeo(new THREE.TorusGeometry(0.014, 0.0045, 8, 14)),
       bellMat,
     );
-    bellRing.position.set(0, 0.278, 0.186);
-    const bell = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.03, 12, 10)), bellMat);
-    bell.position.set(0, 0.252, 0.194);
+    bellRing.position.set(0, 0.292, 0.194);
+    const bell = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.028, 12, 10)), bellMat);
+    bell.position.set(0, 0.268, 0.202);
     bodyPivot.add(bellRing, bell);
 
-    // 4 cute stubby legs with soft round paws
-    const legOffsets: [number, number, number][] = [
-      [-0.088, 0.142, 0.095],
-      [0.088, 0.142, 0.095],
-      [-0.092, 0.142, -0.115],
-      [0.092, 0.142, -0.115],
+    // 4 sculpted puppy legs with subtle haunch taper + cream paws touching y = 0
+    const legSpecs: [number, number, number, boolean][] = [
+      [-0.084, 0.165, 0.094, false],
+      [0.084, 0.165, 0.094, false],
+      [-0.088, 0.165, -0.108, true],
+      [0.088, 0.165, -0.108, true],
     ];
-    for (const [lx, ly, lz] of legOffsets) {
+    for (const [lx, ly, lz, isHind] of legSpecs) {
       const legGroup = new THREE.Group();
       legGroup.position.set(lx, ly, lz);
-      const upperLeg = new THREE.Mesh(
-        trackGeo(new THREE.CapsuleGeometry(0.039, 0.068, 8, 12)),
+      if (isHind) {
+        const haunch = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.056, 12, 10)), furMat);
+        haunch.scale.set(0.84, 1.08, 1.15);
+        haunch.position.set(0, -0.016, -0.01);
+        legGroup.add(haunch);
+      }
+      const legLimb = new THREE.Mesh(
+        trackGeo(new THREE.CylinderGeometry(0.04, 0.033, 0.115, 14)),
         furMat,
       );
-      upperLeg.position.y = -0.048;
-      const paw = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.045, 12, 10)), creamMat);
-      paw.scale.set(0.96, 0.72, 1.16);
-      paw.position.set(0, -0.106, 0.014);
-      legGroup.add(upperLeg, paw);
+      legLimb.position.y = -0.072;
+      const paw = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.044, 14, 10)), creamMat);
+      paw.scale.set(0.92, 0.66, 1.18);
+      paw.position.set(0, -0.136, 0.014);
+      legGroup.add(legLimb, paw);
       bodyPivot.add(legGroup);
       legs.push(legGroup);
     }
 
-    // Fluffy curved puppy tail with creamy tip
-    tailPivot.position.set(0, 0.27, -0.18);
-    const tailBase = new THREE.Mesh(
-      trackGeo(new THREE.CapsuleGeometry(0.03, 0.082, 8, 12)),
+    // Curved tapering puppy tail with cream plume tip
+    tailPivot.position.set(0, 0.275, -0.175);
+    const tailShaft = new THREE.Mesh(
+      trackGeo(new THREE.CylinderGeometry(0.022, 0.032, 0.105, 12)),
       darkFurMat,
     );
-    tailBase.position.set(0, 0.052, -0.026);
-    tailBase.rotation.x = -0.62;
-    const tailCurl = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.04, 12, 10)), darkFurMat);
-    tailCurl.position.set(0, 0.092, -0.056);
-    const tailTip = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.038, 12, 10)), creamMat);
-    tailTip.position.set(0, 0.122, -0.068);
-    tailPivot.add(tailBase, tailCurl, tailTip);
+    tailShaft.position.set(0, 0.048, -0.026);
+    tailShaft.rotation.x = -0.58;
+    const tailTip = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.034, 12, 10)), creamMat);
+    tailTip.scale.set(0.9, 1.25, 0.9);
+    tailTip.position.set(0, 0.105, -0.058);
+    tailPivot.add(tailShaft, tailTip);
     bodyPivot.add(tailPivot);
 
-    // Big round expressive chibi head
-    headPivot.position.set(0, 0.375, 0.128);
-    const head = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.156, 22, 18)), furMat);
-    head.scale.set(1.06, 0.96, 1.0);
+    // Sculpted puppy cranium + protruding snout + soft brow + teardrop floppy ears
+    headPivot.position.set(0, 0.39, 0.132);
+    const head = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.148, 24, 18)), furMat);
+    head.scale.set(1.04, 0.96, 1.02);
     headPivot.add(head);
 
-    // Soft chubby cream muzzle
-    const muzzle = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.078, 16, 12)), creamMat);
-    muzzle.scale.set(1.18, 0.84, 0.92);
-    muzzle.position.set(0, -0.034, 0.118);
-    headPivot.add(muzzle);
+    // Soft forehead dome + cozy side cheeks
+    const forehead = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.105, 16, 12)), furMat);
+    forehead.scale.set(1.0, 0.85, 0.92);
+    forehead.position.set(0, 0.048, 0.032);
+    headPivot.add(forehead);
 
-    // Cute rounded button nose
-    const nose = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.027, 12, 10)), noseMat);
-    nose.scale.set(1.24, 0.86, 0.9);
-    nose.position.set(0, -0.004, 0.178);
+    // Protruding tapered snout bridge & chubby cream muzzle cheeks
+    const snoutBridge = new THREE.Mesh(
+      trackGeo(new THREE.CylinderGeometry(0.046, 0.068, 0.088, 16)),
+      creamMat,
+    );
+    snoutBridge.rotation.x = Math.PI / 2 + 0.12;
+    snoutBridge.scale.set(1.22, 1.0, 0.86);
+    snoutBridge.position.set(0, -0.028, 0.135);
+    headPivot.add(snoutBridge);
+
+    const muzzleTip = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.058, 16, 12)), creamMat);
+    muzzleTip.scale.set(1.2, 0.82, 0.92);
+    muzzleTip.position.set(0, -0.034, 0.158);
+    headPivot.add(muzzleTip);
+
+    // Sculpted rounded triangular puppy nose
+    const nose = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.025, 14, 10)), noseMat);
+    nose.scale.set(1.25, 0.82, 0.92);
+    nose.position.set(0, -0.008, 0.208);
     headPivot.add(nose);
 
-    // Soft pink happy tongue
+    // Happy pink puppy tongue
     const tongue = new THREE.Mesh(
-      trackGeo(new RoundedBoxGeometry(0.03, 0.034, 0.014, 3, 0.006)),
+      trackGeo(new RoundedBoxGeometry(0.028, 0.034, 0.012, 3, 0.005)),
       tongueMat,
     );
-    tongue.position.set(0, -0.062, 0.162);
-    tongue.rotation.x = -0.32;
+    tongue.position.set(0, -0.064, 0.186);
+    tongue.rotation.x = -0.34;
     headPivot.add(tongue);
 
-    // Eyes with dual catchlights, adorable cream eyebrow dots, blush & velvety floppy ears
+    const earGeo = trackGeo(createTeardropEarGeometry());
     const earL = new THREE.Group();
     const earR = new THREE.Group();
     [-1, 1].forEach((side) => {
-      const eye = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.029, 14, 12)), eyeMat);
-      eye.position.set(side * 0.064, 0.026, 0.132);
+      const eye = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.028, 16, 12)), eyeMat);
+      eye.position.set(side * 0.06, 0.028, 0.126);
       const glintMain = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.0105, 8, 8)), glintMat);
-      glintMain.position.set(side * 0.069, 0.035, 0.156);
-      const glintMini = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.005, 6, 6)), glintMat);
-      glintMini.position.set(side * 0.056, 0.019, 0.155);
+      glintMain.position.set(side * 0.065, 0.037, 0.15);
+      const glintMini = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.0048, 6, 6)), glintMat);
+      glintMini.position.set(side * 0.052, 0.021, 0.149);
 
       const browDot = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.017, 10, 8)), creamMat);
-      browDot.scale.set(1.25, 0.72, 0.55);
-      browDot.position.set(side * 0.062, 0.072, 0.128);
-      browDot.rotation.z = side * -0.18;
+      browDot.scale.set(1.25, 0.68, 0.52);
+      browDot.position.set(side * 0.058, 0.072, 0.12);
+      browDot.rotation.z = side * -0.2;
 
-      const blush = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.027, 10, 8)), blushMat);
-      blush.scale.set(1.22, 0.72, 0.42);
-      blush.position.set(side * 0.1, -0.022, 0.114);
+      const blush = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.026, 10, 8)), blushMat);
+      blush.scale.set(1.22, 0.7, 0.4);
+      blush.position.set(side * 0.095, -0.02, 0.108);
 
       const earGroup = side === -1 ? earL : earR;
-      earGroup.position.set(side * 0.132, 0.062, 0.01);
-      const earUpper = new THREE.Mesh(
-        trackGeo(new THREE.SphereGeometry(0.048, 12, 10)),
-        darkFurMat,
-      );
-      earUpper.scale.set(0.75, 1.05, 1.15);
-      earUpper.position.set(side * 0.014, -0.022, 0.008);
-      const earLower = new THREE.Mesh(
-        trackGeo(new THREE.SphereGeometry(0.05, 12, 10)),
-        darkFurMat,
-      );
-      earLower.scale.set(0.72, 1.18, 1.12);
-      earLower.position.set(side * 0.028, -0.078, 0.022);
-      earLower.rotation.z = side * 0.22;
-      earGroup.add(earUpper, earLower);
+      earGroup.position.set(side * 0.124, 0.064, 0.012);
+      const earMesh = new THREE.Mesh(earGeo, darkFurMat);
+      earMesh.position.set(side * 0.02, -0.058, 0.008);
+      earMesh.rotation.set(0.08, side * 1.18, side * 0.24);
+      earGroup.add(earMesh);
 
       headPivot.add(eye, glintMain, glintMini, browDot, blush, earGroup);
     });
     ears = [earL, earR];
     bodyPivot.add(headPivot);
   } else {
-    // Blue Bird (Chim Xanh) - irresistibly plump cozy chibi songbird
-    const blueMat = trackMat(makeClay('#54B7F4', 0.62));
-    const wingBlueMat = trackMat(makeClay('#328BD0', 0.65));
-    const lightWingMat = trackMat(makeClay('#76CBFA', 0.66));
-    const creamMat = trackMat(makeClay('#FFF8E9', 0.72));
-    const beakMat = trackMat(makeClay('#F7B538', 0.46));
-    const beakLowerMat = trackMat(makeClay('#E89A24', 0.5));
-    const footMat = trackMat(makeClay('#EC9B27', 0.58));
-    const eyeMat = trackMat(makeGlossy('#1A2029', 0.08));
+    // Blue Bird (Chim Xanh) - sculpted realistic songbird anatomy + feathered wings
+    const blueMat = trackMat(makeClay('#50B4F3', 0.6));
+    const midWingMat = trackMat(makeClay('#3694D8', 0.64));
+    const deepWingMat = trackMat(makeClay('#2676B9', 0.66));
+    const covertMat = trackMat(makeClay('#67C4FA', 0.62));
+    const wingBarMat = trackMat(makeClay('#DCF1FF', 0.68));
+    const creamMat = trackMat(makeClay('#FFF8EA', 0.72));
+    const beakMat = trackMat(makeClay('#F7B538', 0.44));
+    const beakLowerMat = trackMat(makeClay('#E2921D', 0.48));
+    const footMat = trackMat(makeClay('#E89928', 0.56));
+    const eyeRingMat = trackMat(makeClay('#BCE5FD', 0.7));
+    const eyeMat = trackMat(makeGlossy('#181F28', 0.06));
     const glintMat = trackMat(new THREE.MeshBasicMaterial({color: '#FFFFFF'}));
     const blushMat = trackMat(makeClay('#F79992', 0.76));
 
-    // Plump pear-shaped songbird body (feet touch y=0 cleanly)
-    const body = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.132, 20, 16)), blueMat);
-    body.scale.set(1.02, 0.96, 1.14);
-    body.position.set(0, 0.148, 0);
-    bodyPivot.add(body);
+    // Streamlined songbird Lathe body silhouette (smooth chest + tapered rump)
+    const bodyPts = [
+      new THREE.Vector2(0.001, -0.155),
+      new THREE.Vector2(0.056, -0.132),
+      new THREE.Vector2(0.104, -0.072),
+      new THREE.Vector2(0.122, 0.006),
+      new THREE.Vector2(0.114, 0.078),
+      new THREE.Vector2(0.078, 0.132),
+      new THREE.Vector2(0.001, 0.15),
+    ];
+    const birdBodyGeo = trackGeo(new THREE.LatheGeometry(bodyPts, 24));
+    birdBodyGeo.rotateX(Math.PI * 0.43);
+    const birdBody = new THREE.Mesh(birdBodyGeo, blueMat);
+    birdBody.scale.set(0.98, 1.0, 1.08);
+    birdBody.position.set(0, 0.156, -0.008);
+    bodyPivot.add(birdBody);
 
-    // Creamy soft breast & round tummy
-    const belly = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.106, 18, 14)), creamMat);
-    belly.scale.set(0.92, 0.88, 0.76);
-    belly.position.set(0, 0.128, 0.068);
+    // Smooth creamy breast & underside blending cleanly along the chest curve
+    const belly = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.098, 18, 14)), creamMat);
+    belly.scale.set(0.92, 0.96, 0.76);
+    belly.position.set(0, 0.132, 0.062);
     bodyPivot.add(belly);
 
-    // Cute oversized round chibi head blending seamlessly into chest
-    headPivot.position.set(0, 0.258, 0.046);
-    const head = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.115, 20, 16)), blueMat);
-    head.scale.set(1.04, 0.98, 1.0);
+    // Sleek songbird head + crown crest tufts
+    headPivot.position.set(0, 0.264, 0.054);
+    const head = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.108, 22, 18)), blueMat);
+    head.scale.set(1.02, 0.96, 1.04);
     headPivot.add(head);
 
-    // Soft double rounded head crest tufts (no sharp cone!)
-    const crestMain = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.032, 12, 10)), wingBlueMat);
-    crestMain.scale.set(0.75, 1.45, 1.1);
-    crestMain.position.set(0, 0.124, -0.012);
-    crestMain.rotation.x = -0.45;
-    const crestBack = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.024, 10, 8)), lightWingMat);
-    crestBack.scale.set(0.7, 1.3, 1.05);
-    crestBack.position.set(0, 0.114, -0.044);
-    crestBack.rotation.x = -0.78;
-    headPivot.add(crestMain, crestBack);
+    const crestGeoA = trackGeo(createFeatherBladeGeometry(0.072, 0.022, 0.004));
+    const crestA = new THREE.Mesh(crestGeoA, midWingMat);
+    crestA.position.set(0, 0.092, 0.004);
+    crestA.rotation.x = 1.98;
+    const crestGeoB = trackGeo(createFeatherBladeGeometry(0.056, 0.018, 0.004));
+    const crestB = new THREE.Mesh(crestGeoB, covertMat);
+    crestB.position.set(0, 0.088, -0.026);
+    crestB.rotation.x = 2.25;
+    headPivot.add(crestA, crestB);
 
-    // Cute two-part rounded golden songbird beak
-    const upperBeak = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.028, 12, 10)), beakMat);
-    upperBeak.scale.set(1.05, 0.72, 1.42);
-    upperBeak.position.set(0, -0.008, 0.122);
-    const lowerBeak = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.02, 10, 8)), beakLowerMat);
-    lowerBeak.scale.set(0.92, 0.56, 1.18);
-    lowerBeak.position.set(0, -0.023, 0.115);
+    // Realistic tapered conical songbird beak (upper + lower mandibles)
+    const upperBeakGeo = trackGeo(new THREE.ConeGeometry(0.025, 0.072, 14));
+    upperBeakGeo.rotateX(Math.PI / 2 + 0.06);
+    const upperBeak = new THREE.Mesh(upperBeakGeo, beakMat);
+    upperBeak.scale.set(1.08, 0.78, 1.0);
+    upperBeak.position.set(0, -0.004, 0.128);
+
+    const lowerBeakGeo = trackGeo(new THREE.ConeGeometry(0.018, 0.052, 12));
+    lowerBeakGeo.rotateX(Math.PI / 2 - 0.1);
+    const lowerBeak = new THREE.Mesh(lowerBeakGeo, beakLowerMat);
+    lowerBeak.scale.set(0.96, 0.62, 1.0);
+    lowerBeak.position.set(0, -0.017, 0.118);
     headPivot.add(upperBeak, lowerBeak);
 
     [-1, 1].forEach((side) => {
-      // Big expressive eyes with dual white catchlights + rosy cheeks
-      const eye = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.026, 14, 12)), eyeMat);
-      eye.position.set(side * 0.06, 0.02, 0.09);
-      const glintMain = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.0095, 8, 8)), glintMat);
-      glintMain.position.set(side * 0.065, 0.028, 0.11);
-      const glintMini = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.0045, 6, 6)), glintMat);
-      glintMini.position.set(side * 0.053, 0.013, 0.109);
+      // Soft feather eye ring + expressive eyes + rosy cheek
+      const eyeRing = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.031, 14, 12)), eyeRingMat);
+      eyeRing.scale.set(1.0, 1.0, 0.65);
+      eyeRing.position.set(side * 0.058, 0.018, 0.084);
+      const eye = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.024, 14, 12)), eyeMat);
+      eye.position.set(side * 0.06, 0.019, 0.091);
+      const glintMain = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.009, 8, 8)), glintMat);
+      glintMain.position.set(side * 0.064, 0.027, 0.11);
+      const glintMini = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.0042, 6, 6)), glintMat);
+      glintMini.position.set(side * 0.054, 0.012, 0.109);
 
-      const blush = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.023, 10, 8)), blushMat);
-      blush.scale.set(1.24, 0.72, 0.42);
-      blush.position.set(side * 0.086, -0.016, 0.072);
-      headPivot.add(eye, glintMain, glintMini, blush);
+      const blush = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.02, 10, 8)), blushMat);
+      blush.scale.set(1.2, 0.68, 0.4);
+      blush.position.set(side * 0.082, -0.018, 0.068);
+      headPivot.add(eyeRing, eye, glintMain, glintMini, blush);
 
-      // Cute sturdy little orange feet
+      // Slender songbird legs + 3-toe claws cleanly resting on y = 0
       const footGroup = new THREE.Group();
-      footGroup.position.set(side * 0.048, 0.048, 0.022);
+      footGroup.position.set(side * 0.046, 0.052, 0.016);
       const legStick = new THREE.Mesh(
-        trackGeo(new THREE.CapsuleGeometry(0.012, 0.028, 6, 8)),
+        trackGeo(new THREE.CylinderGeometry(0.009, 0.008, 0.044, 8)),
         footMat,
       );
-      legStick.position.y = -0.02;
-      const toeL = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.015, 8, 6)), footMat);
-      toeL.scale.set(0.75, 0.55, 1.55);
-      toeL.position.set(-0.008, -0.042, 0.014);
-      toeL.rotation.y = 0.25;
-      const toeR = toeL.clone();
-      toeR.position.x = 0.008;
-      toeR.rotation.y = -0.25;
-      footGroup.add(legStick, toeL, toeR);
+      legStick.position.y = -0.024;
+      const toeMid = new THREE.Mesh(trackGeo(new THREE.CapsuleGeometry(0.0055, 0.026, 4, 8)), footMat);
+      toeMid.rotation.x = Math.PI / 2;
+      toeMid.position.set(0, -0.046, 0.014);
+      const toeL = toeMid.clone();
+      toeL.position.set(-0.008, -0.046, 0.012);
+      toeL.rotation.z = 0.36;
+      const toeR = toeMid.clone();
+      toeR.position.set(0.008, -0.046, 0.012);
+      toeR.rotation.z = -0.36;
+      const backToe = new THREE.Mesh(trackGeo(new THREE.CapsuleGeometry(0.005, 0.016, 4, 8)), footMat);
+      backToe.rotation.x = Math.PI / 2;
+      backToe.position.set(0, -0.046, -0.012);
+      footGroup.add(legStick, toeMid, toeL, toeR, backToe);
       bodyPivot.add(footGroup);
       legs.push(footGroup);
     });
     bodyPivot.add(headPivot);
 
-    // Sculpted layered wings (primary + secondary feather lobes)
-    const makeWing = (side: -1 | 1) => {
-      const wingPivot = new THREE.Group();
-      wingPivot.position.set(side * 0.122, 0.168, 0.012);
-      const wingPrimary = new THREE.Mesh(
-        trackGeo(new THREE.SphereGeometry(0.076, 14, 12)),
-        wingBlueMat,
-      );
-      wingPrimary.scale.set(0.42, 0.72, 1.42);
-      wingPrimary.position.set(side * 0.028, -0.008, -0.038);
+    // Sculpted layered multi-feather wings
+    leftWing = createSongbirdWing(-1, deepWingMat, midWingMat, covertMat, wingBarMat, trackGeo);
+    rightWing = createSongbirdWing(1, deepWingMat, midWingMat, covertMat, wingBarMat, trackGeo);
+    bodyPivot.add(leftWing, rightWing);
 
-      const wingCover = new THREE.Mesh(
-        trackGeo(new THREE.SphereGeometry(0.056, 12, 10)),
-        lightWingMat,
-      );
-      wingCover.scale.set(0.42, 0.62, 1.15);
-      wingCover.position.set(side * 0.036, 0.01, -0.015);
-
-      wingPivot.add(wingPrimary, wingCover);
-      bodyPivot.add(wingPivot);
-      return wingPivot;
+    // Fanned 3-blade feathered tail
+    tailPivot.position.set(0, 0.138, -0.128);
+    const makeTailFeather = (xOff: number, yaw: number, len: number, mat: THREE.Material) => {
+      const geo = trackGeo(createFeatherBladeGeometry(len, 0.032, 0.005));
+      geo.rotateX(Math.PI * 0.56);
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(xOff, 0.004, 0);
+      m.rotation.y = yaw;
+      return m;
     };
-    leftWing = makeWing(-1);
-    rightWing = makeWing(1);
-
-    // Fanned 3-feather sculpted tail (no boxy slab!)
-    tailPivot.position.set(0, 0.145, -0.124);
-    const tailMid = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.034, 12, 10)), wingBlueMat);
-    tailMid.scale.set(0.88, 0.34, 1.85);
-    tailMid.position.set(0, 0.018, -0.056);
-    tailMid.rotation.x = 0.26;
-
-    const tailL = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.028, 10, 8)), lightWingMat);
-    tailL.scale.set(0.82, 0.32, 1.65);
-    tailL.position.set(-0.026, 0.014, -0.048);
-    tailL.rotation.set(0.24, -0.28, 0.08);
-
-    const tailR = tailL.clone();
-    tailR.position.x = 0.026;
-    tailR.rotation.set(0.24, 0.28, -0.08);
-
-    tailPivot.add(tailMid, tailL, tailR);
+    tailPivot.add(
+      makeTailFeather(0, 0, 0.145, deepWingMat),
+      makeTailFeather(-0.018, -0.26, 0.128, midWingMat),
+      makeTailFeather(0.018, 0.26, 0.128, midWingMat),
+    );
     bodyPivot.add(tailPivot);
   }
 
@@ -386,7 +514,7 @@ export function buildPetModel(
   let sickGroup: THREE.Group | undefined;
   if (options?.sick) {
     sickGroup = new THREE.Group();
-    sickGroup.position.set(0, speciesId === 'blue_bird' ? 0.45 : 0.63, 0);
+    sickGroup.position.set(0, speciesId === 'blue_bird' ? 0.44 : 0.62, 0);
     const dropMat = trackMat(makeGlossy('#66B8F5', 0.25));
     const dropA = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.034, 8, 8)), dropMat);
     dropA.scale.set(0.85, 1.25, 0.85);
@@ -428,7 +556,7 @@ export function updatePetAnimation(
   if (rig.sickGroup) {
     rig.sickGroup.rotation.y = elapsed * 2.4;
     rig.sickGroup.position.y =
-      (rig.speciesId === 'blue_bird' ? 0.45 : 0.63) + Math.sin(elapsed * 4) * 0.025;
+      (rig.speciesId === 'blue_bird' ? 0.44 : 0.62) + Math.sin(elapsed * 4) * 0.025;
   }
 
   if (rig.speciesId === 'brown_puppy') {
@@ -436,7 +564,6 @@ export function updatePetAnimation(
     const isPlayingJump = mode === 'play_jump';
     const isHeld = mode === 'held_arms';
 
-    // Always wag tail happily! (slower if sick)
     const wagSpeed = rig.sickGroup ? 4.5 : isPlayingJump || isHeld ? 14 : 9.5;
     rig.tailPivot.rotation.y = Math.sin(elapsed * wagSpeed) * 0.55;
     rig.tailPivot.rotation.z = Math.sin(elapsed * wagSpeed) * 0.22;
@@ -504,30 +631,51 @@ export function updatePetAnimation(
     }
     rig.bodyPivot.scale.setScalar(baseScale);
   } else {
-    // Blue Bird animations
+    // Blue Bird animations (fly, orbit-around-player, and joyful ground-landing hops!)
     const isOrbitHeld = mode === 'held_orbit';
+    const isPlayJump = mode === 'play_jump';
     const isPlayCircle = mode === 'play_circle';
     const isShopPlay = mode === 'shop_play';
 
-    if (isOrbitHeld) {
-      // Circling gracefully around the player's body with joyful wing flaps
+    if (isPlayJump) {
+      // Lands on ground in front of player and hops joyfully while fluttering wings
+      const p = extra?.playProgress ?? 0;
+      const hop = Math.abs(Math.sin(p * Math.PI * 4));
+      rig.bodyPivot.position.y = hop * 0.24;
+      rig.bodyPivot.rotation.x = -hop * 0.14;
+      rig.bodyPivot.rotation.z = 0;
+      rig.headPivot.rotation.y = Math.sin(elapsed * 6) * 0.16;
+      rig.headPivot.rotation.z = Math.sin(elapsed * 9) * 0.08;
+      const flutter = 0.18 + hop * 0.62 * Math.abs(Math.sin(elapsed * 24));
+      if (rig.leftWing) rig.leftWing.rotation.z = flutter;
+      if (rig.rightWing) rig.rightWing.rotation.z = -flutter;
+      rig.tailPivot.rotation.x = Math.sin(elapsed * 12) * 0.22;
+      rig.legs.forEach((leg) => {
+        leg.rotation.x = -hop * 0.25;
+      });
+      if (rig.shadowDisc) {
+        rig.shadowDisc.position.y = 0.01;
+        rig.shadowDisc.scale.setScalar(Math.max(0.55, 1 - hop * 0.35));
+      }
+    } else if (isOrbitHeld) {
+      // Circling gracefully around the player's body with realistic feathered wingbeats
       rig.bodyPivot.position.y = Math.sin(elapsed * 4.2) * 0.035;
       rig.bodyPivot.rotation.x = 0.14;
-      rig.bodyPivot.rotation.z = 0.1;
+      rig.bodyPivot.rotation.z = 0.22;
       rig.headPivot.rotation.y = Math.sin(elapsed * 2.4) * 0.18;
       rig.headPivot.rotation.z = Math.sin(elapsed * 3.1) * 0.06;
-      const flap = Math.sin(elapsed * 21) * 0.72;
+      const flap = 0.08 + Math.sin(elapsed * 20) * 0.72;
       if (rig.leftWing) rig.leftWing.rotation.z = flap;
       if (rig.rightWing) rig.rightWing.rotation.z = -flap;
       rig.tailPivot.rotation.x = Math.sin(elapsed * 8) * 0.16;
-      rig.legs.forEach((leg) => (leg.rotation.x = 0.45));
+      rig.legs.forEach((leg) => (leg.rotation.x = 0.48));
     } else if (isShopPlay) {
       const bob = Math.abs(Math.sin(elapsed * 4.5)) * 0.14;
-      rig.bodyPivot.position.y = bob + 0.04;
+      rig.bodyPivot.position.y = bob + 0.02;
       rig.bodyPivot.rotation.x = 0.08;
       rig.bodyPivot.rotation.z = 0;
       rig.headPivot.rotation.y = Math.sin(elapsed * 2.6) * 0.25;
-      const flap = Math.sin(elapsed * 18) * 0.62;
+      const flap = 0.06 + Math.sin(elapsed * 18) * 0.58;
       if (rig.leftWing) rig.leftWing.rotation.z = flap;
       if (rig.rightWing) rig.rightWing.rotation.z = -flap;
       rig.tailPivot.rotation.x = Math.sin(elapsed * 9) * 0.18;
@@ -535,12 +683,12 @@ export function updatePetAnimation(
         rig.shadowDisc.scale.setScalar(Math.max(0.55, 1 - bob * 1.4));
       }
     } else {
-      const flapSpeed = isPlayCircle ? 26 : 19;
-      const flapAmp = isPlayCircle ? 0.85 : 0.68;
-      const flap = Math.sin(elapsed * flapSpeed) * flapAmp;
-      const bob = Math.sin(elapsed * 3.8) * 0.06;
+      const flapSpeed = isPlayCircle ? 24 : 18.5;
+      const flapAmp = isPlayCircle ? 0.78 : 0.66;
+      const flap = 0.06 + Math.sin(elapsed * flapSpeed) * flapAmp;
+      const bob = Math.sin(elapsed * 3.8) * 0.055;
       rig.bodyPivot.position.y = hoverH + bob;
-      rig.bodyPivot.rotation.x = isPlayCircle ? 0.16 : 0.06;
+      rig.bodyPivot.rotation.x = isPlayCircle ? 0.16 : 0.08;
       rig.bodyPivot.rotation.z = 0;
       rig.headPivot.rotation.y = Math.sin(elapsed * 2.2) * 0.16;
       rig.headPivot.rotation.z = Math.sin(elapsed * 2.8) * 0.06;

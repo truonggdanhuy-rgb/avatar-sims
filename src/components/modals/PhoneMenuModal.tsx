@@ -50,6 +50,8 @@ import {
   getPetXpForNextLevel,
   MAX_PET_INTIMACY,
   PET_CATALOG,
+  PET_FEED_HUNGER_THRESHOLD,
+  PET_PLAY_HAPPINESS_THRESHOLD,
   PET_SUPPLY_LIST,
 } from '../../data/petCatalog';
 import {
@@ -1061,6 +1063,54 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                           </div>
                         </div>
 
+                        {/* Care Progress Bars: Hunger & Happiness */}
+                        {(() => {
+                          const hungerPct = Math.round(
+                            Math.max(0, Math.min(100, infoPet.hunger ?? 75)),
+                          );
+                          const happinessPct = Math.round(
+                            Math.max(0, Math.min(100, infoPet.happiness ?? 75)),
+                          );
+                          return (
+                            <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#FAF4EA] p-2.5">
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-[10px] font-black text-[#5A3E28]">
+                                  <span>Độ no</span>
+                                  <span className="tabular-nums text-[#B86A1B]">{hungerPct}%</span>
+                                </div>
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#EAD9C0]">
+                                  <div
+                                    className="h-full rounded-full bg-[#F0A44B] transition-all"
+                                    style={{width: `${hungerPct}%`}}
+                                  />
+                                </div>
+                                <div className="text-[9px] font-bold text-[#8A7058]">
+                                  {hungerPct < PET_FEED_HUNGER_THRESHOLD
+                                    ? 'Cho ăn (+1 thân mật)'
+                                    : 'Đang no'}
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-[10px] font-black text-[#5A3E28]">
+                                  <span>Vui vẻ</span>
+                                  <span className="tabular-nums text-[#2E86B0]">{happinessPct}%</span>
+                                </div>
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#DCE9F2]">
+                                  <div
+                                    className="h-full rounded-full bg-[#47A9D8] transition-all"
+                                    style={{width: `${happinessPct}%`}}
+                                  />
+                                </div>
+                                <div className="text-[9px] font-bold text-[#678094]">
+                                  {happinessPct < PET_PLAY_HAPPINESS_THRESHOLD
+                                    ? 'Chơi (+1 thân mật)'
+                                    : 'Đang rất vui'}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                         {/* Rename Input */}
                         <form
                           onSubmit={(e) => {
@@ -1103,8 +1153,12 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                           <div className="grid grid-cols-3 gap-1.5">
                             {PET_SUPPLY_LIST.map((sup) => {
                               const count = petSupplies[sup.id] ?? 0;
+                              const isFull =
+                                sup.id === 'petFood' &&
+                                (infoPet.hunger ?? 75) >= PET_FEED_HUNGER_THRESHOLD;
                               const disabled =
                                 count <= 0 ||
+                                isFull ||
                                 (sup.id === 'petMedicine' && !infoPet.sick) ||
                                 (sup.id === 'intimacyTest' && isMax);
                               return (
@@ -1126,7 +1180,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                                       ? 'Test Lv+'
                                       : sup.id === 'petMedicine'
                                         ? 'Thuốc'
-                                        : 'Cho ăn'}
+                                        : isFull
+                                          ? 'Đã no'
+                                          : 'Cho ăn'}
                                   </span>
                                   <span className="text-[9px] font-black text-[#9A5B25] tabular-nums">
                                     x{count}
@@ -1247,6 +1303,40 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                                         </span>
                                       )}
                                     </div>
+                                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                                      <div>
+                                        <div className="flex justify-between text-[9px] font-bold text-[#8B6232]">
+                                          <span>Độ no</span>
+                                          <span className="tabular-nums">
+                                            {Math.round(Math.max(0, Math.min(100, pet.hunger ?? 75)))}%
+                                          </span>
+                                        </div>
+                                        <div className="h-1 w-full overflow-hidden rounded-full bg-[#EFE2CC]">
+                                          <div
+                                            className="h-full rounded-full bg-[#EE9F42]"
+                                            style={{
+                                              width: `${Math.round(Math.max(0, Math.min(100, pet.hunger ?? 75)))}%`,
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div className="flex justify-between text-[9px] font-bold text-[#2E779A]">
+                                          <span>Vui vẻ</span>
+                                          <span className="tabular-nums">
+                                            {Math.round(Math.max(0, Math.min(100, pet.happiness ?? 75)))}%
+                                          </span>
+                                        </div>
+                                        <div className="h-1 w-full overflow-hidden rounded-full bg-[#DCEAF2]">
+                                          <div
+                                            className="h-full rounded-full bg-[#48A8D6]"
+                                            style={{
+                                              width: `${Math.round(Math.max(0, Math.min(100, pet.happiness ?? 75)))}%`,
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
 
@@ -1275,9 +1365,14 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                           const count = petSupplies[sup.id] ?? 0;
                           const isTest = sup.id === 'intimacyTest';
                           const targetPet = activePetObj;
+                          const isFullFood =
+                            Boolean(targetPet) &&
+                            sup.id === 'petFood' &&
+                            (targetPet!.hunger ?? 75) >= PET_FEED_HUNGER_THRESHOLD;
                           const canUse = Boolean(
                             targetPet &&
                               count > 0 &&
+                              !isFullFood &&
                               !(sup.id === 'petMedicine' && !targetPet.sick) &&
                               !(sup.id === 'intimacyTest' && targetPet.intimacyLevel >= MAX_PET_INTIMACY),
                           );
@@ -1317,7 +1412,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                                   }}
                                   className="w-full rounded-xl bg-[#49A58D] py-1.5 text-[11px] font-black text-white transition active:scale-95 disabled:cursor-not-allowed disabled:bg-[#DDD5C9] disabled:text-[#8E8275]"
                                 >
-                                  Dùng cho {targetPet.name}
+                                  {isFullFood
+                                    ? `Đã no (${targetPet.name})`
+                                    : `Dùng cho ${targetPet.name}`}
                                 </button>
                               )}
                             </div>

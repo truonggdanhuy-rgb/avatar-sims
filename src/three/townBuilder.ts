@@ -44,6 +44,30 @@ export const TOWN_ZONE_ENTRANCES: Record<
 export const LAKE_CENTER = {x: -23.0, z: 46.8};
 export const TOWN_LAKE_WATER_Y = -0.26;
 
+export const MALL_CENTER = {x: -54.2, z: -2.5};
+export const MALL_ELEVATOR_CAB_POS = {x: -47.85, z: -2.5};
+export const MALL_ELEVATOR_BOARD_POS = {x: -46.15, z: -2.5};
+export const MALL_DECK_Y = 25.0;
+export const MALL_DECK_CENTER = {x: -45.4, z: -2.5};
+export const MALL_DECK_WALK_RADIUS = 4.45;
+
+export function clampPointToMallDeck(x: number, z: number): {x: number; z: number} {
+  let nx = x;
+  let nz = z;
+  const dx = nx - MALL_DECK_CENTER.x;
+  const dz = nz - MALL_DECK_CENTER.z;
+  const d = Math.hypot(dx, dz);
+  if (d > MALL_DECK_WALK_RADIUS && d > 0.0001) {
+    nx = MALL_DECK_CENTER.x + (dx / d) * MALL_DECK_WALK_RADIUS;
+    nz = MALL_DECK_CENTER.z + (dz / d) * MALL_DECK_WALK_RADIUS;
+  }
+  // Keep player cleanly outside the vertical glass shaft cutout on the West side of the deck
+  if (nx < -46.85 && Math.abs(nz - MALL_ELEVATOR_CAB_POS.z) < 1.25) {
+    nx = -46.85;
+  }
+  return {x: nx, z: nz};
+}
+
 export function getLakeShoreRadius(theta: number): number {
   return (
     9.2 +
@@ -113,6 +137,7 @@ export interface TownWorld {
   updateFishingVisuals?: (frame: FishingVisualFrame, elapsed: number) => void;
   setOutdoorSwingSeated?: (seated: boolean) => void;
   getOutdoorSwingSeatPose?: () => {x: number; y: number; z: number; pitch: number} | null;
+  setMallElevatorY?: (y: number) => void;
   updateInsects?: (
     playerX: number,
     playerY: number,
@@ -3678,6 +3703,493 @@ export function buildTownScene(): TownWorld {
     group.add(petShop);
   }
 
+  // ========== DISTRICT 6: MAY MALL SKYSCRAPER (BITEXCO-INSPIRED TOWER + CANTILEVERED SKYDECK + EXTERIOR GLASS ELEVATOR) ==========
+  let mallElevatorCabin: THREE.Group | null = null;
+  const setMallElevatorY = (y: number) => {
+    if (mallElevatorCabin) {
+      mallElevatorCabin.position.y = y;
+    }
+  };
+  {
+    const mallStatic = new THREE.Group();
+    const stonePlazaMat = getMat('#ECE7DD', 0.8);
+    const podiumCreamMat = getMat('#FBF6EC', 0.62);
+    const champagneMat = getMat('#D8C3A5', 0.48);
+    const warmWoodMat = getMat('#B88456', 0.68);
+    const silverSteelMat = getMat('#CFD8E2', 0.34);
+    const darkSteelMat = getMat('#3D4D5E', 0.42);
+    const goldAccentMat = getMat('#E5B85B', 0.34);
+    const deckRimGlowMat = new THREE.MeshStandardMaterial({
+      color: '#B5EAFF',
+      emissive: '#58C4F6',
+      emissiveIntensity: 0.45,
+      roughness: 0.25,
+    });
+    lampBulbs.push(deckRimGlowMat);
+
+    const towerGlassMat = new THREE.MeshStandardMaterial({
+      color: '#5DB5E0',
+      emissive: '#2979B0',
+      emissiveIntensity: 0.08,
+      roughness: 0.14,
+      metalness: 0.32,
+    });
+    windowMeshes.push(towerGlassMat);
+
+    const skyGlassMat = new THREE.MeshStandardMaterial({
+      color: '#BEEBFF',
+      roughness: 0.1,
+      metalness: 0.15,
+      transparent: true,
+      opacity: 0.34,
+      side: THREE.DoubleSide,
+    });
+
+    // 1. Mall Travertine Forecourt Plaza (x: -61.5..-43.8, z: -10.8..+5.8)
+    const forecourtPad = new THREE.Mesh(
+      new RoundedBoxGeometry(17.6, 0.1, 16.4, 2, 0.04),
+      stonePlazaMat,
+    );
+    forecourtPad.position.set(-52.7, 0.04, -2.5);
+    mallStatic.add(forecourtPad);
+
+    // 2. Two-Story Grand Mall Podium Base (x: -60.4..-49.0, z: -10.0..+5.0, height 7.2m)
+    const podiumBase = new THREE.Mesh(
+      new RoundedBoxGeometry(11.4, 7.2, 15.0, 3, 0.18),
+      podiumCreamMat,
+    );
+    podiumBase.position.set(-54.7, 3.62, -2.5);
+    const podiumPlinth = new THREE.Mesh(
+      new RoundedBoxGeometry(11.8, 0.65, 15.4, 2, 0.08),
+      champagneMat,
+    );
+    podiumPlinth.position.set(-54.7, 0.34, -2.5);
+    const podiumRoofBand = new THREE.Mesh(
+      new RoundedBoxGeometry(11.9, 0.48, 15.5, 2, 0.08),
+      silverSteelMat,
+    );
+    podiumRoofBand.position.set(-54.7, 7.22, -2.5);
+    mallStatic.add(podiumBase, podiumPlinth, podiumRoofBand);
+
+    // Warm Wood Architectural Louvers & Display Windows around Podium
+    const sideStoreWinGeo = new THREE.BoxGeometry(0.18, 2.55, 3.8);
+    [-6.6, 1.6].forEach((wz) => {
+      const storeWin = new THREE.Mesh(sideStoreWinGeo, towerGlassMat);
+      storeWin.position.set(-48.96, 1.95, wz);
+      const upperWin = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.0, 3.8), towerGlassMat);
+      upperWin.position.set(-48.96, 5.15, wz);
+      mallStatic.add(storeWin, upperWin);
+    });
+    for (let s = 0; s < 5; s++) {
+      const slat = new THREE.Mesh(new THREE.BoxGeometry(0.16, 6.4, 0.18), warmWoodMat);
+      slat.position.set(-48.92, 3.8, -8.8 + s * 0.42);
+      const slatR = slat.clone();
+      slatR.position.z = 2.6 + s * 0.42;
+      mallStatic.add(slat, slatR);
+    }
+
+    // Main East Mall Entrance Canopy & Glass Double Doors (at z = -6.5)
+    const canopy = new THREE.Mesh(
+      new RoundedBoxGeometry(2.4, 0.28, 4.4, 2, 0.05),
+      silverSteelMat,
+    );
+    canopy.position.set(-47.9, 3.55, -6.5);
+    const doorFrame = new THREE.Mesh(
+      new RoundedBoxGeometry(0.24, 2.85, 2.8, 2, 0.04),
+      darkSteelMat,
+    );
+    doorFrame.position.set(-48.94, 1.5, -6.5);
+    const doorGlass = new THREE.Mesh(
+      new THREE.BoxGeometry(0.28, 2.58, 2.46),
+      towerGlassMat,
+    );
+    doorGlass.position.set(-48.94, 1.44, -6.5);
+    const doorMullion = new THREE.Mesh(new THREE.BoxGeometry(0.32, 2.6, 0.08), silverSteelMat);
+    doorMullion.position.set(-48.94, 1.44, -6.5);
+    mallStatic.add(canopy, doorFrame, doorGlass, doorMullion);
+
+    // Crisp Signboard "MAY MALL" over East Entrance Canopy (facing +X)
+    const signCanvas = document.createElement('canvas');
+    signCanvas.width = 512;
+    signCanvas.height = 128;
+    const sctx = signCanvas.getContext('2d');
+    if (sctx) {
+      sctx.fillStyle = '#18344E';
+      sctx.fillRect(0, 0, 512, 128);
+      sctx.strokeStyle = '#FFD166';
+      sctx.lineWidth = 8;
+      sctx.strokeRect(8, 8, 496, 112);
+      sctx.fillStyle = '#FFF9E8';
+      sctx.font = '900 62px "Segoe UI", system-ui, sans-serif';
+      sctx.textAlign = 'center';
+      sctx.textBaseline = 'middle';
+      sctx.fillText('MAY MALL', 256, 66);
+    }
+    const mallSignTex = new THREE.CanvasTexture(signCanvas);
+    mallSignTex.colorSpace = THREE.SRGBColorSpace;
+    const mallSignBoard = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.5, 0.88),
+      new THREE.MeshBasicMaterial({map: mallSignTex}),
+    );
+    mallSignBoard.position.set(-46.66, 4.18, -6.5);
+    mallSignBoard.rotation.y = Math.PI / 2;
+    group.add(mallSignBoard);
+
+    const entranceHit = new THREE.Mesh(
+      new THREE.BoxGeometry(2.6, 3.6, 3.8),
+      new THREE.MeshBasicMaterial({visible: false}),
+    );
+    entranceHit.position.set(-48.4, 1.8, -6.5);
+    entranceHit.userData = {
+      kind: 'mall_entrance',
+      tx: -46.5,
+      tz: -6.5,
+    };
+    group.add(entranceHit);
+    clickTargets.push(entranceHit);
+
+    // 3. Bitexco-Inspired Tapered Glass Skyscraper Tower (Flat East +X Spine at world x = -49.0, rising to 35.6m!)
+    const TOWER_H = 33.4;
+    const RINGS = 28;
+    const SEGS = 40;
+    const FLAT_LOCAL_X = 5.2; // World x = -54.2 + 5.2 = -49.0 (completely flat vertical spine for glass elevator!)
+    const positions: number[] = [];
+    const indices: number[] = [];
+
+    for (let r = 0; r <= RINGS; r++) {
+      const v = r / RINGS;
+      const rx = THREE.MathUtils.lerp(5.65, 2.45, Math.pow(v, 0.86));
+      const rz = THREE.MathUtils.lerp(6.45, 2.95, Math.pow(v, 0.86));
+      const shiftX = v * 0.45;
+      for (let s = 0; s <= SEGS; s++) {
+        const theta = (s / SEGS) * Math.PI * 2;
+        let lx = Math.cos(theta) * rx + shiftX;
+        const lz = Math.sin(theta) * rz;
+        // Flatten East (+X) side into a crisp architectural spine wall facing the Town
+        if (lx > FLAT_LOCAL_X) {
+          lx = FLAT_LOCAL_X;
+        }
+        // Iconic Bitexco diagonal upward lotus crown slope toward West
+        const maxTopY = TOWER_H + (FLAT_LOCAL_X - lx) * 0.48;
+        const ly = 2.0 + v * (maxTopY - 2.0);
+        positions.push(MALL_CENTER.x + lx, ly, MALL_CENTER.z + lz);
+      }
+    }
+    const stride = SEGS + 1;
+    for (let r = 0; r < RINGS; r++) {
+      for (let s = 0; s < SEGS; s++) {
+        const a = r * stride + s;
+        const b = a + stride;
+        const c = a + 1;
+        const d = b + 1;
+        indices.push(a, b, c, c, b, d);
+      }
+    }
+    const towerHullGeo = new THREE.BufferGeometry();
+    towerHullGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    towerHullGeo.setIndex(indices);
+    towerHullGeo.computeVertexNormals();
+    const towerHull = new THREE.Mesh(towerHullGeo, towerGlassMat);
+    mallStatic.add(towerHull);
+
+    // Slanted Glass Crown Cap + Sleek Architectural Spire Fin (reaching y = 36.2m)
+    const crownCapGeo = new THREE.CylinderGeometry(2.65, 2.75, 0.34, 28);
+    const crownCap = new THREE.Mesh(crownCapGeo, silverSteelMat);
+    crownCap.position.set(MALL_CENTER.x + 1.2, 34.45, MALL_CENTER.z);
+    crownCap.rotation.z = -0.38;
+    const crownSpire = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.22, 3.8, 10),
+      silverSteelMat,
+    );
+    crownSpire.position.set(MALL_CENTER.x - 0.85, 36.6, MALL_CENTER.z);
+    const spireBeacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 10, 10),
+      new THREE.MeshStandardMaterial({
+        color: '#FFE799',
+        emissive: '#FFAA33',
+        emissiveIntensity: 1.35,
+        roughness: 0.2,
+      }),
+    );
+    spireBeacon.position.set(MALL_CENTER.x - 0.85, 38.55, MALL_CENTER.z);
+    mallStatic.add(crownCap, crownSpire, spireBeacon);
+
+    // Sleek Metallic Horizontal Floor Rings wrapping the Bitexco silhouette every 2.8m
+    for (let lvl = 1; lvl <= 10; lvl++) {
+      const y = 7.2 + lvl * 2.55;
+      if (y > 31.8) break;
+      const v = (y - 2.0) / (TOWER_H - 2.0);
+      const rx = THREE.MathUtils.lerp(5.65, 2.45, Math.pow(v, 0.86)) + 0.08;
+      const rz = THREE.MathUtils.lerp(6.45, 2.95, Math.pow(v, 0.86)) + 0.08;
+      const shiftX = v * 0.45;
+      const bandShape = new THREE.Shape();
+      for (let s = 0; s <= 36; s++) {
+        const theta = (s / 36) * Math.PI * 2;
+        let bx = Math.cos(theta) * rx + shiftX;
+        const bz = Math.sin(theta) * rz;
+        if (bx > FLAT_LOCAL_X + 0.08) bx = FLAT_LOCAL_X + 0.08;
+        if (s === 0) bandShape.moveTo(bx, -bz);
+        else bandShape.lineTo(bx, -bz);
+      }
+      const bandGeo = new THREE.ExtrudeGeometry(bandShape, {
+        depth: 0.18,
+        bevelEnabled: false,
+      });
+      bandGeo.rotateX(-Math.PI / 2);
+      const bandMesh = new THREE.Mesh(bandGeo, silverSteelMat);
+      bandMesh.position.set(MALL_CENTER.x, y, MALL_CENTER.z);
+      mallStatic.add(bandMesh);
+    }
+
+    // 4. Cantilevered Circular Bitexco Skydeck Observation Platform at y = 25.0 (Center -45.4, -2.5)
+    const DECK_R = 5.35;
+    const deckUnderFrame = new THREE.Mesh(
+      new THREE.CylinderGeometry(DECK_R + 0.05, DECK_R * 0.72, 0.62, 36),
+      silverSteelMat,
+    );
+    deckUnderFrame.position.set(MALL_DECK_CENTER.x, MALL_DECK_Y - 0.38, MALL_DECK_CENTER.z);
+
+    // 4 Sweeping Diagonal Structural Support Struts under Cantilevered Skydeck
+    [-3.1, -1.0, 1.0, 3.1].forEach((zOff) => {
+      const strut = new THREE.Mesh(
+        new THREE.BoxGeometry(5.6, 0.34, 0.34),
+        silverSteelMat,
+      );
+      strut.position.set(-46.8, MALL_DECK_Y - 1.95, MALL_DECK_CENTER.z + zOff * 0.75);
+      strut.rotation.z = 0.56;
+      mallStatic.add(strut);
+    });
+
+    const deckLedRim = new THREE.Mesh(
+      new THREE.TorusGeometry(DECK_R + 0.04, 0.09, 8, 40),
+      deckRimGlowMat,
+    );
+    deckLedRim.rotation.x = Math.PI / 2;
+    deckLedRim.position.set(MALL_DECK_CENTER.x, MALL_DECK_Y - 0.04, MALL_DECK_CENTER.z);
+    mallStatic.add(deckUnderFrame, deckLedRim);
+
+    // Walkable Skydeck Floor Surface (kept unmerged for crisp raycasting in pierWalkableMeshes)
+    const deckFloor = new THREE.Mesh(
+      new THREE.CylinderGeometry(DECK_R, DECK_R, 0.14, 40),
+      stonePlazaMat,
+    );
+    deckFloor.position.set(MALL_DECK_CENTER.x, MALL_DECK_Y - 0.07, MALL_DECK_CENTER.z);
+    deckFloor.userData = {kind: 'ground', isMallDeck: true};
+    group.add(deckFloor);
+    pierWalkableMeshes.push(deckFloor);
+
+    // Skydeck Glass Safety Parapet Balustrade + Brushed Silver Handrail (leaving West elevator door gap open)
+    const RAIL_SEGMENTS = 28;
+    for (let i = 0; i < RAIL_SEGMENTS; i++) {
+      const a0 = (i / RAIL_SEGMENTS) * Math.PI * 2;
+      const a1 = ((i + 1) / RAIL_SEGMENTS) * Math.PI * 2;
+      const aMid = (a0 + a1) * 0.5;
+      const mx = MALL_DECK_CENTER.x + Math.cos(aMid) * (DECK_R - 0.18);
+      const mz = MALL_DECK_CENTER.z + Math.sin(aMid) * (DECK_R - 0.18);
+      // Leave landing passage open beside the West elevator cab (x < -46.8, |z + 2.5| < 1.25)
+      if (mx < -46.8 && Math.abs(mz - MALL_ELEVATOR_CAB_POS.z) < 1.32) continue;
+
+      const segLen = 2 * (DECK_R - 0.18) * Math.sin(Math.PI / RAIL_SEGMENTS) + 0.04;
+      const railPanel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.96, segLen),
+        skyGlassMat,
+      );
+      railPanel.position.set(mx, MALL_DECK_Y + 0.5, mz);
+      railPanel.rotation.y = -aMid;
+
+      const railTop = new THREE.Mesh(
+        new THREE.BoxGeometry(0.11, 0.07, segLen + 0.04),
+        silverSteelMat,
+      );
+      railTop.position.set(mx, MALL_DECK_Y + 1.0, mz);
+      railTop.rotation.y = -aMid;
+
+      const railPost = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.045, 1.04, 8),
+        silverSteelMat,
+      );
+      railPost.position.set(
+        MALL_DECK_CENTER.x + Math.cos(a0) * (DECK_R - 0.18),
+        MALL_DECK_Y + 0.52,
+        MALL_DECK_CENTER.z + Math.sin(a0) * (DECK_R - 0.18),
+      );
+      group.add(railPanel);
+      mallStatic.add(railTop, railPost);
+    }
+
+    // Two Scenic Brass Telescopes & Lounge Sky-Benches around Deck Perimeter (r = 4.65)
+    [-0.55, 0.65].forEach((ang) => {
+      const tx = MALL_DECK_CENTER.x + Math.cos(ang) * 4.55;
+      const tz = MALL_DECK_CENTER.z + Math.sin(ang) * 4.55;
+      const stand = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06, 0.14, 1.08, 10),
+        silverSteelMat,
+      );
+      stand.position.set(tx, MALL_DECK_Y + 0.54, tz);
+      const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.11, 0.62, 12),
+        goldAccentMat,
+      );
+      barrel.rotation.z = Math.PI / 2 - 0.18;
+      barrel.rotation.y = -ang;
+      barrel.position.set(tx, MALL_DECK_Y + 1.16, tz);
+      mallStatic.add(stand, barrel);
+    });
+
+    [-1.65, 1.65].forEach((ang) => {
+      const bx = MALL_DECK_CENTER.x + Math.cos(ang) * 4.25;
+      const bz = MALL_DECK_CENTER.z + Math.sin(ang) * 4.25;
+      const skyBench = new THREE.Mesh(
+        new RoundedBoxGeometry(1.7, 0.42, 0.58, 2, 0.06),
+        warmWoodMat,
+      );
+      skyBench.position.set(bx, MALL_DECK_Y + 0.24, bz);
+      skyBench.rotation.y = -ang + Math.PI / 2;
+      mallStatic.add(skyBench);
+    });
+
+    // 5. Exposed Exterior Glass Observation Elevator Shaft + Animated Panoramic Cabin (y = 0.02 <-> 25.02)
+    const SHAFT_H = 28.4;
+    const cabX = MALL_ELEVATOR_CAB_POS.x;
+    const cabZ = MALL_ELEVATOR_CAB_POS.z;
+
+    // 4 Vertical Steel Structural Guide Columns flanking the panoramic glass elevator
+    [
+      [-0.95, -1.15],
+      [0.95, -1.15],
+      [-0.95, 1.15],
+      [0.95, 1.15],
+    ].forEach(([ox, oz]) => {
+      const col = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, SHAFT_H, 0.16),
+        silverSteelMat,
+      );
+      col.position.set(cabX + ox, SHAFT_H * 0.5, cabZ + oz);
+      mallStatic.add(col);
+    });
+
+    // Horizontal Tie Braces & Vertical Glass Back Curtain Screen against Flat East Spine
+    for (let y = 3.2; y < SHAFT_H; y += 3.5) {
+      const braceL = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.12, 0.12), darkSteelMat);
+      braceL.position.set(cabX, y, cabZ - 1.15);
+      const braceR = braceL.clone();
+      braceR.position.z = cabZ + 1.15;
+      const spineTie = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.16, 2.38), silverSteelMat);
+      spineTie.position.set(cabX - 0.65, y, cabZ);
+      mallStatic.add(braceL, braceR, spineTie);
+    }
+
+    const shaftCap = new THREE.Mesh(
+      new RoundedBoxGeometry(2.35, 0.42, 2.75, 2, 0.06),
+      silverSteelMat,
+    );
+    shaftCap.position.set(cabX, SHAFT_H + 0.2, cabZ);
+    mallStatic.add(shaftCap);
+
+    // Call Kiosks at Ground Level (x = -46.2, z = -1.1) and Skydeck Level (x = -46.9, z = -1.0)
+    const makeElevatorKiosk = (kx: number, ky: number, kz: number) => {
+      const post = new THREE.Mesh(
+        new RoundedBoxGeometry(0.32, 1.25, 0.36, 2, 0.04),
+        darkSteelMat,
+      );
+      post.position.set(kx, ky + 0.62, kz);
+      const btnUp = new THREE.Mesh(
+        new THREE.SphereGeometry(0.06, 10, 10),
+        new THREE.MeshStandardMaterial({
+          color: '#7CF2AE',
+          emissive: '#38DF82',
+          emissiveIntensity: 0.9,
+        }),
+      );
+      btnUp.position.set(kx + 0.16, ky + 0.9, kz);
+      mallStatic.add(post, btnUp);
+
+      const kioskHit = new THREE.Mesh(
+        new THREE.BoxGeometry(1.8, 2.2, 1.8),
+        new THREE.MeshBasicMaterial({visible: false}),
+      );
+      kioskHit.position.set(kx, ky + 1.0, kz);
+      kioskHit.userData = {kind: 'mall_elevator'};
+      group.add(kioskHit);
+      clickTargets.push(kioskHit);
+    };
+    makeElevatorKiosk(-46.5, 0.04, -1.05);
+    makeElevatorKiosk(-47.15, MALL_DECK_Y, -1.05);
+
+    // Animated Panoramic Glass Elevator Cabin
+    mallElevatorCabin = new THREE.Group();
+    mallElevatorCabin.position.set(cabX, 0.04, cabZ);
+
+    const cabFloor = new THREE.Mesh(
+      new RoundedBoxGeometry(1.78, 0.12, 2.08, 2, 0.03),
+      darkSteelMat,
+    );
+    cabFloor.position.y = 0.04;
+    const cabCeiling = new THREE.Mesh(
+      new RoundedBoxGeometry(1.82, 0.14, 2.12, 2, 0.03),
+      silverSteelMat,
+    );
+    cabCeiling.position.y = 2.38;
+    const cabCeilingLamp = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.38, 0.38, 0.05, 14),
+      new THREE.MeshStandardMaterial({
+        color: '#FFF9DF',
+        emissive: '#FFE08A',
+        emissiveIntensity: 0.95,
+      }),
+    );
+    cabCeilingLamp.position.y = 2.29;
+
+    const cabGlassBack = new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.22, 1.98), skyGlassMat);
+    cabGlassBack.position.set(-0.84, 1.21, 0);
+    const cabGlassSideL = new THREE.Mesh(new THREE.BoxGeometry(1.68, 2.22, 0.05), skyGlassMat);
+    cabGlassSideL.position.set(0, 1.21, -0.99);
+    const cabGlassSideR = cabGlassSideL.clone();
+    cabGlassSideR.position.z = 0.99;
+    const cabGlassFrontArchL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.24, 0.14), silverSteelMat);
+    cabGlassFrontArchL.position.set(0.84, 1.21, -0.94);
+    const cabGlassFrontArchR = cabGlassFrontArchL.clone();
+    cabGlassFrontArchR.position.z = 0.94;
+
+    const cabHit = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 2.8, 2.6),
+      new THREE.MeshBasicMaterial({visible: false}),
+    );
+    cabHit.position.y = 1.25;
+    cabHit.userData = {kind: 'mall_elevator'};
+    clickTargets.push(cabHit);
+
+    mallElevatorCabin.add(
+      cabFloor,
+      cabCeiling,
+      cabCeilingLamp,
+      cabGlassBack,
+      cabGlassSideL,
+      cabGlassSideR,
+      cabGlassFrontArchL,
+      cabGlassFrontArchR,
+      cabHit,
+    );
+    group.add(mallElevatorCabin);
+
+    // Tall Glass Shaft Interaction Proxy so tapping anywhere on the glass tower shaft rides elevator
+    const shaftClickProxy = new THREE.Mesh(
+      new THREE.BoxGeometry(2.5, 27.0, 2.8),
+      new THREE.MeshBasicMaterial({visible: false}),
+    );
+    shaftClickProxy.position.set(cabX, 13.5, cabZ);
+    shaftClickProxy.userData = {kind: 'mall_elevator'};
+    group.add(shaftClickProxy);
+    clickTargets.push(shaftClickProxy);
+
+    // Colliders on Ground Level for Mall Podium & Elevator Shaft
+    colliders.push({type: 'box', id: 'mall_podium', x: -54.7, z: -2.5, hw: 5.95, hd: 7.75, rotY: 0});
+    colliders.push({type: 'box', id: 'mall_shaft', x: cabX, z: cabZ, hw: 1.05, hd: 1.22, rotY: 0});
+
+    mergeStaticGroupByMaterial(mallStatic);
+    group.add(mallStatic);
+  }
+
   // ========== SPARSE FARM-STYLE PALE STEPPING STONES (STOPPING SHORT BEFORE BUILDINGS) ==========
   {
     const stoneTrailSpots: [number, number, number, number][] = [];
@@ -3711,8 +4223,9 @@ export function buildTownScene(): TownWorld {
       }
     };
 
-    // East-West Main Trail (z = 0)
+    // East-West Main Trail (z = 0) + Scenic Mall Spur leading to May Mall Forecourt & Elevator
     addSteppingTrail(-35.5, 0, -8.8, 0);
+    addSteppingTrail(-45.2, -2.5, -36.0, -0.3);
     addSteppingTrail(8.8, 0, 35.5, 0);
 
     // Center North-South Spine (stops well short of Hill in North, flows south into meadow)
@@ -4071,7 +4584,7 @@ export function buildTownScene(): TownWorld {
     [36.5, 35.5, 1.22, true, 2.45],
     [-8.8, 56.5, 1.24, true, -1.2],
     [12.8, 53.5, 1.24, true, -2.0],
-    [-56.0, -4.5, 1.28, true, 0.1],
+    [-69.0, 4.0, 1.28, true, 0.1],
     [56.5, -4.8, 1.26, true, Math.PI - 0.1],
     [-55.0, 29.5, 1.26, true, -0.3],
     [55.5, 29.0, 1.28, true, -Math.PI + 0.3],
@@ -4207,13 +4720,13 @@ export function buildTownScene(): TownWorld {
     [19.4, -18.8, 1.1, true, 2.55],
     [-18.8, 6.8, 1.14, true, -0.35],
     [18.8, 6.8, 1.14, true, -2.8],
-    [-42.5, -5.2, 1.2, true, 0.25],
+    [-43.5, -13.5, 1.2, true, 0.25],
     [43.0, -5.5, 1.2, true, Math.PI - 0.25],
     [-42.0, 29.5, 1.22, true, -0.4],
     [42.0, 29.5, 1.22, true, -2.7],
     [-27.5, -34.0, 1.24, true, -0.6],
     [27.5, -33.5, 1.24, true, -2.5],
-    [-60.0, 12.0, 1.26, true, 0.15],
+    [-66.0, 13.5, 1.26, true, 0.15],
     [60.5, 11.5, 1.26, true, Math.PI - 0.15],
     [-48.5, -36.0, 1.28, true, -0.65],
     [49.0, -36.5, 1.28, true, -2.45],
@@ -5122,7 +5635,7 @@ export function buildTownScene(): TownWorld {
     [29.5, 7.5, '#F28482', 0.9],
     [-5.5, 39.5, '#F7A8B8', 0.88],
     [6.5, 40.2, '#A8D8EA', 0.86],
-    [-46.0, 5.5, '#D0A6FF', 0.94],
+    [-46.0, 10.5, '#D0A6FF', 0.94],
     [46.5, 5.0, '#F7A8B8', 0.94],
     // Outer meadow & edge shrubs
     [-48.0, 34.0, '#FF9EBB', 0.96],
@@ -5137,7 +5650,7 @@ export function buildTownScene(): TownWorld {
     [18.5, 56.0, '#D0A6FF', 0.92],
     [-44.5, -42.5, '#FFAD88', 0.96],
     [44.5, -42.0, '#F7A8B8', 0.96],
-    [-60.0, 3.0, '#8ECAE6', 0.98],
+    [-68.0, -10.5, '#8ECAE6', 0.98],
     [60.5, 2.5, '#FF9EBB', 0.98],
   ];
   const bushBodyParts: THREE.BufferGeometry[] = [];
@@ -5217,7 +5730,7 @@ export function buildTownScene(): TownWorld {
     [32.5, 45.8, 1.3, '#57AE60'],
     [-22.5, -38.5, 1.35, '#4A9D54'],
     [22.8, -38.0, 1.34, '#54AC5D'],
-    [-51.0, 4.5, 1.38, '#4D9E56'],
+    [-51.0, 12.5, 1.38, '#4D9E56'],
     [51.5, 4.0, 1.36, '#58AF61'],
     [-52.0, -25.0, 1.4, '#489852'],
     [52.5, -24.5, 1.38, '#53A95B'],
@@ -5226,7 +5739,7 @@ export function buildTownScene(): TownWorld {
     [-8.5, -32.5, 1.22, '#4E9F57'],
     [8.8, -32.5, 1.24, '#56AE5E'],
     // Outer ring lush bushes
-    [-58.0, -8.5, 1.36, '#4B9E54'],
+    [-68.5, -14.5, 1.36, '#4B9E54'],
     [58.5, -8.0, 1.36, '#56AF5E'],
     [-56.5, 22.0, 1.38, '#489A51'],
     [57.0, 21.5, 1.38, '#53A95B'],
@@ -5308,6 +5821,7 @@ export function buildTownScene(): TownWorld {
     if (Math.hypot(px - 24, pz - 39.5) < 4.5) return true;
     if (Math.hypot(px - 11.8, pz - 38.6) < 4.4) return true;
     if (Math.hypot(px + 16.8, pz - 37.2) < 3.4) return true;
+    if (px >= -64.5 && px <= -36.5 && pz >= -13.0 && pz <= 8.5) return true;
     return false;
   };
 
@@ -5449,7 +5963,7 @@ export function buildTownScene(): TownWorld {
     [-46.0, 10.5, 0.54],
     [46.5, 10.0, 0.56],
     // Outer field stones
-    [-53.5, -2.5, 0.56],
+    [-68.5, 10.0, 0.56],
     [54.0, -3.0, 0.54],
     [-51.0, 39.5, 0.58],
     [51.5, 39.0, 0.56],
@@ -5515,7 +6029,7 @@ export function buildTownScene(): TownWorld {
     [-55.0, 34.0, 1.2],
     [55.5, 33.5, 1.18],
     // Outer zone landmark boulders
-    [-59.5, 7.5, 1.16],
+    [-68.5, -1.5, 1.16],
     [60.0, 7.0, 1.16],
     [-58.0, -24.5, 1.2],
     [58.5, -24.0, 1.18],
@@ -5660,7 +6174,7 @@ export function buildTownScene(): TownWorld {
     [43.0, -27.5, -1.0],
     [-39.2, 52.5, 0.25],
     [27.0, 50.5, -0.3],
-    [-55.5, -1.5, 1.3],
+    [-66.5, 22.0, 1.3],
     [56.0, -1.0, -1.2],
     [-12.2, 55.2, 0.8],
     [16.5, 48.5, -0.75],
@@ -6181,6 +6695,7 @@ export function buildTownScene(): TownWorld {
     updateFishingVisuals,
     setOutdoorSwingSeated,
     getOutdoorSwingSeatPose,
+    setMallElevatorY,
     updateInsects,
     tryCatchInsect,
     update,

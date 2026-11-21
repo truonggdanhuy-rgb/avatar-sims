@@ -18,13 +18,16 @@ import {KoiShopModal} from './components/modals/KoiShopModal';
 import {WorldCanvas} from './components/WorldCanvas';
 import {DEFAULT_AVATAR, SHOP_ITEMS, STARTER_OWNED_IDS} from './data/avatarCatalog';
 import {
-  applyPetIntimacyXp,
+  applyPetCureCare,
+  applyPetFeedCare,
   applyPetLevelStep,
+  applyPetPlayCare,
   createInitialPetSupplies,
   createOwnedPet,
   MAX_PET_INTIMACY,
   PET_CATALOG,
   PET_SUPPLY_META,
+  tickPetCareMeters,
 } from './data/petCatalog';
 import {
   computeFishSellPrice,
@@ -132,6 +135,7 @@ import {
   WellWaterState,
   ZoneId,
 } from './types/game';
+import {finalizePlayerName, sanitizePlayerNameInput} from './utils/playerName';
 import {soundFX} from './utils/sound';
 
 const STORAGE_KEY = 'thi_tran_may_save_v1';
@@ -393,6 +397,7 @@ export default function App() {
           if (!VALID_EXPRS.has(rawExpr)) {
             merged.expression = LEGACY_EXPR_MAP[rawExpr] ?? DEFAULT_AVATAR.expression;
           }
+          merged.name = finalizePlayerName(String(merged.name ?? ''), DEFAULT_AVATAR.name);
           return merged;
         }
       }
@@ -1032,7 +1037,7 @@ export default function App() {
             .map((p: Partial<OwnedPetState>) => {
               const speciesId = p.speciesId as PetSpeciesId;
               const spec = PET_CATALOG[speciesId];
-              return {
+              const basePet: OwnedPetState = {
                 id: p.id!,
                 speciesId,
                 name:
@@ -1045,10 +1050,20 @@ export default function App() {
                     : 1,
                 intimacyXp:
                   typeof p.intimacyXp === 'number' ? Math.max(0, Math.floor(p.intimacyXp)) : 0,
+                hunger:
+                  typeof p.hunger === 'number' && Number.isFinite(p.hunger)
+                    ? Math.max(0, Math.min(100, p.hunger))
+                    : 75,
+                happiness:
+                  typeof p.happiness === 'number' && Number.isFinite(p.happiness)
+                    ? Math.max(0, Math.min(100, p.happiness))
+                    : 75,
                 sick: Boolean(p.sick),
                 lastTickAt: typeof p.lastTickAt === 'number' ? p.lastTickAt : now,
                 adoptedAt: typeof p.adoptedAt === 'number' ? p.adoptedAt : now,
               };
+              const dtOffline = Math.max(0, now - basePet.lastTickAt);
+              return {...tickPetCareMeters(basePet, dtOffline), lastTickAt: now};
             });
         }
       }
@@ -1353,13 +1368,13 @@ export default function App() {
         return {stored: nextStored, lastTickAt: nextTickAt};
       });
 
-      // 5. Pets rare sickness tick (rất hiếm khi bệnh)
+      // 5. Pets hunger/happiness decay & rare sickness tick (rất hiếm khi bệnh)
       setOwnedPets((prev) => {
         if (prev.length === 0) return prev;
         let changed = false;
         const next = prev.map((pet) => {
           const dt = Math.max(0, now - pet.lastTickAt);
-          if (dt < 5000) return pet;
+          if (dt < 2000) return pet;
           changed = true;
           let nextSick = pet.sick;
           if (!nextSick) {
@@ -1369,8 +1384,9 @@ export default function App() {
               nextSick = true;
             }
           }
+          const ticked = tickPetCareMeters(pet, dt);
           return {
-            ...pet,
+            ...ticked,
             sick: nextSick,
             lastTickAt: now,
           };
@@ -2816,22 +2832,28 @@ export default function App() {
     );
   };
 
-  const handleFeedPet = (petId: string) => {
-    if (petSupplies.petFood <= 0) return;
+  const handleFeedPet = (petId: string): {ok: boolean; message: string} => {
+    if (petSupplies.petFood <= 0) {
+      return {ok: false, message: 'Bạn đã hết thức ăn thú cưng! Mua thêm tại cửa hàng Ivan.'};
+    }
     const target = ownedPets.find((p) => p.id === petId);
-    if (!target) return;
+    if (!target) return {ok: false, message: 'Không tìm thấy thú cưng.'};
+    const feedRes = applyPetFeedCare(target);
+    if (!feedRes.ok) {
+      soundFX.tap();
+      return {ok: false, message: feedRes.message};
+    }
     soundFX.sparkle();
     setPetSupplies((prev) => ({
       ...prev,
       petFood: Math.max(0, prev.petFood - 1),
     }));
-    setOwnedPets((prev) =>
-      prev.map((p) => (p.id === petId ? applyPetIntimacyXp(p, 35) : p)),
-    );
+    setOwnedPets((prev) => prev.map((p) => (p.id === petId ? feedRes.pet : p)));
     setStats((prev) => ({
       ...prev,
       mood: Math.min(100, prev.mood + 3),
     }));
+    return {ok: true, message: feedRes.message};
   };
 
   const handleCurePet = (petId: string) => {
@@ -2844,9 +2866,7 @@ export default function App() {
       petMedicine: Math.max(0, prev.petMedicine - 1),
     }));
     setOwnedPets((prev) =>
-      prev.map((p) =>
-        p.id === petId ? {...applyPetIntimacyXp(p, 40), sick: false} : p,
-      ),
+      prev.map((p) => (p.id === petId ? applyPetCureCare(p) : p)),
     );
     setStats((prev) => ({
       ...prev,
@@ -2854,17 +2874,19 @@ export default function App() {
     }));
   };
 
-  const handlePlayWithPet = (petId: string) => {
+  const handlePlayWithPet = (petId: string): {ok: boolean; gainedXp: boolean; message: string} => {
     const target = ownedPets.find((p) => p.id === petId);
-    if (!target) return;
+    if (!target) return {ok: false, gainedXp: false, message: ''};
+    const playRes = applyPetPlayCare(target);
     soundFX.tap();
-    setOwnedPets((prev) =>
-      prev.map((p) => (p.id === petId ? applyPetIntimacyXp(p, 25) : p)),
-    );
+    if (playRes.gainedXp) {
+      setOwnedPets((prev) => prev.map((p) => (p.id === petId ? playRes.pet : p)));
+    }
     setStats((prev) => ({
       ...prev,
       mood: Math.min(100, prev.mood + 4),
     }));
+    return {ok: true, gainedXp: playRes.gainedXp, message: playRes.message};
   };
 
   const handleUsePetSupply = (
@@ -2878,13 +2900,15 @@ export default function App() {
     }
 
     if (supplyId === 'petFood') {
+      const feedRes = applyPetFeedCare(target);
+      if (!feedRes.ok) {
+        return {ok: false, message: feedRes.message};
+      }
       soundFX.sparkle();
       setPetSupplies((prev) => ({...prev, petFood: Math.max(0, prev.petFood - 1)}));
-      setOwnedPets((prev) =>
-        prev.map((p) => (p.id === petId ? applyPetIntimacyXp(p, 35) : p)),
-      );
+      setOwnedPets((prev) => prev.map((p) => (p.id === petId ? feedRes.pet : p)));
       setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 3)}));
-      return {ok: true, message: `Đã cho ${target.name} ăn ngon (+35 điểm thân mật).`};
+      return {ok: true, message: feedRes.message};
     }
 
     if (supplyId === 'petMedicine') {
@@ -2894,12 +2918,10 @@ export default function App() {
       soundFX.sparkle();
       setPetSupplies((prev) => ({...prev, petMedicine: Math.max(0, prev.petMedicine - 1)}));
       setOwnedPets((prev) =>
-        prev.map((p) =>
-          p.id === petId ? {...applyPetIntimacyXp(p, 40), sick: false} : p,
-        ),
+        prev.map((p) => (p.id === petId ? applyPetCureCare(p) : p)),
       );
       setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 4)}));
-      return {ok: true, message: `Đã chữa khỏi bệnh cho ${target.name} (+40 điểm thân mật)!`};
+      return {ok: true, message: `Đã chữa khỏi bệnh cho ${target.name} (+1 thân mật)!`};
     }
 
     // intimacyTest
@@ -3251,7 +3273,10 @@ export default function App() {
         <SettingsModal
           playerName={avatar.name}
           onChangeName={(name) =>
-            setAvatar((prev) => ({...prev, name: name || 'Mây Nhỏ'}))
+            setAvatar((prev) => ({
+              ...prev,
+              name: sanitizePlayerNameInput(name) || 'Mây Nhỏ',
+            }))
           }
           timeOfDay={timeOfDay}
           onChangeTimeOfDay={setTimeOfDay}

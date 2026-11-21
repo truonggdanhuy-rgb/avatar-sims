@@ -11,6 +11,8 @@ import {
   getPetXpForNextLevel,
   MAX_PET_INTIMACY,
   PET_CATALOG,
+  PET_FEED_HUNGER_THRESHOLD,
+  PET_PLAY_HAPPINESS_THRESHOLD,
 } from '../data/petCatalog';
 import {OwnedPetState, PetSupplies} from '../types/game';
 import {soundFX} from '../utils/sound';
@@ -46,6 +48,10 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
   const pct = isMaxIntimacy
     ? 100
     : Math.min(100, Math.round((pet.intimacyXp / Math.max(1, reqXp)) * 100));
+  const hungerPct = Math.max(0, Math.min(100, Math.round(pet.hunger ?? 75)));
+  const happinessPct = Math.max(0, Math.min(100, Math.round(pet.happiness ?? 75)));
+  const isFull = hungerPct >= PET_FEED_HUNGER_THRESHOLD;
+  const isPlayXpReady = happinessPct < PET_PLAY_HAPPINESS_THRESHOLD;
 
   const mainRadius = 60;
   const getArcPos = (idx: number, total: number, radius: number, spanDeg = 148) => {
@@ -58,7 +64,9 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
     };
   };
 
-  const canFeedOrCure = pet.sick ? supplies.petMedicine > 0 : supplies.petFood > 0;
+  const canFeedOrCure = pet.sick
+    ? supplies.petMedicine > 0
+    : supplies.petFood > 0 && !isFull;
 
   const actions = [
     {
@@ -111,9 +119,11 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
         ? supplies.petMedicine > 0
           ? `Cho uống thuốc (còn x${supplies.petMedicine})`
           : 'Hết thuốc! Mua ở cửa hàng Ivan'
-        : supplies.petFood > 0
-          ? `Cho ăn (còn x${supplies.petFood})`
-          : 'Hết thức ăn! Mua ở cửa hàng Ivan',
+        : isFull
+          ? 'Bé đang no rồi! Đợi Độ no dưới 90% mới cho ăn (+1 thân mật)'
+          : supplies.petFood > 0
+            ? `Cho ăn (còn x${supplies.petFood})`
+            : 'Hết thức ăn! Mua ở cửa hàng Ivan',
       bgClass: pet.sick
         ? canFeedOrCure
           ? 'bg-[#D94E67] text-white'
@@ -123,7 +133,11 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
           : 'bg-[#D6CFC5] text-[#8E8478]',
       disabled: !canFeedOrCure,
       slash: false,
-      badge: pet.sick ? `Thuốc x${supplies.petMedicine}` : `Ăn x${supplies.petFood}`,
+      badge: pet.sick
+        ? `Thuốc x${supplies.petMedicine}`
+        : isFull
+          ? 'Đã no'
+          : `Ăn x${supplies.petFood}`,
       badgeClass: pet.sick
         ? canFeedOrCure
           ? 'border-[#D94E67]/60 bg-[#FFF3F5]/95 text-[#A4253D]'
@@ -133,6 +147,7 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
           : 'border-[#B8AFA3]/60 bg-[#F2EDE4]/95 text-[#7D7368]',
       icon: pet.sick ? <Cross className="h-4 w-4" /> : <Utensils className="h-4 w-4" />,
       onClick: () => {
+        if (!canFeedOrCure) return;
         if (pet.sick) {
           soundFX.sparkle();
           onCurePet(pet.id);
@@ -144,11 +159,13 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
     },
     {
       key: 'play',
-      title: 'Chơi đùa cùng thú cưng',
+      title: isPlayXpReady
+        ? 'Chơi đùa cùng thú cưng (+35% Vui vẻ · +1 Thân mật)'
+        : 'Chơi đùa cùng thú cưng (Vui vẻ >= 90% nên không + thân mật)',
       bgClass: 'bg-[#4BA0D8] text-white',
       disabled: false,
       slash: false,
-      badge: 'Chơi',
+      badge: isPlayXpReady && !isMaxIntimacy ? 'Chơi +1' : 'Chơi',
       badgeClass: 'border-[#4BA0D8]/60 bg-[#F2FAFF]/95 text-[#1B6494]',
       icon: <Sparkles className="h-4 w-4" />,
       onClick: () => {
@@ -218,11 +235,11 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
           );
         })}
 
-        {/* Floating Intimacy & Pet Name Card below Center */}
+        {/* Floating Intimacy, Hunger & Happiness Card below Center */}
         {showIntimacyDetail && (
-          <div className="anim-pop absolute top-7 left-0 flex min-w-[186px] -translate-x-1/2 flex-col gap-1.5 rounded-xl border-2 border-[#8C6239]/80 bg-[#FFF9EF]/96 p-2.5 text-[#4A3525] shadow-xl">
+          <div className="anim-pop absolute top-7 left-0 flex min-w-[202px] -translate-x-1/2 flex-col gap-1.5 rounded-xl border-2 border-[#8C6239]/80 bg-[#FFF9EF]/96 p-2.5 text-[#4A3525] shadow-xl">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 min-w-0">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <PetSpeciesIcon speciesId={pet.speciesId} className="h-5 w-5 shrink-0" />
                 <span className="flex items-center gap-1 truncate text-xs font-black text-[#4A3525]">
                   {isMaxIntimacy && <BlingBlingBadge className="h-3.5 w-3.5" />}
@@ -234,25 +251,57 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
               </span>
             </div>
 
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F1DFC6]">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#F07898] to-[#FFAE52] transition-all"
-                style={{width: `${pct}%`}}
-              />
+            {/* Intimacy bar */}
+            <div>
+              <div className="mb-0.5 flex items-center justify-between text-[9.5px] font-extrabold text-[#7A6048]">
+                <span>Thân mật</span>
+                <span>{isMaxIntimacy ? 'MAX' : `${pet.intimacyXp}/${reqXp}`}</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F1DFC6]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#F07898] to-[#FFAE52] transition-all"
+                  style={{width: `${pct}%`}}
+                />
+              </div>
             </div>
 
-            <div className="flex items-center justify-between text-[10px] font-bold text-[#7A6048]">
-              <span>
-                {isMaxIntimacy
-                  ? 'Thân mật tối đa!'
-                  : `Thân mật: ${pet.intimacyXp}/${reqXp}`}
-              </span>
-              {pet.sick && (
-                <span className="rounded bg-[#FCE4E8] px-1 py-px font-black text-[#C93B4B]">
-                  Đang bệnh!
-                </span>
-              )}
+            {/* Two progress bars: Hunger & Happiness */}
+            <div className="grid grid-cols-2 gap-2 pt-0.5">
+              <div>
+                <div className="mb-0.5 flex items-center justify-between text-[9px] font-extrabold text-[#8A541F]">
+                  <span>Độ no</span>
+                  <span className="tabular-nums">{hungerPct}%</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F1DFC6]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#E68A38] to-[#FFBE5C] transition-all"
+                    style={{width: `${hungerPct}%`}}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="mb-0.5 flex items-center justify-between text-[9px] font-extrabold text-[#1E668B]">
+                  <span>Vui vẻ</span>
+                  <span className="tabular-nums">{happinessPct}%</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#D9EAF2]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#459FD4] to-[#58C79B] transition-all"
+                    style={{width: `${happinessPct}%`}}
+                  />
+                </div>
+              </div>
             </div>
+
+            {pet.sick ? (
+              <div className="rounded bg-[#FCE4E8] px-1.5 py-0.5 text-center text-[9.5px] font-black text-[#C93B4B]">
+                Đang bị bệnh! Hãy cho uống thuốc
+              </div>
+            ) : (
+              <div className="text-[9px] font-semibold text-[#8A7058]">
+                Cho ăn / Chơi khi dưới 90% để +1 Thân mật
+              </div>
+            )}
           </div>
         )}
       </div>

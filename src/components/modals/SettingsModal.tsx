@@ -1,6 +1,7 @@
 import React from 'react';
 import {MapPin, Moon, Sun, Volume2, VolumeX, X} from 'lucide-react';
 import {TimeOfDay} from '../../types/game';
+import {finalizePlayerName, sanitizePlayerNameInput} from '../../utils/playerName';
 import {soundFX} from '../../utils/sound';
 
 interface SettingsModalProps {
@@ -30,10 +31,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onToggleSound,
   onClose,
 }) => {
+  const handleClose = () => {
+    onChangeName(finalizePlayerName(playerName));
+    onClose();
+  };
+
   return (
     <div
       className="absolute inset-0 z-50 flex items-center justify-center bg-stone-950/65 p-4"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="anim-pop flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl border-4 border-[#8A6240] bg-[#FAF3E8] shadow-2xl"
@@ -47,7 +53,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             type="button"
             onClick={() => {
               soundFX.tap();
-              onClose();
+              handleClose();
             }}
             aria-label="Đóng bảng cài đặt"
             className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E3CEB2] text-[#4A3525] active:scale-95"
@@ -70,10 +76,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               type="text"
               maxLength={16}
               value={playerName}
-              onChange={(e) => onChangeName(e.target.value)}
+              onChange={(e) => onChangeName(sanitizePlayerNameInput(e.target.value))}
+              onBlur={(e) => onChangeName(finalizePlayerName(e.target.value))}
               placeholder="Nhập tên của bạn..."
               className="h-11 w-full rounded-xl border border-[#D8C2A6] bg-white px-3.5 text-sm font-semibold text-[#4A3525] outline-none focus:border-[#8A6240]"
             />
+            <p className="mt-1 text-[10px] font-semibold text-[#7A6048]">
+              Chỉ dùng chữ cái, số và khoảng cách (không icon hoặc ký tự đặc biệt).
+            </p>
           </div>
 
           {/* Time of Day Selector */}

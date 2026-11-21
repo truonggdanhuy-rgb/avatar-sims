@@ -99,7 +99,8 @@ export type AvatarPose =
   | 'fish_cast'
   | 'fish_wait'
   | 'fish_pull'
-  | 'net_swing';
+  | 'net_swing'
+  | 'play_pet';
 
 export interface AvatarConfig {
   name: string;
@@ -589,6 +590,8 @@ export interface OwnedPetState {
   name: string;
   intimacyLevel: number;
   intimacyXp: number;
+  hunger: number; // 0..100 (100 = full, drops over time; feed only when hungry)
+  happiness: number; // 0..100 (100 = joyful, drops over time; play boosts +1 intimacy only when reduced)
   sick: boolean;
   lastTickAt: number;
   adoptedAt: number;
