@@ -1,14 +1,21 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import {AvatarConfig, AvatarPose, ToolId} from '../types/game';
+import {AvatarConfig, AvatarPose, PetSpeciesId, ToolId} from '../types/game';
 import {
   buildCharacterHair,
   createHairClayMaterial,
   headSurfacePoint,
 } from './hairSystem';
 import {clayMat, glossyClayMat, makeShadowed} from './materials';
+import {buildPetModel, PetRig, updatePetAnimation} from './pets3d';
 
-export type HoldPose = 'none' | 'carry_front' | 'carry_bag' | 'carry_umbrella' | 'carry_net';
+export type HoldPose =
+  | 'none'
+  | 'carry_front'
+  | 'carry_bag'
+  | 'carry_umbrella'
+  | 'carry_net'
+  | 'carry_pet_arms';
 
 const HEAD_PIVOT_Y = 0.968;
 
@@ -18,6 +25,7 @@ const HAND_POSES: Record<HoldPose, {armX: number; armZ: number; elbowX: number; 
   carry_front: {armX: -0.42, armZ: 0.44, elbowX: -0.98, elbowZ: 0.08},
   carry_bag: {armX: -0.06, armZ: 0.48, elbowX: -0.14, elbowZ: 0.06},
   carry_net: {armX: -1.16, armZ: 0.24, elbowX: -1.24, elbowZ: -0.18},
+  carry_pet_arms: {armX: -0.56, armZ: 0.14, elbowX: -0.96, elbowZ: -0.4},
 };
 
 export interface SkirtDeformPair {
@@ -50,6 +58,7 @@ export interface AvatarRig {
   toolType?: ToolId | null;
   rodBobber?: THREE.Object3D;
   rodLine?: THREE.Object3D;
+  heldPetRig?: PetRig;
 }
 
 function shadeHex(hex: string, factor: number): THREE.Color {
@@ -955,7 +964,10 @@ function createPencilSkirtGeometry(
 
 export function buildAvatarRig(
   config: AvatarConfig,
-  options?: {equippedTool?: ToolId | null},
+  options?: {
+    equippedTool?: ToolId | null;
+    carryingPet?: {speciesId: PetSpeciesId; sick?: boolean} | null;
+  },
 ): AvatarRig {
   const root = new THREE.Group();
   const bodyPivot = new THREE.Group();
@@ -1780,22 +1792,26 @@ export function buildAvatarRig(
   // ========== SEAMLESS ARTICULATED ARMS + REAL HANDHELD GRIP ==========
   const isShortSleeve = config.top === 'sailor_blouse';
   const isSleeveless = config.top === 'sundress';
-  const equippedTool = options?.equippedTool ?? null;
+  const carryingPet = options?.carryingPet ?? null;
+  const equippedTool = !carryingPet ? (options?.equippedTool ?? null) : null;
   const handheld =
-    !equippedTool && config.handheld && config.handheld !== 'none'
+    !carryingPet && !equippedTool && config.handheld && config.handheld !== 'none'
       ? config.handheld
       : null;
-  const holdPose: HoldPose = equippedTool
-    ? equippedTool === 'wooden_net'
-      ? 'carry_net'
-      : 'carry_front'
-    : !handheld
-      ? 'none'
-      : handheld === 'tote_bag'
-        ? 'carry_bag'
-        : handheld === 'mini_umbrella'
-          ? 'carry_umbrella'
-          : 'carry_front';
+  const holdPose: HoldPose =
+    carryingPet && carryingPet.speciesId === 'brown_puppy'
+      ? 'carry_pet_arms'
+      : equippedTool
+        ? equippedTool === 'wooden_net'
+          ? 'carry_net'
+          : 'carry_front'
+        : !handheld
+          ? 'none'
+          : handheld === 'tote_bag'
+            ? 'carry_bag'
+            : handheld === 'mini_umbrella'
+              ? 'carry_umbrella'
+              : 'carry_front';
 
   const makeArm = (side: -1 | 1) => {
     // Relaxed natural A-pose seated flush on shoulder corner with breathing room beside waist/hips
@@ -2915,6 +2931,41 @@ export function buildAvatarRig(
     }
   }
 
+  let heldPetRig: PetRig | undefined;
+  if (carryingPet) {
+    if (carryingPet.speciesId === 'brown_puppy') {
+      const petPoseCfg = HAND_POSES.carry_pet_arms;
+      leftArm.rotation.x = petPoseCfg.armX;
+      leftArm.rotation.z = -petPoseCfg.armZ;
+      leftElbow.rotation.x = petPoseCfg.elbowX;
+      leftElbow.rotation.z = -petPoseCfg.elbowZ;
+
+      rightArm.rotation.x = petPoseCfg.armX;
+      rightArm.rotation.z = petPoseCfg.armZ;
+      rightElbow.rotation.x = petPoseCfg.elbowX;
+      rightElbow.rotation.z = petPoseCfg.elbowZ;
+
+      heldPetRig = buildPetModel('brown_puppy', {
+        scale: 0.96,
+        sick: carryingPet.sick,
+        withShadow: false,
+      });
+      heldPetRig.root.position.set(0, 0.54, 0.28);
+      heldPetRig.root.rotation.y = 0.32;
+      bodyPivot.add(heldPetRig.root);
+    } else if (carryingPet.speciesId === 'blue_bird') {
+      heldPetRig = buildPetModel('blue_bird', {
+        scale: 1.08,
+        sick: carryingPet.sick,
+        withShadow: false,
+      });
+      // Orbit smoothly around the player's body in root space
+      heldPetRig.root.position.set(0.7, 1.06, 0);
+      heldPetRig.root.rotation.y = 0;
+      root.add(heldPetRig.root);
+    }
+  }
+
   makeShadowed(root, true, true);
   shadowDisc.castShadow = false;
 
@@ -2945,6 +2996,7 @@ export function buildAvatarRig(
     toolType: equippedTool,
     rodBobber: rodBobberObj,
     rodLine: rodLineObj,
+    heldPetRig,
   };
 }
 
@@ -3003,24 +3055,31 @@ export function updateAvatarRigAnimation(
     rig.rightLeg.rotation.z = 0;
     if (rig.leftKnee) rig.leftKnee.rotation.x = Math.max(0, -swing) * 0.5 + 0.06;
     if (rig.rightKnee) rig.rightKnee.rotation.x = Math.max(0, swing) * 0.5 + 0.06;
-    rig.leftArm.rotation.x = -swing * 0.45;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.none.elbowX - 0.08 + Math.max(0, -swing) * 0.15;
-
-    if (hold === 'carry_umbrella') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + swing * 0.06;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
-    } else if (hold === 'carry_front') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_front.armX + swing * 0.1;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX;
-    } else if (hold === 'carry_bag') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX + swing * 0.22;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
-    } else if (hold === 'carry_net') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_net.armX + swing * 0.05;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX;
+    if (hold === 'carry_pet_arms') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_pet_arms.armX + swing * 0.04;
+      rig.rightArm.rotation.x = HAND_POSES.carry_pet_arms.armX + swing * 0.04;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_pet_arms.elbowX;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_pet_arms.elbowX;
     } else {
-      rig.rightArm.rotation.x = swing * 0.45;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.none.elbowX - 0.08 + Math.max(0, swing) * 0.15;
+      rig.leftArm.rotation.x = -swing * 0.45;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.none.elbowX - 0.08 + Math.max(0, -swing) * 0.15;
+
+      if (hold === 'carry_umbrella') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + swing * 0.06;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
+      } else if (hold === 'carry_front') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_front.armX + swing * 0.1;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX;
+      } else if (hold === 'carry_bag') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX + swing * 0.22;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
+      } else if (hold === 'carry_net') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_net.armX + swing * 0.05;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX;
+      } else {
+        rig.rightArm.rotation.x = swing * 0.45;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.none.elbowX - 0.08 + Math.max(0, swing) * 0.15;
+      }
     }
 
     if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
@@ -3101,23 +3160,30 @@ export function updateAvatarRigAnimation(
     if (rig.leftKnee) rig.leftKnee.rotation.x = 0.62;
     if (rig.rightKnee) rig.rightKnee.rotation.x = 0.42;
 
-    rig.leftArm.rotation.x = -0.58;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.42;
-    if (hold === 'carry_umbrella') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX - 0.08;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
-    } else if (hold === 'carry_front') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_front.armX - 0.12;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX;
-    } else if (hold === 'carry_bag') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX - 0.15;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
-    } else if (hold === 'carry_net') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_net.armX - 0.06;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX;
+    if (hold === 'carry_pet_arms') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_pet_arms.armX - 0.06;
+      rig.rightArm.rotation.x = HAND_POSES.carry_pet_arms.armX - 0.06;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_pet_arms.elbowX;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_pet_arms.elbowX;
     } else {
-      rig.rightArm.rotation.x = -0.58;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = -0.42;
+      rig.leftArm.rotation.x = -0.58;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = -0.42;
+      if (hold === 'carry_umbrella') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX - 0.08;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
+      } else if (hold === 'carry_front') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_front.armX - 0.12;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX;
+      } else if (hold === 'carry_bag') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX - 0.15;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
+      } else if (hold === 'carry_net') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_net.armX - 0.06;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX;
+      } else {
+        rig.rightArm.rotation.x = -0.58;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = -0.42;
+      }
     }
 
     if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
@@ -3327,24 +3393,48 @@ export function updateAvatarRigAnimation(
     rig.headPivot.rotation.x = Math.sin(breathPhase - 0.5) * 0.024;
     rig.headPivot.rotation.z = Math.sin(elapsed * 0.95) * 0.016;
 
-    rig.leftArm.rotation.x = Math.sin(breathPhase - 0.3) * 0.024;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.none.elbowX - breath01 * 0.03;
-
-    if (hold === 'carry_umbrella') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + breath * 0.014;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
-    } else if (hold === 'carry_front') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_front.armX + breath * 0.014;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX;
-    } else if (hold === 'carry_bag') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX + breath * 0.014;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
-    } else if (hold === 'carry_net') {
-      rig.rightArm.rotation.x = HAND_POSES.carry_net.armX + breath * 0.012;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX;
+    if (hold === 'carry_pet_arms') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_pet_arms.armX + breath * 0.014;
+      rig.rightArm.rotation.x = HAND_POSES.carry_pet_arms.armX + breath * 0.014;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_pet_arms.elbowX;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_pet_arms.elbowX;
     } else {
-      rig.rightArm.rotation.x = -Math.sin(breathPhase - 0.3) * 0.024;
-      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.none.elbowX - breath01 * 0.03;
+      rig.leftArm.rotation.x = Math.sin(breathPhase - 0.3) * 0.024;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.none.elbowX - breath01 * 0.03;
+
+      if (hold === 'carry_umbrella') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + breath * 0.014;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
+      } else if (hold === 'carry_front') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_front.armX + breath * 0.014;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_front.elbowX;
+      } else if (hold === 'carry_bag') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_bag.armX + breath * 0.014;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_bag.elbowX;
+      } else if (hold === 'carry_net') {
+        rig.rightArm.rotation.x = HAND_POSES.carry_net.armX + breath * 0.012;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_net.elbowX;
+      } else {
+        rig.rightArm.rotation.x = -Math.sin(breathPhase - 0.3) * 0.024;
+        if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.none.elbowX - breath01 * 0.03;
+      }
+    }
+  }
+
+  if (rig.heldPetRig) {
+    if (rig.heldPetRig.speciesId === 'blue_bird') {
+      const orbitAngle = elapsed * 2.15;
+      const orbitRadius = 0.7;
+      const orbitY = 1.05 + Math.sin(elapsed * 3.0) * 0.11;
+      rig.heldPetRig.root.position.set(
+        Math.cos(orbitAngle) * orbitRadius,
+        orbitY,
+        Math.sin(orbitAngle) * orbitRadius,
+      );
+      rig.heldPetRig.root.rotation.y = -orbitAngle;
+      updatePetAnimation(rig.heldPetRig, 'held_orbit', elapsed, {baseScale: 1.08});
+    } else {
+      updatePetAnimation(rig.heldPetRig, 'held_arms', elapsed, {baseScale: 0.96});
     }
   }
 }

@@ -18,6 +18,7 @@ import {
   Trophy,
   Utensils,
   Wrench,
+  X,
 } from 'lucide-react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
@@ -29,11 +30,15 @@ import {
   rollRandomRiverFish,
 } from '../data/fishingCatalog';
 import {getNetRepairCost} from '../data/insectCatalog';
+import {MAX_PET_INTIMACY, PET_CATALOG} from '../data/petCatalog';
 import {FishIllustration} from './FishingIcons';
 import {InsectIllustration} from './InsectIcons';
+import {PetSpeciesIcon} from './PetIcons';
 import {FURNITURE_BY_ID, isPointOnFurnitureSurface} from '../data/furnitureCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from '../three/avatar3d';
 import {FishingVisualFrame} from '../three/fishingVisuals3d';
+import {createNameplateHandle, syncNameplateScale} from '../three/nameplate';
+import {buildPetModel, PetRig, updatePetAnimation} from '../three/pets3d';
 import {
   buildSubzoneScene,
   HouseDoorHandle,
@@ -66,6 +71,9 @@ import {
   InsectRarity,
   InsectSpeciesId,
   LivestockAnimalState,
+  OwnedPetState,
+  PetSpeciesId,
+  PetSupplies,
   PlacedFurniture,
   PondFishState,
   RiverFishSpeciesId,
@@ -75,6 +83,7 @@ import {
   ZoneId,
 } from '../types/game';
 import {soundFX} from '../utils/sound';
+import {PetArcMenu} from './PetArcMenu';
 import {PlotArcMenu} from './PlotArcMenu';
 
 interface WorldCanvasProps {
@@ -184,6 +193,16 @@ interface WorldCanvasProps {
   onScatterPondFeed: () => void;
   onPondProximityChange: (near: boolean) => void;
   onAddCoins: (amount: number) => void;
+  activePet: OwnedPetState | null;
+  carriedPetId: string | null;
+  petSupplies: PetSupplies;
+  onOpenPetSupplyShop: () => void;
+  onOpenPetAdopt: () => void;
+  onHoldPet: (petId: string) => void;
+  onReleasePet: () => void;
+  onFeedPet: (petId: string) => void;
+  onCurePet: (petId: string) => void;
+  onPlayWithPet: (petId: string) => void;
 }
 
 interface ProjectedTag {
@@ -312,9 +331,9 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
 
   if (zone === 'petshop') {
     if (isPortrait) {
-      return {fov, pos: [0, 7.6, 11.8] as const, look: [0, 0.75, -0.35] as const};
+      return {fov, pos: [0, 10.8, 16.6] as const, look: [0, 0.85, -0.4] as const};
     }
-    return {fov, pos: [0, 6.8, 10.4] as const, look: [0, 0.75, -0.35] as const};
+    return {fov, pos: [0, 9.4, 14.2] as const, look: [0, 0.85, -0.4] as const};
   }
 
   if (isPortrait) {
@@ -337,7 +356,7 @@ function getZoneWalkBounds(zone: ZoneId) {
     return {minX: -5.6, maxX: 5.6, minZ: -4.8, maxZ: 4.9};
   }
   if (zone === 'petshop') {
-    return {minX: -4.15, maxX: 4.15, minZ: -4.05, maxZ: 4.05};
+    return {minX: -7.5, maxX: 7.5, minZ: -6.1, maxZ: 6.15};
   }
   return {minX: -3.45, maxX: 3.45, minZ: -4.05, maxZ: 4.05};
 }
@@ -962,6 +981,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onPondProximityChange,
   onAddCoins,
   onOpenPhone,
+  activePet,
+  carriedPetId,
+  petSupplies,
+  onOpenPetSupplyShop,
+  onOpenPetAdopt,
+  onHoldPet,
+  onReleasePet,
+  onFeedPet,
+  onCurePet,
+  onPlayWithPet,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const labelLayerRef = useRef<HTMLDivElement | null>(null);
@@ -985,6 +1014,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [tags, setTags] = useState<ProjectedTag[]>([]);
   const [speechBubble, setSpeechBubble] = useState<string | null>(null);
   const [arcMenuPos, setArcMenuPos] = useState<{plotId: number; x: number; y: number} | null>(null);
+  const [petArcMenuPos, setPetArcMenuPos] = useState<{petId: string; x: number; y: number} | null>(null);
   const [fishingState, setFishingState] = useState<FishingPhase>('idle');
   const [biteAlertPos, setBiteAlertPos] = useState<{x: number; y: number} | null>(null);
   const [brokenRodPrompt, setBrokenRodPrompt] = useState<{
@@ -1026,6 +1056,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     placedFurniture,
     editFurnitureMode,
     selectedFurnitureId,
+    activePet,
+    carriedPetId,
   });
   stateRef.current = {
     zone,
@@ -1044,6 +1076,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     placedFurniture,
     editFurnitureMode,
     selectedFurnitureId,
+    activePet,
+    carriedPetId,
   };
 
   const callbacksRef = useRef({
@@ -1082,6 +1116,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onScatterPondFeed,
     onPondProximityChange,
     onAddCoins,
+    onOpenPetSupplyShop,
+    onOpenPetAdopt,
   });
   callbacksRef.current = {
     onChangeZone,
@@ -1119,10 +1155,20 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onScatterPondFeed,
     onPondProximityChange,
     onAddCoins,
+    onOpenPetSupplyShop,
+    onOpenPetAdopt,
   };
 
   const rebuildSceneTriggerRef = useRef<(() => void) | null>(null);
-  const rebuildAvatarTriggerRef = useRef<((cfg: AvatarConfig, equippedTool: ToolId | null) => void) | null>(null);
+  const rebuildAvatarTriggerRef = useRef<
+    ((
+      cfg: AvatarConfig,
+      equippedTool: ToolId | null,
+      carryingPet: {speciesId: PetSpeciesId; sick?: boolean} | null,
+    ) => void) | null
+  >(null);
+  const syncPetCompanionRef = useRef<(() => void) | null>(null);
+  const triggerPetPlayRef = useRef<((petId: string) => void) | null>(null);
   const farmPondFishActionRef = useRef<(() => void) | null>(null);
   const cancelFishingRef = useRef<(() => void) | null>(null);
   const activeTownRef = useRef<TownWorld | null>(null);
@@ -1141,6 +1187,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const nearPondRef = useRef<boolean>(false);
   const homeExitTriggeredRef = useRef<boolean>(false);
   const selectedPlotRef = useRef<{plotId: number; worldPos: THREE.Vector3} | null>(null);
+  const selectedPetRef = useRef<{petId: string} | null>(null);
 
   const showBubble = (text: string, _x?: number, _y?: number, _z?: number) => {
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
@@ -1160,6 +1207,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
   useEffect(() => {
     homeExitTriggeredRef.current = false;
+    selectedPetRef.current = null;
+    setPetArcMenuPos(null);
     if (zone !== 'town' && zone !== 'fishing' && zone !== 'garden') {
       if (fishTimerRef.current) {
         clearTimeout(fishTimerRef.current);
@@ -1262,13 +1311,32 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   }, [zone, fishingState]);
 
   useEffect(() => {
-    const equippedTool: ToolId | null = fishingRod.equipped
-      ? 'wooden_rod'
-      : bugNet.equipped
-        ? 'wooden_net'
+    const carryingPet =
+      carriedPetId && activePet && activePet.id === carriedPetId
+        ? {speciesId: activePet.speciesId, sick: activePet.sick}
         : null;
-    rebuildAvatarTriggerRef.current?.(avatar, equippedTool);
-  }, [avatar, fishingRod.equipped, bugNet.equipped]);
+    const equippedTool: ToolId | null = carryingPet
+      ? null
+      : fishingRod.equipped
+        ? 'wooden_rod'
+        : bugNet.equipped
+          ? 'wooden_net'
+          : null;
+    rebuildAvatarTriggerRef.current?.(avatar, equippedTool, carryingPet);
+    syncPetCompanionRef.current?.();
+    if (carryingPet || !activePet) {
+      selectedPetRef.current = null;
+      setPetArcMenuPos(null);
+    }
+  }, [
+    avatar,
+    fishingRod.equipped,
+    bugNet.equipped,
+    carriedPetId,
+    activePet?.id,
+    activePet?.speciesId,
+    activePet?.sick,
+  ]);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -1394,15 +1462,34 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
     let insectAlertCooldown = 0;
 
+    const initCarriedPet =
+      stateRef.current.carriedPetId &&
+      stateRef.current.activePet &&
+      stateRef.current.activePet.id === stateRef.current.carriedPetId
+        ? {
+            speciesId: stateRef.current.activePet.speciesId,
+            sick: stateRef.current.activePet.sick,
+          }
+        : null;
     let playerRig: AvatarRig = buildAvatarRig(stateRef.current.avatar, {
-      equippedTool: stateRef.current.fishingRod.equipped
-        ? 'wooden_rod'
-        : stateRef.current.bugNet.equipped
-          ? 'wooden_net'
-          : null,
+      equippedTool: initCarriedPet
+        ? null
+        : stateRef.current.fishingRod.equipped
+          ? 'wooden_rod'
+          : stateRef.current.bugNet.equipped
+            ? 'wooden_net'
+            : null,
+      carryingPet: initCarriedPet,
     });
     playerRig.root.position.set(playerPos.x, 0.14, playerPos.z);
     scene.add(playerRig.root);
+
+    const playerNameplate = createNameplateHandle(stateRef.current.avatar.name, {kind: 'player'});
+    playerNameplate.sprite.position.set(0, 2.46, 0);
+    playerRig.root.add(playerNameplate.sprite);
+
+    const petNameplate = createNameplateHandle('Thú Cưng', {kind: 'pet'});
+    petNameplate.sprite.visible = false;
 
     const playerProxy = new THREE.Mesh(
       new THREE.BoxGeometry(0.95, 1.85, 0.95),
@@ -1423,6 +1510,181 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let currentGrounds: THREE.Object3D[] = [];
     let currentWallSurfaces: HouseWallSurface[] = [];
     let prevGroundY = 0.14;
+
+    const petCompanion = {
+      rig: null as PetRig | null,
+      proxy: null as THREE.Mesh | null,
+      petId: null as string | null,
+      speciesId: null as PetSpeciesId | null,
+      sick: false,
+      x: 0,
+      y: 0.14,
+      z: 2.0,
+      rotY: 0,
+      playTimer: 0,
+      playDuration: 2.2,
+      playKind: 'none' as 'none' | 'jump' | 'circle',
+      playOrbitAngle: 0,
+    };
+
+    const getPetTargetOffset = (
+      speciesId: PetSpeciesId,
+      px: number,
+      pz: number,
+      rotY: number,
+      zNow: ZoneId,
+    ) => {
+      // Flying pets fly cleanly on the character's LEFT side (-X local, opposite +X umbrella).
+      // Walking pets follow slightly behind & to the left at safe distance (>= 1.2m).
+      const spec = PET_CATALOG[speciesId];
+      const lx = spec.moveType === 'fly' ? -1.38 : -0.96;
+      const lz = spec.moveType === 'fly' ? -0.14 : -1.22;
+      const cosR = Math.cos(rotY);
+      const sinR = Math.sin(rotY);
+      const wx = px + lx * cosR + lz * sinR;
+      const wz = pz - lx * sinR + lz * cosR;
+      const b = getZoneWalkBounds(zNow);
+      return {
+        x: THREE.MathUtils.clamp(wx, b.minX + 0.35, b.maxX - 0.35),
+        z: THREE.MathUtils.clamp(wz, b.minZ + 0.35, b.maxZ - 0.35),
+      };
+    };
+
+    const getPetGroundY = (px: number, pz: number, zNow: ZoneId): number => {
+      if (zNow === 'town') {
+        return getTownGroundHeight(px, pz, currentPlazaRadius);
+      }
+      if (zNow === 'garden' && px > 9.35 && px < 15.9 && Math.abs(pz - 3.0) < 0.98) {
+        return 0.36;
+      }
+      return 0.02;
+    };
+
+    const refreshClickTargetsWithPet = () => {
+      const base = activeTown
+        ? [...activeTown.clickTargets, playerProxy]
+        : activeSubzone
+          ? [...activeSubzone.clickTargets, playerProxy]
+          : [playerProxy];
+      if (petCompanion.proxy) {
+        base.push(petCompanion.proxy);
+      }
+      currentClickTargets = base;
+    };
+
+    const disposePetCompanion = () => {
+      if (petNameplate.sprite.parent && petNameplate.sprite.parent === petCompanion.rig?.root) {
+        petCompanion.rig.root.remove(petNameplate.sprite);
+      }
+      if (petCompanion.rig) {
+        scene.remove(petCompanion.rig.root);
+        petCompanion.rig.dispose();
+        petCompanion.rig = null;
+      }
+      if (petCompanion.proxy) {
+        petCompanion.proxy.geometry.dispose();
+        (petCompanion.proxy.material as THREE.Material).dispose();
+        petCompanion.proxy = null;
+      }
+      petCompanion.petId = null;
+      petCompanion.speciesId = null;
+      petCompanion.sick = false;
+      petCompanion.playTimer = 0;
+      petCompanion.playKind = 'none';
+      refreshClickTargetsWithPet();
+    };
+
+    const placePetCompanionNearPlayer = () => {
+      if (!petCompanion.rig || !petCompanion.speciesId) return;
+      const zNow = stateRef.current.zone;
+      const off = getPetTargetOffset(
+        petCompanion.speciesId,
+        playerPos.x,
+        playerPos.z,
+        playerPos.rotY,
+        zNow,
+      );
+      petCompanion.x = off.x;
+      petCompanion.z = off.z;
+      petCompanion.rotY = playerPos.rotY;
+      const gy = getPetGroundY(off.x, off.z, zNow);
+      petCompanion.y = PET_CATALOG[petCompanion.speciesId].moveType === 'fly' ? gy + 1.32 : gy;
+      petCompanion.rig.root.position.set(petCompanion.x, petCompanion.y, petCompanion.z);
+      petCompanion.rig.root.rotation.y = petCompanion.rotY;
+    };
+
+    const syncPetCompanion = (forceSnap = false) => {
+      const {activePet: curPet, carriedPetId: curCarried} = stateRef.current;
+      const shouldShow = Boolean(curPet && curCarried !== curPet.id);
+      if (!shouldShow || !curPet) {
+        if (petCompanion.rig) {
+          disposePetCompanion();
+        }
+        return;
+      }
+
+      const needsRebuild =
+        !petCompanion.rig ||
+        petCompanion.petId !== curPet.id ||
+        petCompanion.speciesId !== curPet.speciesId ||
+        petCompanion.sick !== curPet.sick;
+
+      if (needsRebuild) {
+        const hadSamePet = petCompanion.rig !== null && petCompanion.petId === curPet.id;
+        const prevX = petCompanion.x;
+        const prevY = petCompanion.y;
+        const prevZ = petCompanion.z;
+        const prevRotY = petCompanion.rotY;
+        disposePetCompanion();
+
+        const petScale = curPet.speciesId === 'blue_bird' ? 1.28 : 1.24;
+        const rig = buildPetModel(curPet.speciesId, {
+          scale: petScale,
+          sick: curPet.sick,
+          withShadow: true,
+        });
+        const proxy = new THREE.Mesh(
+          new THREE.BoxGeometry(1.05, 1.05, 1.05),
+          new THREE.MeshBasicMaterial({visible: false}),
+        );
+        proxy.position.set(0, 0.42, 0);
+        proxy.userData = {kind: 'active_pet', petId: curPet.id};
+        rig.root.add(proxy);
+
+        petCompanion.rig = rig;
+        petCompanion.proxy = proxy;
+        petCompanion.petId = curPet.id;
+        petCompanion.speciesId = curPet.speciesId;
+        petCompanion.sick = curPet.sick;
+        scene.add(rig.root);
+
+        if (hadSamePet && !forceSnap) {
+          petCompanion.x = prevX;
+          petCompanion.y = prevY;
+          petCompanion.z = prevZ;
+          petCompanion.rotY = prevRotY;
+          rig.root.position.set(prevX, prevY, prevZ);
+          rig.root.rotation.y = prevRotY;
+        } else {
+          placePetCompanionNearPlayer();
+        }
+        refreshClickTargetsWithPet();
+      } else if (forceSnap) {
+        placePetCompanionNearPlayer();
+      }
+    };
+
+    syncPetCompanionRef.current = () => syncPetCompanion(false);
+    triggerPetPlayRef.current = (petId: string) => {
+      if (petCompanion.petId !== petId || !petCompanion.rig || !petCompanion.speciesId) return;
+      petCompanion.playKind = petCompanion.speciesId === 'blue_bird' ? 'circle' : 'jump';
+      petCompanion.playDuration = petCompanion.speciesId === 'blue_bird' ? 2.8 : 2.1;
+      petCompanion.playTimer = petCompanion.playDuration;
+      petCompanion.playOrbitAngle = Math.atan2(
+        petCompanion.z - playerPos.z,
+        petCompanion.x - playerPos.x,
+      );
+    };
 
     const selectionRing = new THREE.Mesh(
       new THREE.RingGeometry(0.76, 0.96, 32),
@@ -1447,6 +1709,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const {zone: z, plots: pl, fishingState: fs, placedFurniture: pf} = stateRef.current;
       const legacyFs: 'idle' | 'waiting' | 'bite' =
         fs === 'idle' ? 'idle' : fs === 'bite' ? 'bite' : 'waiting';
+      const zoneChanged = activeZoneLoaded !== z;
 
       if (activeTown) {
         scene.remove(activeTown.group);
@@ -1469,14 +1732,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         activeTown.setFishingState?.(legacyFs);
         scene.add(activeTown.group);
         currentAnchors = activeTown.labelAnchors;
-        currentClickTargets = [...activeTown.clickTargets, playerProxy];
         currentColliders = activeTown.colliders;
         currentNavGrid = buildNavGrid('town', currentColliders);
         currentPlazaRadius = activeTown.plazaRadius;
         currentGrounds = activeTown.groundMeshes;
         activeDoorsRef.current = [];
         currentWallSurfaces = [];
-        if (activeZoneLoaded !== 'town') {
+        if (zoneChanged) {
           activeTarget = null;
           activeSeat = null;
           jumpY = 0;
@@ -1488,7 +1750,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             playerPos.z = 3.6;
             playerPos.rotY = 0;
             warpedToPlaza = true;
-          } else if (activeZoneLoaded !== null) {
+          } else if (activeZoneLoaded !== null && activeZoneLoaded !== 'town') {
             const exitSpawn = TOWN_ZONE_ENTRANCES[activeZoneLoaded];
             playerPos.x = exitSpawn.tx;
             playerPos.z = exitSpawn.tz;
@@ -1510,7 +1772,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       } else {
         controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : 4.5;
-        controls.maxDistance = z === 'garden' || z === 'home' ? 26 : 18;
+        controls.maxDistance = z === 'garden' || z === 'home' ? 26 : z === 'petshop' ? 22 : 18;
         activeSubzone = buildSubzoneScene(z, {
           plots: pl,
           fishingState: legacyFs,
@@ -1532,13 +1794,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
         scene.add(activeSubzone.group);
         currentAnchors = activeSubzone.labelAnchors;
-        currentClickTargets = [...activeSubzone.clickTargets, playerProxy];
         currentColliders = activeSubzone.colliders;
         currentNavGrid = buildNavGrid(z, currentColliders);
         currentGrounds = [activeSubzone.groundMesh];
         activeDoorsRef.current = activeSubzone.doors ?? [];
         currentWallSurfaces = activeSubzone.wallSurfaces ?? [];
-        if (activeZoneLoaded !== z) {
+        if (zoneChanged) {
           activeTarget = null;
           activeSeat = null;
           jumpY = 0;
@@ -1551,6 +1812,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           } else if (z === 'garden') {
             playerPos.x = 0;
             playerPos.z = 10.2;
+            playerPos.rotY = Math.PI;
+          } else if (z === 'petshop') {
+            playerPos.x = 0;
+            playerPos.z = 4.6;
             playerPos.rotY = Math.PI;
           } else {
             playerPos.x = 0;
@@ -1565,11 +1830,22 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
       activeZoneLoaded = z;
+      syncPetCompanion(zoneChanged);
+      refreshClickTargetsWithPet();
     };
 
     rebuildSceneTriggerRef.current = loadCurrentWorld;
-    rebuildAvatarTriggerRef.current = (cfg: AvatarConfig, equippedTool: ToolId | null) => {
+    rebuildAvatarTriggerRef.current = (
+      cfg: AvatarConfig,
+      equippedTool: ToolId | null,
+      carryingPet: {speciesId: PetSpeciesId; sick?: boolean} | null,
+    ) => {
+      playerRig.root.remove(playerNameplate.sprite);
+      if (petNameplate.sprite.parent === playerRig.heldPetRig?.root) {
+        playerRig.heldPetRig.root.remove(petNameplate.sprite);
+      }
       scene.remove(playerRig.root);
+      playerRig.heldPetRig?.dispose();
       playerRig.root.traverse((obj) => {
         if ((obj as THREE.Mesh).isMesh) {
           const m = obj as THREE.Mesh;
@@ -1578,7 +1854,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           else m.material.dispose();
         }
       });
-      playerRig = buildAvatarRig(cfg, {equippedTool});
+      playerRig = buildAvatarRig(cfg, {equippedTool, carryingPet});
       const curY =
         stateRef.current.zone === 'town'
           ? getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius)
@@ -1586,6 +1862,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       playerRig.root.position.set(playerPos.x, curY, playerPos.z);
       playerRig.root.rotation.y = playerPos.rotY;
       playerRig.root.add(playerProxy);
+      playerRig.root.add(playerNameplate.sprite);
       scene.add(playerRig.root);
     };
 
@@ -2058,6 +2335,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       selectedPlotRef.current = null;
       setArcMenuPos(null);
+      selectedPetRef.current = null;
+      setPetArcMenuPos(null);
 
       // 1. Check interactive buildings/objects/NPCs/player
       const hits = raycaster.intersectObjects(currentClickTargets, true);
@@ -2564,16 +2843,47 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
+          if (kind === 'active_pet') {
+            soundFX.tap();
+            const petId = data.petId as string;
+            if (petCompanion.rig && stateRef.current.activePet?.id === petId) {
+              const cw = container?.clientWidth || window.innerWidth || 800;
+              const ch = container?.clientHeight || window.innerHeight || 600;
+              _projVec
+                .set(
+                  petCompanion.rig.root.position.x,
+                  petCompanion.rig.root.position.y + 0.55,
+                  petCompanion.rig.root.position.z,
+                )
+                .project(camera);
+              const rawX = ((_projVec.x + 1) / 2) * cw;
+              const rawY = ((-_projVec.y + 1) / 2) * ch;
+              const padX = Math.min(185, cw * 0.38);
+              const minY = Math.min(185, ch * 0.45);
+              selectedPetRef.current = {petId};
+              setPetArcMenuPos({
+                petId,
+                x: Math.max(padX, Math.min(cw - padX, rawX)),
+                y: Math.max(minY, Math.min(ch - 85, rawY)),
+              });
+            }
+            return;
+          }
+
           if (kind === 'ivan_npc') {
             soundFX.tap();
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
-              showBubble(
-                'Ivan: Chào mừng bạn đến Cửa Hàng Pets! Bé sóc nhỏ của mình cũng rất vui được gặp bạn đó~',
-                0,
-                2.25,
-                -2.6,
-              );
+              callbacksRef.current.onOpenPetSupplyShop();
+            });
+            return;
+          }
+
+          if (kind === 'open_pet_adopt') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenPetAdopt();
             });
             return;
           }
@@ -2590,6 +2900,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (selectedPlotRef.current) {
             selectedPlotRef.current = null;
             setArcMenuPos(null);
+          }
+          if (selectedPetRef.current) {
+            selectedPetRef.current = null;
+            setPetArcMenuPos(null);
           }
           releaseSeatIfNeeded();
           const pt = groundHits[0].point;
@@ -2898,6 +3212,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         if (selectedPlotRef.current) {
           selectedPlotRef.current = null;
           setArcMenuPos(null);
+        }
+        if (selectedPetRef.current) {
+          selectedPetRef.current = null;
+          setPetArcMenuPos(null);
         }
 
         let fwdX = controls.target.x - camera.position.x;
@@ -3473,6 +3791,177 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         avatarPoseProgress,
       );
 
+      // Update active 3D Companion Pet (walk or left-side fly, keeping safe distance from player)
+      if (petCompanion.rig && petCompanion.speciesId) {
+        const isFly = PET_CATALOG[petCompanion.speciesId].moveType === 'fly';
+        const companionScale = petCompanion.speciesId === 'blue_bird' ? 1.28 : 1.24;
+        const minSafeDist = isFly ? 1.3 : 1.2;
+        let petMovedSpeed = 0;
+
+        if (petCompanion.playTimer > 0) {
+          petCompanion.playTimer = Math.max(0, petCompanion.playTimer - delta);
+          const p = 1 - petCompanion.playTimer / Math.max(0.01, petCompanion.playDuration);
+
+          if (petCompanion.playKind === 'circle') {
+            // Flying pet orbits gracefully around the player at safe radius
+            petCompanion.playOrbitAngle += delta * 3.85;
+            const radius = 1.38;
+            const tx = playerPos.x + Math.cos(petCompanion.playOrbitAngle) * radius;
+            const tz = playerPos.z + Math.sin(petCompanion.playOrbitAngle) * radius;
+            const b = getZoneWalkBounds(z);
+            petCompanion.x = THREE.MathUtils.clamp(tx, b.minX + 0.35, b.maxX - 0.35);
+            petCompanion.z = THREE.MathUtils.clamp(tz, b.minZ + 0.35, b.maxZ - 0.35);
+            const gy = getPetGroundY(petCompanion.x, petCompanion.z, z);
+            petCompanion.y = gy + 1.42 + Math.sin(elapsed * 4.5) * 0.08;
+            petCompanion.rotY = Math.atan2(
+              -Math.sin(petCompanion.playOrbitAngle),
+              Math.cos(petCompanion.playOrbitAngle),
+            );
+            petCompanion.rig.root.position.set(petCompanion.x, petCompanion.y, petCompanion.z);
+            petCompanion.rig.root.rotation.y = petCompanion.rotY;
+            updatePetAnimation(petCompanion.rig, 'play_circle', elapsed, {
+              baseScale: companionScale,
+              playProgress: p,
+              hoverHeight: 0,
+            });
+          } else {
+            // Walking pet approaches slightly closer in front of player (still >= 1.16m) & jumps happily
+            const cosR = Math.cos(playerPos.rotY);
+            const sinR = Math.sin(playerPos.rotY);
+            const goalX = playerPos.x + 0.24 * cosR + 1.2 * sinR;
+            const goalZ = playerPos.z - 0.24 * sinR + 1.2 * cosR;
+            const b = getZoneWalkBounds(z);
+            const cgx = THREE.MathUtils.clamp(goalX, b.minX + 0.35, b.maxX - 0.35);
+            const cgz = THREE.MathUtils.clamp(goalZ, b.minZ + 0.35, b.maxZ - 0.35);
+            const followA = 1 - Math.exp(-8 * delta);
+            petCompanion.x = THREE.MathUtils.lerp(petCompanion.x, cgx, followA);
+            petCompanion.z = THREE.MathUtils.lerp(petCompanion.z, cgz, followA);
+            const dPlayer = Math.hypot(petCompanion.x - playerPos.x, petCompanion.z - playerPos.z);
+            if (dPlayer < 1.16 && dPlayer > 0.001) {
+              petCompanion.x = playerPos.x + ((petCompanion.x - playerPos.x) / dPlayer) * 1.16;
+              petCompanion.z = playerPos.z + ((petCompanion.z - playerPos.z) / dPlayer) * 1.16;
+            }
+            petCompanion.y = getPetGroundY(petCompanion.x, petCompanion.z, z);
+            const faceRot = Math.atan2(playerPos.x - petCompanion.x, playerPos.z - petCompanion.z);
+            let rDiff = faceRot - petCompanion.rotY;
+            while (rDiff > Math.PI) rDiff -= Math.PI * 2;
+            while (rDiff < -Math.PI) rDiff += Math.PI * 2;
+            petCompanion.rotY += rDiff * Math.min(1, delta * 10);
+            petCompanion.rig.root.position.set(petCompanion.x, petCompanion.y, petCompanion.z);
+            petCompanion.rig.root.rotation.y = petCompanion.rotY;
+            updatePetAnimation(petCompanion.rig, 'play_jump', elapsed, {
+              baseScale: companionScale,
+              playProgress: p,
+            });
+          }
+
+          if (petCompanion.playTimer <= 0) {
+            petCompanion.playKind = 'none';
+          }
+        } else {
+          const targetOff = getPetTargetOffset(
+            petCompanion.speciesId,
+            playerPos.x,
+            playerPos.z,
+            playerPos.rotY,
+            z,
+          );
+          const dx = targetOff.x - petCompanion.x;
+          const dz = targetOff.z - petCompanion.z;
+          const dist = Math.hypot(dx, dz);
+
+          if (dist > 0.05) {
+            const maxStep = (z === 'town' ? 5.6 : 3.9) * delta;
+            const step = dist > 2.4 ? dist * Math.min(1, delta * 5.2) : Math.min(dist, maxStep);
+            const prevX = petCompanion.x;
+            const prevZ = petCompanion.z;
+            petCompanion.x += (dx / dist) * step;
+            petCompanion.z += (dz / dist) * step;
+            petMovedSpeed = Math.hypot(petCompanion.x - prevX, petCompanion.z - prevZ) / Math.max(0.001, delta);
+          }
+
+          // Enforce safe distance so walking & flying pets NEVER touch/overlap avatar
+          const curDistPlayer = Math.hypot(petCompanion.x - playerPos.x, petCompanion.z - playerPos.z);
+          if (curDistPlayer < minSafeDist) {
+            if (curDistPlayer < 0.001) {
+              petCompanion.x = targetOff.x;
+              petCompanion.z = targetOff.z;
+            } else {
+              petCompanion.x =
+                playerPos.x + ((petCompanion.x - playerPos.x) / curDistPlayer) * minSafeDist;
+              petCompanion.z =
+                playerPos.z + ((petCompanion.z - playerPos.z) / curDistPlayer) * minSafeDist;
+            }
+          }
+
+          const gy = getPetGroundY(petCompanion.x, petCompanion.z, z);
+          if (isFly) {
+            const targetY = gy + 1.32;
+            petCompanion.y = THREE.MathUtils.damp(petCompanion.y, targetY, 8, delta);
+          } else {
+            petCompanion.y = THREE.MathUtils.damp(petCompanion.y, gy, 12, delta);
+          }
+
+          const desiredRot =
+            dist > 0.25 ? Math.atan2(dx, dz) : playerPos.rotY;
+          let rDiff = desiredRot - petCompanion.rotY;
+          while (rDiff > Math.PI) rDiff -= Math.PI * 2;
+          while (rDiff < -Math.PI) rDiff += Math.PI * 2;
+          petCompanion.rotY += rDiff * Math.min(1, delta * 9);
+
+          petCompanion.rig.root.position.set(petCompanion.x, petCompanion.y, petCompanion.z);
+          petCompanion.rig.root.rotation.y = petCompanion.rotY;
+
+          updatePetAnimation(
+            petCompanion.rig,
+            isFly ? 'fly' : petMovedSpeed > 0.14 ? 'walk' : 'idle',
+            elapsed,
+            {baseScale: companionScale, hoverHeight: 0},
+          );
+        }
+      }
+
+      // Sync crisp 3D Sprite Nameplates locked onto Player & Active Pet
+      const isEditingHome = z === 'home' && stateRef.current.editFurnitureMode;
+      playerNameplate.update(av.name, {kind: 'player'});
+      playerNameplate.sprite.visible = !isEditingHome;
+      playerNameplate.sprite.position.set(
+        0,
+        2.42 + (playerPos.pose === 'sleep' ? -0.45 : playerRig.bodyPivot.position.y),
+        0,
+      );
+      if (playerNameplate.sprite.visible) {
+        syncNameplateScale(playerNameplate.sprite, camera, 0.34);
+      }
+
+      const curPetTag = stateRef.current.activePet;
+      const isCarryingTag = Boolean(
+        curPetTag && stateRef.current.carriedPetId === curPetTag.id && playerRig.heldPetRig,
+      );
+      if (curPetTag && !isEditingHome && (isCarryingTag || petCompanion.rig)) {
+        const targetParent = isCarryingTag ? playerRig.heldPetRig!.root : petCompanion.rig!.root;
+        if (petNameplate.sprite.parent !== targetParent) {
+          targetParent.add(petNameplate.sprite);
+        }
+        const petLabelY = isCarryingTag
+          ? curPetTag.speciesId === 'blue_bird'
+            ? 0.72
+            : 0.88
+          : curPetTag.speciesId === 'blue_bird'
+            ? 0.88
+            : 1.02;
+        petNameplate.update(curPetTag.name, {
+          kind: 'pet',
+          isMax: curPetTag.intimacyLevel >= MAX_PET_INTIMACY,
+          sick: curPetTag.sick,
+        });
+        petNameplate.sprite.visible = true;
+        petNameplate.sprite.position.set(0, petLabelY, 0);
+        syncNameplateScale(petNameplate.sprite, camera, 0.30);
+      } else {
+        petNameplate.sprite.visible = false;
+      }
+
       if (z === 'town') {
         activeTown?.updateFishingVisuals?.(fishVisualFrame, elapsed);
         const insectEvents = activeTown?.updateInsects?.(
@@ -3639,6 +4128,36 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             );
           }
         }
+
+        if (selectedPetRef.current) {
+          const {activePet: curPet, carriedPetId: curCarried} = stateRef.current;
+          if (!curPet || curCarried === curPet.id || !petCompanion.rig) {
+            selectedPetRef.current = null;
+            setPetArcMenuPos(null);
+          } else {
+            _projVec
+              .set(
+                petCompanion.rig.root.position.x,
+                petCompanion.rig.root.position.y + 0.68,
+                petCompanion.rig.root.position.z,
+              )
+              .project(camera);
+            if (_projVec.z <= 1) {
+              const rawX = ((_projVec.x + 1) / 2) * cw;
+              const rawY = ((-_projVec.y + 1) / 2) * ch;
+              const padX = Math.min(185, cw * 0.38);
+              const minY = Math.min(185, ch * 0.45);
+              const nx = Math.max(padX, Math.min(cw - padX, rawX));
+              const ny = Math.max(minY, Math.min(ch - 85, rawY));
+              const pid = selectedPetRef.current.petId;
+              setPetArcMenuPos((prev) =>
+                prev && prev.petId === pid && Math.abs(prev.x - nx) < 1 && Math.abs(prev.y - ny) < 1
+                  ? prev
+                  : {petId: pid, x: nx, y: ny},
+              );
+            }
+          }
+        }
       }
 
       if (isSoftwareGl) afterDraw(tick);
@@ -3667,6 +4186,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       window.removeEventListener('orientationchange', handleResize);
       document.removeEventListener('fullscreenchange', handleResize);
       document.removeEventListener('webkitfullscreenchange', handleResize);
+      disposePetCompanion();
+      playerNameplate.dispose();
+      petNameplate.dispose();
+      playerRig.heldPetRig?.dispose();
       activeTown?.dispose();
       activeSubzone?.dispose();
       selectionRing.geometry.dispose();
@@ -3810,6 +4333,34 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           );
         })()}
 
+      {/* Radial Arc Pet Menu when tapping companion pet */}
+      {petArcMenuPos &&
+        activePet &&
+        activePet.id === petArcMenuPos.petId &&
+        carriedPetId !== activePet.id && (
+          <PetArcMenu
+            pet={activePet}
+            screenX={petArcMenuPos.x}
+            screenY={petArcMenuPos.y}
+            supplies={petSupplies}
+            onHoldPet={(petId) => {
+              selectedPetRef.current = null;
+              setPetArcMenuPos(null);
+              onHoldPet(petId);
+            }}
+            onFeedPet={onFeedPet}
+            onCurePet={onCurePet}
+            onPlayWithPet={(petId) => {
+              triggerPetPlayRef.current?.(petId);
+              onPlayWithPet(petId);
+            }}
+            onClose={() => {
+              selectedPetRef.current = null;
+              setPetArcMenuPos(null);
+            }}
+          />
+        )}
+
       {/* Top-Left Compact Smartphone Icon Button */}
       {!miniActive && !(zone === 'home' && editFurnitureMode) && (
         <button
@@ -3833,6 +4384,25 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               <span className="h-1 w-1 rounded-[1px] bg-white/95" />
             </span>
             <span className="h-[2px] w-2.5 rounded-full bg-white/80" />
+          </span>
+        </button>
+      )}
+
+      {/* Top-Left Release Pet ('X') Button beside Phone when hugging / shoulder-perching a pet */}
+      {carriedPetId && activePet && !miniActive && !(zone === 'home' && editFurnitureMode) && (
+        <button
+          type="button"
+          onClick={() => {
+            soundFX.tap();
+            onReleasePet();
+          }}
+          aria-label="Thả thú cưng ra"
+          title="Thả thú cưng ra"
+          className="phone-ui anim-pop absolute top-2.5 left-[62px] z-30 flex h-11 items-center gap-1.5 rounded-2xl border-2 border-[#3C3128] bg-[#FFF2EA]/95 px-2.5 text-[#3B2B1E] shadow-lg transition-transform hover:scale-105 active:scale-95"
+        >
+          <PetSpeciesIcon speciesId={activePet.speciesId} className="h-6 w-6 shrink-0" />
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#DF5E56] text-white shadow-xs">
+            <X className="h-3.5 w-3.5 stroke-[3]" />
           </span>
         </button>
       )}

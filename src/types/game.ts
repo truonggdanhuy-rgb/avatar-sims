@@ -565,5 +565,42 @@ export interface InsectDexRecord {
   maxLengthMm: number;
 }
 
+export type PetMoveType = 'walk' | 'fly';
+
+export type PetHoldMode = 'arms' | 'shoulder';
+
+export type PetSpeciesId = 'brown_puppy' | 'blue_bird';
+
+export interface PetSpeciesDefinition {
+  id: PetSpeciesId;
+  name: string;
+  moveType: PetMoveType;
+  price: number;
+  canHold: boolean;
+  holdMode: PetHoldMode;
+  description: string;
+  primaryColor: string;
+  accentColor: string;
+}
+
+export interface OwnedPetState {
+  id: string;
+  speciesId: PetSpeciesId;
+  name: string;
+  intimacyLevel: number;
+  intimacyXp: number;
+  sick: boolean;
+  lastTickAt: number;
+  adoptedAt: number;
+}
+
+export type PetSupplyId = 'petFood' | 'petMedicine' | 'intimacyTest';
+
+export interface PetSupplies {
+  petFood: number;
+  petMedicine: number;
+  intimacyTest: number;
+}
+
 
 

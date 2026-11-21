@@ -4,6 +4,7 @@ import {
   ArrowUp,
   Backpack,
   BookOpen,
+  Check,
   ClipboardList,
   CloudSun,
   Coins,
@@ -13,10 +14,13 @@ import {
   Gift,
   Heart,
   Home,
+  Info,
   Moon,
+  Package,
   Send,
   Settings,
   Shirt,
+  Sparkles,
   Sun,
   UserCircle2,
   Volume2,
@@ -35,10 +39,19 @@ import {
   GameStats,
   InsectDexRecord,
   InsectSpeciesId,
+  OwnedPetState,
+  PetSupplies,
+  PetSupplyId,
   RiverFishSpeciesId,
   TimeOfDay,
   ZoneId,
 } from '../../types/game';
+import {
+  getPetXpForNextLevel,
+  MAX_PET_INTIMACY,
+  PET_CATALOG,
+  PET_SUPPLY_LIST,
+} from '../../data/petCatalog';
 import {
   RIVER_FISH_LIST,
   WOODEN_ROD_MAX_DURABILITY,
@@ -66,6 +79,7 @@ import {
   InsectIllustration,
   WoodenNetIcon,
 } from '../InsectIcons';
+import {BlingBlingBadge, PetSpeciesIcon, PetSupplyIcon} from '../PetIcons';
 
 interface PhoneMenuModalProps {
   zone: ZoneId;
@@ -80,6 +94,9 @@ interface PhoneMenuModalProps {
   bugNet: BugNetState;
   fishDex: Partial<Record<RiverFishSpeciesId, FishDexRecord>>;
   insectDex: Partial<Record<InsectSpeciesId, InsectDexRecord>>;
+  ownedPets: OwnedPetState[];
+  activePetId: string | null;
+  petSupplies: PetSupplies;
   accountCreatedAt: number;
   accountId: string;
   showJoystick: boolean;
@@ -89,6 +106,9 @@ interface PhoneMenuModalProps {
   initialBagSubTab?: 'list' | 'tools' | 'pets' | 'mounts';
   onToggleEquipRod: () => void;
   onToggleEquipNet: () => void;
+  onToggleSummonPet: (petId: string) => void;
+  onRenamePet: (petId: string, newName: string) => void;
+  onUsePetSupply: (petId: string, supplyId: PetSupplyId) => {ok: boolean; message: string};
   onToggleJoystick: () => void;
   onToggleJumpButton: () => void;
   onTeleportToPlaza: () => void;
@@ -143,6 +163,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   bugNet,
   fishDex,
   insectDex,
+  ownedPets,
+  activePetId,
+  petSupplies,
   accountCreatedAt,
   accountId,
   showJoystick,
@@ -152,6 +175,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   initialBagSubTab = 'list',
   onToggleEquipRod,
   onToggleEquipNet,
+  onToggleSummonPet,
+  onRenamePet,
+  onUsePetSupply,
   onToggleJoystick,
   onToggleJumpButton,
   onTeleportToPlaza,
@@ -166,6 +192,10 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
 }) => {
   const [tab, setTab] = useState<PhoneTab>(initialTab);
   const [bagSubTab, setBagSubTab] = useState<BagSubTab>(initialBagSubTab);
+  const [petsSubView, setPetsSubView] = useState<'pets' | 'supplies'>('pets');
+  const [selectedPetInfoId, setSelectedPetInfoId] = useState<string | null>(null);
+  const [petRenameDraft, setPetRenameDraft] = useState('');
+  const [petActionFeedback, setPetActionFeedback] = useState<string | null>(null);
   const [dexCategory, setDexCategory] = useState<'fish' | 'insects'>('fish');
   const [fishDexWater, setFishDexWater] = useState<FishWaterType>('river');
   const [deviceTime, setDeviceTime] = useState<string>(() => formatDeviceTime());
@@ -725,10 +755,18 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                         type="button"
                         onClick={() => {
                           soundFX.tap();
+                          setSelectedPetInfoId(null);
+                          setPetsSubView('pets');
+                          setPetActionFeedback(null);
                           setBagSubTab('pets');
                         }}
                         className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#E08A58] active:scale-95"
                       >
+                        {activePetId && (
+                          <span className="absolute -top-1.5 right-1 rounded-full bg-[#DF7E5C] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
+                            Đang gọi
+                          </span>
+                        )}
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
                           <PetCatFaceIcon className="h-10 w-10" />
                         </div>
@@ -938,22 +976,363 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 </div>
               )}
 
-              {bagSubTab === 'pets' && (
-                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#E8CBB0] bg-[#FFF8F0] p-5 text-center">
-                  <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-xs border border-[#F0D9C2]">
-                    <PetCatFaceIcon className="h-12 w-12" />
+              {bagSubTab === 'pets' && (() => {
+                const infoPet = selectedPetInfoId
+                  ? ownedPets.find((p) => p.id === selectedPetInfoId) ?? null
+                  : null;
+                const activePetObj = activePetId
+                  ? ownedPets.find((p) => p.id === activePetId) ?? null
+                  : ownedPets[0] ?? null;
+
+                if (infoPet) {
+                  const spec = PET_CATALOG[infoPet.speciesId];
+                  const isMax = infoPet.intimacyLevel >= MAX_PET_INTIMACY;
+                  const reqXp = getPetXpForNextLevel(infoPet.intimacyLevel);
+                  const pct = isMax
+                    ? 100
+                    : Math.min(100, Math.round((infoPet.intimacyXp / Math.max(1, reqXp)) * 100));
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFX.tap();
+                            setSelectedPetInfoId(null);
+                            setPetActionFeedback(null);
+                          }}
+                          className="flex items-center gap-1 rounded-xl bg-[#EFE0C9] px-2.5 py-1.5 text-[11px] font-bold text-[#5B422E] active:scale-95"
+                        >
+                          <ArrowLeft className="h-3.5 w-3.5" />
+                          <span>Danh sách Pets</span>
+                        </button>
+                        <span className="text-[11px] font-extrabold text-[#7B6247]">
+                          Thông Tin Pet
+                        </span>
+                      </div>
+
+                      <div className="rounded-2xl border-2 border-[#E7CFAF] bg-white p-3.5 shadow-xs space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[#EFE0C9] bg-[#FFF8EC]">
+                            <PetSpeciesIcon speciesId={infoPet.speciesId} className="h-11 w-11" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1 text-sm font-black text-[#4A3525]">
+                              {isMax && <BlingBlingBadge className="h-4 w-4" />}
+                              <span className="truncate">{infoPet.name}</span>
+                            </div>
+                            <div className="mt-0.5 text-[11px] font-bold text-[#7A6048]">
+                              Loài: {spec.name} · {spec.moveType === 'fly' ? 'Bay bên trái' : 'Đi bộ'}
+                            </div>
+                            <div className="mt-0.5 text-[10px] font-bold text-[#9C653C]">
+                              Tương tác: {spec.canHold ? (spec.holdMode === 'shoulder' ? 'Bay quanh người' : 'Ôm trên tay') : 'Không thể ôm'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Intimacy & Health */}
+                        <div className="rounded-xl bg-[#FAF4EA] p-2.5 space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-black text-[#5A3E28]">
+                            <span className="inline-flex items-center gap-1">
+                              <Heart className="h-3.5 w-3.5 text-[#E56B8A] fill-current" />
+                              Độ thân mật: Lv.{infoPet.intimacyLevel}/{MAX_PET_INTIMACY}
+                            </span>
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-extrabold ${
+                                infoPet.sick
+                                  ? 'bg-[#FCE4E8] text-[#C93B4B]'
+                                  : 'bg-[#E5F6EB] text-[#2B7344]'
+                              }`}
+                            >
+                              {infoPet.sick ? 'Đang bị bệnh' : 'Khỏe mạnh'}
+                            </span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-[#EAD9C0]">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-[#EE7394] to-[#F5AA4E] transition-all"
+                              style={{width: `${pct}%`}}
+                            />
+                          </div>
+                          <div className="text-[10px] font-bold text-[#7A6048]">
+                            {isMax
+                              ? 'Đã đạt cấp 10 — Tên pet hiển thị hiệu ứng bling bling!'
+                              : `Tiến độ lên cấp: ${infoPet.intimacyXp}/${reqXp}`}
+                          </div>
+                        </div>
+
+                        {/* Rename Input */}
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const trimmed = petRenameDraft.trim();
+                            if (!trimmed) return;
+                            soundFX.sparkle();
+                            onRenamePet(infoPet.id, trimmed);
+                            setPetActionFeedback(`Đã đổi tên thành "${trimmed}"!`);
+                          }}
+                          className="space-y-1.5"
+                        >
+                          <label className="block text-[11px] font-extrabold text-[#5A3E28]">
+                            Đổi tên thú cưng:
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={petRenameDraft}
+                              onChange={(e) => setPetRenameDraft(e.target.value)}
+                              maxLength={18}
+                              placeholder="Nhập tên mới..."
+                              className="min-w-0 flex-1 rounded-xl border border-[#DECBB0] bg-[#FAF4EA] px-3 py-2 text-xs font-bold text-[#3B2A1A] focus:border-[#6F4E37] focus:outline-none"
+                            />
+                            <button
+                              type="submit"
+                              className="flex shrink-0 items-center gap-1 rounded-xl bg-[#6F4E37] px-3 py-2 text-xs font-black text-amber-50 active:scale-95"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              Lưu
+                            </button>
+                          </div>
+                        </form>
+
+                        {/* Quick Use Pet Supplies on this Pet */}
+                        <div className="border-t border-[#F0E3D1] pt-2.5 space-y-1.5">
+                          <div className="text-[10px] font-extrabold text-[#7B6247]">
+                            Dùng đồ từ Túi &gt; Pets cho bé này:
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {PET_SUPPLY_LIST.map((sup) => {
+                              const count = petSupplies[sup.id] ?? 0;
+                              const disabled =
+                                count <= 0 ||
+                                (sup.id === 'petMedicine' && !infoPet.sick) ||
+                                (sup.id === 'intimacyTest' && isMax);
+                              return (
+                                <button
+                                  key={sup.id}
+                                  type="button"
+                                  disabled={disabled}
+                                  onClick={() => {
+                                    const res = onUsePetSupply(infoPet.id, sup.id);
+                                    if (res.ok) soundFX.sparkle();
+                                    else soundFX.tap();
+                                    setPetActionFeedback(res.message);
+                                  }}
+                                  className="flex flex-col items-center gap-1 rounded-xl border border-[#E5D3B8] bg-[#FFF9F0] p-1.5 text-center transition active:scale-95 disabled:opacity-45"
+                                >
+                                  <PetSupplyIcon supplyId={sup.id} className="h-6 w-6" />
+                                  <span className="line-clamp-1 text-[9px] font-extrabold text-[#4A3525]">
+                                    {sup.id === 'intimacyTest'
+                                      ? 'Test Lv+'
+                                      : sup.id === 'petMedicine'
+                                        ? 'Thuốc'
+                                        : 'Cho ăn'}
+                                  </span>
+                                  <span className="text-[9px] font-black text-[#9A5B25] tabular-nums">
+                                    x{count}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {petActionFeedback && (
+                          <div className="rounded-xl bg-[#EAF8EE] px-2.5 py-1.5 text-[11px] font-bold text-[#2A6E40]">
+                            {petActionFeedback}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="flex flex-1 flex-col space-y-2.5">
+                    {/* Sub-switcher: Pets List (default, ONLY pets!) vs Pet Supplies */}
+                    <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-[#EFE6D6] p-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFX.tap();
+                          setPetsSubView('pets');
+                        }}
+                        className={`rounded-lg py-1.5 text-[11px] font-black transition ${
+                          petsSubView === 'pets'
+                            ? 'bg-[#DF7E5C] text-white shadow-xs'
+                            : 'text-[#6A5138]'
+                        }`}
+                      >
+                        Thú Cưng ({ownedPets.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFX.tap();
+                          setPetsSubView('supplies');
+                        }}
+                        className={`flex items-center justify-center gap-1 rounded-lg py-1.5 text-[11px] font-black transition ${
+                          petsSubView === 'supplies'
+                            ? 'bg-[#49A58D] text-white shadow-xs'
+                            : 'text-[#6A5138]'
+                        }`}
+                      >
+                        <Package className="h-3 w-3" />
+                        Đồ Dùng Pets
+                      </button>
+                    </div>
+
+                    {petsSubView === 'pets' ? (
+                      ownedPets.length === 0 ? (
+                        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#E8CBB0] bg-[#FFF8F0] p-5 text-center">
+                          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#F0D9C2] bg-white shadow-xs">
+                            <PetCatFaceIcon className="h-12 w-12" />
+                          </div>
+                          <div className="text-sm font-black text-[#5C3D24]">
+                            Chưa có thú cưng nào
+                          </div>
+                          <p className="mt-1.5 text-xs leading-relaxed font-semibold text-[#7D6147]">
+                            Hãy ghé <strong className="text-[#B85B38]">Cửa Hàng Pets</strong> trong thị trấn để nhận nuôi bé Cún Nâu hoặc Chim Xanh nhé!
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          {ownedPets.map((pet) => {
+                            const spec = PET_CATALOG[pet.speciesId];
+                            const isActive = activePetId === pet.id;
+                            const isMax = pet.intimacyLevel >= MAX_PET_INTIMACY;
+                            return (
+                              <div
+                                key={pet.id}
+                                className={`relative rounded-2xl border-2 bg-white p-3 shadow-xs transition ${
+                                  isActive
+                                    ? 'border-[#DF7E5C] bg-[#FFFDF9]'
+                                    : 'border-[#E6D4BC]'
+                                }`}
+                              >
+                                {/* 'i' Info Button at Top-Right of Pet Card */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    soundFX.tap();
+                                    setPetRenameDraft(pet.name);
+                                    setPetActionFeedback(null);
+                                    setSelectedPetInfoId(pet.id);
+                                  }}
+                                  aria-label={`Thông tin ${pet.name}`}
+                                  title="Thông tin & Đổi tên"
+                                  className="absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full border border-[#DECBB0] bg-[#FFF7EA] text-[#6F4E37] shadow-2xs transition hover:bg-[#F3E4CE] active:scale-90"
+                                >
+                                  <Info className="h-3.5 w-3.5" />
+                                </button>
+
+                                <div className="flex items-center gap-3 pr-8">
+                                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#EFE0C9] bg-[#FFF7EC]">
+                                    <PetSpeciesIcon speciesId={pet.speciesId} className="h-10 w-10" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1 text-xs font-black text-[#4A3525]">
+                                      {isMax && <BlingBlingBadge className="h-3.5 w-3.5" />}
+                                      <span className="truncate">{pet.name}</span>
+                                    </div>
+                                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-[#7A6048]">
+                                      <span>{spec.moveType === 'fly' ? 'Bay' : 'Đi bộ'}</span>
+                                      <span>·</span>
+                                      <span className="text-[#C84A6E]">
+                                        Thân mật Lv.{pet.intimacyLevel}
+                                      </span>
+                                      {pet.sick && (
+                                        <span className="rounded bg-[#FCE4E8] px-1 py-px text-[#C93B4B]">
+                                          Ốm
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    soundFX.tap();
+                                    onToggleSummonPet(pet.id);
+                                  }}
+                                  className={`mt-2.5 w-full rounded-xl py-2 text-xs font-black transition active:scale-98 ${
+                                    isActive
+                                      ? 'bg-[#D67C3A] text-white'
+                                      : 'bg-[#439A6C] text-white'
+                                  }`}
+                                >
+                                  {isActive ? 'Thu Hồi Pet' : 'Gọi Pet Đồng Hành'}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )
+                    ) : (
+                      <div className="space-y-2.5">
+                        {PET_SUPPLY_LIST.map((sup) => {
+                          const count = petSupplies[sup.id] ?? 0;
+                          const isTest = sup.id === 'intimacyTest';
+                          const targetPet = activePetObj;
+                          const canUse = Boolean(
+                            targetPet &&
+                              count > 0 &&
+                              !(sup.id === 'petMedicine' && !targetPet.sick) &&
+                              !(sup.id === 'intimacyTest' && targetPet.intimacyLevel >= MAX_PET_INTIMACY),
+                          );
+                          return (
+                            <div
+                              key={sup.id}
+                              className="rounded-2xl border-2 border-[#E6D4BC] bg-white p-3 space-y-2"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#EFE0C9] bg-[#FFF8EC]">
+                                  <PetSupplyIcon supplyId={sup.id} className="h-8 w-8" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="flex items-center gap-1 text-xs font-black text-[#4A3525]">
+                                      {isTest && <Sparkles className="h-3 w-3 text-[#D85A9E]" />}
+                                      {sup.name}
+                                    </span>
+                                    <span className="rounded bg-[#F3E9D8] px-1.5 py-0.5 text-[10px] font-black text-[#6B4E34] tabular-nums">
+                                      x{count}
+                                    </span>
+                                  </div>
+                                  <p className="mt-0.5 text-[10px] font-semibold text-[#7A6048]">
+                                    {sup.description}
+                                  </p>
+                                </div>
+                              </div>
+                              {targetPet && (
+                                <button
+                                  type="button"
+                                  disabled={!canUse}
+                                  onClick={() => {
+                                    const res = onUsePetSupply(targetPet.id, sup.id);
+                                    if (res.ok) soundFX.sparkle();
+                                    else soundFX.tap();
+                                    setPetActionFeedback(res.message);
+                                  }}
+                                  className="w-full rounded-xl bg-[#49A58D] py-1.5 text-[11px] font-black text-white transition active:scale-95 disabled:cursor-not-allowed disabled:bg-[#DDD5C9] disabled:text-[#8E8275]"
+                                >
+                                  Dùng cho {targetPet.name}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {petActionFeedback && (
+                          <div className="rounded-xl bg-[#EAF8EE] px-2.5 py-2 text-[11px] font-bold text-[#2A6E40]">
+                            {petActionFeedback}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-sm font-black text-[#5C3D24]">
-                    Thú Cưng Đồng Hành (Pets)
-                  </div>
-                  <span className="mt-1 rounded-full bg-[#FCE7D2] px-2.5 py-0.5 text-[10px] font-extrabold text-[#A85F24]">
-                    Sắp ra mắt
-                  </span>
-                  <p className="mt-2 text-xs font-semibold leading-relaxed text-[#7D6147]">
-                    Bạn sẽ sớm có thể nuôi và dẫn các bé thú cưng đáng yêu đi dạo khắp thị trấn!
-                  </p>
-                </div>
-              )}
+                );
+              })()}
 
               {bagSubTab === 'mounts' && (
                 <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#BBD6EA] bg-[#F2F8FC] p-5 text-center">

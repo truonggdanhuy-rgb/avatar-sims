@@ -10,11 +10,22 @@ import {LivestockModal} from './components/modals/LivestockModal';
 import {OrderBoardModal} from './components/modals/OrderBoardModal';
 import {PhoneMenuModal} from './components/modals/PhoneMenuModal';
 import {PondModal} from './components/modals/PondModal';
+import {PetAdoptModal} from './components/modals/PetAdoptModal';
+import {PetSupplyShopModal} from './components/modals/PetSupplyShopModal';
 import {SettingsModal} from './components/modals/SettingsModal';
 import {WardrobeModal} from './components/modals/WardrobeModal';
 import {KoiShopModal} from './components/modals/KoiShopModal';
 import {WorldCanvas} from './components/WorldCanvas';
 import {DEFAULT_AVATAR, SHOP_ITEMS, STARTER_OWNED_IDS} from './data/avatarCatalog';
+import {
+  applyPetIntimacyXp,
+  applyPetLevelStep,
+  createInitialPetSupplies,
+  createOwnedPet,
+  MAX_PET_INTIMACY,
+  PET_CATALOG,
+  PET_SUPPLY_META,
+} from './data/petCatalog';
 import {
   computeFishSellPrice,
   createInitialFishDex,
@@ -105,6 +116,10 @@ import {
   KitchenLevel,
   LivestockAnimalState,
   MillJob,
+  OwnedPetState,
+  PetSpeciesId,
+  PetSupplies,
+  PetSupplyId,
   PlacedFurniture,
   PlotLevel,
   PondFishSpecies,
@@ -303,6 +318,8 @@ export default function App() {
   const [pondOpen, setPondOpen] = useState(false);
   const [farmShopOpen, setFarmShopOpen] = useState(false);
   const [koiShopOpen, setKoiShopOpen] = useState(false);
+  const [petSupplyShopOpen, setPetSupplyShopOpen] = useState(false);
+  const [petAdoptOpen, setPetAdoptOpen] = useState(false);
   const [phoneInitialTab, setPhoneInitialTab] = useState<'menu' | 'guide' | 'bag' | 'fishdex'>('menu');
   const [phoneBagSubTab, setPhoneBagSubTab] = useState<'list' | 'tools' | 'pets' | 'mounts'>('list');
   const [nearPond, setNearPond] = useState(false);
@@ -995,6 +1012,110 @@ export default function App() {
     return [];
   });
 
+  const [ownedPets, setOwnedPets] = useState<OwnedPetState[]>(() => {
+    const now = Date.now();
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.ownedPets)) {
+          return (parsed.ownedPets as Partial<OwnedPetState>[])
+            .filter(
+              (p): p is Partial<OwnedPetState> =>
+                Boolean(
+                  p &&
+                    typeof p.id === 'string' &&
+                    typeof p.speciesId === 'string' &&
+                    p.speciesId in PET_CATALOG,
+                ),
+            )
+            .map((p: Partial<OwnedPetState>) => {
+              const speciesId = p.speciesId as PetSpeciesId;
+              const spec = PET_CATALOG[speciesId];
+              return {
+                id: p.id!,
+                speciesId,
+                name:
+                  typeof p.name === 'string' && p.name.trim()
+                    ? p.name.trim().slice(0, 20)
+                    : spec.name,
+                intimacyLevel:
+                  typeof p.intimacyLevel === 'number'
+                    ? Math.max(1, Math.min(MAX_PET_INTIMACY, Math.floor(p.intimacyLevel)))
+                    : 1,
+                intimacyXp:
+                  typeof p.intimacyXp === 'number' ? Math.max(0, Math.floor(p.intimacyXp)) : 0,
+                sick: Boolean(p.sick),
+                lastTickAt: typeof p.lastTickAt === 'number' ? p.lastTickAt : now,
+                adoptedAt: typeof p.adoptedAt === 'number' ? p.adoptedAt : now,
+              };
+            });
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return [];
+  });
+
+  const [activePetId, setActivePetId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.activePetId === 'string' && parsed.activePetId.trim()) {
+          return parsed.activePetId;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return null;
+  });
+
+  const [carriedPetId, setCarriedPetId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.carriedPetId === 'string' && parsed.carriedPetId.trim()) {
+          return parsed.carriedPetId;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return null;
+  });
+
+  const [petSupplies, setPetSupplies] = useState<PetSupplies>(() => {
+    const defaults = createInitialPetSupplies();
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.petSupplies && typeof parsed.petSupplies === 'object') {
+          const s = parsed.petSupplies;
+          return {
+            petFood:
+              typeof s.petFood === 'number' ? Math.max(0, Math.floor(s.petFood)) : defaults.petFood,
+            petMedicine:
+              typeof s.petMedicine === 'number'
+                ? Math.max(0, Math.floor(s.petMedicine))
+                : defaults.petMedicine,
+            intimacyTest:
+              typeof s.intimacyTest === 'number'
+                ? Math.max(0, Math.floor(s.intimacyTest))
+                : defaults.intimacyTest,
+          };
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return defaults;
+  });
+
   const [teleportToPlazaPulse, setTeleportToPlazaPulse] = useState(0);
   const [teleportCooldownEndAt, setTeleportCooldownEndAt] = useState(0);
   const [teleportClockNow, setTeleportClockNow] = useState(() => Date.now());
@@ -1231,6 +1352,31 @@ export default function App() {
             : prev.lastTickAt + generated * WELL_WATER_INTERVAL_MS;
         return {stored: nextStored, lastTickAt: nextTickAt};
       });
+
+      // 5. Pets rare sickness tick (rất hiếm khi bệnh)
+      setOwnedPets((prev) => {
+        if (prev.length === 0) return prev;
+        let changed = false;
+        const next = prev.map((pet) => {
+          const dt = Math.max(0, now - pet.lastTickAt);
+          if (dt < 5000) return pet;
+          changed = true;
+          let nextSick = pet.sick;
+          if (!nextSick) {
+            const dtSec = Math.min(dt / 1000, 120);
+            const pPerSec = 0.000035;
+            if (Math.random() < 1 - Math.pow(1 - pPerSec, dtSec)) {
+              nextSick = true;
+            }
+          }
+          return {
+            ...pet,
+            sick: nextSick,
+            lastTickAt: now,
+          };
+        });
+        return changed ? next : prev;
+      });
     };
 
     tickFarmWorld();
@@ -1273,6 +1419,10 @@ export default function App() {
           showJoystick,
           showJumpButton,
           redeemedCodes,
+          ownedPets,
+          activePetId,
+          carriedPetId,
+          petSupplies,
         }),
       );
     } catch {
@@ -1308,6 +1458,10 @@ export default function App() {
     showJoystick,
     showJumpButton,
     redeemedCodes,
+    ownedPets,
+    activePetId,
+    carriedPetId,
+    petSupplies,
   ]);
 
   const handleZoneChange = (next: ZoneId) => {
@@ -1324,6 +1478,10 @@ export default function App() {
       setPastureCoop(null);
       setPondOpen(false);
       setFarmShopOpen(false);
+    }
+    if (next !== 'petshop') {
+      setPetSupplyShopOpen(false);
+      setPetAdoptOpen(false);
     }
   };
 
@@ -2587,6 +2745,182 @@ export default function App() {
     });
   };
 
+  // === PETS SYSTEM HANDLERS ===
+  const activePet: OwnedPetState | null = activePetId
+    ? ownedPets.find((p) => p.id === activePetId) ?? null
+    : null;
+  const effectiveCarriedPetId =
+    carriedPetId && activePet && carriedPetId === activePet.id && PET_CATALOG[activePet.speciesId]?.canHold
+      ? carriedPetId
+      : null;
+
+  const handleAdoptPet = (speciesId: PetSpeciesId) => {
+    const spec = PET_CATALOG[speciesId];
+    if (!spec || stats.coins < spec.price) return;
+    soundFX.sparkle();
+    const newPet = createOwnedPet(speciesId, ownedPets.length + 1);
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - spec.price,
+      mood: Math.min(100, prev.mood + 10),
+    }));
+    setOwnedPets((prev) => [...prev, newPet]);
+    setActivePetId(newPet.id);
+    setCarriedPetId(null);
+  };
+
+  const handleBuyPetSupply = (supplyId: PetSupplyId, qty = 1) => {
+    const meta = PET_SUPPLY_META[supplyId];
+    if (!meta || qty <= 0) return;
+    const totalCost = meta.price * qty;
+    if (stats.coins < totalCost) return;
+    soundFX.tap();
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - totalCost,
+    }));
+    setPetSupplies((prev) => ({
+      ...prev,
+      [supplyId]: (prev[supplyId] || 0) + qty,
+    }));
+  };
+
+  const handleToggleSummonPet = (petId: string) => {
+    const target = ownedPets.find((p) => p.id === petId);
+    if (!target) return;
+    soundFX.tap();
+    setCarriedPetId(null);
+    setActivePetId((prev) => (prev === petId ? null : petId));
+  };
+
+  const handleHoldPet = (petId: string) => {
+    const target = ownedPets.find((p) => p.id === petId);
+    if (!target) return;
+    const spec = PET_CATALOG[target.speciesId];
+    if (!spec?.canHold) return;
+    soundFX.tap();
+    setActivePetId(petId);
+    setCarriedPetId(petId);
+  };
+
+  const handleReleasePet = () => {
+    soundFX.tap();
+    setCarriedPetId(null);
+  };
+
+  const handleRenamePet = (petId: string, newName: string) => {
+    const trimmed = newName.trim().slice(0, 20);
+    if (!trimmed) return;
+    setOwnedPets((prev) =>
+      prev.map((p) => (p.id === petId ? {...p, name: trimmed} : p)),
+    );
+  };
+
+  const handleFeedPet = (petId: string) => {
+    if (petSupplies.petFood <= 0) return;
+    const target = ownedPets.find((p) => p.id === petId);
+    if (!target) return;
+    soundFX.sparkle();
+    setPetSupplies((prev) => ({
+      ...prev,
+      petFood: Math.max(0, prev.petFood - 1),
+    }));
+    setOwnedPets((prev) =>
+      prev.map((p) => (p.id === petId ? applyPetIntimacyXp(p, 35) : p)),
+    );
+    setStats((prev) => ({
+      ...prev,
+      mood: Math.min(100, prev.mood + 3),
+    }));
+  };
+
+  const handleCurePet = (petId: string) => {
+    if (petSupplies.petMedicine <= 0) return;
+    const target = ownedPets.find((p) => p.id === petId);
+    if (!target || !target.sick) return;
+    soundFX.sparkle();
+    setPetSupplies((prev) => ({
+      ...prev,
+      petMedicine: Math.max(0, prev.petMedicine - 1),
+    }));
+    setOwnedPets((prev) =>
+      prev.map((p) =>
+        p.id === petId ? {...applyPetIntimacyXp(p, 40), sick: false} : p,
+      ),
+    );
+    setStats((prev) => ({
+      ...prev,
+      mood: Math.min(100, prev.mood + 4),
+    }));
+  };
+
+  const handlePlayWithPet = (petId: string) => {
+    const target = ownedPets.find((p) => p.id === petId);
+    if (!target) return;
+    soundFX.tap();
+    setOwnedPets((prev) =>
+      prev.map((p) => (p.id === petId ? applyPetIntimacyXp(p, 25) : p)),
+    );
+    setStats((prev) => ({
+      ...prev,
+      mood: Math.min(100, prev.mood + 4),
+    }));
+  };
+
+  const handleUsePetSupply = (
+    petId: string,
+    supplyId: PetSupplyId,
+  ): {ok: boolean; message: string} => {
+    const target = ownedPets.find((p) => p.id === petId);
+    if (!target) return {ok: false, message: 'Không tìm thấy thú cưng.'};
+    if ((petSupplies[supplyId] || 0) <= 0) {
+      return {ok: false, message: 'Bạn đã hết vật phẩm này trong túi.'};
+    }
+
+    if (supplyId === 'petFood') {
+      soundFX.sparkle();
+      setPetSupplies((prev) => ({...prev, petFood: Math.max(0, prev.petFood - 1)}));
+      setOwnedPets((prev) =>
+        prev.map((p) => (p.id === petId ? applyPetIntimacyXp(p, 35) : p)),
+      );
+      setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 3)}));
+      return {ok: true, message: `Đã cho ${target.name} ăn ngon (+35 điểm thân mật).`};
+    }
+
+    if (supplyId === 'petMedicine') {
+      if (!target.sick) {
+        return {ok: false, message: `${target.name} đang hoàn toàn khỏe mạnh!`};
+      }
+      soundFX.sparkle();
+      setPetSupplies((prev) => ({...prev, petMedicine: Math.max(0, prev.petMedicine - 1)}));
+      setOwnedPets((prev) =>
+        prev.map((p) =>
+          p.id === petId ? {...applyPetIntimacyXp(p, 40), sick: false} : p,
+        ),
+      );
+      setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 4)}));
+      return {ok: true, message: `Đã chữa khỏi bệnh cho ${target.name} (+40 điểm thân mật)!`};
+    }
+
+    // intimacyTest
+    if (target.intimacyLevel >= MAX_PET_INTIMACY) {
+      return {ok: false, message: `${target.name} đã đạt cấp thân mật tối đa (Lv.10)!`};
+    }
+    soundFX.sparkle();
+    setPetSupplies((prev) => ({
+      ...prev,
+      intimacyTest: Math.max(0, prev.intimacyTest - 1),
+    }));
+    const nextLv = Math.min(MAX_PET_INTIMACY, target.intimacyLevel + 1);
+    setOwnedPets((prev) =>
+      prev.map((p) => (p.id === petId ? applyPetLevelStep(p, 1) : p)),
+    );
+    return {
+      ok: true,
+      message: `Test thân mật thành công! ${target.name} đã lên Lv.${nextLv}!`,
+    };
+  };
+
   return (
     <main className="relative h-[100dvh] w-full overflow-hidden bg-[#BFE6F7] select-none">
       <WorldCanvas
@@ -2614,11 +2948,21 @@ export default function App() {
         showJoystick={showJoystick}
         showJumpButton={showJumpButton}
         teleportToPlazaPulse={teleportToPlazaPulse}
+        activePet={activePet}
+        carriedPetId={effectiveCarriedPetId}
+        petSupplies={petSupplies}
         onChangeZone={handleZoneChange}
         onOpenWardrobe={() => setWardrobeOpen(true)}
         onOpenShop={() => setBoutiqueOpen(true)}
         onOpenKoiShop={() => setKoiShopOpen(true)}
         onOpenFurnitureShop={() => setFurnitureShopOpen(true)}
+        onOpenPetSupplyShop={() => setPetSupplyShopOpen(true)}
+        onOpenPetAdopt={() => setPetAdoptOpen(true)}
+        onHoldPet={handleHoldPet}
+        onReleasePet={handleReleasePet}
+        onFeedPet={handleFeedPet}
+        onCurePet={handleCurePet}
+        onPlayWithPet={handlePlayWithPet}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenDailyQuests={() => setDailyQuestsOpen(true)}
         onOpenPhone={() => {
@@ -2844,6 +3188,9 @@ export default function App() {
           bugNet={bugNet}
           fishDex={fishDex}
           insectDex={insectDex}
+          ownedPets={ownedPets}
+          activePetId={activePetId}
+          petSupplies={petSupplies}
           accountCreatedAt={accountCreatedAt}
           accountId={accountId}
           showJoystick={showJoystick}
@@ -2853,6 +3200,9 @@ export default function App() {
           initialBagSubTab={phoneBagSubTab}
           onToggleEquipRod={handleToggleEquipRod}
           onToggleEquipNet={handleToggleEquipNet}
+          onToggleSummonPet={handleToggleSummonPet}
+          onRenamePet={handleRenamePet}
+          onUsePetSupply={handleUsePetSupply}
           onToggleJoystick={() => setShowJoystick((prev) => !prev)}
           onToggleJumpButton={() => setShowJumpButton((prev) => !prev)}
           onTeleportToPlaza={handleTeleportToPlaza}
@@ -2876,6 +3226,24 @@ export default function App() {
           onToggleSound={handleToggleSound}
           onRedeemGiftCode={handleRedeemGiftCode}
           onClose={() => setPhoneOpen(false)}
+        />
+      )}
+
+      {zone === 'petshop' && petSupplyShopOpen && (
+        <PetSupplyShopModal
+          coins={stats.coins}
+          supplies={petSupplies}
+          onBuySupply={handleBuyPetSupply}
+          onClose={() => setPetSupplyShopOpen(false)}
+        />
+      )}
+
+      {zone === 'petshop' && petAdoptOpen && (
+        <PetAdoptModal
+          coins={stats.coins}
+          ownedPets={ownedPets}
+          onAdoptPet={handleAdoptPet}
+          onClose={() => setPetAdoptOpen(false)}
         />
       )}
 
