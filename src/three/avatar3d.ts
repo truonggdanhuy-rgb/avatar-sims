@@ -42,6 +42,9 @@ export interface AvatarRig {
   leftKnee?: THREE.Group;
   rightKnee?: THREE.Group;
   eyelids: THREE.Mesh[];
+  openEyeGroup?: THREE.Group;
+  closedEyeGroup?: THREE.Group;
+  skipNaturalBlink?: boolean;
   shadowDisc?: THREE.Mesh;
   holdPose?: HoldPose;
   toolType?: ToolId | null;
@@ -59,114 +62,383 @@ function shadeHex(hex: string, factor: number): THREE.Color {
 }
 
 const _eyeTexCache = new Map<string, THREE.CanvasTexture>();
+const _mouthTexCache = new Map<string, THREE.CanvasTexture>();
 
-function createNendoroidEyeTexture(
+function drawFourPointStar(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  outerR: number,
+  innerR: number,
+) {
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const a = (i * Math.PI) / 4;
+    const px = x + Math.cos(a) * r;
+    const py = y + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function createChibiEyeTexture(
   eyeColor: string,
-  style: AvatarConfig['eyeStyle'],
+  style: AvatarConfig['eyeStyle'] | 'sleep_closed',
+  side: -1 | 1,
 ): THREE.CanvasTexture | null {
   if (typeof document === 'undefined') return null;
-  const key = `${eyeColor}_${style}`;
+  const effectiveStyle: AvatarConfig['eyeStyle'] | 'sleep_closed' =
+    style === 'wink' ? (side === 1 ? 'happy_arc' : 'bright') : style;
+  const key = `chibi_eye_v3_${eyeColor}_${effectiveStyle}_${side}`;
   const cached = _eyeTexCache.get(key);
   if (cached) return cached;
 
-  const size = 192;
+  const w = 320;
+  const h = 280;
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
-  const cx = size * 0.5;
-  const cy = size * 0.5;
-  const baseCol = new THREE.Color(eyeColor);
-  const darkHex = `#${shadeHex(eyeColor, -0.26).getHexString()}`;
-  const midHex = `#${baseCol.getHexString()}`;
-  const lightHex = `#${shadeHex(eyeColor, 0.2).getHexString()}`;
-  const rimHex = `#${shadeHex(eyeColor, -0.34).getHexString()}`;
+  ctx.clearRect(0, 0, w, h);
 
-  // Clean warm sclera with soft upper eyelid shadow
-  ctx.fillStyle = '#FFFDF9';
-  ctx.fillRect(0, 0, size, size);
-  const scleraShade = ctx.createLinearGradient(0, 0, 0, size * 0.44);
-  scleraShade.addColorStop(0, 'rgba(182, 168, 178, 0.42)');
-  scleraShade.addColorStop(1, 'rgba(255, 253, 249, 0)');
-  ctx.fillStyle = scleraShade;
-  ctx.fillRect(0, 0, size, size * 0.44);
+  const cx = w * 0.5;
+  const cy = h * 0.56;
+  // side === -1 is viewer's left eye (inner corner toward +X / canvas right)
+  const dir = side === -1 ? 1 : -1;
 
-  const isAlmond = style === 'almond' || style === 'squint';
-  const irisRx = isAlmond ? size * 0.255 : size * 0.245;
-  const irisRy = isAlmond ? size * 0.3 : size * 0.31;
-  const irisCy = style === 'squint' ? cy + size * 0.025 : cy;
+  if (effectiveStyle === 'sleep_closed' || effectiveStyle === 'happy_arc') {
+    ctx.strokeStyle = '#241814';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (effectiveStyle === 'sleep_closed') {
+      ctx.lineWidth = 15;
+      ctx.beginPath();
+      ctx.moveTo(cx - 88, cy - 4);
+      ctx.quadraticCurveTo(cx, cy + 32, cx + 88, cy - 4);
+      ctx.stroke();
+    } else {
+      ctx.lineWidth = 18;
+      ctx.beginPath();
+      ctx.moveTo(cx - 90, cy + 20);
+      ctx.quadraticCurveTo(cx, cy - 44, cx + 90, cy + 20);
+      ctx.stroke();
+      // Cute outer lash flick
+      ctx.lineWidth = 11;
+      ctx.beginPath();
+      ctx.moveTo(cx - dir * 78, cy + 10);
+      ctx.quadraticCurveTo(cx - dir * 94, cy + 4, cx - dir * 102, cy - 12);
+      ctx.stroke();
+    }
+  } else if (effectiveStyle === 'joy_xd') {
+    ctx.strokeStyle = '#1E1512';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 21;
 
-  // Iris body vertical Nendoroid gradient (deep upper shadow -> luminous jewel crescent)
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx, irisCy, irisRx, irisRy, 0, 0, Math.PI * 2);
-  ctx.clip();
-
-  const irisGrad = ctx.createLinearGradient(0, irisCy - irisRy, 0, irisCy + irisRy);
-  irisGrad.addColorStop(0.0, darkHex);
-  irisGrad.addColorStop(0.45, midHex);
-  irisGrad.addColorStop(0.84, lightHex);
-  irisGrad.addColorStop(1.0, midHex);
-  ctx.fillStyle = irisGrad;
-  ctx.fillRect(0, 0, size, size);
-
-  // Subtle lower glowing crescent inside iris
-  const glowGrad = ctx.createRadialGradient(
-    cx,
-    irisCy + irisRy * 0.42,
-    irisRx * 0.08,
-    cx,
-    irisCy + irisRy * 0.35,
-    irisRx * 0.78,
-  );
-  glowGrad.addColorStop(0, 'rgba(255, 255, 255, 0.48)');
-  glowGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-  ctx.fillStyle = glowGrad;
-  ctx.fillRect(0, 0, size, size);
-
-  // Crisp pupil blended under upper shadow
-  ctx.beginPath();
-  ctx.ellipse(cx, irisCy - irisRy * 0.06, irisRx * 0.46, irisRy * 0.44, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#1E161A';
-  ctx.fill();
-
-  // Top dark limbal shadow arc
-  ctx.fillStyle = 'rgba(24, 16, 20, 0.36)';
-  ctx.fillRect(0, irisCy - irisRy, size, irisRy * 0.42);
-  ctx.restore();
-
-  // Soft crisp outer iris ring
-  ctx.beginPath();
-  ctx.ellipse(cx, irisCy, irisRx, irisRy, 0, 0, Math.PI * 2);
-  ctx.lineWidth = 4.2;
-  ctx.strokeStyle = rimHex;
-  ctx.stroke();
-
-  // Crisp Nendoroid specular catchlights
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.ellipse(
-    cx - irisRx * 0.36,
-    irisCy - irisRy * 0.32,
-    irisRx * 0.25,
-    irisRy * 0.2,
-    -0.32,
-    0,
-    Math.PI * 2,
-  );
-  ctx.fill();
-
-  if (style === 'starry' || style === 'cheerful' || style === 'wink') {
+    // Viewer left eye draws '>' pointing inward (+X), viewer right eye draws '<' pointing inward (-X)
+    const tipX = cx + dir * 72;
+    const tailX = cx - dir * 76;
+    const armY = 56;
     ctx.beginPath();
-    ctx.arc(cx + irisRx * 0.38, irisCy + irisRy * 0.36, irisRx * 0.13, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  if (style === 'starry') {
+    ctx.moveTo(tailX, cy - armY);
+    ctx.quadraticCurveTo(cx + dir * 12, cy - armY * 0.32, tipX, cy);
+    ctx.quadraticCurveTo(cx + dir * 12, cy + armY * 0.32, tailX, cy + armY);
+    ctx.stroke();
+  } else {
+    // Rich expressive big chibi eyes: 'bright', 'gentle', 'sparkle', 'heroic', 'cool'
+    const darkHex = `#${shadeHex(eyeColor, -0.34).getHexString()}`;
+    const midHex = `#${new THREE.Color(eyeColor).getHexString()}`;
+    const lightHex = `#${shadeHex(eyeColor, 0.26).getHexString()}`;
+    const rimHex = `#${shadeHex(eyeColor, -0.42).getHexString()}`;
+    const lashColor = effectiveStyle === 'gentle' ? '#362016' : '#1B1516';
+
+    const traceEyeShape = () => {
+      ctx.beginPath();
+      if (effectiveStyle === 'cool') {
+        const halfW = 104;
+        const topY = cy - 36;
+        const botY = cy + 52;
+        ctx.moveTo(cx - halfW, topY + 6);
+        ctx.quadraticCurveTo(cx, topY - 12, cx + halfW, topY + 6);
+        ctx.bezierCurveTo(
+          cx + halfW - 6,
+          botY + 12,
+          cx - halfW + 6,
+          botY + 12,
+          cx - halfW,
+          topY + 6,
+        );
+      } else if (effectiveStyle === 'gentle') {
+        // Warm, softly droopy-outer large oval chibi eye
+        ctx.ellipse(cx, cy + 4, 102, 92, dir * -0.07, 0, Math.PI * 2);
+      } else if (effectiveStyle === 'sparkle') {
+        ctx.ellipse(cx, cy, 106, 98, 0, 0, Math.PI * 2);
+      } else if (effectiveStyle === 'heroic') {
+        // Bold rounded-almond chibi eye with crisp outer lift
+        const rx = 104;
+        const ry = 88;
+        ctx.moveTo(cx - dir * rx, cy - 10);
+        ctx.bezierCurveTo(
+          cx - dir * (rx * 0.65),
+          cy - ry * 1.15,
+          cx + dir * (rx * 0.62),
+          cy - ry * 1.06,
+          cx + dir * rx,
+          cy + 8,
+        );
+        ctx.bezierCurveTo(
+          cx + dir * (rx * 0.65),
+          cy + ry * 1.04,
+          cx - dir * (rx * 0.58),
+          cy + ry * 1.05,
+          cx - dir * rx,
+          cy - 10,
+        );
+      } else {
+        // 'bright': classic big luminous Nendoroid-style rounded eye
+        ctx.ellipse(cx, cy + 2, 104, 94, 0, 0, Math.PI * 2);
+      }
+      ctx.closePath();
+    };
+
+    // 1. Sclera + subtle soft top lid shade
+    ctx.save();
+    traceEyeShape();
+    ctx.clip();
+
+    ctx.fillStyle = '#FFFDFB';
+    ctx.fillRect(0, 0, w, h);
+
+    const lidShade = ctx.createLinearGradient(0, cy - 96, 0, cy - 16);
+    lidShade.addColorStop(0, 'rgba(155, 145, 175, 0.30)');
+    lidShade.addColorStop(1, 'rgba(255, 253, 251, 0)');
+    ctx.fillStyle = lidShade;
+    ctx.fillRect(0, cy - 104, w, 94);
+
+    // 2. Large Soulful Iris & Pupil
+    const irisRx =
+      effectiveStyle === 'cool'
+        ? 54
+        : effectiveStyle === 'sparkle'
+          ? 78
+          : effectiveStyle === 'gentle'
+            ? 74
+            : 75;
+    const irisRy =
+      effectiveStyle === 'cool'
+        ? 52
+        : effectiveStyle === 'sparkle'
+          ? 84
+          : effectiveStyle === 'gentle'
+            ? 80
+            : 80;
+    const irisCx =
+      cx +
+      dir *
+        (effectiveStyle === 'heroic' ? 5 : effectiveStyle === 'gentle' ? 6 : 2);
+    const irisCy =
+      effectiveStyle === 'cool'
+        ? cy + 12
+        : effectiveStyle === 'gentle'
+          ? cy + 8
+          : cy + 5;
+
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(cx + irisRx * 0.28, irisCy - irisRy * 0.44, irisRx * 0.08, 0, Math.PI * 2);
+    ctx.ellipse(irisCx, irisCy, irisRx, irisRy, 0, 0, Math.PI * 2);
+    ctx.clip();
+
+    const grad = ctx.createLinearGradient(0, irisCy - irisRy, 0, irisCy + irisRy);
+    grad.addColorStop(0.0, darkHex);
+    grad.addColorStop(0.45, midHex);
+    grad.addColorStop(0.84, lightHex);
+    grad.addColorStop(1.0, midHex);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Luminous lower iris crescent glow
+    const glow = ctx.createRadialGradient(
+      irisCx,
+      irisCy + irisRy * 0.48,
+      6,
+      irisCx,
+      irisCy + irisRy * 0.42,
+      irisRx * 0.85,
+    );
+    glow.addColorStop(0, 'rgba(255, 255, 255, 0.58)');
+    glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
+
+    // Crisp deep pupil
+    ctx.beginPath();
+    ctx.ellipse(
+      irisCx,
+      irisCy - irisRy * 0.04,
+      irisRx * 0.46,
+      irisRy * 0.46,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fillStyle = '#17131B';
     ctx.fill();
+
+    ctx.restore();
+
+    // Subtle iris outline ring
+    ctx.beginPath();
+    ctx.ellipse(irisCx, irisCy, irisRx, irisRy, 0, 0, Math.PI * 2);
+    ctx.lineWidth = 4.5;
+    ctx.strokeStyle = rimHex;
+    ctx.stroke();
+
+    // Glossy anime/chibi specular catchlights
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(
+      irisCx - irisRx * 0.36,
+      irisCy - irisRy * 0.34,
+      irisRx * 0.28,
+      irisRy * 0.25,
+      -0.28,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+
+    if (effectiveStyle !== 'cool') {
+      // Secondary bottom-right bounce dot
+      ctx.beginPath();
+      ctx.arc(
+        irisCx + irisRx * 0.34,
+        irisCy + irisRy * 0.38,
+        irisRx * (effectiveStyle === 'sparkle' ? 0.17 : 0.13),
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+
+      // Tiny crisp upper-right glint
+      ctx.beginPath();
+      ctx.arc(
+        irisCx + irisRx * 0.28,
+        irisCy - irisRy * 0.42,
+        irisRx * 0.09,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(irisCx + irisRx * 0.3, irisCy + irisRy * 0.28, irisRx * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (effectiveStyle === 'sparkle') {
+      ctx.fillStyle = '#FFFDF8';
+      drawFourPointStar(
+        ctx,
+        irisCx - irisRx * 0.12,
+        irisCy + irisRy * 0.42,
+        irisRx * 0.2,
+        irisRx * 0.07,
+      );
+    }
+
+    ctx.restore();
+
+    // 3. Crisp Upper Eyelash Wing & Gentle Lower Rim
+    ctx.strokeStyle = lashColor;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (effectiveStyle === 'cool') {
+      ctx.lineWidth = 15;
+      ctx.beginPath();
+      ctx.moveTo(cx - dir * 112, cy - 34);
+      ctx.quadraticCurveTo(cx, cy - 48, cx + dir * 106, cy - 28);
+      ctx.stroke();
+
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = 'rgba(42, 30, 26, 0.72)';
+      ctx.beginPath();
+      ctx.moveTo(cx - dir * 84, cy + 54);
+      ctx.quadraticCurveTo(cx, cy + 62, cx + dir * 82, cy + 54);
+      ctx.stroke();
+    } else if (effectiveStyle === 'gentle') {
+      ctx.lineWidth = 17;
+      ctx.beginPath();
+      ctx.moveTo(cx - dir * 106, cy - 12);
+      ctx.quadraticCurveTo(cx - dir * 88, cy - 24, cx - dir * 68, cy - 58);
+      ctx.bezierCurveTo(
+        cx - dir * 32,
+        cy - 92,
+        cx + dir * 50,
+        cy - 92,
+        cx + dir * 94,
+        cy - 18,
+      );
+      ctx.stroke();
+
+      ctx.lineWidth = 5.5;
+      ctx.strokeStyle = 'rgba(62, 36, 24, 0.58)';
+      ctx.beginPath();
+      ctx.moveTo(cx - dir * 74, cy + 72);
+      ctx.quadraticCurveTo(cx, cy + 94, cx + dir * 74, cy + 70);
+      ctx.stroke();
+    } else {
+      // 'bright', 'sparkle', 'heroic': thick velvety curved upper lash + adorable outer wing
+      const outerX = cx - dir * 104;
+      const innerX = cx + dir * 98;
+      const peakY =
+        effectiveStyle === 'sparkle'
+          ? cy - 98
+          : effectiveStyle === 'heroic'
+            ? cy - 88
+            : cy - 94;
+
+      ctx.lineWidth = effectiveStyle === 'heroic' ? 19 : 18;
+      ctx.beginPath();
+      ctx.moveTo(outerX - dir * 14, cy - 22);
+      ctx.quadraticCurveTo(outerX + dir * 4, cy - 16, outerX + dir * 18, cy - 42);
+      ctx.bezierCurveTo(
+        cx - dir * 42,
+        peakY,
+        cx + dir * 50,
+        peakY + 8,
+        innerX,
+        cy + 4,
+      );
+      ctx.stroke();
+
+      if (effectiveStyle === 'sparkle') {
+        // Extra cute dainty upper-outer lash accent
+        ctx.lineWidth = 8.5;
+        ctx.beginPath();
+        ctx.moveTo(outerX + dir * 10, cy - 48);
+        ctx.lineTo(outerX - dir * 10, cy - 60);
+        ctx.stroke();
+      }
+
+      // Soft lower contour
+      ctx.lineWidth = 5.5;
+      ctx.strokeStyle = 'rgba(42, 28, 24, 0.65)';
+      ctx.beginPath();
+      ctx.moveTo(outerX + dir * 24, cy + 68);
+      ctx.quadraticCurveTo(
+        cx,
+        cy + (effectiveStyle === 'sparkle' ? 98 : 90),
+        innerX - dir * 22,
+        cy + 66,
+      );
+      ctx.stroke();
+    }
   }
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -176,46 +448,175 @@ function createNendoroidEyeTexture(
   return tex;
 }
 
+function createChibiMouthTexture(
+  expr: AvatarConfig['expression'],
+): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
+  const key = `chibi_mouth_v3_${expr}`;
+  const cached = _mouthTexCache.get(key);
+  if (cached) return cached;
+
+  const w = 320;
+  const h = 260;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.clearRect(0, 0, w, h);
+  const cx = w * 0.5;
+  const noseY = h * 0.22;
+  const mouthY = h * 0.58;
+
+  // Tiny sculpted warm nose button with soft highlight
+  ctx.fillStyle = expr === 'joy_open' ? '#CF6B6F' : '#C27C62';
+  ctx.beginPath();
+  ctx.ellipse(cx, noseY, 6.2, 4.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255, 232, 218, 0.72)';
+  ctx.beginPath();
+  ctx.arc(cx - 1.8, noseY - 1.4, 2.0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (expr === 'sweet_smile') {
+    ctx.strokeStyle = '#582D24';
+    ctx.lineWidth = 11.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 46, mouthY - 14);
+    ctx.quadraticCurveTo(cx, mouthY + 24, cx + 46, mouthY - 14);
+    ctx.stroke();
+
+    // Subtle rosy corner dimples
+    ctx.fillStyle = 'rgba(220, 120, 118, 0.45)';
+    ctx.beginPath();
+    ctx.arc(cx - 50, mouthY - 12, 5.5, 0, Math.PI * 2);
+    ctx.arc(cx + 50, mouthY - 12, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (expr === 'joy_open') {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx - 46, mouthY - 14);
+    ctx.quadraticCurveTo(cx, mouthY - 8, cx + 46, mouthY - 14);
+    ctx.bezierCurveTo(cx + 46, mouthY + 38, cx - 46, mouthY + 38, cx - 46, mouthY - 14);
+    ctx.closePath();
+    ctx.fillStyle = '#A83844';
+    ctx.fill();
+    ctx.clip();
+
+    // Crisp white upper teeth band
+    ctx.fillStyle = '#FFFDF9';
+    ctx.fillRect(cx - 44, mouthY - 16, 88, 14);
+
+    // Warm pink tongue
+    ctx.beginPath();
+    ctx.ellipse(cx, mouthY + 22, 34, 19, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#F68B97';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = '#4A2220';
+    ctx.lineWidth = 5.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 46, mouthY - 14);
+    ctx.quadraticCurveTo(cx, mouthY - 8, cx + 46, mouthY - 14);
+    ctx.bezierCurveTo(cx + 46, mouthY + 38, cx - 46, mouthY + 38, cx - 46, mouthY - 14);
+    ctx.stroke();
+  } else if (expr === 'cat_w') {
+    ctx.strokeStyle = '#48241C';
+    ctx.lineWidth = 11.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 46, mouthY - 6);
+    ctx.quadraticCurveTo(cx - 24, mouthY + 22, cx, mouthY - 2);
+    ctx.quadraticCurveTo(cx + 24, mouthY + 22, cx + 46, mouthY - 6);
+    ctx.stroke();
+  } else if (expr === 'gentle_o') {
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx, mouthY + 4, 21, 24, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#A83844';
+    ctx.fill();
+    ctx.clip();
+    ctx.beginPath();
+    ctx.ellipse(cx, mouthY + 19, 19, 14, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#F48E99';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = '#4E2422';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.ellipse(cx, mouthY + 4, 21, 24, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (expr === 'confident') {
+    ctx.strokeStyle = '#38201B';
+    ctx.lineWidth = 11;
+    ctx.beginPath();
+    ctx.moveTo(cx - 44, mouthY + 2);
+    ctx.quadraticCurveTo(cx + 6, mouthY + 8, cx + 48, mouthY - 12);
+    ctx.stroke();
+  } else if (expr === 'pout') {
+    ctx.strokeStyle = '#38201B';
+    ctx.lineWidth = 11;
+    ctx.beginPath();
+    ctx.moveTo(cx - 34, mouthY + 14);
+    ctx.quadraticCurveTo(cx - 2, mouthY - 14, cx + 28, mouthY + 12);
+    ctx.stroke();
+
+    // Cute side puff cheek curve
+    ctx.lineWidth = 8.5;
+    ctx.beginPath();
+    ctx.moveTo(cx + 22, mouthY - 8);
+    ctx.quadraticCurveTo(cx + 42, mouthY + 6, cx + 24, mouthY + 24);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  _mouthTexCache.set(key, tex);
+  return tex;
+}
+
 /**
- * Curved spherical eye disc with exact front-facing UVs (0..1) so procedural eye textures
- * map cleanly onto the face without bug-eye bulge.
+ * Curved conformal surface patch sampled directly from `headSurfacePoint`
+ * so procedural eye and mouth decals wrap flush on the clay head with zero clipping.
  */
-function createCurvedEyePatchGeometry(
-  rx: number,
-  ry: number,
-  bulge: number,
-  radialSegs = 24,
-  ringSegs = 6,
+function createHeadConformalPatchGeometry(
+  latMin: number,
+  latMax: number,
+  lonMin: number,
+  lonMax: number,
+  loft = 0.0028,
+  segU = 18,
+  segV = 14,
 ): THREE.BufferGeometry {
-  const positions: number[] = [0, 0, bulge];
-  const uvs: number[] = [0.5, 0.5];
+  const positions: number[] = [];
+  const uvs: number[] = [];
   const indices: number[] = [];
 
-  for (let ir = 1; ir <= ringSegs; ir++) {
-    const r = ir / ringSegs;
-    const z = bulge * Math.sqrt(Math.max(0, 1 - r * r * 0.92));
-    for (let j = 0; j < radialSegs; j++) {
-      const th = (j / radialSegs) * Math.PI * 2;
-      const nx = r * Math.cos(th);
-      const ny = r * Math.sin(th);
-      positions.push(nx * rx, ny * ry, z);
-      uvs.push(0.5 + 0.5 * nx, 0.5 + 0.5 * ny);
+  for (let iv = 0; iv <= segV; iv++) {
+    const v = iv / segV;
+    const lat = THREE.MathUtils.lerp(latMax, latMin, v);
+    for (let iu = 0; iu <= segU; iu++) {
+      const u = iu / segU;
+      const lon = THREE.MathUtils.lerp(lonMin, lonMax, u);
+      const [px, py, pz] = headSurfacePoint(lat, lon, loft);
+      positions.push(px, py, pz);
+      uvs.push(u, v);
     }
   }
 
-  for (let j = 0; j < radialSegs; j++) {
-    const nextJ = (j + 1) % radialSegs;
-    indices.push(0, 1 + j, 1 + nextJ);
-  }
-  for (let ir = 1; ir < ringSegs; ir++) {
-    const rowA = 1 + (ir - 1) * radialSegs;
-    const rowB = 1 + ir * radialSegs;
-    for (let j = 0; j < radialSegs; j++) {
-      const nextJ = (j + 1) % radialSegs;
-      const a = rowA + j;
-      const b = rowB + j;
-      const c = rowB + nextJ;
-      const d = rowA + nextJ;
+  const stride = segU + 1;
+  for (let iv = 0; iv < segV; iv++) {
+    for (let iu = 0; iu < segU; iu++) {
+      const a = iv * stride + iu;
+      const b = a + 1;
+      const d = (iv + 1) * stride + iu;
+      const c = d + 1;
       indices.push(a, b, d);
       indices.push(b, c, d);
     }
@@ -490,6 +891,66 @@ function createTorsoProfilePoints(scaleOffset = 0, yMin = -0.195, yMax = 0.21): 
   return basePts.map(([r, y]) => new THREE.Vector2(Math.max(0.005, r), y));
 }
 
+function createFittedFemaleTorsoProfile(): THREE.Vector2[] {
+  const pts: [number, number][] = [
+    [0.01, -0.195],
+    [0.195, -0.195],
+    [0.172, -0.14],
+    [0.162, -0.095],
+    [0.184, -0.02],
+    [0.194, 0.055],
+    [0.184, 0.125],
+    [0.166, 0.168],
+    [0.106, 0.196],
+    [0.072, 0.21],
+  ];
+  return pts.map(([r, y]) => new THREE.Vector2(r, y));
+}
+
+function createPencilSkirtGeometry(
+  waistR: number,
+  hipR: number,
+  hemR: number,
+  height: number,
+  segU = 32,
+  segV = 12,
+): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  for (let iv = 0; iv <= segV; iv++) {
+    const t = iv / segV; // 0 = top waist, 1 = bottom hem
+    const y = (0.5 - t) * height;
+    const curveR =
+      t < 0.36
+        ? THREE.MathUtils.lerp(waistR, hipR, Math.sin((t / 0.36) * (Math.PI * 0.5)))
+        : THREE.MathUtils.lerp(hipR, hemR, (t - 0.36) / 0.64);
+    for (let iu = 0; iu <= segU; iu++) {
+      const u = iu / segU;
+      const th = u * Math.PI * 2;
+      positions.push(Math.sin(th) * curveR, y, Math.cos(th) * curveR);
+      uvs.push(u, 1 - t);
+    }
+  }
+
+  for (let iv = 0; iv < segV; iv++) {
+    for (let iu = 0; iu < segU; iu++) {
+      const a = iv * (segU + 1) + iu;
+      const b = a + segU + 1;
+      indices.push(a, b, a + 1);
+      indices.push(b, b + 1, a + 1);
+    }
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
 
 
 export function buildAvatarRig(
@@ -539,7 +1000,8 @@ export function buildAvatarRig(
     const legPivot = new THREE.Group();
     legPivot.position.set(xOffset, 0.52, 0);
 
-    const legMat = config.bottom === 'wide_trousers' ? bottomMat : skinMat;
+    const isTrousers = config.bottom === 'wide_trousers' || config.bottom === 'office_trousers';
+    const legMat = isTrousers ? bottomMat : skinMat;
     const hipCap = new THREE.Mesh(new THREE.SphereGeometry(0.078, 14, 12), legMat);
     legPivot.add(hipCap);
 
@@ -573,6 +1035,30 @@ export function buildAvatarRig(
       kneeTrouserCap.scale.set(1, 0.92, 1);
       kneeTrouserCap.position.y = KNEE_Y;
       legPivot.add(hipPantCap, thighPant, kneeTrouserCap);
+    } else if (config.bottom === 'office_trousers') {
+      // Handsome tailored straight-leg dress slacks (suông gọn, không loe!)
+      const hipPantCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.095, 14, 12),
+        bottomMat,
+      );
+      hipPantCap.scale.set(1, 0.88, 0.96);
+      const thighPant = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.092, 0.086, 0.22, 18),
+        bottomMat,
+      );
+      thighPant.position.y = -0.108;
+      const thighCrease = new THREE.Mesh(
+        new RoundedBoxGeometry(0.014, 0.18, 0.012, 2, 0.004),
+        bottomLightMat,
+      );
+      thighCrease.position.set(0, -0.11, 0.086);
+      const kneeTrouserCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.085, 14, 12),
+        bottomMat,
+      );
+      kneeTrouserCap.scale.set(1, 0.9, 0.96);
+      kneeTrouserCap.position.y = KNEE_Y;
+      legPivot.add(hipPantCap, thighPant, thighCrease, kneeTrouserCap);
     } else if (config.bottom === 'denim_shorts') {
       const hipShortCap = new THREE.Mesh(
         new THREE.SphereGeometry(0.105, 14, 12),
@@ -620,10 +1106,28 @@ export function buildAvatarRig(
       );
       cuff.position.y = -0.18;
       kneePivot.add(cuff);
+    } else if (config.bottom === 'office_trousers') {
+      // Straight tapered tailored slacks ending cleanly above dress shoes
+      const shinPant = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.085, 0.078, 0.21, 18),
+        bottomMat,
+      );
+      shinPant.position.y = -0.104;
+      const shinCrease = new THREE.Mesh(
+        new RoundedBoxGeometry(0.013, 0.185, 0.012, 2, 0.004),
+        bottomLightMat,
+      );
+      shinCrease.position.set(0, -0.102, 0.079);
+      const tailoredHem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.079, 0.022, 18),
+        bottomDarkMat,
+      );
+      tailoredHem.position.y = -0.196;
+      kneePivot.add(shinPant, shinCrease, tailoredHem);
     }
 
     // Knit ankle sock + rolled cuff bridging the lower shin smoothly into shoes
-    if (config.bottom !== 'wide_trousers' && config.shoes !== 'boots') {
+    if (!isTrousers && config.shoes !== 'boots') {
       const sockTube = new THREE.Mesh(
         new THREE.CylinderGeometry(0.062, 0.059, 0.105, 18),
         sockMat,
@@ -727,6 +1231,7 @@ export function buildAvatarRig(
   torsoGroup.position.set(0, 0.77, 0);
   bodyPivot.add(torsoGroup);
 
+  const isOfficeFemale = config.top === 'office_female';
   const baseTorsoMat =
     config.top === 'sailor_blouse' || config.top === 'cardigan_vest'
       ? topTrimMat
@@ -735,7 +1240,9 @@ export function buildAvatarRig(
   const isHoodie = config.top === 'hoodie';
   const torsoMesh = new THREE.Mesh(
     new THREE.LatheGeometry(
-      createTorsoProfilePoints(isHoodie ? 0.024 : 0, isHoodie ? -0.215 : -0.195, 0.21),
+      isOfficeFemale
+        ? createFittedFemaleTorsoProfile()
+        : createTorsoProfilePoints(isHoodie ? 0.024 : 0, isHoodie ? -0.215 : -0.195, 0.21),
       28,
     ),
     baseTorsoMat,
@@ -1001,6 +1508,155 @@ export function buildAvatarRig(
     );
     waistSash.position.set(0, -0.09, 0);
     torsoGroup.add(neckTrim, waistSash);
+  } else if (config.top === 'office_male') {
+    // Crisp white tailored dress shirt with structured V-collar, tie, tie clip & central placket
+    const shirtWhite = clayMat(config.topColor || '#FFFFFF', 0.56, 0.02);
+    const shirtShade = clayMat('#E3E9F0', 0.62, 0.02);
+    const tieMat = clayMat('#1F3456', 0.44, 0.05);
+    const tieStripeMat = clayMat('#3B5D8C', 0.42, 0.05);
+    const silverMat = new THREE.MeshStandardMaterial({
+      color: '#DCE2EA',
+      roughness: 0.18,
+      metalness: 0.65,
+    });
+
+    const neckBand = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.118, 0.132, 0.042, 22),
+      shirtWhite,
+    );
+    neckBand.position.set(0, 0.196, 0);
+    torsoGroup.add(neckBand);
+
+    [-1, 1].forEach((s) => {
+      const collarWing = new THREE.Mesh(
+        new RoundedBoxGeometry(0.088, 0.048, 0.032, 2, 0.012),
+        shirtWhite,
+      );
+      collarWing.position.set(s * 0.058, 0.172, 0.106);
+      collarWing.rotation.z = -s * 0.34;
+      collarWing.rotation.y = s * 0.36;
+      collarWing.rotation.x = 0.22;
+      torsoGroup.add(collarWing);
+    });
+
+    const placket = new THREE.Mesh(
+      new RoundedBoxGeometry(0.04, 0.3, 0.018, 2, 0.006),
+      shirtShade,
+    );
+    placket.position.set(0, -0.01, 0.205);
+    placket.rotation.x = -0.05;
+    torsoGroup.add(placket);
+
+    // Sculpted 3D tailored necktie + Windsor knot + metallic tie clip
+    const tieKnot = new THREE.Mesh(
+      new RoundedBoxGeometry(0.054, 0.052, 0.034, 3, 0.014),
+      tieMat,
+    );
+    tieKnot.position.set(0, 0.146, 0.198);
+    tieKnot.rotation.x = -0.22;
+
+    const tieShape = new THREE.Shape();
+    tieShape.moveTo(-0.018, 0.135);
+    tieShape.lineTo(0.018, 0.135);
+    tieShape.lineTo(0.036, -0.088);
+    tieShape.lineTo(0.0, -0.142);
+    tieShape.lineTo(-0.036, -0.088);
+    tieShape.closePath();
+    const tieGeo = new THREE.ExtrudeGeometry(tieShape, {
+      depth: 0.016,
+      bevelEnabled: true,
+      bevelThickness: 0.006,
+      bevelSize: 0.005,
+      bevelSegments: 2,
+    });
+    const tieBlade = new THREE.Mesh(tieGeo, tieMat);
+    tieBlade.position.set(0, -0.004, 0.204);
+    tieBlade.rotation.x = -0.06;
+
+    const tieAccent = new THREE.Mesh(
+      new RoundedBoxGeometry(0.054, 0.016, 0.022, 2, 0.005),
+      tieStripeMat,
+    );
+    tieAccent.position.set(0, 0.035, 0.216);
+    tieAccent.rotation.z = 0.32;
+
+    const tieClip = new THREE.Mesh(
+      new RoundedBoxGeometry(0.044, 0.011, 0.012, 2, 0.004),
+      silverMat,
+    );
+    tieClip.position.set(0.008, 0.015, 0.223);
+    torsoGroup.add(tieKnot, tieBlade, tieAccent, tieClip);
+  } else if (config.top === 'office_female') {
+    // Fitted waist-cinching white office blouse with sculpted feminine chest & crisp V-collar
+    const shirtWhite = clayMat(config.topColor || '#FFFFFF', 0.54, 0.02);
+    const shirtShadow = clayMat('#E6EBF0', 0.62, 0.02);
+    const pearlBtnMat = glossyClayMat('#FFF8F2', 0.2);
+
+    // Subtle collarbone V-neck skin reveal
+    const vNeckShape = new THREE.Shape();
+    vNeckShape.moveTo(-0.056, 0.04);
+    vNeckShape.lineTo(0.056, 0.04);
+    vNeckShape.lineTo(0.0, -0.042);
+    vNeckShape.closePath();
+    const vNeckSkin = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(vNeckShape, {
+        depth: 0.018,
+        bevelEnabled: true,
+        bevelThickness: 0.006,
+        bevelSize: 0.005,
+        bevelSegments: 2,
+      }),
+      skinMat,
+    );
+    vNeckSkin.position.set(0, 0.16, 0.118);
+    vNeckSkin.rotation.x = -0.45;
+    torsoGroup.add(vNeckSkin);
+
+    // Sculpted feminine bust contour integrated cleanly in crisp blouse fabric
+    [-1, 1].forEach((s) => {
+      const bust = new THREE.Mesh(new THREE.SphereGeometry(0.088, 18, 16), shirtWhite);
+      bust.scale.set(1.06, 0.94, 0.86);
+      bust.position.set(s * 0.068, 0.05, 0.138);
+      torsoGroup.add(bust);
+    });
+    const bridgeChest = new THREE.Mesh(
+      new THREE.SphereGeometry(0.062, 14, 12),
+      shirtWhite,
+    );
+    bridgeChest.scale.set(1.25, 0.82, 0.72);
+    bridgeChest.position.set(0, 0.048, 0.142);
+    torsoGroup.add(bridgeChest);
+
+    // Crisp tailored V-lapels
+    [-1, 1].forEach((s) => {
+      const lapel = new THREE.Mesh(
+        new RoundedBoxGeometry(0.042, 0.125, 0.022, 2, 0.008),
+        shirtWhite,
+      );
+      lapel.position.set(s * 0.042, 0.145, 0.155);
+      lapel.rotation.z = s * 0.42;
+      lapel.rotation.y = s * 0.28;
+      lapel.rotation.x = -0.35;
+      torsoGroup.add(lapel);
+    });
+
+    // Vertical waist-contour seams & delicate pearl buttons
+    const placket = new THREE.Mesh(
+      new RoundedBoxGeometry(0.026, 0.21, 0.016, 2, 0.005),
+      shirtShadow,
+    );
+    placket.position.set(0, -0.025, 0.175);
+    torsoGroup.add(placket);
+
+    for (let i = 0; i < 3; i++) {
+      const btn = new THREE.Mesh(
+        new THREE.SphereGeometry(0.011, 10, 8),
+        pearlBtnMat,
+      );
+      btn.scale.set(1, 1, 0.6);
+      btn.position.set(0, 0.01 - i * 0.058, 0.186 - i * 0.004);
+      torsoGroup.add(btn);
+    }
   }
 
   // Bottoms on Torso (clean radial hierarchy so all skirts drape smoothly over seated lap via paired geometries)
@@ -1041,6 +1697,69 @@ export function buildAvatarRig(
     hemRing.position.set(0, hemOffsetY, 0);
     skirtPivot.add(hemRing);
     skirtDeformMeshes.push({mesh: hemRing, standGeo: hemStandGeo, sitGeo: hemSitGeo});
+  } else if (config.bottom === 'office_skirt') {
+    // High-waisted chic office pencil skirt hugging waist smoothly with slim belt & gold buckle
+    const skirtWaistR = isOfficeFemale ? 0.168 : 0.215;
+    const waistbandY = isOfficeFemale ? -0.118 : -0.156;
+    const waistband = new THREE.Mesh(
+      new THREE.CylinderGeometry(skirtWaistR, skirtWaistR + 0.012, 0.048, 28),
+      bottomDarkMat,
+    );
+    waistband.position.set(0, waistbandY, 0);
+    torsoGroup.add(waistband);
+
+    const goldBuckle = new THREE.Mesh(
+      new RoundedBoxGeometry(0.046, 0.028, 0.014, 2, 0.005),
+      new THREE.MeshStandardMaterial({color: '#E8C36A', roughness: 0.2, metalness: 0.65}),
+    );
+    goldBuckle.position.set(0, waistbandY, skirtWaistR + 0.008);
+    torsoGroup.add(goldBuckle);
+
+    skirtPivot = new THREE.Group();
+    skirtPivot.position.set(0, waistbandY, 0);
+    torsoGroup.add(skirtPivot);
+
+    const skirtH = isOfficeFemale ? 0.295 : 0.255;
+    const skirtGeo = createPencilSkirtGeometry(
+      skirtWaistR + 0.008,
+      isOfficeFemale ? 0.218 : 0.234,
+      isOfficeFemale ? 0.204 : 0.218,
+      skirtH,
+    );
+    const skirtOffsetY = -skirtH * 0.5 - 0.012;
+    const skirtSitGeo = createSeatedSkirtDrapeGeometry(skirtGeo, skirtOffsetY, 0);
+    const skirtMesh = new THREE.Mesh(skirtGeo, bottomMat);
+    skirtMesh.position.set(0, skirtOffsetY, 0);
+    skirtPivot.add(skirtMesh);
+    skirtDeformMeshes.push({mesh: skirtMesh, standGeo: skirtGeo, sitGeo: skirtSitGeo});
+
+    const hemStandGeo = new THREE.TorusGeometry(isOfficeFemale ? 0.204 : 0.218, 0.01, 8, 32);
+    const hemOffsetY = -skirtH - 0.008;
+    const hemSitGeo = createSeatedSkirtDrapeGeometry(hemStandGeo, hemOffsetY, Math.PI / 2);
+    const hemRing = new THREE.Mesh(hemStandGeo, bottomDarkMat);
+    hemRing.rotation.x = Math.PI / 2;
+    hemRing.position.set(0, hemOffsetY, 0);
+    skirtPivot.add(hemRing);
+    skirtDeformMeshes.push({mesh: hemRing, standGeo: hemStandGeo, sitGeo: hemSitGeo});
+  } else if (config.bottom === 'office_trousers') {
+    const waistR = isOfficeFemale ? 0.194 : 0.22;
+    const beltMat = clayMat('#241B17', 0.42, 0.1);
+    const waist = new THREE.Mesh(
+      new THREE.CylinderGeometry(waistR, waistR + 0.006, 0.072, 26),
+      bottomMat,
+    );
+    waist.position.set(0, -0.204, 0);
+    const belt = new THREE.Mesh(
+      new THREE.CylinderGeometry(waistR + 0.008, waistR + 0.008, 0.032, 26),
+      beltMat,
+    );
+    belt.position.set(0, -0.186, 0);
+    const buckle = new THREE.Mesh(
+      new RoundedBoxGeometry(0.048, 0.032, 0.016, 2, 0.005),
+      new THREE.MeshStandardMaterial({color: '#D6DCE4', roughness: 0.2, metalness: 0.65}),
+    );
+    buckle.position.set(0, -0.186, waistR + 0.01);
+    torsoGroup.add(waist, belt, buckle);
   } else {
     const waist = new THREE.Mesh(
       new THREE.CylinderGeometry(0.22, 0.224, 0.078, 26),
@@ -1082,7 +1801,11 @@ export function buildAvatarRig(
     // Relaxed natural A-pose seated flush on shoulder corner with breathing room beside waist/hips
     const shoulderPivot = new THREE.Group();
     const baseArmZ = isHoodie ? 0.4 : HAND_POSES.none.armZ;
-    shoulderPivot.position.set(side * (isHoodie ? 0.214 : 0.198), 0.89, 0);
+    shoulderPivot.position.set(
+      side * (isHoodie ? 0.214 : isOfficeFemale ? 0.184 : 0.198),
+      isOfficeFemale ? 0.885 : 0.89,
+      0,
+    );
     shoulderPivot.rotation.z = side * baseArmZ;
 
     const upperMat = isSleeveless ? skinMat : isShortSleeve ? topTrimMat : topMat;
@@ -1666,372 +2389,131 @@ export function buildAvatarRig(
     headPivot.add(earGrp);
   });
 
-  // Optional Soft Rosy Cheeks (ONLY rendered when config.blush === true!)
+  // Optional Soft Rosy Cheeks positioned right beneath large chibi eye corners
   if (config.blush) {
-    const blushPatchGeo = new THREE.SphereGeometry(0.042, 14, 10);
-    const blushStrokeMat = clayMat('#EB7482', 0.6);
+    const blushPatchGeo = new THREE.SphereGeometry(0.048, 14, 10);
     [-1, 1].forEach((side) => {
       const cheek = new THREE.Mesh(blushPatchGeo, cheekMat);
-      cheek.scale.set(1.2, 0.6, 0.09);
-      cheek.position.set(side * 0.168, 0.194, 0.2155);
-      cheek.rotation.y = side * 0.42;
+      cheek.scale.set(1.38, 0.72, 0.08);
+      const [cx, cy, cz] = headSurfacePoint(117, side * 42, 0.0022);
+      cheek.position.set(cx, cy, cz);
+      cheek.rotation.y = side * 0.48;
       headPivot.add(cheek);
-
-      // Two delicate anime blush hatch lines flush on the patch
-      [-0.013, 0.01].forEach((dx) => {
-        const hatch = new THREE.Mesh(
-          createTaperedTubeGeometry(
-            [
-              [-0.006, -0.008, 0],
-              [0.006, 0.009, 0.001],
-            ],
-            0.0021,
-            4,
-            6,
-            0.25,
-          ),
-          blushStrokeMat,
-        );
-        hatch.position.set(side * 0.168 + dx, 0.194, 0.2195);
-        hatch.rotation.y = side * 0.42;
-        headPivot.add(hatch);
-      });
     });
   }
 
-  // Expressive Detailed Nendoroid Eyes ('starry' | 'almond' | 'cheerful' | 'cozy' | 'squint' | 'wink')
-  const lashMat = clayMat('#241A19', 0.42);
-  const eyeTex = createNendoroidEyeTexture(config.eyeColor, config.eyeStyle);
-  const eyePatchMat = new THREE.MeshStandardMaterial({
-    color: '#FFFFFF',
-    map: eyeTex,
-    roughness: 0.2,
-    metalness: 0.0,
-  });
+  // ========== CONFORMAL BIG CHIBI FACIAL SYSTEM ==========
   const eyelids: THREE.Mesh[] = [];
+  const openEyeGroup = new THREE.Group();
+  const closedEyeGroup = new THREE.Group();
+  closedEyeGroup.visible = false;
 
-  const makeEye = (side: -1 | 1) => {
-    const eyeGroup = new THREE.Group();
-    eyeGroup.position.set(side * 0.11, 0.252, 0.252);
-    eyeGroup.rotation.y = side * 0.2;
+  const eyeLatMin = 80;
+  const eyeLatMax = 115;
 
-    const isClosedCozy =
-      config.eyeStyle === 'cozy' || (config.eyeStyle === 'wink' && side === 1);
-
-    if (isClosedCozy) {
-      const isWinkSide = config.eyeStyle === 'wink';
-      const arcPts: [number, number, number][] = isWinkSide
-        ? [
-            [side * -0.044, 0.016, 0.01],
-            [side * -0.004, -0.002, 0.019],
-            [side * 0.044, -0.018, 0.01],
-          ]
-        : [
-            [-0.044, -0.012, 0.01],
-            [-0.022, 0.01, 0.017],
-            [0, 0.018, 0.02],
-            [0.022, 0.01, 0.017],
-            [0.044, -0.012, 0.01],
-          ];
-      const arc = new THREE.Mesh(
-        createTaperedTubeGeometry(arcPts, 0.0056, 14, 8, 0.22),
-        lashMat,
-      );
-      if (isWinkSide) {
-        const lowerWing = new THREE.Mesh(
-          createTaperedTubeGeometry(
-            [
-              [side * -0.04, -0.018, 0.01],
-              [side * 0.002, -0.004, 0.018],
-              [side * 0.044, -0.018, 0.01],
-            ],
-            0.0044,
-            10,
-            8,
-            0.2,
-          ),
-          lashMat,
-        );
-        eyeGroup.add(lowerWing);
-      } else {
-        const wing = new THREE.Mesh(
-          createTaperedTubeGeometry(
-            [
-              [side * 0.038, -0.008, 0.011],
-              [side * 0.052, -0.002, 0.008],
-            ],
-            0.0036,
-            6,
-            6,
-            0.15,
-          ),
-          lashMat,
-        );
-        eyeGroup.add(wing);
-      }
-      eyeGroup.add(arc);
-      return eyeGroup;
-    }
-
-    const isAlmond = config.eyeStyle === 'almond';
-    const isSquint = config.eyeStyle === 'squint';
-    const rx = isAlmond || isSquint ? 0.054 : 0.05;
-    const ry = isAlmond ? 0.048 : isSquint ? 0.046 : 0.056;
-
-    const eyeDisc = new THREE.Mesh(
-      createCurvedEyePatchGeometry(rx, ry, 0.015),
-      eyePatchMat,
+  ([-1, 1] as const).forEach((side) => {
+    const lonA = side === -1 ? -46 : 10;
+    const lonB = side === -1 ? -10 : 46;
+    const patchGeo = createHeadConformalPatchGeometry(
+      eyeLatMin,
+      eyeLatMax,
+      lonA,
+      lonB,
+      0.0028,
+      20,
+      16,
     );
-    eyeGroup.add(eyeDisc);
 
-    // Sculpted tapered Upper Eyelash sits cleanly IN FRONT of both iris & drooping squint lid
-    const upperLashPts: [number, number, number][] = isSquint
-      ? [
-          [side * -0.052, 0.016, 0.02],
-          [0, 0.012, 0.025],
-          [side * 0.054, 0.01, 0.018],
-        ]
-      : [
-          [side * -0.048, 0.014, 0.014],
-          [side * -0.024, ry * 0.88, 0.02],
-          [0, ry * 0.98, 0.022],
-          [side * 0.032, ry * (isAlmond ? 0.84 : 0.8), 0.019],
-          [side * 0.058, isAlmond ? 0.012 : 0.006, 0.012],
-        ];
-    const upperLash = new THREE.Mesh(
-      createTaperedTubeGeometry(upperLashPts, isSquint ? 0.0064 : 0.0058, 16, 8, 0.24),
-      lashMat,
-    );
-    eyeGroup.add(upperLash);
+    const openTex = createChibiEyeTexture(config.eyeColor, config.eyeStyle, side);
+    const openMat = new THREE.MeshStandardMaterial({
+      color: '#FFFFFF',
+      map: openTex,
+      transparent: true,
+      alphaTest: 0.02,
+      roughness: 0.24,
+      metalness: 0.0,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+    });
+    openEyeGroup.add(new THREE.Mesh(patchGeo, openMat));
 
-    // Subtle lower-outer lash accent for refined Nendoroid finish
-    const lowerAccent = new THREE.Mesh(
-      createTaperedTubeGeometry(
-        [
-          [side * -0.03, -ry * 0.86, 0.014],
-          [0, -ry * 0.94, 0.018],
-          [side * 0.038, -ry * 0.78, 0.013],
-        ],
-        isSquint ? 0.0038 : 0.0024,
-        10,
-        6,
-        0.18,
-      ),
-      isSquint ? lashMat : clayMat(shadeHex(config.skinTone, -0.22).getHex(), 0.6),
-    );
-    eyeGroup.add(lowerAccent);
+    const closedTex = createChibiEyeTexture(config.eyeColor, 'sleep_closed', side);
+    const closedMat = new THREE.MeshStandardMaterial({
+      color: '#FFFFFF',
+      map: closedTex,
+      transparent: true,
+      alphaTest: 0.02,
+      roughness: 0.34,
+      metalness: 0.0,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+    });
+    closedEyeGroup.add(new THREE.Mesh(patchGeo, closedMat));
+  });
+  headPivot.add(openEyeGroup, closedEyeGroup);
 
-    // Moving Skin Eyelid (stays tucked strictly behind upperLash z <= 0.019 while cleanly masking upper iris)
-    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.056, 14, 12), skinMat);
-    const baseLidScaleY = isSquint ? 0.54 : 0.06;
-    const baseLidY = isSquint ? 0.031 : 0.046;
-    lid.scale.set(1.03, baseLidScaleY, 0.28);
-    lid.position.set(0, baseLidY, 0.003);
-    lid.userData.baseScaleY = baseLidScaleY;
-    lid.userData.baseY = baseLidY;
-    eyeGroup.add(lid);
-    eyelids.push(lid);
-
-    // Soft cheek lower-lid rise when squinting (nheo mắt)
-    if (isSquint) {
-      const lowerLid = new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 10), skinMat);
-      lowerLid.scale.set(1.02, 0.24, 0.26);
-      lowerLid.position.set(0, -0.042, 0.002);
-      eyeGroup.add(lowerLid);
-    }
-
-    return eyeGroup;
-  };
-  headPivot.add(makeEye(-1), makeEye(1));
-
-  // Fine Sculpted Tapered Eyebrows matching each expression & hair color
+  // Clean Sculpted Eyebrows aligned smoothly above the big chibi eyes
   const browBaseCol = new THREE.Color(config.hairColor);
   const browLum = {h: 0, s: 0, l: 0};
   browBaseCol.getHSL(browLum);
   if (browLum.l > 0.58) browBaseCol.setHSL(browLum.h, browLum.s * 0.85, 0.44);
-  else browBaseCol.lerp(new THREE.Color('#1E1512'), 0.22);
-  const eyebrowMat = clayMat(browBaseCol.getHex(), 0.56);
+  else browBaseCol.lerp(new THREE.Color('#1A1412'), 0.32);
+  const eyebrowMat = clayMat(browBaseCol.getHex(), 0.54);
 
   [-1, 1].forEach((side) => {
-    const expr = config.expression;
-    const isSquint = config.eyeStyle === 'squint';
-    const baseY =
-      expr === 'grin'
-        ? 0.312
-        : isSquint
-          ? 0.296
-          : expr === 'calm'
-            ? 0.302
-            : 0.306;
-    const innerDY =
-      expr === 'bashful'
-        ? 0.007
-        : expr === 'smirk' && side === 1
-          ? 0.011
-          : expr === 'cat'
-            ? -0.004
-            : isSquint
-              ? -0.005
-              : 0;
-    const outerDY =
-      expr === 'bashful'
-        ? -0.005
-        : expr === 'smirk' && side === 1
-          ? 0.009
-          : expr === 'grin'
-            ? 0.004
-            : -0.002;
+    const es = config.eyeStyle;
+    const ex = config.expression;
+    const isPout = ex === 'pout';
+    const isCool = es === 'cool' || ex === 'confident';
+    const isHappy =
+      es === 'happy_arc' ||
+      es === 'joy_xd' ||
+      es === 'sparkle' ||
+      ex === 'joy_open';
+
+    const browLat = isPout ? 78 : isCool ? 78 : isHappy ? 74 : 76;
+    const innerLat = isPout ? browLat + 3.2 : isCool ? browLat + 1.8 : browLat + 0.6;
+    const midLat = isPout ? browLat - 0.4 : isCool ? browLat : browLat - 2.2;
+    const outerLat = isPout ? browLat - 3.8 : isCool ? browLat + 0.4 : browLat + 0.8;
+
+    const lonInner = side * 15;
+    const lonMid = side * 27;
+    const lonOuter = side * 39;
 
     const brow = new THREE.Mesh(
       createTaperedTubeGeometry(
         [
-          [side * -0.036, innerDY, 0.003],
-          [0, 0.006, 0.007],
-          [side * 0.038, outerDY, -0.002],
+          headSurfacePoint(innerLat, lonInner, 0.0034),
+          headSurfacePoint(midLat, lonMid, 0.0038),
+          headSurfacePoint(outerLat, lonOuter, 0.0032),
         ],
-        0.0038,
-        10,
+        isPout || isCool ? 0.0046 : 0.0042,
+        12,
         6,
         0.24,
       ),
       eyebrowMat,
     );
-    brow.position.set(side * 0.11, baseY, 0.258);
-    brow.rotation.y = side * 0.2;
     headPivot.add(brow);
   });
 
-  // Delicate Expressive Nendoroid Mouths ('smile' | 'grin' | 'cat' | 'calm' | 'smirk' | 'bashful')
-  const mouthLineMat = clayMat('#5E342D', 0.5);
-  const mouthY = 0.15;
-  const mouthZ = 0.241;
-
-  if (config.expression === 'grin') {
-    // Cute chibi anime ':D' open smile — thin top smile line + smooth flat rose cavity + soft coral tongue (zero creepy teeth/lipstick!)
-    const mouthCavityShape = new THREE.Shape();
-    mouthCavityShape.moveTo(-0.022, 0.0035);
-    mouthCavityShape.quadraticCurveTo(0, 0.0005, 0.022, 0.0035);
-    mouthCavityShape.quadraticCurveTo(0.019, -0.0155, 0, -0.0155);
-    mouthCavityShape.quadraticCurveTo(-0.019, -0.0155, -0.022, 0.0035);
-    const mouthCavity = new THREE.Mesh(
-      new THREE.ShapeGeometry(mouthCavityShape, 12),
-      clayMat('#B4565E', 0.62),
-    );
-    mouthCavity.position.set(0, mouthY + 0.001, mouthZ - 0.0012);
-
-    const tongueShape = new THREE.Shape();
-    tongueShape.moveTo(-0.012, -0.0085);
-    tongueShape.quadraticCurveTo(0, -0.0028, 0.012, -0.0085);
-    tongueShape.quadraticCurveTo(0.009, -0.014, 0, -0.014);
-    tongueShape.quadraticCurveTo(-0.009, -0.014, -0.012, -0.0085);
-    const tongue = new THREE.Mesh(
-      new THREE.ShapeGeometry(tongueShape, 10),
-      clayMat('#EC959C', 0.54),
-    );
-    tongue.position.set(0, mouthY + 0.001, mouthZ - 0.0003);
-
-    const upperLip = new THREE.Mesh(
-      createTaperedTubeGeometry(
-        [
-          [-0.0235, mouthY + 0.0045, mouthZ - 0.0028],
-          [0, mouthY + 0.0018, mouthZ + 0.0006],
-          [0.0235, mouthY + 0.0045, mouthZ - 0.0028],
-        ],
-        0.0025,
-        14,
-        6,
-        0.22,
-      ),
-      mouthLineMat,
-    );
-    headPivot.add(mouthCavity, tongue, upperLip);
-  } else if (config.expression === 'cat') {
-    const catMouth = new THREE.Mesh(
-      createTaperedTubeGeometry(
-        [
-          [-0.028, mouthY + 0.0045, mouthZ - 0.003],
-          [-0.014, mouthY - 0.0035, mouthZ],
-          [0, mouthY + 0.0025, mouthZ + 0.0018],
-          [0.014, mouthY - 0.0035, mouthZ],
-          [0.028, mouthY + 0.0045, mouthZ - 0.003],
-        ],
-        0.0029,
-        18,
-        6,
-        0.24,
-      ),
-      mouthLineMat,
-    );
-    headPivot.add(catMouth);
-  } else if (config.expression === 'calm') {
-    const calmMouth = new THREE.Mesh(
-      createTaperedTubeGeometry(
-        [
-          [-0.019, mouthY + 0.001, mouthZ - 0.001],
-          [0, mouthY - 0.0008, mouthZ + 0.001],
-          [0.019, mouthY + 0.001, mouthZ - 0.001],
-        ],
-        0.0028,
-        10,
-        6,
-        0.25,
-      ),
-      mouthLineMat,
-    );
-    headPivot.add(calmMouth);
-  } else if (config.expression === 'smirk') {
-    const smirkMouth = new THREE.Mesh(
-      createTaperedTubeGeometry(
-        [
-          [-0.021, mouthY - 0.0015, mouthZ - 0.001],
-          [0.002, mouthY - 0.001, mouthZ + 0.0015],
-          [0.024, mouthY + 0.007, mouthZ - 0.0032],
-        ],
-        0.0029,
-        12,
-        6,
-        0.22,
-      ),
-      mouthLineMat,
-    );
-    headPivot.add(smirkMouth);
-  } else if (config.expression === 'bashful') {
-    const bashfulMouth = new THREE.Mesh(
-      createTaperedTubeGeometry(
-        [
-          [-0.017, mouthY + 0.001, mouthZ - 0.001],
-          [-0.0055, mouthY - 0.0025, mouthZ + 0.001],
-          [0.0055, mouthY + 0.0018, mouthZ + 0.001],
-          [0.017, mouthY - 0.0015, mouthZ - 0.001],
-        ],
-        0.0027,
-        12,
-        6,
-        0.25,
-      ),
-      mouthLineMat,
-    );
-    headPivot.add(bashfulMouth);
-  } else {
-    // 'smile': delicate soft Nendoroid U-smile
-    const smileMesh = new THREE.Mesh(
-      createTaperedTubeGeometry(
-        [
-          [-0.024, mouthY + 0.0045, mouthZ - 0.0025],
-          [-0.012, mouthY - 0.0028, mouthZ + 0.0008],
-          [0, mouthY - 0.0045, mouthZ + 0.0016],
-          [0.012, mouthY - 0.0028, mouthZ + 0.0008],
-          [0.024, mouthY + 0.0045, mouthZ - 0.0025],
-        ],
-        0.003,
-        14,
-        6,
-        0.24,
-      ),
-      mouthLineMat,
-    );
-    headPivot.add(smileMesh);
-  }
+  // Conformal Cute Chibi Mouth + Nose Button
+  const mouthTex = createChibiMouthTexture(config.expression);
+  const mouthPatchGeo = createHeadConformalPatchGeometry(107, 142, -22, 22, 0.0026, 18, 14);
+  const mouthMat = new THREE.MeshStandardMaterial({
+    color: '#FFFFFF',
+    map: mouthTex,
+    transparent: true,
+    alphaTest: 0.02,
+    roughness: 0.42,
+    metalness: 0.0,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+  });
+  headPivot.add(new THREE.Mesh(mouthPatchGeo, mouthMat));
 
   // ========== MODULAR STYLIZED 3D CLAY HAIR SYSTEM ==========
   const hairAssembly = buildCharacterHair(config, hairMat, topMat);
@@ -2381,20 +2863,20 @@ export function buildAvatarRig(
     const frameMat = glossyClayMat(accCol, 0.25);
     const lensMat = glossyClayMat('#1A1D24', 0.1);
     [-1, 1].forEach((side) => {
-      const gx = side * 0.112;
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.066, 0.01, 8, 18), frameMat);
-      rim.position.set(gx, 0.258, 0.304);
-      rim.rotation.y = side * 0.12;
+      const gx = side * 0.132;
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.074, 0.0095, 8, 22), frameMat);
+      rim.position.set(gx, 0.25, 0.296);
+      rim.rotation.y = side * 0.14;
       headPivot.add(rim);
       if (isSun) {
-        const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.01, 16), lensMat);
+        const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.068, 0.01, 18), lensMat);
         lens.rotation.x = Math.PI / 2;
-        lens.rotation.z = -side * 0.12;
-        lens.position.set(gx, 0.258, 0.3);
+        lens.rotation.z = -side * 0.14;
+        lens.position.set(gx, 0.25, 0.292);
         headPivot.add(lens);
       }
-      const pStart = new THREE.Vector3(side * 0.175, 0.262, 0.296);
-      const pEnd = new THREE.Vector3(side * 0.302, 0.262, 0.015);
+      const pStart = new THREE.Vector3(side * 0.204, 0.254, 0.288);
+      const pEnd = new THREE.Vector3(side * 0.302, 0.258, 0.015);
       const mid = pStart.clone().add(pEnd).multiplyScalar(0.5);
       const len = pStart.distanceTo(pEnd);
       const arm = new THREE.Mesh(
@@ -2408,8 +2890,8 @@ export function buildAvatarRig(
       );
       headPivot.add(arm);
     });
-    const bridge = new THREE.Mesh(new RoundedBoxGeometry(0.08, 0.013, 0.013, 2, 0.005), frameMat);
-    bridge.position.set(0, 0.264, 0.308);
+    const bridge = new THREE.Mesh(new RoundedBoxGeometry(0.068, 0.013, 0.013, 2, 0.005), frameMat);
+    bridge.position.set(0, 0.256, 0.302);
     headPivot.add(bridge);
   } else if (config.accessory === 'scarf') {
     const scarfMat = clayMat(accCol, 0.78);
@@ -2452,6 +2934,12 @@ export function buildAvatarRig(
     leftKnee,
     rightKnee,
     eyelids,
+    openEyeGroup,
+    closedEyeGroup,
+    skipNaturalBlink:
+      config.eyeStyle === 'happy_arc' ||
+      config.eyeStyle === 'joy_xd' ||
+      config.eyeStyle === 'wink',
     shadowDisc,
     holdPose,
     toolType: equippedTool,
@@ -2467,13 +2955,19 @@ export function updateAvatarRigAnimation(
   isCozyEyes = false,
   poseProgress = 0,
 ): void {
+  const isNaturalBlink = !isCozyEyes && !rig.skipNaturalBlink && elapsed % 4.5 > 4.38;
+  const eyesClosed = pose === 'sleep' || isNaturalBlink;
+  if (rig.openEyeGroup && rig.closedEyeGroup) {
+    rig.openEyeGroup.visible = !eyesClosed;
+    rig.closedEyeGroup.visible = eyesClosed;
+  }
   if (rig.eyelids.length > 0) {
-    const eyesClosed = pose === 'sleep' || isCozyEyes;
+    const lidClosed = pose === 'sleep' || isCozyEyes;
     rig.eyelids.forEach((lid) => {
       const baseScaleY = (lid.userData.baseScaleY as number) ?? 0.06;
       const baseY = (lid.userData.baseY as number) ?? 0.046;
-      lid.scale.y = eyesClosed ? 1.15 : baseScaleY;
-      lid.position.y = eyesClosed ? 0 : baseY;
+      lid.scale.y = lidClosed ? 1.15 : baseScaleY;
+      lid.position.y = lidClosed ? 0 : baseY;
     });
   }
 
@@ -2809,7 +3303,7 @@ export function updateAvatarRigAnimation(
     if (rig.rightElbow) rig.rightElbow.rotation.x = -0.08;
     if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
     rig.headPivot.position.y = HEAD_PIVOT_Y;
-    rig.bodyPivot.position.y = 0.36;
+    rig.bodyPivot.position.y = 0.88;
     rig.bodyPivot.rotation.x = -Math.PI / 2;
     rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = 0;

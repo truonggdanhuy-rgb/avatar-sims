@@ -236,7 +236,7 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
         currentRig,
         'idle',
         elapsed,
-        avatarRef.current.eyeStyle === 'cozy',
+        avatarRef.current.eyeStyle === 'happy_arc',
       );
       renderer.render(scene, camera);
       if (isSoftwareGl) afterDraw(tick);

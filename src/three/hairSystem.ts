@@ -125,7 +125,8 @@ function isMaleStyle(hairBack: HairBackStyle): boolean {
     hairBack === 'boy_1' ||
     hairBack === 'boy_2' ||
     hairBack === 'boy_3' ||
-    hairBack === 'boy_4'
+    hairBack === 'boy_4' ||
+    hairBack === 'hero_wave'
   );
 }
 
@@ -196,6 +197,20 @@ function getFrontPetals(
         {c: 4, hw: 12, drop: 22},
         {c: 22, hw: 13, drop: 19},
         {c: 44, hw: 15, drop: 29},
+      ],
+    };
+  }
+
+  if (hairBack === 'hero_wave') {
+    return {
+      browBaseLat: 54,
+      partLon: 20,
+      petals: [
+        {c: -52, hw: 17, drop: 26},
+        {c: -28, hw: 18, drop: 14},
+        {c: -4, hw: 16, drop: 11},
+        {c: 20, hw: 14, drop: 8},
+        {c: 44, hw: 18, drop: 24},
       ],
     };
   }
@@ -302,7 +317,7 @@ function createUnifiedClayCapGeometry(
 
   // Full plush Nendoroid volume across crown & brow (never crushed flat!)
   const baseCrownLoft =
-    hairBack === 'boy_4'
+    hairBack === 'boy_4' || hairBack === 'hero_wave'
       ? 0.088
       : hairBack === 'boy_3'
         ? 0.086
@@ -339,7 +354,7 @@ function createUnifiedClayCapGeometry(
         ? 120
         : hairBack === 'boy_2'
           ? 135
-          : hairBack === 'boy_4' || hairBack === 'boy_3'
+          : hairBack === 'boy_4' || hairBack === 'boy_3' || hairBack === 'hero_wave'
             ? 133
             : hairBack === 'boy_1' || hairBack === 'short_crop'
               ? 131
@@ -995,6 +1010,30 @@ function buildFrontSignatureAccents(
         ),
       );
     }
+  } else if (hairBack === 'hero_wave' && !isSnugCap) {
+    // Cohesive sculpted clay S-wave curl emerging smoothly from upper-left forehead hairline (Image 4)
+    const heroCurlSteps: LockStep[] = [
+      {lat: 38, lon: 6, offset: crownOuterOffset + 0.002},
+      {lat: 50, lon: -6, offset: crownOuterOffset + 0.014},
+      {lat: 63, lon: -16, offset: 0.046},
+      {lat: 70, lon: -12, offset: 0.028},
+      {lat: 68, lon: -1, offset: 0.012},
+    ];
+    grp.add(
+      new THREE.Mesh(
+        createClayLockGeometry(sampleHeadSteps(heroCurlSteps, 18), {
+          width: 0.072,
+          depth: 0.036,
+          innerFlatten: 0.62,
+          profile: 'quiff',
+          edgePinch: 0.2,
+          tubularSegs: 18,
+          radialSegs: 12,
+          roundTipScale: 0.14,
+        }),
+        hairMat,
+      ),
+    );
   }
 
   return grp;

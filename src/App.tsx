@@ -316,11 +316,68 @@ export default function App() {
   const homeSpotRef = useRef<{x: number; z: number}>({x: -1.8, z: 4.5});
 
   const [avatar, setAvatar] = useState<AvatarConfig>(() => {
+    const LEGACY_EYE_MAP: Record<string, AvatarConfig['eyeStyle']> = {
+      starry: 'sparkle',
+      almond: 'heroic',
+      cheerful: 'bright',
+      squint: 'cool',
+      wink: 'wink',
+      hero: 'heroic',
+      sweet: 'bright',
+      halftime: 'cool',
+      cool_slit: 'cool',
+      happy_xd: 'joy_xd',
+      pout_xd: 'joy_xd',
+      cozy: 'happy_arc',
+    };
+    const LEGACY_EXPR_MAP: Record<string, AvatarConfig['expression']> = {
+      smile: 'sweet_smile',
+      grin: 'joy_open',
+      cat: 'cat_w',
+      calm: 'confident',
+      smirk: 'confident',
+      bashful: 'pout',
+      hero_smile: 'confident',
+      sweet_u: 'sweet_smile',
+      open_o: 'gentle_o',
+      happy_d: 'joy_open',
+      cool_line: 'confident',
+      pout_puff: 'pout',
+    };
+    const VALID_EYES = new Set<string>([
+      'bright',
+      'gentle',
+      'sparkle',
+      'heroic',
+      'cool',
+      'happy_arc',
+      'joy_xd',
+      'wink',
+    ]);
+    const VALID_EXPRS = new Set<string>([
+      'sweet_smile',
+      'joy_open',
+      'cat_w',
+      'gentle_o',
+      'confident',
+      'pout',
+    ]);
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.avatar) return {...DEFAULT_AVATAR, ...parsed.avatar};
+        if (parsed.avatar) {
+          const merged = {...DEFAULT_AVATAR, ...parsed.avatar} as AvatarConfig & Record<string, unknown>;
+          const rawEye = String(merged.eyeStyle ?? '');
+          if (!VALID_EYES.has(rawEye)) {
+            merged.eyeStyle = LEGACY_EYE_MAP[rawEye] ?? DEFAULT_AVATAR.eyeStyle;
+          }
+          const rawExpr = String(merged.expression ?? '');
+          if (!VALID_EXPRS.has(rawExpr)) {
+            merged.expression = LEGACY_EXPR_MAP[rawExpr] ?? DEFAULT_AVATAR.expression;
+          }
+          return merged;
+        }
       }
     } catch {
       // ignore storage errors

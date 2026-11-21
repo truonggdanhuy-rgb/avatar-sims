@@ -229,6 +229,189 @@ function build3DFlowerHead(petalHex: string, centerHex = '#FFD24C', scale = 1): 
   return fg;
 }
 
+function createSolidBedSleepBlanket(
+  quiltMat: THREE.Material,
+  cuffMat: THREE.Material,
+): THREE.Group {
+  const sleepGrp = new THREE.Group();
+
+  // Closed manifold solid quilt profile from inside mattress (y=0.48) up to plush dome (y=1.16)
+  // and draping down both sides (|x|=0.95..1.07, y=0.14) — zero hollow interior gap!
+  const buildQuiltCrossSection = (expand = 0, domeBoost = 0) => {
+    const s = new THREE.Shape();
+    const ox = 1.07 + expand;
+    const ix = 0.94;
+    const baseSideY = 0.14;
+    const innerBaseY = 0.48;
+    const peakY = 1.16 + domeBoost;
+
+    s.moveTo(-ox, baseSideY);
+    s.lineTo(-ox, 0.58);
+    s.bezierCurveTo(-ox, 0.78, -0.78, 1.04 + domeBoost, -0.34, 1.13 + domeBoost);
+    s.quadraticCurveTo(0, peakY + 0.03, 0.34, 1.13 + domeBoost);
+    s.bezierCurveTo(0.78, 1.04 + domeBoost, ox, 0.78, ox, 0.58);
+    s.lineTo(ox, baseSideY);
+    s.lineTo(ix, baseSideY);
+    s.lineTo(ix, innerBaseY);
+    s.lineTo(-ix, innerBaseY);
+    s.lineTo(-ix, baseSideY);
+    s.closePath();
+    return s;
+  };
+
+  // Main quilted blanket covering neck (z=-0.44) all the way past foot of mattress (z=+1.20)
+  const mainGeo = new THREE.ExtrudeGeometry(buildQuiltCrossSection(0, 0), {
+    depth: 1.54,
+    bevelEnabled: true,
+    bevelThickness: 0.055,
+    bevelSize: 0.035,
+    bevelSegments: 4,
+    curveSegments: 22,
+  });
+  mainGeo.translate(0, 0, -0.38);
+  const mainQuilt = new THREE.Mesh(mainGeo, quiltMat);
+
+  // Plush folded cream/pastel cuff right up at the sleeping character's neck/collarbone
+  const cuffGeo = new THREE.ExtrudeGeometry(buildQuiltCrossSection(0.015, 0.018), {
+    depth: 0.16,
+    bevelEnabled: true,
+    bevelThickness: 0.032,
+    bevelSize: 0.02,
+    bevelSegments: 3,
+    curveSegments: 22,
+  });
+  cuffGeo.translate(0, 0, -0.415);
+  const cuffMesh = new THREE.Mesh(cuffGeo, cuffMat);
+
+  sleepGrp.add(mainQuilt, cuffMesh);
+  return sleepGrp;
+}
+
+function buildUnderPotWoodStand(
+  woodMat: THREE.Material,
+  trayTopY = 0.175,
+  trayRadius = 0.195,
+): THREE.Group {
+  const stand = new THREE.Group();
+  const barY = trayTopY - 0.026;
+  const legLen = Math.hypot(0.035, barY);
+
+  // 4 short splayed wooden legs strictly UNDER the cross-cradle (never piercing the pot!)
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.017, legLen, 8), woodMat);
+    const rMid = trayRadius * 0.88;
+    leg.position.set(Math.cos(a) * rMid, barY * 0.5, Math.sin(a) * rMid);
+    leg.rotation.order = 'YXZ';
+    leg.rotation.y = -a;
+    leg.rotation.z = -0.18;
+    stand.add(leg);
+  }
+
+  // Cross-cradle bars supporting the circular wooden tray
+  for (let i = 0; i < 2; i++) {
+    const bar = new THREE.Mesh(
+      new RoundedBoxGeometry(trayRadius * 1.92, 0.032, 0.04, 2, 0.008),
+      woodMat,
+    );
+    bar.position.y = barY;
+    bar.rotation.y = i * (Math.PI / 2);
+    stand.add(bar);
+  }
+
+  const tray = new THREE.Mesh(
+    new THREE.CylinderGeometry(trayRadius, trayRadius * 0.94, 0.026, 16),
+    woodMat,
+  );
+  tray.position.y = trayTopY - 0.013;
+  stand.add(tray);
+
+  return stand;
+}
+
+let _clayFiddleLeafGeo: THREE.BufferGeometry | null = null;
+function getClayFiddleLeafGeometry(): THREE.BufferGeometry {
+  if (_clayFiddleLeafGeo) return _clayFiddleLeafGeo;
+  const s = new THREE.Shape();
+  s.moveTo(0, 0);
+  s.bezierCurveTo(0.035, 0.042, 0.075, 0.052, 0.115, 0.044);
+  s.bezierCurveTo(0.165, 0.034, 0.215, 0.118, 0.295, 0.105);
+  s.bezierCurveTo(0.355, 0.095, 0.375, 0.036, 0.375, 0);
+  s.bezierCurveTo(0.375, -0.036, 0.355, -0.095, 0.295, -0.105);
+  s.bezierCurveTo(0.215, -0.118, 0.165, -0.034, 0.115, -0.044);
+  s.bezierCurveTo(0.075, -0.052, 0.035, -0.042, 0, 0);
+
+  const geo = new THREE.ExtrudeGeometry(s, {
+    depth: 0.012,
+    bevelEnabled: true,
+    bevelThickness: 0.012,
+    bevelSize: 0.011,
+    bevelSegments: 4,
+    curveSegments: 14,
+  });
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, -0.006, 0);
+
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const u = THREE.MathUtils.clamp(x / 0.38, 0, 1);
+    const arch = Math.sin(u * Math.PI) * 0.022 - u * u * 0.018;
+    const cup = z * z * 0.35;
+    pos.setY(i, y + arch + cup);
+  }
+  geo.computeVertexNormals();
+  _clayFiddleLeafGeo = geo;
+  return geo;
+}
+
+let _clayMonsteraLeafGeo: THREE.BufferGeometry | null = null;
+function getClayMonsteraLeafGeometry(): THREE.BufferGeometry {
+  if (_clayMonsteraLeafGeo) return _clayMonsteraLeafGeo;
+  const s = new THREE.Shape();
+  s.moveTo(0, 0);
+  // Basal upper lobe + sculpted Monstera scallop notches tapering to plump rounded tip
+  s.bezierCurveTo(-0.035, 0.055, 0.02, 0.138, 0.095, 0.145);
+  s.bezierCurveTo(0.115, 0.147, 0.125, 0.105, 0.145, 0.105);
+  s.bezierCurveTo(0.165, 0.105, 0.17, 0.142, 0.205, 0.132);
+  s.bezierCurveTo(0.222, 0.126, 0.228, 0.092, 0.246, 0.09);
+  s.bezierCurveTo(0.268, 0.088, 0.305, 0.068, 0.345, 0.016);
+  s.quadraticCurveTo(0.365, 0, 0.345, -0.016);
+  // Symmetric lower lobe
+  s.bezierCurveTo(0.305, -0.068, 0.268, -0.088, 0.246, -0.09);
+  s.bezierCurveTo(0.228, -0.092, 0.222, -0.126, 0.205, -0.132);
+  s.bezierCurveTo(0.17, -0.142, 0.165, -0.105, 0.145, -0.105);
+  s.bezierCurveTo(0.125, -0.105, 0.115, -0.147, 0.095, -0.145);
+  s.bezierCurveTo(0.02, -0.138, -0.035, -0.055, 0, 0);
+
+  const geo = new THREE.ExtrudeGeometry(s, {
+    depth: 0.011,
+    bevelEnabled: true,
+    bevelThickness: 0.011,
+    bevelSize: 0.01,
+    bevelSegments: 4,
+    curveSegments: 14,
+  });
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, -0.0055, 0);
+
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const u = THREE.MathUtils.clamp(x / 0.35, 0, 1);
+    const arch = Math.sin(u * Math.PI) * 0.02 - u * u * 0.024;
+    const cup = z * z * 0.25;
+    pos.setY(i, y + arch + cup);
+  }
+  geo.computeVertexNormals();
+  _clayMonsteraLeafGeo = geo;
+  return geo;
+}
+
 export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
   const g = new THREE.Group();
   const mainMat = clayMat(item.color, 0.72);
@@ -508,11 +691,21 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
         clayMat('#FFFDF8', 0.78),
       );
       mattress.position.set(0, 0.4, 0);
+
+      const idleBlanket = new THREE.Group();
       const blanket = new THREE.Mesh(
         new RoundedBoxGeometry(2.08, 0.52, 1.5, 3, 0.12),
         mainMat,
       );
       blanket.position.set(0, 0.42, 0.42);
+      idleBlanket.add(blanket);
+
+      const sleepBlanket = createSolidBedSleepBlanket(mainMat, clayMat('#FFFDF8', 0.78));
+      sleepBlanket.visible = false;
+
+      g.userData.bedIdleBlanket = idleBlanket;
+      g.userData.bedSleepBlanket = sleepBlanket;
+
       [-0.44, 0.44].forEach((px) => {
         const pillow = new THREE.Mesh(
           new RoundedBoxGeometry(0.82, 0.22, 0.5, 2, 0.07),
@@ -521,7 +714,7 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
         pillow.position.set(px, 0.72, -0.76);
         g.add(pillow);
       });
-      g.add(headboard, mattress, blanket);
+      g.add(headboard, mattress, idleBlanket, sleepBlanket);
       break;
     }
 
@@ -1381,73 +1574,67 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
         }
         g.add(pot, rim, soil);
       } else {
-        // Sculpted Monstera Plant on cozy 3-legged wooden stand
+        // Sculpted polymer-clay Monstera Plant seated cleanly ON TOP of wooden stand (zero leg pierce!)
         const standWood = clayMat('#9E6A3E', 0.72);
-        for (let i = 0; i < 3; i++) {
-          const a = (i / 3) * Math.PI * 2;
-          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.02, 0.28, 7), standWood);
-          leg.position.set(Math.cos(a) * 0.19, 0.14, Math.sin(a) * 0.19);
-          leg.rotation.z = -Math.cos(a) * 0.14;
-          leg.rotation.x = Math.sin(a) * 0.14;
-          g.add(leg);
-        }
-        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.3, 12), accentMat);
-        pot.position.y = 0.27;
-        const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.23, 0.05, 12), accentMat);
-        rim.position.y = 0.41;
+        const stand = buildUnderPotWoodStand(standWood, 0.175, 0.19);
+        g.add(stand);
+
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.3, 16), accentMat);
+        pot.position.y = 0.325;
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(0.215, 0.026, 8, 18), accentMat);
+        rim.rotation.x = Math.PI / 2;
+        rim.position.y = 0.47;
         const soil = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.2, 0.2, 0.04, 10),
+          new THREE.CylinderGeometry(0.195, 0.195, 0.036, 14),
           clayMat('#684227', 0.9),
         );
-        soil.position.y = 0.425;
+        soil.position.y = 0.468;
 
-        const stemMat = clayMat('#4C8D52', 0.74);
-        const leafMat = clayMat(item.color || '#4F9E5A', 0.62);
-        const leafDark = clayMat('#3B8246', 0.65);
+        const stemMat = clayMat('#4C8D52', 0.72);
+        const leafMat = clayMat(item.color || '#4F9E5A', 0.58);
+        const leafDark = clayMat('#3B8246', 0.62);
+        const veinMat = clayMat('#76C47B', 0.56);
+        const monsteraGeo = getClayMonsteraLeafGeometry();
 
-        const frondSpecs: [number, number, number, number][] = [
-          [0, 0.56, 0.35, 1.05],
-          [1.05, 0.52, 0.62, 0.95],
-          [2.15, 0.48, 0.55, 0.9],
-          [3.2, 0.54, 0.6, 1.0],
-          [4.25, 0.46, 0.52, 0.85],
-          [5.3, 0.5, 0.66, 0.92],
+        const frondSpecs: [number, number, number, number, number][] = [
+          [0.05, 0.52, 0.26, 0.98, 0.14],
+          [0.98, 0.44, 0.32, 0.92, 0.22],
+          [1.92, 0.4, 0.29, 0.86, 0.18],
+          [2.88, 0.48, 0.3, 0.95, 0.16],
+          [3.82, 0.38, 0.33, 0.84, 0.24],
+          [4.75, 0.45, 0.28, 0.9, 0.18],
+          [5.55, 0.56, 0.18, 0.88, 0.08],
         ];
-        frondSpecs.forEach(([ang, len, tilt, sc], idx) => {
+        frondSpecs.forEach(([ang, height, reach, sc, droop], idx) => {
           const frond = new THREE.Group();
-          frond.position.set(Math.cos(ang) * 0.05, 0.42, Math.sin(ang) * 0.05);
-          frond.rotation.y = -ang;
+          frond.rotation.y = ang;
 
+          const startPt = new THREE.Vector3(0.03, 0.465, 0);
+          const midPt = new THREE.Vector3(reach * 0.55, 0.465 + height * 0.68, 0);
+          const tipPt = new THREE.Vector3(reach, 0.465 + height, 0);
+          const curve = new THREE.CatmullRomCurve3([startPt, midPt, tipPt]);
           const petiole = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.014, 0.02, len, 6),
+            new THREE.TubeGeometry(curve, 8, 0.013, 7, false),
             stemMat,
           );
-          petiole.rotation.z = -tilt;
-          petiole.position.set(Math.sin(tilt) * (len * 0.5), Math.cos(tilt) * (len * 0.5), 0);
           frond.add(petiole);
 
-          // Heart-shaped layered Monstera leaf blade at petiole tip
-          const tipX = Math.sin(tilt) * len;
-          const tipY = Math.cos(tilt) * len;
           const bladeGroup = new THREE.Group();
-          bladeGroup.position.set(tipX, tipY, 0);
-          bladeGroup.rotation.z = -tilt - 0.55;
+          bladeGroup.position.copy(tipPt);
+          bladeGroup.rotation.z = -droop - 0.18;
           bladeGroup.scale.setScalar(sc);
 
-          const mainLobe = new THREE.Mesh(
-            new THREE.SphereGeometry(0.16, 8, 6),
+          const blade = new THREE.Mesh(
+            monsteraGeo,
             idx % 2 === 0 ? leafMat : leafDark,
           );
-          mainLobe.scale.set(1.3, 0.14, 1.05);
-          mainLobe.position.set(0.11, 0, 0);
-          const tipLobe = new THREE.Mesh(
-            new THREE.ConeGeometry(0.11, 0.22, 6),
-            idx % 2 === 0 ? leafMat : leafDark,
+          const midrib = new THREE.Mesh(
+            new THREE.CapsuleGeometry(0.008, 0.22, 4, 6),
+            veinMat,
           );
-          tipLobe.scale.set(1, 1, 0.18);
-          tipLobe.rotation.z = -Math.PI / 2;
-          tipLobe.position.set(0.26, 0, 0);
-          bladeGroup.add(mainLobe, tipLobe);
+          midrib.rotation.z = Math.PI / 2;
+          midrib.position.set(0.14, 0.017, 0);
+          bladeGroup.add(blade, midrib);
 
           frond.add(bladeGroup);
           g.add(frond);
@@ -1458,70 +1645,111 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
     }
 
     case 'plant_fiddle': {
-      // Sculpted Fiddle-Leaf Fig in ceramic pot + wooden stand + veined broad paddle leaves
+      // Sculpted Fiddle-Leaf Fig seated cleanly ON TOP of wooden stand + curved organic branches + plump clay leaves
       const standMat = clayMat('#8F5F39', 0.72);
-      for (let i = 0; i < 3; i++) {
-        const a = (i / 3) * Math.PI * 2;
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.22, 7), standMat);
-        leg.position.set(Math.cos(a) * 0.18, 0.11, Math.sin(a) * 0.18);
-        g.add(leg);
-      }
-      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.34, 12), accentMat);
-      pot.position.y = 0.27;
+      const stand = buildUnderPotWoodStand(standMat, 0.175, 0.195);
+      g.add(stand);
+
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.32, 16), accentMat);
+      pot.position.y = 0.335;
       const rim = new THREE.Mesh(
-        new THREE.TorusGeometry(0.21, 0.025, 6, 14),
-        clayMat('#DFD2BE', 0.6),
+        new THREE.TorusGeometry(0.218, 0.026, 8, 18),
+        clayMat('#DFD2BE', 0.58),
       );
       rim.rotation.x = Math.PI / 2;
-      rim.position.y = 0.43;
+      rim.position.y = 0.49;
       const soil = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.2, 0.2, 0.04, 10),
+        new THREE.CylinderGeometry(0.198, 0.198, 0.036, 14),
         clayMat('#6B4429', 0.9),
       );
-      soil.position.y = 0.43;
+      soil.position.y = 0.488;
 
-      const trunkMat = clayMat('#7D5737', 0.8);
-      const trunkLow = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.56, 7), trunkMat);
-      trunkLow.position.y = 0.68;
-      const branchL = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 0.42, 6), trunkMat);
-      branchL.position.set(-0.08, 1.06, 0.04);
-      branchL.rotation.z = 0.35;
-      const branchR = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 0.46, 6), trunkMat);
-      branchR.position.set(0.08, 1.08, -0.04);
-      branchR.rotation.z = -0.32;
+      const trunkMat = clayMat('#7D5737', 0.78);
+      const leafDark = clayMat('#3F874B', 0.58);
+      const veinMat = clayMat('#7BC480', 0.54);
+      const fiddleGeo = getClayFiddleLeafGeometry();
 
-      const leafDark = clayMat('#3F874B', 0.62);
-      const fiddleSpecs: [number, number, number, number, number, number][] = [
-        [-0.22, 1.24, 0.1, 0.95, 0.4, 0.6],
-        [0.24, 1.28, -0.08, 1.0, 2.6, 0.55],
-        [0.02, 1.38, 0.16, 0.92, 1.5, 0.38],
-        [-0.18, 0.96, -0.18, 0.88, 3.8, 0.62],
-        [0.18, 0.98, 0.18, 0.9, 5.4, 0.58],
-        [0.0, 1.15, -0.22, 0.85, 4.7, 0.5],
+      // Curved sculpted main trunk rising smoothly from soil
+      const mainTrunkCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 0.47, 0),
+        new THREE.Vector3(-0.018, 0.68, 0.012),
+        new THREE.Vector3(0.014, 0.9, -0.01),
+        new THREE.Vector3(0.02, 1.18, 0.04),
+      ]);
+      const mainTrunk = new THREE.Mesh(
+        new THREE.TubeGeometry(mainTrunkCurve, 12, 0.03, 8, false),
+        trunkMat,
+      );
+
+      const branchLeftCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.01, 0.79, 0.005),
+        new THREE.Vector3(-0.08, 0.94, 0.045),
+        new THREE.Vector3(-0.14, 1.12, 0.075),
+      ]);
+      const branchLeft = new THREE.Mesh(
+        new THREE.TubeGeometry(branchLeftCurve, 8, 0.021, 7, false),
+        trunkMat,
+      );
+
+      const branchRightCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.008, 0.84, -0.005),
+        new THREE.Vector3(0.09, 0.98, -0.05),
+        new THREE.Vector3(0.15, 1.16, -0.06),
+      ]);
+      const branchRight = new THREE.Mesh(
+        new THREE.TubeGeometry(branchRightCurve, 8, 0.021, 7, false),
+        trunkMat,
+      );
+
+      // Every leaf connects via a real curved clay petiole directly from trunk/branch to leaf base socket!
+      const fiddleLeafSpecs: {
+        anchor: [number, number, number];
+        base: [number, number, number];
+        yaw: number;
+        pitch: number;
+        roll: number;
+        scale: number;
+      }[] = [
+        {anchor: [-0.005, 0.74, 0.01], base: [-0.08, 0.84, -0.09], yaw: 2.35, pitch: 0.34, roll: 0.14, scale: 0.92},
+        {anchor: [0.008, 0.82, -0.005], base: [0.1, 0.9, 0.09], yaw: -0.72, pitch: 0.38, roll: -0.1, scale: 0.9},
+        {anchor: [-0.09, 0.96, 0.05], base: [-0.18, 1.03, -0.02], yaw: 2.85, pitch: 0.32, roll: 0.16, scale: 0.96},
+        {anchor: [0.1, 1.0, -0.05], base: [0.18, 1.08, 0.03], yaw: -0.18, pitch: 0.3, roll: -0.14, scale: 0.98},
+        {anchor: [-0.14, 1.12, 0.075], base: [-0.17, 1.24, 0.12], yaw: 2.2, pitch: 0.24, roll: 0.08, scale: 0.94},
+        {anchor: [0.15, 1.16, -0.06], base: [0.19, 1.28, -0.09], yaw: 0.45, pitch: 0.24, roll: -0.08, scale: 0.94},
+        {anchor: [0.02, 1.18, 0.04], base: [0.02, 1.32, 0.06], yaw: -1.42, pitch: 0.18, roll: 0.05, scale: 0.9},
       ];
-      fiddleSpecs.forEach(([lx, ly, lz, sc, yaw, pitch], idx) => {
-        const lg = new THREE.Group();
-        lg.position.set(lx, ly, lz);
-        lg.rotation.y = yaw;
-        lg.rotation.z = -pitch;
-        lg.scale.setScalar(sc);
 
-        const padMain = new THREE.Mesh(
-          new THREE.SphereGeometry(0.14, 8, 6),
-          idx % 2 === 0 ? mainMat : leafDark,
+      fiddleLeafSpecs.forEach((spec, idx) => {
+        const p0 = new THREE.Vector3(...spec.anchor);
+        const p2 = new THREE.Vector3(...spec.base);
+        const p1 = p0.clone().lerp(p2, 0.5);
+        p1.y += 0.035;
+        const petiole = new THREE.Mesh(
+          new THREE.TubeGeometry(new THREE.CatmullRomCurve3([p0, p1, p2]), 6, 0.011, 6, false),
+          trunkMat,
         );
-        padMain.scale.set(1.35, 0.14, 0.85);
-        padMain.position.x = 0.14;
-        const padBase = new THREE.Mesh(
-          new THREE.SphereGeometry(0.09, 7, 5),
-          idx % 2 === 0 ? mainMat : leafDark,
+        g.add(petiole);
+
+        const lg = new THREE.Group();
+        lg.position.copy(p2);
+        lg.rotation.order = 'YXZ';
+        lg.rotation.y = spec.yaw;
+        lg.rotation.z = -spec.pitch;
+        lg.rotation.x = spec.roll;
+        lg.scale.setScalar(spec.scale);
+
+        const blade = new THREE.Mesh(fiddleGeo, idx % 2 === 0 ? mainMat : leafDark);
+        const midrib = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.007, 0.26, 4, 6),
+          veinMat,
         );
-        padBase.scale.set(1.0, 0.14, 0.7);
-        padBase.position.x = 0.04;
-        lg.add(padMain, padBase);
+        midrib.rotation.z = Math.PI / 2;
+        midrib.position.set(0.16, 0.018, 0);
+        lg.add(blade, midrib);
         g.add(lg);
       });
-      g.add(pot, rim, soil, trunkLow, branchL, branchR);
+
+      g.add(pot, rim, soil, mainTrunk, branchLeft, branchRight);
       break;
     }
 

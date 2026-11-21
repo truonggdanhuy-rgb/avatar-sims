@@ -19,26 +19,45 @@ export type HairBackStyle =
   | 'boy_1'
   | 'boy_2'
   | 'boy_3'
-  | 'boy_4';
+  | 'boy_4'
+  | 'hero_wave';
 
 export type HairFrontStyle = 'air_bangs' | 'side_sweep' | 'curtain' | 'neat_fringe';
 
-export type EyeStyle = 'starry' | 'almond' | 'cheerful' | 'cozy' | 'squint' | 'wink';
+export type EyeStyle =
+  | 'bright'
+  | 'gentle'
+  | 'sparkle'
+  | 'heroic'
+  | 'cool'
+  | 'happy_arc'
+  | 'joy_xd'
+  | 'wink';
 
-export type ExpressionStyle = 'smile' | 'grin' | 'cat' | 'calm' | 'smirk' | 'bashful';
+export type ExpressionStyle =
+  | 'sweet_smile'
+  | 'joy_open'
+  | 'cat_w'
+  | 'gentle_o'
+  | 'confident'
+  | 'pout';
 
 export type TopStyle =
   | 'sailor_blouse'
   | 'knit_sweater'
   | 'hoodie'
   | 'sundress'
-  | 'cardigan_vest';
+  | 'cardigan_vest'
+  | 'office_male'
+  | 'office_female';
 
 export type BottomStyle =
   | 'pleated_skirt'
   | 'denim_shorts'
   | 'wide_trousers'
-  | 'midi_skirt';
+  | 'midi_skirt'
+  | 'office_trousers'
+  | 'office_skirt';
 
 export type ShoeStyle = 'sneakers' | 'mary_janes' | 'boots' | 'loafers';
 

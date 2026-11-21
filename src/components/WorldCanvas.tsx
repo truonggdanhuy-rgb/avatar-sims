@@ -1002,7 +1002,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [nearbyDoor, setNearbyDoor] = useState<{id: string; label: string; isOpen: boolean} | null>(
     null,
   );
-  const [nearbyLightSwitch, setNearbyLightSwitch] = useState<boolean | null>(null);
+  const [houseLightsOn, setHouseLightsOn] = useState(true);
   const [nearbyLamp, setNearbyLamp] = useState<HouseLampInfo | null>(null);
   const [nearPond, setNearPond] = useState(false);
   const [confirmPondFeed, setConfirmPondFeed] = useState(false);
@@ -1134,9 +1134,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const houseLightsOnRef = useRef<boolean>(true);
   const lampStatesRef = useRef<Record<string, boolean>>({});
   const activeBathtubIdRef = useRef<string | null>(null);
+  const activeBedIdRef = useRef<string | null>(null);
   const activeDoorsRef = useRef<HouseDoorHandle[]>([]);
   const nearbyDoorKeyRef = useRef<string>('');
-  const nearbyLightSwitchKeyRef = useRef<string>('');
   const nearbyLampKeyRef = useRef<string>('');
   const nearPondRef = useRef<boolean>(false);
   const homeExitTriggeredRef = useRef<boolean>(false);
@@ -1173,11 +1173,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       openDoorsRef.current = {};
       activeDoorsRef.current = [];
       activeBathtubIdRef.current = null;
+      activeBedIdRef.current = null;
       nearbyDoorKeyRef.current = '';
-      nearbyLightSwitchKeyRef.current = '';
       nearbyLampKeyRef.current = '';
       setNearbyDoor(null);
-      setNearbyLightSwitch(null);
       setNearbyLamp(null);
       setHomeToolsOpen(false);
     }
@@ -1528,6 +1527,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         if (z === 'home' && activeBathtubIdRef.current) {
           activeSubzone.setActiveBathtub?.(activeBathtubIdRef.current);
         }
+        if (z === 'home' && activeBedIdRef.current) {
+          activeSubzone.setActiveBed?.(activeBedIdRef.current);
+        }
         scene.add(activeSubzone.group);
         currentAnchors = activeSubzone.labelAnchors;
         currentClickTargets = [...activeSubzone.clickTargets, playerProxy];
@@ -1817,6 +1819,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         if (activeSeat.isBath) {
           activeBathtubIdRef.current = null;
           activeSubzone?.setActiveBathtub?.(null);
+        }
+        if (activeSeat.isBed) {
+          activeBedIdRef.current = null;
+          activeSubzone?.setActiveBed?.(null);
         }
         playerPos.x = activeSeat.standX;
         playerPos.z = activeSeat.standZ;
@@ -2196,10 +2202,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'bed') {
             soundFX.tap();
+            const bedId = data.furnitureId as string;
             const bedSeat: SeatTarget = {
               seatX: (data.seatX as number) ?? 2.35,
               seatZ: (data.seatZ as number) ?? -3.1,
-              seatY: (data.seatY as number) ?? 0.68,
+              seatY: (data.seatY as number) ?? 0.65,
               rotY: (data.sitRotY as number) ?? 0,
               standX: data.tx as number,
               standZ: data.tz as number,
@@ -2207,6 +2214,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             };
             startWalkTo(data.tx as number, data.tz as number, 'sleep', bedSeat, () => {
               soundFX.nap();
+              activeBedIdRef.current = bedId;
+              activeSubzone?.setActiveBed?.(bedId);
               callbacksRef.current.onRestoreEnergy();
               showBubble('Ngủ thật ngon! (+Năng lượng)', bedSeat.seatX, 2.1, bedSeat.seatZ);
             });
@@ -2258,30 +2267,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
-          if (kind === 'light_switch') {
-            const doToggleSwitch = () => {
-              const nextOn = !houseLightsOnRef.current;
-              houseLightsOnRef.current = nextOn;
-              activeSubzone?.setHouseLightsOn?.(nextOn);
-              soundFX.tap();
-              nearbyLightSwitchKeyRef.current = String(nextOn);
-              setNearbyLightSwitch(nextOn);
-              showBubble(
-                nextOn
-                  ? 'Đã bật đèn phòng sáng trưng!'
-                  : 'Đã tắt đèn phòng — bật từng chiếc đèn để chill nhé!',
-              );
-            };
-            const dist = Math.hypot(playerPos.x - -0.42, playerPos.z - 7.08);
-            if (dist < 2.65) {
-              doToggleSwitch();
-            } else {
-              soundFX.tap();
-              startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, doToggleSwitch);
-            }
-            return;
-          }
-
           if (kind === 'lamp') {
             const fid = data.furnitureId as string;
             const label = (data.label as string) || 'Đèn';
@@ -2290,11 +2275,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               const nextOn = !cur;
               lampStatesRef.current[fid] = nextOn;
               activeSubzone?.setLampOn?.(fid, nextOn);
+              const houseLamps = activeSubzone?.getHouseLamps?.() ?? [];
+              const matched = houseLamps.find((l) => l.id === fid);
+              if (matched) {
+                nearbyLampKeyRef.current = `${matched.id}:${nextOn}`;
+                setNearbyLamp({...matched, isOn: nextOn});
+              }
               soundFX.tap();
               showBubble(nextOn ? `Đã bật ${label}!` : `Đã tắt ${label}.`);
             };
             const dist = Math.hypot(playerPos.x - (data.tx as number), playerPos.z - (data.tz as number));
-            if (dist < 2.4) {
+            if (dist < 2.65) {
               doToggleLamp();
             } else {
               soundFX.tap();
@@ -3082,7 +3073,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if ((playerPos.pose === 'sit' || playerPos.pose === 'bath') && activeSeat) {
         groundOffset = activeSeat.seatY - 0.245;
       } else if (playerPos.pose === 'sleep' && activeSeat?.isBed) {
-        groundOffset = 0;
+        groundOffset = activeSeat.seatY - 0.65;
       } else if (z === 'town') {
         if (isPointOnPlazaFlowerBed(playerPos.x, playerPos.z) && prevGroundY + jumpY >= 0.82) {
           groundOffset = 0.98;
@@ -3478,7 +3469,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         playerRig,
         playerPos.pose,
         elapsed,
-        av.eyeStyle === 'cozy',
+        av.eyeStyle === 'happy_arc',
         avatarPoseProgress,
       );
 
@@ -3598,16 +3589,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
 
         if (z === 'home') {
-          const switchDist = Math.hypot(playerPos.x - -0.42, playerPos.z - 7.08);
-          const nextSwitchKey = switchDist < 2.65 ? String(houseLightsOnRef.current) : '';
-          if (nextSwitchKey !== nearbyLightSwitchKeyRef.current) {
-            nearbyLightSwitchKeyRef.current = nextSwitchKey;
-            setNearbyLightSwitch(switchDist < 2.65 ? houseLightsOnRef.current : null);
-          }
-
           const houseLamps = activeSubzoneRef.current?.getHouseLamps?.() ?? [];
           let closestLamp: HouseLampInfo | null = null;
-          let bestLampD = 2.35;
+          let bestLampD = 2.85;
           for (const l of houseLamps) {
             const d = Math.hypot(playerPos.x - l.x, playerPos.z - l.z);
             if (d < bestLampD) {
@@ -3620,15 +3604,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             nearbyLampKeyRef.current = nextLampKey;
             setNearbyLamp(closestLamp);
           }
-        } else {
-          if (nearbyLightSwitchKeyRef.current !== '') {
-            nearbyLightSwitchKeyRef.current = '';
-            setNearbyLightSwitch(null);
-          }
-          if (nearbyLampKeyRef.current !== '') {
-            nearbyLampKeyRef.current = '';
-            setNearbyLamp(null);
-          }
+        } else if (nearbyLampKeyRef.current !== '') {
+          nearbyLampKeyRef.current = '';
+          setNearbyLamp(null);
         }
 
         const isNearPondNow =
@@ -3729,10 +3707,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const handleToggleHouseLights = () => {
     const nextOn = !houseLightsOnRef.current;
     houseLightsOnRef.current = nextOn;
+    setHouseLightsOn(nextOn);
     activeSubzoneRef.current?.setHouseLightsOn?.(nextOn);
     soundFX.tap();
-    nearbyLightSwitchKeyRef.current = String(nextOn);
-    setNearbyLightSwitch(nextOn);
     showBubble(
       nextOn
         ? 'Đã bật đèn phòng sáng trưng!'
@@ -3879,6 +3856,23 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
               <button
                 type="button"
+                onClick={handleToggleHouseLights}
+                className={`flex min-h-[30px] items-center gap-1 rounded-xl border-2 px-2 py-1 text-[11px] font-bold shadow-md transition-transform active:scale-95 ${
+                  houseLightsOn
+                    ? 'border-[#8C6239] bg-[#FFF8EB] text-[#4A3525]'
+                    : 'border-[#4D648D] bg-[#1E2B45] text-[#F8E7B9]'
+                }`}
+              >
+                {houseLightsOn ? (
+                  <LightbulbOff className="h-3.5 w-3.5 text-[#C26A38]" />
+                ) : (
+                  <Lightbulb className="h-3.5 w-3.5 text-[#FFD166]" />
+                )}
+                <span>{houseLightsOn ? 'Tắt đèn' : 'Bật đèn'}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   soundFX.tap();
                   if (editFurnitureMode) setHomeToolsOpen(false);
@@ -3914,28 +3908,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {/* Proximity Door / Light Switch / Lamp Controls inside House */}
-      {zone === 'home' && !editFurnitureMode && (nearbyDoor || nearbyLightSwitch !== null || nearbyLamp) && (
+      {/* Proximity Door & Lamp Controls inside House */}
+      {zone === 'home' && !editFurnitureMode && (nearbyDoor || nearbyLamp) && (
         <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
-          {nearbyLightSwitch !== null && (
-            <button
-              type="button"
-              onClick={handleToggleHouseLights}
-              className={`anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 px-4 py-2 text-xs font-bold shadow-lg transition-transform active:scale-95 ${
-                nearbyLightSwitch
-                  ? 'border-[#C9963B] bg-[#FFF8EB] text-[#4A3525]'
-                  : 'border-[#4D648D] bg-[#1E2B45] text-[#F8E7B9]'
-              }`}
-            >
-              {nearbyLightSwitch ? (
-                <LightbulbOff className="h-4 w-4 text-[#C26A38]" />
-              ) : (
-                <Lightbulb className="h-4 w-4 text-[#FFD166]" />
-              )}
-              <span>{nearbyLightSwitch ? 'Tắt Đèn Phòng' : 'Bật Đèn Phòng'}</span>
-            </button>
-          )}
-
           {nearbyLamp && (
             <button
               type="button"

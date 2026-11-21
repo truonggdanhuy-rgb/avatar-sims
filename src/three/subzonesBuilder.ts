@@ -82,6 +82,7 @@ export interface SubzoneWorld {
   setLampOn?: (instanceId: string, on: boolean) => void;
   getHouseLamps?: () => HouseLampInfo[];
   setActiveBathtub?: (instanceId: string | null) => void;
+  setActiveBed?: (instanceId: string | null) => void;
   triggerPondFeed?: () => void;
   setFishingState?: (state: 'idle' | 'waiting' | 'bite') => void;
   updateFishingVisuals?: (frame: FishingVisualFrame, elapsed: number) => void;
@@ -209,6 +210,7 @@ export function buildSubzoneScene(
   let setLampOnFn: ((instanceId: string, on: boolean) => void) | undefined;
   let getHouseLampsFn: (() => HouseLampInfo[]) | undefined;
   let setActiveBathtubFn: ((instanceId: string | null) => void) | undefined;
+  let setActiveBedFn: ((instanceId: string | null) => void) | undefined;
   let triggerPondFeedFn: (() => void) | undefined;
   let currentFishingState: 'idle' | 'waiting' | 'bite' = options.fishingState ?? 'idle';
   let subzoneFishingVisuals: FishingSpotVisuals | null = null;
@@ -833,7 +835,7 @@ export function buildSubzoneScene(
 
     doors = doorControllers.map((d) => d.handle);
 
-    // ========== ROOM LIGHT SWITCH NEAR FRONT DOOR + DYNAMIC HOUSE LIGHTS / CLOCKS / BATHTUBS ==========
+    // ========== HOUSE LIGHTS / CLOCKS / BATHTUBS / BEDS ==========
     let houseLightsOn = options.houseLightsOn ?? true;
     let activeBathtubId: string | null = null;
     const clockControllers: {
@@ -841,7 +843,7 @@ export function buildSubzoneScene(
       minPivot: THREE.Object3D;
       secPivot?: THREE.Object3D;
     }[] = [];
-    const MAX_HOUSE_LIGHTS = 3;
+    const MAX_HOUSE_LIGHTS = 6;
     const houseLightPool = Array.from({length: MAX_HOUSE_LIGHTS}, () => {
       const pl = new THREE.PointLight('#FFD896', 0, 18, 1.15);
       group.add(pl);
@@ -879,50 +881,14 @@ export function buildSubzoneScene(
       rippleMesh: THREE.Mesh;
       levelY: number;
     }[] = [];
-
-    // Doorframe light switch post right beside the front entrance mat (always visible & accessible)
-    const switchGroup = new THREE.Group();
-    switchGroup.position.set(-0.42, 0, 7.08);
-    const switchPost = new THREE.Mesh(
-      new RoundedBoxGeometry(0.16, 1.34, 0.14, 2, 0.03),
-      clayMat('#9E6A3E', 0.72),
-    );
-    switchPost.position.y = 0.67;
-    const switchPlate = new THREE.Mesh(
-      new RoundedBoxGeometry(0.22, 0.3, 0.05, 2, 0.015),
-      clayMat('#FAF5EC', 0.55),
-    );
-    switchPlate.position.set(0, 1.12, -0.075);
-    const switchRocker = new THREE.Mesh(
-      new RoundedBoxGeometry(0.09, 0.13, 0.04, 2, 0.01),
-      clayMat('#E8DFD1', 0.5),
-    );
-    switchRocker.position.set(0, 1.11, -0.1);
-    switchRocker.rotation.x = houseLightsOn ? -0.26 : 0.26;
-    const switchLedMat = new THREE.MeshStandardMaterial({
-      color: houseLightsOn ? '#FFD166' : '#475569',
-      emissive: houseLightsOn ? '#FFB703' : '#1E293B',
-      emissiveIntensity: houseLightsOn ? 0.9 : 0.08,
-      roughness: 0.35,
-    });
-    const switchLed = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), switchLedMat);
-    switchLed.position.set(0, 1.22, -0.1);
-    switchGroup.add(switchPost, switchPlate, switchRocker, switchLed);
-    group.add(switchGroup);
-    addBoxProxy(
-      group,
-      [0.62, 1.48, 0.62],
-      [-0.42, 0.74, 7.08],
-      {kind: 'light_switch', tx: -0.78, tz: 6.45},
-      clickTargets,
-    );
+    const bedControllers: {
+      id: string;
+      idleBlanket: THREE.Object3D;
+      sleepBlanket: THREE.Object3D;
+    }[] = [];
 
     setHouseLightsOnFn = (on: boolean) => {
       houseLightsOn = on;
-      switchRocker.rotation.x = on ? -0.26 : 0.26;
-      switchLedMat.color.set(on ? '#FFD166' : '#475569');
-      switchLedMat.emissive.set(on ? '#FFB703' : '#1E293B');
-      switchLedMat.emissiveIntensity = on ? 0.9 : 0.08;
     };
     getHouseLightsOnFn = () => houseLightsOn;
 
@@ -985,6 +951,14 @@ export function buildSubzoneScene(
           streamMesh: meshGroup.userData.tubStreamMesh as THREE.Mesh,
           rippleMesh: meshGroup.userData.tubRippleMesh as THREE.Mesh,
           levelY: 0.28,
+        });
+      }
+
+      if (meshGroup.userData.bedIdleBlanket && meshGroup.userData.bedSleepBlanket) {
+        bedControllers.push({
+          id: pf.instanceId,
+          idleBlanket: meshGroup.userData.bedIdleBlanket as THREE.Object3D,
+          sleepBlanket: meshGroup.userData.bedSleepBlanket as THREE.Object3D,
         });
       }
 
@@ -1069,14 +1043,15 @@ export function buildSubzoneScene(
         };
       } else if (cat.interactive === 'bed') {
         const side = toWorld(-(cat.halfW + 0.48), 0.35);
+        const sleepAnchor = toWorld(0, 0.5);
         proxyData = {
           kind: 'bed',
           furnitureId: pf.instanceId,
           catalogId: pf.catalogId,
           tx: side.wx,
           tz: side.wz,
-          seatX: pf.x,
-          seatZ: pf.z,
+          seatX: sleepAnchor.wx,
+          seatZ: sleepAnchor.wz,
           seatY: posY + 0.65,
           sitRotY: pf.rotY,
           colliderId: pf.instanceId,
@@ -1163,6 +1138,13 @@ export function buildSubzoneScene(
       }));
     setActiveBathtubFn = (instanceId: string | null) => {
       activeBathtubId = instanceId;
+    };
+    setActiveBedFn = (instanceId: string | null) => {
+      for (const b of bedControllers) {
+        const active = b.id === instanceId;
+        b.idleBlanket.visible = !active;
+        b.sleepBlanket.visible = active;
+      }
     };
 
     // Clear open front exit doormat (no signboard blocking doorway & no floating "Ra Thị Trấn" text)
@@ -4227,6 +4209,7 @@ export function buildSubzoneScene(
     setLampOn: setLampOnFn,
     getHouseLamps: getHouseLampsFn,
     setActiveBathtub: setActiveBathtubFn,
+    setActiveBed: setActiveBedFn,
     triggerPondFeed: triggerPondFeedFn,
     setFishingState: setFishingStateFn,
     updateFishingVisuals: updateFishingVisualsFn,
