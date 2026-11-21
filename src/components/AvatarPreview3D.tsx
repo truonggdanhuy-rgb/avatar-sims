@@ -179,31 +179,19 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
 
     let frameId = 0;
     let disposed = false;
+    let frameSkip = 0;
     const clock = new THREE.Clock();
     let lastNow = performance.now();
     let camY = headZoomRef.current ? 1.36 : 1.25;
     let camZ = headZoomRef.current ? 2.18 : 4.25;
     let lookY = headZoomRef.current ? 1.28 : 0.96;
 
-    function afterDraw(cb: () => void) {
-      const gl = renderer.getContext() as WebGL2RenderingContext;
-      const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-      gl.flush();
-      const poll = () => {
-        if (disposed) return;
-        const state = sync && gl.getSyncParameter(sync, gl.SYNC_STATUS);
-        if (state === gl.UNSIGNALED) {
-          frameId = window.setTimeout(poll, 5);
-        } else {
-          if (sync) gl.deleteSync(sync);
-          frameId = window.setTimeout(cb, 80);
-        }
-      };
-      frameId = window.setTimeout(poll, 5);
-    }
-
     function tick() {
       if (disposed) return;
+      frameId = requestAnimationFrame(tick);
+      if (isSoftwareGl && ((frameSkip++ & 1) === 1)) {
+        return;
+      }
       const now = performance.now();
       const delta = Math.min((now - lastNow) / 1000, 0.1);
       lastNow = now;
@@ -239,17 +227,18 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
         avatarRef.current.eyeStyle === 'happy_arc',
       );
       renderer.render(scene, camera);
-      if (isSoftwareGl) afterDraw(tick);
-      else frameId = requestAnimationFrame(tick);
     }
 
-    if (!isSoftwareGl) renderer.compile(scene, camera);
+    try {
+      renderer.compile(scene, camera);
+    } catch {
+      // ignore shader pre-compile issues
+    }
     tick();
 
     return () => {
       disposed = true;
       cancelAnimationFrame(frameId);
-      clearTimeout(frameId);
       dom.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);

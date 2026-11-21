@@ -1235,7 +1235,7 @@ export default function App() {
         let changed = false;
         const next = prev.map((ani) => {
           const dt = Math.max(0, now - ani.lastTickAt);
-          if (dt < 800) return ani;
+          if (dt < 2500) return ani;
           changed = true;
 
           const totalLifeMs = ani.growDurationMs + ani.activeDurationMs;
@@ -1331,7 +1331,7 @@ export default function App() {
             return fish;
           }
           const dt = Math.max(0, now - fish.lastTickAt);
-          if (dt < 800) return fish;
+          if (dt < 2500) return fish;
           changed = true;
 
           // Hunger drops ~5.5% per hour (so checking ~1-2x/day is comfy!)
@@ -1400,7 +1400,7 @@ export default function App() {
         let changed = false;
         const next = prev.map((pet) => {
           const dt = Math.max(0, now - pet.lastTickAt);
-          if (dt < 2000) return pet;
+          if (dt < 2500) return pet;
           changed = true;
           let nextSick = pet.sick;
           if (!nextSick) {
@@ -1427,50 +1427,61 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          houseVersion: HOUSE_LAYOUT_VERSION,
-          avatar,
-          stats,
-          plots,
-          farmInventory,
-          kitchenLevel,
-          warehouseLevel,
-          millQueue,
-          cookingQueue,
-          livestock,
-          troughs,
-          pondFish,
-          waterCan,
-          wellWater,
-          farmOrders,
-          ownedIds,
-          dailyQuests,
-          placedFurniture,
-          furnitureInventory,
-          fishingRod,
-          woodenBoat,
-          fishBasket,
-          fishDex,
-          bugNet,
-          insectBasket,
-          insectDex,
-          accountCreatedAt,
-          accountId,
-          showJoystick,
-          showJumpButton,
-          redeemedCodes,
-          ownedPets,
-          activePetId,
-          carriedPetId,
-          petSupplies,
-        }),
-      );
-    } catch {
-      // ignore storage quota errors
-    }
+    const persistState = () => {
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            houseVersion: HOUSE_LAYOUT_VERSION,
+            avatar,
+            stats,
+            plots,
+            farmInventory,
+            kitchenLevel,
+            warehouseLevel,
+            millQueue,
+            cookingQueue,
+            livestock,
+            troughs,
+            pondFish,
+            waterCan,
+            wellWater,
+            farmOrders,
+            ownedIds,
+            dailyQuests,
+            placedFurniture,
+            furnitureInventory,
+            fishingRod,
+            woodenBoat,
+            fishBasket,
+            fishDex,
+            bugNet,
+            insectBasket,
+            insectDex,
+            accountCreatedAt,
+            accountId,
+            showJoystick,
+            showJumpButton,
+            redeemedCodes,
+            ownedPets,
+            activePetId,
+            carriedPetId,
+            petSupplies,
+          }),
+        );
+      } catch {
+        // ignore storage quota errors
+      }
+    };
+
+    const timer = window.setTimeout(persistState, 800);
+    window.addEventListener('pagehide', persistState);
+    window.addEventListener('beforeunload', persistState);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('pagehide', persistState);
+      window.removeEventListener('beforeunload', persistState);
+    };
   }, [
     avatar,
     stats,

@@ -555,6 +555,74 @@ function snapPointToNearestWall(
   };
 }
 
+const COLLIDER_CELL_SIZE = 4.0;
+const COLLIDER_HASH_PAD = 1.05;
+
+interface ColliderSpatialIndex {
+  buckets: Map<number, WorldCollider[]>;
+}
+
+const colliderIndexCache = new WeakMap<WorldCollider[], ColliderSpatialIndex>();
+
+function getColliderCellKey(cx: number, cz: number): number {
+  return ((cx + 2048) << 12) | (cz + 2048);
+}
+
+function getColliderSpatialIndex(colliders: WorldCollider[]): ColliderSpatialIndex {
+  let cached = colliderIndexCache.get(colliders);
+  if (cached) return cached;
+
+  const buckets = new Map<number, WorldCollider[]>();
+  for (let i = 0; i < colliders.length; i++) {
+    const col = colliders[i];
+    let ahw: number;
+    let ahd: number;
+    if (col.type === 'circle') {
+      ahw = col.r + COLLIDER_HASH_PAD;
+      ahd = col.r + COLLIDER_HASH_PAD;
+    } else {
+      const rot = col.rotY || 0;
+      const cos = Math.abs(Math.cos(rot));
+      const sin = Math.abs(Math.sin(rot));
+      ahw = col.hw * cos + col.hd * sin + COLLIDER_HASH_PAD;
+      ahd = col.hw * sin + col.hd * cos + COLLIDER_HASH_PAD;
+    }
+    const minCx = Math.floor((col.x - ahw) / COLLIDER_CELL_SIZE);
+    const maxCx = Math.floor((col.x + ahw) / COLLIDER_CELL_SIZE);
+    const minCz = Math.floor((col.z - ahd) / COLLIDER_CELL_SIZE);
+    const maxCz = Math.floor((col.z + ahd) / COLLIDER_CELL_SIZE);
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cz = minCz; cz <= maxCz; cz++) {
+        const key = getColliderCellKey(cx, cz);
+        let list = buckets.get(key);
+        if (!list) {
+          list = [];
+          buckets.set(key, list);
+        }
+        list.push(col);
+      }
+    }
+  }
+  cached = {buckets};
+  colliderIndexCache.set(colliders, cached);
+  return cached;
+}
+
+function queryNearbyColliders(
+  px: number,
+  pz: number,
+  colliders: WorldCollider[],
+  radius: number,
+): WorldCollider[] {
+  if (colliders.length <= 24 || radius > COLLIDER_HASH_PAD) {
+    return colliders;
+  }
+  const index = getColliderSpatialIndex(colliders);
+  const cx = Math.floor(px / COLLIDER_CELL_SIZE);
+  const cz = Math.floor(pz / COLLIDER_CELL_SIZE);
+  return index.buckets.get(getColliderCellKey(cx, cz)) ?? [];
+}
+
 function resolvePointAgainstColliders(
   px: number,
   pz: number,
@@ -567,7 +635,9 @@ function resolvePointAgainstColliders(
   let collided = false;
 
   for (let pass = 0; pass < 2; pass++) {
-    for (const col of colliders) {
+    const candidates = queryNearbyColliders(x, z, colliders, radius);
+    for (let i = 0; i < candidates.length; i++) {
+      const col = candidates[i];
       if (skipBedColliders && col.id?.startsWith('plaza_curved_bed_')) continue;
       if (col.type === 'circle') {
         const dx = x - col.x;
@@ -641,8 +711,9 @@ function isPointBlockedByColliders(
   colliders: WorldCollider[],
   radius = PLAYER_RADIUS + 0.12,
 ): boolean {
-  for (let i = 0; i < colliders.length; i++) {
-    const col = colliders[i];
+  const candidates = queryNearbyColliders(px, pz, colliders, radius);
+  for (let i = 0; i < candidates.length; i++) {
+    const col = candidates[i];
     if (col.type === 'circle') {
       const dx = px - col.x;
       const dz = pz - col.z;
@@ -674,14 +745,58 @@ function buildNavGrid(zone: ZoneId, colliders: WorldCollider[]): NavGrid {
   const total = cols * rows;
   const blocked = new Uint8Array(total);
   const inflate = PLAYER_RADIUS + (zone === 'town' ? 0.14 : 0.08);
+  const inflateSq = inflate * inflate;
 
-  for (let r = 0; r < rows; r++) {
-    const wz = b.minZ + r * step;
-    const rowOff = r * cols;
-    for (let c = 0; c < cols; c++) {
-      const wx = b.minX + c * step;
-      if (isPointBlockedByColliders(wx, wz, colliders, inflate)) {
-        blocked[rowOff + c] = 1;
+  // Pre-warm spatial index for subsequent walk / pathfinding queries
+  getColliderSpatialIndex(colliders);
+
+  // Stamp each collider directly onto only the grid cells within its inflated AABB
+  for (let i = 0; i < colliders.length; i++) {
+    const col = colliders[i];
+    if (col.type === 'circle') {
+      const ext = col.r + inflate;
+      const minDistSq = ext * ext;
+      const minC = Math.max(0, Math.floor((col.x - ext - b.minX) / step));
+      const maxC = Math.min(cols - 1, Math.ceil((col.x + ext - b.minX) / step));
+      const minR = Math.max(0, Math.floor((col.z - ext - b.minZ) / step));
+      const maxR = Math.min(rows - 1, Math.ceil((col.z + ext - b.minZ) / step));
+      for (let r = minR; r <= maxR; r++) {
+        const dz = b.minZ + r * step - col.z;
+        const rowOff = r * cols;
+        for (let c = minC; c <= maxC; c++) {
+          if (blocked[rowOff + c] === 1) continue;
+          const dx = b.minX + c * step - col.x;
+          if (dx * dx + dz * dz < minDistSq) {
+            blocked[rowOff + c] = 1;
+          }
+        }
+      }
+    } else {
+      const rot = col.rotY || 0;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const ahw = col.hw * Math.abs(cos) + col.hd * Math.abs(sin) + inflate;
+      const ahd = col.hw * Math.abs(sin) + col.hd * Math.abs(cos) + inflate;
+      const minC = Math.max(0, Math.floor((col.x - ahw - b.minX) / step));
+      const maxC = Math.min(cols - 1, Math.ceil((col.x + ahw - b.minX) / step));
+      const minR = Math.max(0, Math.floor((col.z - ahd - b.minZ) / step));
+      const maxR = Math.min(rows - 1, Math.ceil((col.z + ahd - b.minZ) / step));
+      for (let r = minR; r <= maxR; r++) {
+        const dz = b.minZ + r * step - col.z;
+        const rowOff = r * cols;
+        for (let c = minC; c <= maxC; c++) {
+          if (blocked[rowOff + c] === 1) continue;
+          const dx = b.minX + c * step - col.x;
+          const lx = dx * cos - dz * sin;
+          const lz = dx * sin + dz * cos;
+          const cx = Math.max(-col.hw, Math.min(col.hw, lx));
+          const cz = Math.max(-col.hd, Math.min(col.hd, lz));
+          const vx = lx - cx;
+          const vz = lz - cz;
+          if (vx * vx + vz * vz < inflateSq) {
+            blocked[rowOff + c] = 1;
+          }
+        }
       }
     }
   }
@@ -1567,11 +1682,40 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let currentAnchors: TownAnchor[] = [];
     let currentClickTargets: THREE.Object3D[] = [];
     let currentColliders: WorldCollider[] = [];
+    let currentShadowBlockers: THREE.Mesh[] = [];
     let currentNavGrid: NavGrid | null = null;
     let currentPlazaRadius = 6.8;
     let currentGrounds: THREE.Object3D[] = [];
     let currentWallSurfaces: HouseWallSurface[] = [];
     let prevGroundY = 0.14;
+
+    const collectShadowBlockers = (root: THREE.Object3D): THREE.Mesh[] => {
+      const blockers: THREE.Mesh[] = [];
+      const visit = (obj: THREE.Object3D) => {
+        if (!obj.visible) return;
+        if ((obj as THREE.Sprite).isSprite || (obj as THREE.Points).isPoints) return;
+        const mesh = obj as THREE.Mesh;
+        if (mesh.isMesh) {
+          const ud = mesh.userData || {};
+          if (!ud.isWaterMesh && !ud.isWaterSurface && !ud.isFishingVisual) {
+            const mat = mesh.material;
+            const visibleMat = Array.isArray(mat)
+              ? mat.some((m) => m.visible !== false && (!m.transparent || m.opacity >= 0.15))
+              : Boolean(mat && mat.visible !== false && (!mat.transparent || mat.opacity >= 0.15));
+            if (visibleMat) {
+              if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+              blockers.push(mesh);
+            }
+          }
+        }
+        const children = obj.children;
+        for (let i = 0; i < children.length; i++) {
+          visit(children[i]);
+        }
+      };
+      visit(root);
+      return blockers;
+    };
 
     const petCompanion = {
       rig: null as PetRig | null,
@@ -1822,6 +1966,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         scene.add(activeTown.group);
         currentAnchors = activeTown.labelAnchors;
         currentColliders = activeTown.colliders;
+        currentShadowBlockers = collectShadowBlockers(activeTown.group);
         currentNavGrid = buildNavGrid('town', currentColliders);
         currentPlazaRadius = activeTown.plazaRadius;
         currentGrounds = activeTown.groundMeshes;
@@ -1911,6 +2056,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         scene.add(activeSubzone.group);
         currentAnchors = activeSubzone.labelAnchors;
         currentColliders = activeSubzone.colliders;
+        currentShadowBlockers = [];
         currentNavGrid = buildNavGrid(z, currentColliders);
         currentGrounds = [activeSubzone.groundMesh];
         activeDoorsRef.current = activeSubzone.doors ?? [];
@@ -1948,6 +2094,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       activeZoneLoaded = z;
       syncPetCompanion(zoneChanged);
       refreshClickTargetsWithPet();
+      try {
+        renderer.compile(scene, camera);
+      } catch {
+        // ignore shader pre-compile issues
+      }
     };
 
     rebuildSceneTriggerRef.current = loadCurrentWorld;
@@ -2087,10 +2238,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
 
     const _shadowRay = new THREE.Raycaster();
+    _shadowRay.camera = camera;
     const _shadowUpDir = new THREE.Vector3(0, 1, 0);
     const _shadowOrigin = new THREE.Vector3();
     const _shadowTarget = new THREE.Vector3();
     const _shadowCamDir = new THREE.Vector3();
+    const _shadowHits: THREE.Intersection[] = [];
 
     const isObjTreeVisible = (obj: THREE.Object3D): boolean => {
       let cur: THREE.Object3D | null = obj;
@@ -2122,6 +2275,26 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         return allowShoreGrass ? hit.point.y > 0.38 : hit.point.y > waterY + 0.14;
       }
       return true;
+    };
+
+    const hasShadowBlockerRayHit = (
+      waterY: number,
+      allowShoreGrass: boolean,
+    ): boolean => {
+      _shadowRay.camera = camera;
+      for (let i = 0; i < currentShadowBlockers.length; i++) {
+        const blocker = currentShadowBlockers[i];
+        _shadowHits.length = 0;
+        blocker.raycast(_shadowRay, _shadowHits);
+        for (let h = 0; h < _shadowHits.length; h++) {
+          if (isShadowBlockerHit(_shadowHits[h], waterY, allowShoreGrass)) {
+            _shadowHits.length = 0;
+            return true;
+          }
+        }
+      }
+      _shadowHits.length = 0;
+      return false;
     };
 
     const isWaterTargetOpenForShadow = (
@@ -2166,11 +2339,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       _shadowRay.set(_shadowOrigin, _shadowUpDir);
       _shadowRay.near = 0.04;
       _shadowRay.far = 28;
-      const upHits = _shadowRay.intersectObject(activeTown.group, true);
-      for (let i = 0; i < upHits.length; i++) {
-        if (isShadowBlockerHit(upHits[i], waterY, false)) {
-          return false;
-        }
+      if (hasShadowBlockerRayHit(waterY, false)) {
+        return false;
       }
 
       // Camera line-of-sight occlusion ray (ensures fish shadow is visible from camera)
@@ -2182,11 +2352,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         _shadowRay.set(camera.position, _shadowCamDir);
         _shadowRay.near = 0.25;
         _shadowRay.far = camDist - 0.32;
-        const camHits = _shadowRay.intersectObject(activeTown.group, true);
-        for (let i = 0; i < camHits.length; i++) {
-          if (isShadowBlockerHit(camHits[i], waterY, true)) {
-            return false;
-          }
+        if (hasShadowBlockerRayHit(waterY, true)) {
+          return false;
         }
       }
 
@@ -3490,7 +3657,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 stateRef.current.woodenBoat.owned
                   ? 'Chạm Biển hiệu Xuống Thuyền hoặc chiếc thuyền neo để xuống sông! (Hoặc cầm Cần Câu để câu từ bờ)'
                   : stateRef.current.fishingRod.owned
-                    ? 'Mở Túi Đồ cầm Cần Câu để câu từ bờ, hoặc ghé Sạp Ship (350 Xu) mua Thuyền Gỗ!'
+                    ? `Mở Túi Đồ cầm Cần Câu để câu từ bờ, hoặc ghé Sạp Ship (${WOODEN_BOAT_PRICE} Xu) mua Thuyền Gỗ!`
                     : `Ghé Sạp Ship (${WOODEN_BOAT_PRICE} Xu) mua Thuyền Gỗ, hoặc mua Cần Câu ở Sạp Koi để câu từ bờ!`,
               );
               return;
@@ -3730,38 +3897,28 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     resizeObserver.observe(container);
 
     let frameId = 0;
+    let hiddenTimerId = 0;
     let disposed = false;
+    let frameSkip = 0;
     let lastTagPush = 0;
     let lastHadTags = false;
+    let lastTagSnapshot: ProjectedTag[] = [];
     let biteAlertShown = false;
     let lastBiteAlertX = -9999;
     let lastBiteAlertY = -9999;
     const clock = new THREE.Clock();
 
-    function afterDraw(cb: () => void) {
-      const gl = renderer.getContext() as WebGL2RenderingContext;
-      const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-      gl.flush();
-      const poll = () => {
-        if (disposed) return;
-        const state = sync && gl.getSyncParameter(sync, gl.SYNC_STATUS);
-        if (state === gl.UNSIGNALED) {
-          frameId = window.setTimeout(poll, 5);
-        } else {
-          if (sync) gl.deleteSync(sync);
-          frameId = window.setTimeout(cb, 80);
-        }
-      };
-      frameId = window.setTimeout(poll, 5);
-    }
-
     function tick() {
       if (disposed) return;
       if (document.hidden) {
         clock.getDelta();
-        frameId = window.setTimeout(() => {
+        hiddenTimerId = window.setTimeout(() => {
           if (!disposed) frameId = requestAnimationFrame(tick);
         }, 250);
+        return;
+      }
+      frameId = requestAnimationFrame(tick);
+      if (isSoftwareGl && ((frameSkip++ & 1) === 1)) {
         return;
       }
       const delta = Math.min(clock.getDelta(), 0.05);
@@ -5118,9 +5275,25 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               });
             }
           }
-          setTags(nextTags);
+          const changed =
+            nextTags.length !== lastTagSnapshot.length ||
+            nextTags.some((t, idx) => {
+              const prev = lastTagSnapshot[idx];
+              return (
+                !prev ||
+                prev.id !== t.id ||
+                prev.label !== t.label ||
+                Math.abs(prev.x - t.x) >= 0.5 ||
+                Math.abs(prev.y - t.y) >= 0.5
+              );
+            });
+          if (changed) {
+            lastTagSnapshot = nextTags;
+            setTags(nextTags);
+          }
           lastHadTags = true;
         } else if (lastHadTags) {
+          lastTagSnapshot = [];
           setTags([]);
           lastHadTags = false;
         }
@@ -5232,17 +5405,19 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
-      if (isSoftwareGl) afterDraw(tick);
-      else frameId = requestAnimationFrame(tick);
     }
 
-    if (!isSoftwareGl) renderer.compile(scene, camera);
+    try {
+      renderer.compile(scene, camera);
+    } catch {
+      // ignore shader pre-compile issues
+    }
     tick();
 
     return () => {
       disposed = true;
       cancelAnimationFrame(frameId);
-      clearTimeout(frameId);
+      clearTimeout(hiddenTimerId);
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
       if (fishTimerRef.current) clearTimeout(fishTimerRef.current);
       resizeObserver.disconnect();
