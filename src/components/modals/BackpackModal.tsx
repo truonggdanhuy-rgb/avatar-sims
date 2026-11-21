@@ -21,10 +21,12 @@ import {
 } from '../../types/game';
 import {
   getPetXpForNextLevel,
+  isPetTooHungry,
   MAX_PET_INTIMACY,
   PET_CATALOG,
   PET_FEED_HUNGER_THRESHOLD,
   PET_PLAY_HAPPINESS_THRESHOLD,
+  PET_STARVING_THRESHOLD,
   PET_SUPPLY_LIST,
 } from '../../data/petCatalog';
 import {
@@ -445,6 +447,7 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
             if (infoPet) {
               const spec = PET_CATALOG[infoPet.speciesId];
               const isMax = infoPet.intimacyLevel >= MAX_PET_INTIMACY;
+              const isStarving = isPetTooHungry(infoPet);
               const reqXp = getPetXpForNextLevel(infoPet.intimacyLevel);
               const pct = isMax
                 ? 100
@@ -563,9 +566,22 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                       );
                     })()}
 
+                    {isStarving && (
+                      <div className="rounded-xl border border-[#F2C79D] bg-[#FFF3E2] px-2.5 py-2 text-[11px] font-extrabold text-[#B55412]">
+                        {infoPet.name} đang đói quá (≤{PET_STARVING_THRESHOLD}%)! Mọi hành động khác tạm khóa, chỉ có thể cho bé ăn lúc này.
+                      </div>
+                    )}
+
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
+                        if (isStarving) {
+                          soundFX.tap();
+                          setPetActionFeedback(
+                            `${infoPet.name} đang đói quá, hãy cho bé ăn trước rồi mới đổi tên nhé!`,
+                          );
+                          return;
+                        }
                         const trimmed = petRenameDraft.trim();
                         if (!trimmed) return;
                         soundFX.sparkle();
@@ -581,14 +597,16 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                         <input
                           type="text"
                           value={petRenameDraft}
+                          disabled={isStarving}
                           onChange={(e) => setPetRenameDraft(e.target.value)}
                           maxLength={18}
-                          placeholder="Nhập tên mới..."
-                          className="min-w-0 flex-1 rounded-xl border border-[#DECBB0] bg-[#FAF4EA] px-3 py-2 text-xs font-bold text-[#3B2A1A] focus:border-[#6F4E37] focus:outline-none"
+                          placeholder={isStarving ? 'Cho ăn trước khi đổi tên...' : 'Nhập tên mới...'}
+                          className="min-w-0 flex-1 rounded-xl border border-[#DECBB0] bg-[#FAF4EA] px-3 py-2 text-xs font-bold text-[#3B2A1A] focus:border-[#6F4E37] focus:outline-none disabled:opacity-55"
                         />
                         <button
                           type="submit"
-                          className="flex shrink-0 items-center gap-1 rounded-xl bg-[#6F4E37] px-3 py-2 text-xs font-black text-amber-50 active:scale-95"
+                          disabled={isStarving}
+                          className="flex shrink-0 items-center gap-1 rounded-xl bg-[#6F4E37] px-3 py-2 text-xs font-black text-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
                         >
                           <Check className="h-3.5 w-3.5" />
                           Lưu
@@ -606,9 +624,11 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                           const isFull =
                             sup.id === 'petFood' &&
                             (infoPet.hunger ?? 75) >= PET_FEED_HUNGER_THRESHOLD;
+                          const blockedByHunger = isStarving && sup.id !== 'petFood';
                           const disabled =
                             count <= 0 ||
                             isFull ||
+                            blockedByHunger ||
                             (sup.id === 'petMedicine' && !infoPet.sick) ||
                             (sup.id === 'intimacyTest' && isMax);
                           return (
@@ -750,6 +770,11 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                                       Ốm
                                     </span>
                                   )}
+                                  {isPetTooHungry(pet) && (
+                                    <span className="rounded bg-[#FFF1DC] px-1 py-px text-[#B85814]">
+                                      Đói quá
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                                   <div>
@@ -817,14 +842,17 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                       const count = petSupplies[sup.id] ?? 0;
                       const isTest = sup.id === 'intimacyTest';
                       const targetPet = activePetObj;
+                      const isTargetStarving = Boolean(targetPet && isPetTooHungry(targetPet));
                       const isFullFood =
                         Boolean(targetPet) &&
                         sup.id === 'petFood' &&
                         (targetPet!.hunger ?? 75) >= PET_FEED_HUNGER_THRESHOLD;
+                      const blockedByHunger = isTargetStarving && sup.id !== 'petFood';
                       const canUse = Boolean(
                         targetPet &&
                           count > 0 &&
                           !isFullFood &&
+                          !blockedByHunger &&
                           !(sup.id === 'petMedicine' && !targetPet.sick) &&
                           !(
                             sup.id === 'intimacyTest' &&

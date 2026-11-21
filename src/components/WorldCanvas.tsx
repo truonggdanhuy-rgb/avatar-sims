@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {
   Anchor,
   Armchair,
+  ArrowDown,
   Backpack,
   Bug,
   Building2,
@@ -20,6 +21,7 @@ import {
   Sparkles,
   Trophy,
   Utensils,
+  Wind,
   Wrench,
   X,
 } from 'lucide-react';
@@ -1176,6 +1178,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const teleportPlazaActionRef = useRef<(() => void) | null>(null);
   const mallRideActionRef = useRef<(() => void) | null>(null);
   const disembarkBoatActionRef = useRef<(() => void) | null>(null);
+  const launchParachuteRef = useRef<(() => void) | null>(null);
   const playerNameDomRef = useRef<HTMLDivElement | null>(null);
   const petNameDomRef = useRef<HTMLDivElement | null>(null);
   const mallElevatorHudRef = useRef<'none' | 'near_ground' | 'deck' | 'riding'>('none');
@@ -1187,6 +1190,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [petArcMenuPos, setPetArcMenuPos] = useState<{petId: string; x: number; y: number} | null>(null);
   const [mallElevatorHud, setMallElevatorHud] = useState<'none' | 'near_ground' | 'deck' | 'riding'>('none');
   const [isBoatingHud, setIsBoatingHud] = useState(false);
+  const [parachuteConfirmOpen, setParachuteConfirmOpen] = useState(false);
+  const [isParachutingHud, setIsParachutingHud] = useState(false);
   const [fishingState, setFishingState] = useState<FishingPhase>('idle');
   const [biteAlertPos, setBiteAlertPos] = useState<{x: number; y: number} | null>(null);
   const [brokenRodPrompt, setBrokenRodPrompt] = useState<{
@@ -1398,6 +1403,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       mallElevatorHudRef.current = 'none';
       setMallElevatorHud('none');
       setIsBoatingHud(false);
+      setIsParachutingHud(false);
+      setParachuteConfirmOpen(false);
     }
     if (zone !== 'town' && zone !== 'fishing' && zone !== 'garden') {
       if (fishTimerRef.current) {
@@ -1679,6 +1686,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       duration: 4.4,
       y: 0.04,
     };
+    const parachuteCtrl = {
+      active: false,
+      worldY: MALL_DECK_Y,
+    };
     const boatState = {
       active: false,
       x: RIVER_BOAT_SPAWN.x,
@@ -1715,28 +1726,40 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let currentClickTargets: THREE.Object3D[] = [];
     let currentColliders: WorldCollider[] = [];
     let currentShadowBlockers: THREE.Mesh[] = [];
+    let currentShadowBlockerBoxes: THREE.Box3[] = [];
+    const _shadowBoxHitVec = new THREE.Vector3();
     let currentNavGrid: NavGrid | null = null;
     let currentPlazaRadius = 6.8;
     let currentGrounds: THREE.Object3D[] = [];
     let currentWallSurfaces: HouseWallSurface[] = [];
     let prevGroundY = 0.14;
 
-    const collectShadowBlockers = (root: THREE.Object3D): THREE.Mesh[] => {
-      const blockers: THREE.Mesh[] = [];
+    const collectShadowBlockers = (root: THREE.Object3D): {meshes: THREE.Mesh[]; boxes: THREE.Box3[]} => {
+      const meshes: THREE.Mesh[] = [];
+      const boxes: THREE.Box3[] = [];
+      root.updateMatrixWorld(true);
       const visit = (obj: THREE.Object3D) => {
         if (!obj.visible) return;
         if ((obj as THREE.Sprite).isSprite || (obj as THREE.Points).isPoints) return;
         const mesh = obj as THREE.Mesh;
         if (mesh.isMesh) {
           const ud = mesh.userData || {};
-          if (!ud.isWaterMesh && !ud.isWaterSurface && !ud.isFishingVisual) {
+          if (
+            !ud.isWaterMesh &&
+            !ud.isWaterSurface &&
+            !ud.isFishingVisual &&
+            !ud.noShadowBlock &&
+            (ud.kind !== 'ground' || ud.isMallDeck) &&
+            (!(mesh as THREE.InstancedMesh).isInstancedMesh || ud.isTreeShadowCaster)
+          ) {
             const mat = mesh.material;
             const visibleMat = Array.isArray(mat)
               ? mat.some((m) => m.visible !== false && (!m.transparent || m.opacity >= 0.15))
               : Boolean(mat && mat.visible !== false && (!mat.transparent || mat.opacity >= 0.15));
             if (visibleMat) {
               if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
-              blockers.push(mesh);
+              meshes.push(mesh);
+              boxes.push(new THREE.Box3().setFromObject(mesh));
             }
           }
         }
@@ -1746,7 +1769,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       };
       visit(root);
-      return blockers;
+      return {meshes, boxes};
     };
 
     const petCompanion = {
@@ -1998,7 +2021,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         scene.add(activeTown.group);
         currentAnchors = activeTown.labelAnchors;
         currentColliders = activeTown.colliders;
-        currentShadowBlockers = collectShadowBlockers(activeTown.group);
+        const shadowData = collectShadowBlockers(activeTown.group);
+        currentShadowBlockers = shadowData.meshes;
+        currentShadowBlockerBoxes = shadowData.boxes;
         currentNavGrid = buildNavGrid('town', currentColliders);
         currentPlazaRadius = activeTown.plazaRadius;
         currentGrounds = activeTown.groundMeshes;
@@ -2009,6 +2034,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           mallElev.progress = 0;
           mallElev.y = 0.04;
           activeTown.setMallElevatorY?.(0.04);
+          parachuteCtrl.active = false;
+          parachuteCtrl.worldY = MALL_DECK_Y;
+          setIsParachutingHud(false);
+          setParachuteConfirmOpen(false);
           boatState.active = false;
           boatState.targetX = null;
           boatState.targetZ = null;
@@ -2056,6 +2085,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         mallElev.state = 'ground';
         mallElev.progress = 0;
         mallElev.y = 0.04;
+        parachuteCtrl.active = false;
+        parachuteCtrl.worldY = MALL_DECK_Y;
+        setIsParachutingHud(false);
+        setParachuteConfirmOpen(false);
         boatState.active = false;
         boatState.targetX = null;
         boatState.targetZ = null;
@@ -2089,6 +2122,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         currentAnchors = activeSubzone.labelAnchors;
         currentColliders = activeSubzone.colliders;
         currentShadowBlockers = [];
+        currentShadowBlockerBoxes = [];
         currentNavGrid = buildNavGrid(z, currentColliders);
         currentGrounds = [activeSubzone.groundMesh];
         activeDoorsRef.current = activeSubzone.doors ?? [];
@@ -2315,7 +2349,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       allowShoreGrass: boolean,
     ): boolean => {
       _shadowRay.camera = camera;
+      const maxDistSq = _shadowRay.far * _shadowRay.far;
       for (let i = 0; i < currentShadowBlockers.length; i++) {
+        const box = currentShadowBlockerBoxes[i];
+        if (box) {
+          const hitPt = _shadowRay.ray.intersectBox(box, _shadowBoxHitVec);
+          if (!hitPt) continue;
+          if (hitPt.distanceToSquared(_shadowRay.ray.origin) > maxDistSq) continue;
+        }
         const blocker = currentShadowBlockers[i];
         _shadowHits.length = 0;
         blocker.raycast(_shadowRay, _shadowHits);
@@ -2450,7 +2491,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const waterKindTown: 'river' | 'lake' | null =
           zNow === 'town' ? (target.targetX < -55 ? 'river' : 'lake') : null;
         const baseJitter = (Math.random() - 0.5) * 0.32;
-        const spreadCandidates = [0, 0.55, -0.55, 1.05, -1.05, 1.55, -1.55, 2.05, -2.05];
+        const spreadCandidates = [0, 0.7, -0.7, 1.35, -1.35];
         let chosenAngle = facingRotY + baseJitter;
         if (waterKindTown) {
           for (let si = 0; si < spreadCandidates.length; si++) {
@@ -2625,7 +2666,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     disembarkBoatActionRef.current = () => disembarkBoat(true);
 
     jumpActionRef.current = () => {
-      if (boatState.active) return;
+      if (boatState.active || parachuteCtrl.active) return;
       if (
         stateRef.current.zone === 'town' &&
         (mallElev.state === 'riding_up' || mallElev.state === 'riding_down')
@@ -2643,7 +2684,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
 
     catchActionRef.current = () => {
-      if (stateRef.current.zone !== 'town' || boatState.active) return;
+      if (stateRef.current.zone !== 'town' || boatState.active || parachuteCtrl.active) return;
       const net = stateRef.current.bugNet;
       if (!net.owned || !net.equipped) return;
       if (!stateRef.current.showJoystick) {
@@ -2683,6 +2724,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       activeTown?.setMallElevatorY?.(0.04);
       mallElevatorHudRef.current = 'none';
       setMallElevatorHud('none');
+      parachuteCtrl.active = false;
+      parachuteCtrl.worldY = MALL_DECK_Y;
+      setIsParachutingHud(false);
+      setParachuteConfirmOpen(false);
       boatState.active = false;
       boatState.targetX = null;
       boatState.targetZ = null;
@@ -2770,6 +2815,40 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
     mallRideActionRef.current = startMallElevatorRide;
 
+    launchParachuteRef.current = () => {
+      if (stateRef.current.zone !== 'town' || mallElev.state !== 'deck' || parachuteCtrl.active) {
+        return;
+      }
+      setParachuteConfirmOpen(false);
+      activeTarget = null;
+      releaseSeatIfNeeded();
+      jumpY = 0;
+      jumpVel = 0;
+      playPetTimer = 0;
+      if (fishCtrl.phase !== 'idle') {
+        resetFishing(false);
+      }
+      mallElev.state = 'ground';
+      mallElev.progress = 0;
+      mallElev.y = 0.04;
+      activeTown?.setMallElevatorY?.(0.04);
+      mallElevatorHudRef.current = 'none';
+      setMallElevatorHud('none');
+
+      parachuteCtrl.active = true;
+      parachuteCtrl.worldY = MALL_DECK_Y;
+      prevGroundY = MALL_DECK_Y;
+      playerPos.x = -39.4;
+      playerPos.z = 2.6;
+      playerPos.rotY = Math.PI * 0.42;
+      playerPos.pose = 'parachute';
+
+      setIsParachutingHud(true);
+      callbacksRef.current.onEnableJoystick();
+      soundFX.sparkle();
+      showBubble('Bung dù rồi! Dùng Joystick để chọn nơi đáp đất nhé!');
+    };
+
     farmPondFishActionRef.current = () => {
       if (stateRef.current.zone !== 'garden') return;
       const spotX = 15.2;
@@ -2790,6 +2869,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     const pointer = new THREE.Vector2();
 
     const handlePointerTap = (clientX: number, clientY: number) => {
+      if (parachuteCtrl.active) return;
       if (
         stateRef.current.zone === 'town' &&
         (mallElev.state === 'riding_up' || mallElev.state === 'riding_down')
@@ -3842,6 +3922,24 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
+          if (kind === 'mall_parachute') {
+            soundFX.tap();
+            if (stateRef.current.zone === 'town' && mallElev.state === 'deck') {
+              const dist = Math.hypot(
+                playerPos.x - (data.tx as number),
+                playerPos.z - (data.tz as number),
+              );
+              if (dist < 0.85) {
+                setParachuteConfirmOpen(true);
+              } else {
+                startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+                  setParachuteConfirmOpen(true);
+                });
+              }
+            }
+            return;
+          }
+
           if (stateRef.current.zone === 'town' && mallElev.state === 'deck') {
             return;
           }
@@ -4188,7 +4286,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
 
       // Jump vertical physics
-      if (!isRidingMallElevator && (jumpY > 0 || jumpVel !== 0)) {
+      if (!isRidingMallElevator && !parachuteCtrl.active && (jumpY > 0 || jumpVel !== 0)) {
         jumpY += jumpVel * delta;
         jumpVel -= JUMP_GRAVITY * delta;
         if (jumpY <= 0) {
@@ -4199,7 +4297,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
         }
       }
-      const isAirborne = !isRidingMallElevator && jumpY > 0.01;
+      const isAirborne = !isRidingMallElevator && !parachuteCtrl.active && jumpY > 0.01;
 
       const onFlowerBedLevel = z === 'town' && !isOnMallDeck && prevGroundY + jumpY >= 0.86;
 
@@ -4319,6 +4417,98 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           groundOffset = RIVER_WATER_Y + 0.18 + boatBob;
         }
         prevGroundY = groundOffset;
+      } else if (z === 'town' && parachuteCtrl.active) {
+        activeTarget = null;
+        activeSeat = null;
+        jumpY = 0;
+        jumpVel = 0;
+        playPetTimer = 0;
+
+        if (joyMag > 0.06) {
+          let fwdX = controls.target.x - camera.position.x;
+          let fwdZ = controls.target.z - camera.position.z;
+          const fwdLen = Math.hypot(fwdX, fwdZ);
+          if (fwdLen > 0.001) {
+            fwdX /= fwdLen;
+            fwdZ /= fwdLen;
+          } else {
+            fwdX = 0;
+            fwdZ = -1;
+          }
+          const rightX = -fwdZ;
+          const rightZ = fwdX;
+          const moveDirX = rightX * joy.x + fwdX * -joy.y;
+          const moveDirZ = rightZ * joy.x + fwdZ * -joy.y;
+          const moveLen = Math.hypot(moveDirX, moveDirZ) || 1;
+          const stepLen = 6.8 * Math.min(1, joyMag) * delta;
+          const b = getZoneWalkBounds('town');
+          playerPos.x = THREE.MathUtils.clamp(
+            playerPos.x + (moveDirX / moveLen) * stepLen,
+            b.minX + 0.8,
+            b.maxX - 0.8,
+          );
+          playerPos.z = THREE.MathUtils.clamp(
+            playerPos.z + (moveDirZ / moveLen) * stepLen,
+            b.minZ + 0.8,
+            b.maxZ - 0.8,
+          );
+          const targetRot = Math.atan2(moveDirX, moveDirZ);
+          let diff = targetRot - playerPos.rotY;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          playerPos.rotY += diff * Math.min(1, delta * 7);
+        }
+
+        // Monotonic steady descent — never climbs upward
+        parachuteCtrl.worldY -= 2.35 * delta;
+
+        // Nudge safely onto dry land if gliding over the West River or Town Lake
+        if (parachuteCtrl.worldY <= 2.4) {
+          const riverCx = getWestRiverCenterX(playerPos.z);
+          const riverHw = getWestRiverHalfWidth(playerPos.z);
+          if (Math.abs(playerPos.x - riverCx) < riverHw + 1.25) {
+            playerPos.x = riverCx + riverHw + 1.4;
+          }
+          const lakeDx = playerPos.x - LAKE_CENTER.x;
+          const lakeDz = playerPos.z - LAKE_CENTER.z;
+          const lakeDist = Math.hypot(lakeDx, lakeDz);
+          const lakeAng = Math.atan2(lakeDz, lakeDx);
+          const lakeShoreR = getLakeShoreRadius(lakeAng) + 1.35;
+          if (lakeDist < lakeShoreR) {
+            const nx = lakeDist > 0.001 ? lakeDx / lakeDist : 1;
+            const nz = lakeDist > 0.001 ? lakeDz / lakeDist : 0;
+            playerPos.x = LAKE_CENTER.x + nx * lakeShoreR;
+            playerPos.z = LAKE_CENTER.z + nz * lakeShoreR;
+          }
+        }
+
+        let landGroundY = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+        if (parachuteCtrl.worldY < landGroundY + 2.5) {
+          const resolved = resolvePointAgainstColliders(
+            playerPos.x,
+            playerPos.z,
+            currentColliders,
+            PLAYER_RADIUS,
+            false,
+          );
+          playerPos.x = resolved.x;
+          playerPos.z = resolved.z;
+          landGroundY = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+        }
+
+        if (parachuteCtrl.worldY <= landGroundY + 0.08) {
+          parachuteCtrl.active = false;
+          playerPos.pose = 'idle';
+          groundOffset = landGroundY;
+          prevGroundY = landGroundY;
+          setIsParachutingHud(false);
+          soundFX.tap();
+          showBubble('Đã đáp đất an toàn!');
+        } else {
+          playerPos.pose = 'parachute';
+          groundOffset = parachuteCtrl.worldY;
+          prevGroundY = parachuteCtrl.worldY;
+        }
       } else {
         if (isRidingMallElevator) {
           activeTarget = null;
@@ -5357,7 +5547,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (elapsed - lastTagPush > 0.065) {
         lastTagPush = elapsed;
         const nextElevHud: 'none' | 'near_ground' | 'deck' | 'riding' =
-          z !== 'town'
+          z !== 'town' || parachuteCtrl.active
             ? 'none'
             : isRidingMallElevator
               ? 'riding'
@@ -5794,6 +5984,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             <Anchor className="h-4 w-4 text-[#2E82A8]" />
             <span>Lên bờ</span>
           </button>
+        </div>
+      )}
+
+      {/* Parachute Glide Status HUD Banner */}
+      {zone === 'town' && isParachutingHud && !miniActive && (
+        <div className="phone-ui pointer-events-none absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
+          <div className="anim-pop flex items-center gap-2 rounded-2xl border-2 border-[#E86C5D] bg-[#FFF8F2]/95 px-4 py-2 text-xs font-extrabold text-[#5E281B] shadow-lg whitespace-nowrap">
+            <ArrowDown className="h-4 w-4 shrink-0 text-[#E86C5D]" />
+            <span>Đang lướt dù đáp đất · Dùng Joystick chọn hướng</span>
+          </div>
         </div>
       )}
 
@@ -6470,6 +6670,58 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
+      {/* MayMall Skydeck Parachute Jump Confirmation Modal */}
+      {parachuteConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+          onClick={() => setParachuteConfirmOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="anim-pop w-full max-w-sm rounded-3xl border-4 border-[#F5B09B] bg-[#FFF8F2] p-5 text-[#3B2A1A] shadow-2xl"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#F5B8A5] bg-[#FFE8E1] text-[#E86C5D]">
+                <Wind className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black">Nhảy Dù Từ May Mall?</h3>
+                <p className="text-xs font-bold text-[#7A6048]">
+                  Độ cao Sân Thượng: 25m
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-3 rounded-2xl border border-[#EFE0D4] bg-white px-3.5 py-3 text-xs font-bold leading-relaxed text-[#523D28]">
+              Bung dù lướt xuống từ từ và dùng <b>Joystick</b> để điều khiển hướng đáp đất khắp thị trấn. Sau khi chạm đất, dù sẽ tự động thu lại!
+            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  setParachuteConfirmOpen(false);
+                }}
+                className="rounded-xl bg-[#EADCCB] py-2.5 text-xs font-black text-[#5C442C] transition active:scale-95"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  launchParachuteRef.current?.();
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#E86C5D] py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-[#D65A4C] active:scale-95"
+              >
+                <Wind className="h-3.5 w-3.5" />
+                Bung Dù Ngay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {miniActive && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-stone-950/70 p-4">
           <div className="anim-pop relative flex h-80 w-full max-w-md flex-col overflow-hidden rounded-3xl border-4 border-amber-300 bg-[#182342] p-4 text-white shadow-2xl">
@@ -6645,7 +6897,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Right-Side FPS-Style Jump Button (Moved inward, higher up, softer colors) */}
-      {showJumpButton && !miniActive && !(zone === 'home' && editFurnitureMode) && (
+      {showJumpButton && !miniActive && !isParachutingHud && !(zone === 'home' && editFurnitureMode) && (
         <button
           type="button"
           onPointerDown={(e) => {

@@ -33,8 +33,10 @@ import {
   applyPetPlayCare,
   createInitialPetSupplies,
   createOwnedPet,
+  isPetTooHungry,
   MAX_PET_INTIMACY,
   PET_CATALOG,
+  PET_STARVING_THRESHOLD,
   PET_SUPPLY_META,
   tickPetCareMeters,
 } from './data/petCatalog';
@@ -1605,7 +1607,7 @@ export default function App() {
     equippedFoodId,
   ]);
 
-  // Gentle passive hunger decay (-1 every 65 seconds for relaxed family pacing)
+  // Gentle passive hunger decay (-1 every 130 seconds for relaxed pacing)
   useEffect(() => {
     const id = window.setInterval(() => {
       setStats((prev) => {
@@ -1613,7 +1615,7 @@ export default function App() {
         if (cur <= 0) return prev;
         return {...prev, hunger: Math.max(0, cur - 1)};
       });
-    }, 65000);
+    }, 130000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -2444,7 +2446,7 @@ export default function App() {
     setStats((prev) => ({
       ...prev,
       energy: Math.max(5, prev.energy - 2),
-      hunger: Math.max(0, (prev.hunger ?? 90) - 2),
+      hunger: Math.max(0, (prev.hunger ?? 90) - 1),
       mood: Math.min(100, prev.mood + 2),
     }));
     markQuestDone('fishing');
@@ -2618,7 +2620,7 @@ export default function App() {
     setStats((prev) => ({
       ...prev,
       energy: Math.max(5, prev.energy - 2),
-      hunger: Math.max(0, (prev.hunger ?? 90) - 2),
+      hunger: Math.max(0, (prev.hunger ?? 90) - 1),
       mood: Math.min(100, prev.mood + 2),
     }));
 
@@ -2988,9 +2990,19 @@ export default function App() {
     ? ownedPets.find((p) => p.id === activePetId) ?? null
     : null;
   const effectiveCarriedPetId =
-    carriedPetId && activePet && carriedPetId === activePet.id && PET_CATALOG[activePet.speciesId]?.canHold
+    carriedPetId &&
+    activePet &&
+    carriedPetId === activePet.id &&
+    PET_CATALOG[activePet.speciesId]?.canHold &&
+    !isPetTooHungry(activePet)
       ? carriedPetId
       : null;
+
+  useEffect(() => {
+    if (carriedPetId && activePet && carriedPetId === activePet.id && isPetTooHungry(activePet)) {
+      setCarriedPetId(null);
+    }
+  }, [carriedPetId, activePet]);
 
   const handleAdoptPet = (speciesId: PetSpeciesId) => {
     const spec = PET_CATALOG[speciesId];
@@ -3033,7 +3045,7 @@ export default function App() {
 
   const handleHoldPet = (petId: string) => {
     const target = ownedPets.find((p) => p.id === petId);
-    if (!target) return;
+    if (!target || isPetTooHungry(target)) return;
     const spec = PET_CATALOG[target.speciesId];
     if (!spec?.canHold) return;
     soundFX.tap();
@@ -3047,6 +3059,8 @@ export default function App() {
   };
 
   const handleRenamePet = (petId: string, newName: string) => {
+    const target = ownedPets.find((p) => p.id === petId);
+    if (!target || isPetTooHungry(target)) return;
     const trimmed = newName.trim().slice(0, 20);
     if (!trimmed) return;
     setOwnedPets((prev) =>
@@ -3081,7 +3095,7 @@ export default function App() {
   const handleCurePet = (petId: string) => {
     if (petSupplies.petMedicine <= 0) return;
     const target = ownedPets.find((p) => p.id === petId);
-    if (!target || !target.sick) return;
+    if (!target || !target.sick || isPetTooHungry(target)) return;
     soundFX.sparkle();
     setPetSupplies((prev) => ({
       ...prev,
@@ -3101,6 +3115,9 @@ export default function App() {
     if (!target) return {ok: false, gainedXp: false, message: ''};
     const playRes = applyPetPlayCare(target);
     soundFX.tap();
+    if (!playRes.gainedXp && isPetTooHungry(target)) {
+      return {ok: false, gainedXp: false, message: playRes.message};
+    }
     if (playRes.gainedXp) {
       setOwnedPets((prev) => prev.map((p) => (p.id === petId ? playRes.pet : p)));
     }
@@ -3131,6 +3148,13 @@ export default function App() {
       setOwnedPets((prev) => prev.map((p) => (p.id === petId ? feedRes.pet : p)));
       setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 3)}));
       return {ok: true, message: feedRes.message};
+    }
+
+    if (isPetTooHungry(target)) {
+      return {
+        ok: false,
+        message: `${target.name} đang đói quá (≤${PET_STARVING_THRESHOLD}%), chỉ có thể cho bé ăn lúc này!`,
+      };
     }
 
     if (supplyId === 'petMedicine') {

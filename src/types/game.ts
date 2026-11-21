@@ -100,7 +100,8 @@ export type AvatarPose =
   | 'fish_wait'
   | 'fish_pull'
   | 'net_swing'
-  | 'play_pet';
+  | 'play_pet'
+  | 'parachute';
 
 export interface AvatarConfig {
   name: string;

@@ -53,6 +53,7 @@ export interface AvatarRig {
   closedEyeGroup?: THREE.Group;
   skipNaturalBlink?: boolean;
   shadowDisc?: THREE.Mesh;
+  parachuteGroup?: THREE.Group;
   holdPose?: HoldPose;
   toolType?: ToolId | null;
   rodBobber?: THREE.Object3D;
@@ -3168,6 +3169,69 @@ export function buildAvatarRig(
     }
   }
 
+  // Lightweight static clay Parachute assembly (hidden unless pose === 'parachute')
+  const parachuteGroup = new THREE.Group();
+  parachuteGroup.visible = false;
+  const chuteDomeGeo = new THREE.SphereGeometry(0.92, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.52);
+  const chuteCreamMat = clayMat('#FFF5E1', 0.65, 0.02);
+  const chuteCoralMat = clayMat('#F26B5B', 0.55, 0.02);
+  const chuteGoldMat = clayMat('#FFD166', 0.42, 0.06);
+  const chuteCordMat = clayMat('#4C4038', 0.85, 0.05);
+
+  const chuteMain = new THREE.Mesh(chuteDomeGeo, chuteCreamMat);
+  chuteMain.scale.set(1.12, 0.72, 0.94);
+  chuteMain.position.set(0, 2.38, -0.04);
+  parachuteGroup.add(chuteMain);
+
+  for (let w = 0; w < 4; w++) {
+    const wedge = new THREE.Mesh(
+      new THREE.SphereGeometry(0.926, 6, 6, (w * Math.PI) / 2, Math.PI / 4, 0, Math.PI * 0.515),
+      chuteCoralMat,
+    );
+    wedge.scale.set(1.12, 0.72, 0.94);
+    wedge.position.set(0, 2.38, -0.04);
+    parachuteGroup.add(wedge);
+  }
+
+  const chuteRim = new THREE.Mesh(new THREE.TorusGeometry(0.96, 0.048, 6, 18), chuteGoldMat);
+  chuteRim.rotation.x = Math.PI / 2;
+  chuteRim.scale.set(1.06, 0.88, 1);
+  chuteRim.position.set(0, 2.36, -0.04);
+  parachuteGroup.add(chuteRim);
+
+  const chuteTopCap = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), chuteCoralMat);
+  chuteTopCap.scale.set(1.2, 0.6, 1.2);
+  chuteTopCap.position.set(0, 3.04, -0.04);
+  parachuteGroup.add(chuteTopCap);
+
+  const cordEndpoints: [number, number, number, number, number, number][] = [
+    [-0.88, 2.34, 0.34, -0.24, 1.56, 0.08],
+    [0.88, 2.34, 0.34, 0.24, 1.56, 0.08],
+    [-0.84, 2.34, -0.44, -0.22, 1.48, -0.08],
+    [0.84, 2.34, -0.44, 0.22, 1.48, -0.08],
+  ];
+  const cordUpVec = new THREE.Vector3(0, 1, 0);
+  cordEndpoints.forEach(([tx, ty, tz, bx, by, bz]) => {
+    const topP = new THREE.Vector3(tx, ty, tz);
+    const botP = new THREE.Vector3(bx, by, bz);
+    const diff = new THREE.Vector3().subVectors(topP, botP);
+    const len = diff.length();
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, len, 5), chuteCordMat);
+    cord.position.addVectors(topP, botP).multiplyScalar(0.5);
+    cord.quaternion.setFromUnitVectors(cordUpVec, diff.normalize());
+    parachuteGroup.add(cord);
+  });
+
+  [-0.24, 0.24].forEach((sx) => {
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 6), chuteGoldMat);
+    grip.rotation.z = Math.PI / 2;
+    grip.position.set(sx, 1.54, 0.08);
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.42, 0.24), chuteCordMat);
+    strap.position.set(sx * 0.72, 0.96, 0);
+    parachuteGroup.add(grip, strap);
+  });
+  bodyPivot.add(parachuteGroup);
+
   root.updateMatrixWorld(true);
   const headBounds = new THREE.Box3().setFromObject(headPivot);
   const headTopAbovePivot = Number.isFinite(headBounds.max.y)
@@ -3203,6 +3267,7 @@ export function buildAvatarRig(
       config.eyeStyle === 'joy_xd' ||
       config.eyeStyle === 'wink',
     shadowDisc,
+    parachuteGroup,
     holdPose,
     toolType: equippedTool,
     rodBobber: rodBobberObj,
@@ -3236,7 +3301,10 @@ export function updateAvatarRigAnimation(
   }
 
   if (rig.shadowDisc) {
-    rig.shadowDisc.visible = pose !== 'sit' && pose !== 'sleep';
+    rig.shadowDisc.visible = pose !== 'sit' && pose !== 'sleep' && pose !== 'parachute';
+  }
+  if (rig.parachuteGroup) {
+    rig.parachuteGroup.visible = pose === 'parachute';
   }
 
   const hold = rig.holdPose || 'none';
@@ -3257,6 +3325,12 @@ export function updateAvatarRigAnimation(
         }
       }
     }
+  }
+
+  if (pose !== 'parachute') {
+    rig.bodyPivot.rotation.z = 0;
+    rig.leftArm.rotation.z = 0;
+    rig.rightArm.rotation.z = 0;
   }
 
   if (pose === 'walk') {
@@ -3592,6 +3666,22 @@ export function updateAvatarRigAnimation(
     rig.bodyPivot.rotation.x = 0.16;
     rig.headPivot.rotation.x = 0.12 + Math.sin(elapsed * 5.5) * 0.035;
     rig.headPivot.rotation.z = Math.sin(elapsed * 3.5) * 0.045;
+  } else if (pose === 'parachute') {
+    const sway = Math.sin(elapsed * 1.9) * 0.055;
+    rig.bodyPivot.rotation.z = sway;
+    rig.bodyPivot.rotation.x = 0.08;
+    rig.bodyPivot.position.y = 0;
+    rig.leftArm.rotation.set(-2.28, 0, 0.18);
+    rig.rightArm.rotation.set(-2.28, 0, -0.18);
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.48;
+    if (rig.rightElbow) rig.rightElbow.rotation.x = -0.48;
+    rig.leftLeg.rotation.set(0.16 + Math.sin(elapsed * 2.4) * 0.08, 0, -0.04);
+    rig.rightLeg.rotation.set(-0.12 - Math.sin(elapsed * 2.4) * 0.08, 0, 0.04);
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.28;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.34;
+    if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
+    rig.headPivot.position.y = HEAD_PIVOT_Y;
+    rig.headPivot.rotation.set(0.08, 0, -sway * 0.4);
   } else {
     // Gentle breathing Idle: subtle body bob & soft breathing rhythm
     const breathPhase = elapsed * 2.15;

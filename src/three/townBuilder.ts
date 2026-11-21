@@ -28,7 +28,7 @@ import {
 export const TOWN_PLAZA_RADIUS = 7.2;
 export const HILL_CENTER = {x: 0, z: -64};
 export const HILL_RADIUS = 40.0;
-export const HILL_PEAK_Y = 8.4;
+export const HILL_PEAK_Y = 13.2;
 
 export const TOWN_ZONE_ENTRANCES: Record<
   Exclude<ZoneId, 'town'>,
@@ -181,6 +181,7 @@ export function clampPointToMallDeck(x: number, z: number): {x: number; z: numbe
   const deckObstacles: [number, number, number][] = [
     [-43.9, -0.25, 0.78],
     [-41.56, -3.94, 0.48],
+    [-41.9, 2.6, 0.72],
   ];
   for (let i = 0; i < deckObstacles.length; i++) {
     const [ox, oz, minR] = deckObstacles[i];
@@ -327,7 +328,6 @@ export interface TownWorld {
 }
 
 const _dropDummy = new THREE.Object3D();
-const _smokeDummy = new THREE.Object3D();
 const _instDummy = new THREE.Object3D();
 const _instColor = new THREE.Color();
 
@@ -858,7 +858,7 @@ export function buildTownScene(): TownWorld {
     metalness: 0.0,
   });
   const groundMesh = new THREE.Mesh(terrainGeo, terrainMat);
-  groundMesh.userData = {kind: 'ground'};
+  groundMesh.userData = {kind: 'ground', noShadowBlock: true};
   group.add(groundMesh);
 
   // Gentle walkable Scenic Overlook Hill in the North (-Z)
@@ -887,8 +887,174 @@ export function buildTownScene(): TownWorld {
   });
   const hillMesh = new THREE.Mesh(hillGeo, hillMat);
   hillMesh.position.set(HILL_CENTER.x, 0, HILL_CENTER.z);
-  hillMesh.userData = {kind: 'ground'};
+  hillMesh.userData = {kind: 'ground', noShadowBlock: true};
   group.add(hillMesh);
+
+  // Static Clay Hot Air Balloon Station ("Trạm Khinh Khí Cầu") on Top of the Raised North Hill
+  {
+    const stationZ = HILL_CENTER.z - 0.8;
+    const balloonStation = new THREE.Group();
+    balloonStation.position.set(HILL_CENTER.x, HILL_PEAK_Y, stationZ);
+
+    const bStoneMat = getMat('#CBD4DE', 0.82);
+    const bTimberMat = getMat('#8A5B36', 0.76);
+    const bDeckMat = getMat('#D6A46E', 0.72);
+    const bBoothCreamMat = getMat('#FFF5E4', 0.68);
+    const bBoothAwningMat = getMat('#E86C5D', 0.56);
+    const bRopeMat = getMat('#DFC79C', 0.84);
+    const bWickerMat = getMat('#B87D44', 0.82);
+    const bSteelMat = getMat('#4E5A66', 0.45, 0.45);
+    const bAccentGold = getMat('#F2C249', 0.34, 0.35);
+
+    const foundation = new THREE.Mesh(new THREE.CylinderGeometry(4.65, 4.95, 0.24, 8), bStoneMat);
+    foundation.position.y = 0.08;
+    const woodDeck = new THREE.Mesh(new THREE.CylinderGeometry(4.38, 4.5, 0.16, 8), bDeckMat);
+    woodDeck.position.y = 0.24;
+    balloonStation.add(foundation, woodDeck);
+
+    // 2 Wide South Entry Steps
+    const stepLower = new THREE.Mesh(new RoundedBoxGeometry(2.6, 0.12, 0.65, 2, 0.03), bStoneMat);
+    stepLower.position.set(0, 0.05, 4.65);
+    const stepUpper = new THREE.Mesh(new RoundedBoxGeometry(2.25, 0.12, 0.52, 2, 0.03), bDeckMat);
+    stepUpper.position.set(0, 0.15, 4.25);
+    balloonStation.add(stepLower, stepUpper);
+
+    // Perimeter Timber Posts + Rope Railing (leaving South entrance open)
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const px = Math.sin(a) * 4.18;
+      const pz = Math.cos(a) * 4.18;
+      if (pz > 2.6 && Math.abs(px) < 1.8) continue;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.095, 1.05, 8), bTimberMat);
+      post.position.set(px, 0.82, pz);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.1, 7, 6), bAccentGold);
+      cap.position.set(px, 1.38, pz);
+      balloonStation.add(post, cap);
+
+      const nextIdx = (i + 1) % 8;
+      const na = (nextIdx / 8) * Math.PI * 2;
+      const nx = Math.sin(na) * 4.18;
+      const nz = Math.cos(na) * 4.18;
+      if ((pz > 2.6 && Math.abs(px) < 1.8) || (nz > 2.6 && Math.abs(nx) < 1.8)) continue;
+      const midX = (px + nx) * 0.5;
+      const midZ = (pz + nz) * 0.5;
+      const segLen = Math.hypot(nx - px, nz - pz);
+      const ropeRail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, segLen, 6), bRopeMat);
+      ropeRail.rotation.z = Math.PI / 2;
+      ropeRail.rotation.y = Math.atan2(-(nz - pz), nx - px);
+      ropeRail.position.set(midX, 1.05, midZ);
+      balloonStation.add(ropeRail);
+    }
+
+    // Small Pastel Ticket Booth (-2.45, -1.65)
+    const boothGroup = new THREE.Group();
+    boothGroup.position.set(-2.45, 0.32, -1.65);
+    boothGroup.rotation.y = 0.42;
+    const boothBody = new THREE.Mesh(new RoundedBoxGeometry(1.72, 1.9, 1.38, 2, 0.08), bBoothCreamMat);
+    boothBody.position.y = 0.95;
+    const boothCounter = new THREE.Mesh(new RoundedBoxGeometry(1.86, 0.12, 0.45, 2, 0.03), bTimberMat);
+    boothCounter.position.set(0, 0.98, 0.72);
+    const boothWin = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.65, 0.1), getMat('#89CFF0', 0.4));
+    boothWin.position.set(0, 1.38, 0.66);
+    const boothRoof = createExtrudedRoof(2.08, 0.78, 1.75, bBoothAwningMat);
+    boothRoof.position.set(0, 2.24, 0.06);
+    boothGroup.add(boothBody, boothCounter, boothWin, boothRoof);
+    balloonStation.add(boothGroup);
+    colliders.push({
+      type: 'circle',
+      id: 'balloon_ticket_booth',
+      x: HILL_CENTER.x - 2.45,
+      z: stationZ - 1.65,
+      r: 1.05,
+    });
+
+    // Large Static Clay Hot Air Balloon Moored on Timber Launch Cradle (0.95, -1.1)
+    const bx = 0.95;
+    const bz = -1.1;
+    const basketGroup = new THREE.Group();
+    basketGroup.position.set(bx, 0.32, bz);
+
+    const cradlePad = new THREE.Mesh(new THREE.CylinderGeometry(1.42, 1.52, 0.14, 16), bStoneMat);
+    cradlePad.position.y = 0.07;
+    const basketBody = new THREE.Mesh(new RoundedBoxGeometry(1.52, 1.08, 1.52, 2, 0.1), bWickerMat);
+    basketBody.position.y = 0.68;
+    const basketRim = new THREE.Mesh(new RoundedBoxGeometry(1.64, 0.16, 1.64, 2, 0.05), bTimberMat);
+    basketRim.position.y = 1.24;
+    basketGroup.add(cradlePad, basketBody, basketRim);
+
+    [
+      [-0.64, -0.64],
+      [0.64, -0.64],
+      [-0.64, 0.64],
+      [0.64, 0.64],
+    ].forEach(([sx, sz]) => {
+      const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.042, 1.45, 7), bSteelMat);
+      strut.position.set(sx, 1.94, sz);
+      const mooring = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.28, 5), bRopeMat);
+      mooring.position.set(sx * 1.42, 0.62, sz * 1.42);
+      mooring.rotation.z = sx > 0 ? 0.32 : -0.32;
+      basketGroup.add(strut, mooring);
+    });
+
+    const burnerFrame = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.36, 0.22, 10), bSteelMat);
+    burnerFrame.position.y = 2.68;
+    basketGroup.add(burnerFrame);
+
+    // Sculpted Large Static Pastel Envelope (y = 2.6..9.6m relative to deck, maxR = 3.05m)
+    const envPoints = [
+      new THREE.Vector2(0.01, 0),
+      new THREE.Vector2(0.82, 0.16),
+      new THREE.Vector2(1.75, 1.05),
+      new THREE.Vector2(2.68, 2.35),
+      new THREE.Vector2(3.05, 3.72),
+      new THREE.Vector2(2.94, 4.92),
+      new THREE.Vector2(2.15, 5.95),
+      new THREE.Vector2(1.05, 6.58),
+      new THREE.Vector2(0.01, 6.82),
+    ];
+    const envColors = ['#FF758F', '#FFF6E3', '#66C7E8', '#FFD166', '#9BE080', '#FFF6E3', '#F79D65', '#7B9CE8'];
+    const GORE_COUNT = 8;
+    const goreAngle = (Math.PI * 2) / GORE_COUNT;
+    for (let g = 0; g < GORE_COUNT; g++) {
+      const goreGeo = new THREE.LatheGeometry(envPoints, 3, g * goreAngle, goreAngle + 0.02);
+      const goreMesh = new THREE.Mesh(goreGeo, getMat(envColors[g % envColors.length], 0.58));
+      goreMesh.position.y = 2.68;
+      basketGroup.add(goreMesh);
+    }
+
+    const eqBand = new THREE.Mesh(new THREE.TorusGeometry(3.04, 0.11, 8, 28), bAccentGold);
+    eqBand.rotation.x = Math.PI / 2;
+    eqBand.position.y = 6.4;
+    const crownCap = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), bBoothAwningMat);
+    crownCap.scale.set(1.2, 0.65, 1.2);
+    crownCap.position.y = 9.52;
+    basketGroup.add(eqBand, crownCap);
+
+    // Station Pennant Banner Mast on East Side (3.3, 0.32, 0.6)
+    const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, 3.25, 8), bSteelMat);
+    flagPole.position.set(3.25, 1.92, 0.85);
+    const flagFinial = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), bAccentGold);
+    flagFinial.position.set(3.25, 3.58, 0.85);
+    const flagCloth = new THREE.Mesh(new RoundedBoxGeometry(0.95, 0.45, 0.04, 1, 0.01), bBoothAwningMat);
+    flagCloth.position.set(2.75, 3.25, 0.85);
+    balloonStation.add(basketGroup, flagPole, flagFinial, flagCloth);
+
+    colliders.push({
+      type: 'circle',
+      id: 'balloon_station_basket',
+      x: HILL_CENTER.x + bx,
+      z: stationZ + bz,
+      r: 1.45,
+    });
+    labelAnchors.push({
+      id: 'balloon_station',
+      label: 'Trạm Khinh Khí Cầu',
+      worldPos: new THREE.Vector3(HILL_CENTER.x + 0.35, HILL_PEAK_Y + 5.6, stationZ - 0.6),
+    });
+
+    mergeStaticGroupByMaterial(balloonStation);
+    group.add(balloonStation);
+  }
 
   // Static sculpted sky clouds spread high above the gentle mountain & broad town
   const cloudMat = getMat('#FFFFFF', 0.85);
@@ -910,6 +1076,9 @@ export function buildTownScene(): TownWorld {
     cloud.add(p1, p2, p3);
     cloud.scale.set(cs * 1.25, cs * 0.72, cs * 0.9);
     cloud.position.set(cx, cy, cz);
+    cloud.traverse((c) => {
+      c.userData.noShadowBlock = true;
+    });
     group.add(cloud);
   });
 
@@ -1207,8 +1376,6 @@ export function buildTownScene(): TownWorld {
     const urnStoneMat = getMat('#E6DDD0', 0.74);
     const foliageLushMat = getMat('#4EA85B', 0.74);
     const noticeWoodMat = getMat('#9C653A', 0.74);
-    const noticeBoardMat = getMat('#FBF4E4', 0.84);
-    const postboxRedMat = getMat('#D64545', 0.42);
     const cafeClothCoralMat = getMat('#E87D72', 0.62);
     const cafeClothCreamMat = getMat('#FFFBF0', 0.65);
 
@@ -1246,22 +1413,54 @@ export function buildTownScene(): TownWorld {
       plazaDecor.add(diamond, outerTile);
     }
 
-    // 2. North & South Floral Iron Entrance Archways (wide 4.9m clearance across walkways!)
-    [-7.02, 7.02].forEach((az, archIdx) => {
+    // 2. Single South Floral Entrance Archway with Climbing Vines, Flowers & Centered Hanging String Bulb (North hill-side arch removed!)
+    {
+      const az = 7.02;
       const archGrp = new THREE.Group();
       archGrp.position.set(0, 0.1, az);
+      const archBloomCols = ['#FF85A1', '#FFD166', '#9BE080', '#FF9F68', '#C69EFF'];
+      const vineGreenMat = getMat('#3D8B4C', 0.78);
 
-      [-2.45, 2.45].forEach((px) => {
-        const plinth = new THREE.Mesh(new RoundedBoxGeometry(0.54, 0.62, 0.54, 2, 0.05), urnStoneMat);
+      [-2.45, 2.45].forEach((px, pIdx) => {
+        const plinth = new THREE.Mesh(new RoundedBoxGeometry(0.56, 0.62, 0.56, 2, 0.05), urnStoneMat);
         plinth.position.set(px, 0.31, 0);
         const col = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.115, 2.9, 10), archIronMat);
         col.position.set(px, 2.02, 0);
-        const urnBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.14, 0.28, 10), urnStoneMat);
+        const urnBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.15, 0.3, 10), urnStoneMat);
         urnBowl.position.set(px, 0.76, 0);
-        const urnBush = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 7), foliageLushMat);
-        urnBush.position.set(px, 1.04, 0);
+        const urnBush = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 7), foliageLushMat);
+        urnBush.position.set(px, 1.05, 0);
         archGrp.add(plinth, col, urnBowl, urnBush);
-        colliders.push({type: 'circle', id: `plaza_arch_${archIdx}_${px}`, x: px, z: az, r: 0.32});
+
+        // Helical climbing vine + lush foliage tufts & flowers wrapping each pillar
+        const vinePts: THREE.Vector3[] = [];
+        for (let s = 0; s <= 12; s++) {
+          const u = s / 12;
+          const vy = 0.85 + u * 2.52;
+          const ang = u * Math.PI * 3.4 + pIdx * Math.PI;
+          vinePts.push(new THREE.Vector3(px + Math.cos(ang) * 0.125, vy, Math.sin(ang) * 0.125));
+        }
+        const vineCurve = new THREE.CatmullRomCurve3(vinePts);
+        archGrp.add(new THREE.Mesh(new THREE.TubeGeometry(vineCurve, 20, 0.034, 5, false), vineGreenMat));
+
+        for (let f = 0; f < 6; f++) {
+          const fu = 0.15 + (f / 5) * 0.82;
+          const pt = vineCurve.getPoint(fu);
+          const leafClump = new THREE.Mesh(new THREE.SphereGeometry(0.145, 7, 6), foliageLushMat);
+          leafClump.position.set(pt.x * 1.02 - px * 0.02, pt.y, pt.z * 1.25);
+          const pillarBloom = new THREE.Mesh(
+            new THREE.SphereGeometry(0.088, 6, 6),
+            getMat(archBloomCols[(f + pIdx * 2) % archBloomCols.length], 0.56),
+          );
+          pillarBloom.position.set(
+            pt.x + (pt.x >= px ? 0.08 : -0.08),
+            pt.y + 0.03,
+            pt.z + (pt.z >= 0 ? 0.09 : -0.09),
+          );
+          archGrp.add(leafClump, pillarBloom);
+        }
+
+        colliders.push({type: 'circle', id: `plaza_arch_south_${px}`, x: px, z: az, r: 0.34});
       });
 
       const archSpan = new THREE.Mesh(
@@ -1276,48 +1475,68 @@ export function buildTownScene(): TownWorld {
       innerScroll.position.set(0, 3.35, 0);
       archGrp.add(archSpan, innerScroll);
 
-      // Decorative blossom garland along arch crest
-      const archBloomCols = ['#FF85A1', '#FFD166', '#9BE080', '#FF9F68'];
-      for (let b = 0; b <= 6; b++) {
-        const phi = 0.25 + (b / 6) * (Math.PI - 0.5);
+      // Rich blossom & trailing vine garland along upper arch crest
+      for (let b = 0; b <= 10; b++) {
+        const phi = 0.14 + (b / 10) * (Math.PI - 0.28);
         const bx = Math.cos(phi) * 2.44;
         const by = 3.35 + Math.sin(phi) * 2.44;
-        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.18, 7, 6), foliageLushMat);
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.19, 7, 6), foliageLushMat);
         leaf.position.set(bx, by, 0);
+        const sideLeaf = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), vineGreenMat);
+        sideLeaf.position.set(bx * 0.98, by - 0.08, b % 2 === 0 ? 0.12 : -0.12);
         const blossom = new THREE.Mesh(
-          new THREE.SphereGeometry(0.095, 6, 6),
-          getMat(archBloomCols[b % archBloomCols.length], 0.58),
+          new THREE.SphereGeometry(0.098, 6, 6),
+          getMat(archBloomCols[b % archBloomCols.length], 0.56),
         );
-        blossom.position.set(bx, by + 0.04, 0.12);
+        blossom.position.set(bx, by + 0.05, 0.14);
         const blossomBack = blossom.clone();
-        blossomBack.position.z = -0.12;
-        archGrp.add(leaf, blossom, blossomBack);
+        blossomBack.position.z = -0.14;
+        archGrp.add(leaf, sideLeaf, blossom, blossomBack);
       }
 
-      // Crest Star Finial at the top center
+      // Centered Hanging Pendant String Cord + Small Warm Glowing Bulb Under Arch Crest
+      const archWire = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6),
+        archIronMat,
+      );
+      archWire.position.set(0, 5.46, 0);
+      const archSocket = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.055, 0.09, 8),
+        archGoldMat,
+      );
+      archSocket.position.set(0, 5.24, 0);
+      const archLampMat = new THREE.MeshStandardMaterial({
+        color: '#FFF5CC',
+        emissive: '#FFC95C',
+        emissiveIntensity: 0.28,
+        roughness: 0.2,
+      });
+      lampBulbs.push(archLampMat);
+      const archLampBulb = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), archLampMat);
+      archLampBulb.position.set(0, 5.12, 0);
+      archGrp.add(archWire, archSocket, archLampBulb);
+
       const crestFinial = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), archGoldMat);
       crestFinial.position.set(0, 5.98, 0);
       archGrp.add(crestFinial);
       plazaDecor.add(archGrp);
-    });
+    }
 
-    // 3. NW & SE Plaza Quadrant Cozy Café Tables + Umbrella + Interactive Stools
+    // 3. Symmetrical NW & NE Plaza Café Tables + Identical Striped Umbrellas + Interactive Stools (x = ±3.35, z = -3.35)
     [
       {
         id: 'nw_cafe',
-        cx: -3.22,
-        cz: -3.48,
-        withUmbrella: true,
+        cx: -3.35,
+        cz: -3.35,
         stoolOff: {ox: 0.72, oz: 0.35},
       },
       {
-        id: 'se_cafe',
-        cx: 3.22,
-        cz: 3.48,
-        withUmbrella: false,
-        stoolOff: {ox: -0.72, oz: -0.35},
+        id: 'ne_cafe',
+        cx: 3.35,
+        cz: -3.35,
+        stoolOff: {ox: -0.72, oz: 0.35},
       },
-    ].forEach(({id, cx, cz, withUmbrella, stoolOff}) => {
+    ].forEach(({id, cx, cz, stoolOff}) => {
       const tbl = new THREE.Group();
       tbl.position.set(cx, 0.14, cz);
       const tBase = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.06, 12), archIronMat);
@@ -1331,26 +1550,20 @@ export function buildTownScene(): TownWorld {
       tRim.position.y = 0.72;
       tbl.add(tBase, tStem, tTop, tRim);
 
-      if (withUmbrella) {
-        const uPole = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.032, 2.25, 8), noticeWoodMat);
-        uPole.position.y = 1.84;
-        const uDome = new THREE.Mesh(new THREE.ConeGeometry(1.18, 0.38, 8), cafeClothCoralMat);
-        uDome.position.y = 2.88;
-        const uStripe = new THREE.Mesh(new THREE.ConeGeometry(1.19, 0.382, 2, 1, false, 0, Math.PI / 4), cafeClothCreamMat);
-        uStripe.position.y = 2.885;
-        const uStripe2 = uStripe.clone();
-        uStripe2.rotation.y = Math.PI;
-        tbl.add(uPole, uDome, uStripe, uStripe2);
-      } else {
-        // Checkered mini board + coffee mugs on SE table
-        const board = new THREE.Mesh(new RoundedBoxGeometry(0.42, 0.03, 0.42, 1, 0.01), noticeWoodMat);
-        board.position.y = 0.765;
-        const grid = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.015, 0.32), mosaicCreamMat);
-        grid.position.y = 0.78;
-        tbl.add(board, grid);
-      }
+      const uPole = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.032, 2.25, 8), noticeWoodMat);
+      uPole.position.y = 1.84;
+      const uDome = new THREE.Mesh(new THREE.ConeGeometry(1.18, 0.38, 8), cafeClothCoralMat);
+      uDome.position.y = 2.88;
+      const uStripe = new THREE.Mesh(
+        new THREE.ConeGeometry(1.19, 0.382, 2, 1, false, 0, Math.PI / 4),
+        cafeClothCreamMat,
+      );
+      uStripe.position.y = 2.885;
+      const uStripe2 = uStripe.clone();
+      uStripe2.rotation.y = Math.PI;
+      tbl.add(uPole, uDome, uStripe, uStripe2);
 
-      // Coffee cups on table
+      // Symmetrical coffee mugs on table
       [-0.18, 0.2].forEach((mx, mi) => {
         const mug = new THREE.Mesh(
           new THREE.CylinderGeometry(0.048, 0.04, 0.1, 8),
@@ -1362,7 +1575,6 @@ export function buildTownScene(): TownWorld {
       plazaDecor.add(tbl);
       colliders.push({type: 'circle', id: `plaza_${id}_tbl`, x: cx, z: cz, r: 0.56});
 
-      // Sit-able Café Stool beside table
       const sx = cx + stoolOff.ox;
       const sz = cz + stoolOff.oz;
       const sRotY = Math.atan2(cx - sx, cz - sz);
@@ -1394,63 +1606,20 @@ export function buildTownScene(): TownWorld {
       colliders.push({type: 'circle', id: `plaza_${id}_stool`, x: sx, z: sz, r: 0.28});
     });
 
-    // 4. NE Quadrant: Town Community Bulletin Kiosk & Classic Postbox
-    {
-      const bx = 3.45;
-      const bz = -3.45;
-      const kiosk = new THREE.Group();
-      kiosk.position.set(bx, 0.14, bz);
-      kiosk.rotation.y = -Math.PI * 0.75;
-      [-0.65, 0.65].forEach((px) => {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 1.85, 8), noticeWoodMat);
-        post.position.set(px, 0.92, 0);
-        kiosk.add(post);
-      });
-      const boardFrame = new THREE.Mesh(new RoundedBoxGeometry(1.52, 1.02, 0.12, 2, 0.03), noticeWoodMat);
-      boardFrame.position.set(0, 1.32, 0);
-      const boardInner = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.84, 0.14), noticeBoardMat);
-      boardInner.position.set(0, 1.32, 0);
-      const boardRoof = new THREE.Mesh(new RoundedBoxGeometry(1.72, 0.14, 0.42, 2, 0.04), getMat('#C95D4B', 0.62));
-      boardRoof.position.set(0, 1.9, 0);
-      // Mini pinned flyers on board
-      [
-        [-0.36, 1.42, '#FFD166'],
-        [0.04, 1.38, '#8ECAE6'],
-        [0.38, 1.24, '#FFB4C6'],
-        [-0.22, 1.12, '#B7E4C7'],
-      ].forEach(([nx, ny, nc]) => {
-        const note = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.24, 0.02), getMat(nc as string, 0.65));
-        note.position.set(nx as number, ny as number, 0.075);
-        kiosk.add(note);
-      });
-      kiosk.add(boardFrame, boardInner, boardRoof);
-      plazaDecor.add(kiosk);
-      colliders.push({type: 'circle', id: 'plaza_bulletin', x: bx, z: bz, r: 0.85});
-
-      // Classic Plaza Postbox beside Bulletin Board
-      const pbx = 2.45;
-      const pbz = -4.15;
-      const postbox = new THREE.Group();
-      postbox.position.set(pbx, 0.14, pbz);
-      postbox.rotation.y = -Math.PI * 0.82;
-      const pbPed = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.45, 10), archIronMat);
-      pbPed.position.y = 0.22;
-      const pbBody = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.72, 12), postboxRedMat);
-      pbBody.position.y = 0.78;
-      const pbCap = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), postboxRedMat);
-      pbCap.position.y = 1.14;
-      const pbTrim = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.025, 6, 14), archGoldMat);
-      pbTrim.rotation.x = Math.PI / 2;
-      pbTrim.position.y = 1.12;
-      postbox.add(pbPed, pbBody, pbCap, pbTrim);
-      plazaDecor.add(postbox);
-      colliders.push({type: 'circle', id: 'plaza_postbox', x: pbx, z: pbz, r: 0.3});
-    }
-
-    // 5. SW Quadrant: Ornate Topiary Tiers & Festive Plaza Balloon Flower Pedestal
-    {
-      const gx = -3.4;
-      const gz = 3.45;
+    // 4. Four Symmetrical Festive Balloon Flower Pedestals ("Bồn Cây Bong Bóng") Framing the South & Side Plaza
+    const urnSpots: [number, number][] = [
+      [-3.35, 3.35],
+      [3.35, 3.35],
+      [-5.25, -1.85],
+      [5.25, -1.85],
+    ];
+    const balloonPalettes = [
+      ['#FF7597', '#67C6E3', '#FFD166'],
+      ['#67C6E3', '#FFD166', '#B388F5'],
+      ['#FF9F68', '#9BE080', '#FF7597'],
+      ['#B388F5', '#FF7597', '#67C6E3'],
+    ];
+    urnSpots.forEach(([gx, gz], idx) => {
       const ped = new THREE.Group();
       ped.position.set(gx, 0.14, gz);
       const base = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 0.48, 12), urnStoneMat);
@@ -1460,8 +1629,25 @@ export function buildTownScene(): TownWorld {
       rim.position.y = 0.48;
       const mound = new THREE.Mesh(new THREE.SphereGeometry(0.38, 10, 8), foliageLushMat);
       mound.position.y = 0.62;
+
+      // Blossoms tucked on the lush shrub mound
+      const moundBlossomCols = ['#FF85A1', '#FFD166', '#8EE0FF', '#FFFFFF'];
+      [
+        [0.24, 0.72, 0.18],
+        [-0.24, 0.68, 0.2],
+        [0.18, 0.74, -0.22],
+        [-0.2, 0.71, -0.18],
+      ].forEach(([fx, fy, fz], fi) => {
+        const fl = new THREE.Mesh(
+          new THREE.SphereGeometry(0.068, 6, 5),
+          getMat(moundBlossomCols[(fi + idx) % moundBlossomCols.length], 0.52),
+        );
+        fl.position.set(fx, fy, fz);
+        ped.add(fl);
+      });
+
       // Trio of floating sculpted colorful festival balloons anchored to pedestal
-      const balloonCols = ['#FF7597', '#67C6E3', '#FFD166'];
+      const bCols = balloonPalettes[idx % balloonPalettes.length];
       [
         [-0.18, 1.55, 0.06],
         [0.16, 1.72, -0.08],
@@ -1470,15 +1656,15 @@ export function buildTownScene(): TownWorld {
         const stringH = bly - 0.62;
         const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, stringH, 4), mosaicCreamMat);
         wire.position.set(blx * 0.5, 0.62 + stringH * 0.5, blz * 0.5);
-        const bal = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), getMat(balloonCols[bi], 0.35));
+        const bal = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), getMat(bCols[bi], 0.35));
         bal.scale.set(0.95, 1.15, 0.95);
         bal.position.set(blx, bly, blz);
         ped.add(wire, bal);
       });
       ped.add(base, rim, mound);
       plazaDecor.add(ped);
-      colliders.push({type: 'circle', id: 'plaza_balloon_urn', x: gx, z: gz, r: 0.58});
-    }
+      colliders.push({type: 'circle', id: `plaza_balloon_urn_${idx}`, x: gx, z: gz, r: 0.58});
+    });
 
     mergeStaticGroupByMaterial(plazaDecor);
     group.add(plazaDecor);
@@ -1520,6 +1706,7 @@ export function buildTownScene(): TownWorld {
     districtNightPoolMat,
     districtPoolSpecs.length,
   );
+  districtNightPoolIM.userData = {noShadowBlock: true};
   districtNightPoolIM.renderOrder = 2;
   districtNightPoolIM.visible = false;
   districtPoolSpecs.forEach(([px, py, pz, ps], i) => {
@@ -1544,10 +1731,7 @@ export function buildTownScene(): TownWorld {
     return m;
   };
 
-  // ========== DISTRICT 1: NHÀ CỦA TÔI (Cozy Dormer Cottage + Partial Fence + Chimney Smoke) ==========
-  const SMOKE_COUNT = 7;
-  let chimneySmokeMesh: THREE.InstancedMesh | null = null;
-  const smokeOriginWorld = new THREE.Vector3();
+  // ========== DISTRICT 1: NHÀ CỦA TÔI (Cozy Dormer Cottage + Partial Fence) ==========
   {
     const home = new THREE.Group();
     home.position.set(-32, 0, -22.5);
@@ -1596,23 +1780,6 @@ export function buildTownScene(): TownWorld {
     dormerRoof.position.set(-0.78, 4.05, 1.18);
     const dormerWin = buildFramedWindow(0.54, 0.44, timberMat, makeWinMat());
     dormerWin.position.set(-0.78, 3.56, 1.6);
-
-    // Brick Chimney + Stone Cap
-    const chimney = new THREE.Mesh(
-      new RoundedBoxGeometry(0.68, 1.6, 0.68, 2, 0.06),
-      getMat('#A95948', 0.78),
-    );
-    chimney.position.set(1.38, 4.15, -0.78);
-    const chimneyCap = new THREE.Mesh(
-      new RoundedBoxGeometry(0.84, 0.18, 0.84, 2, 0.04),
-      stoneMat,
-    );
-    chimneyCap.position.set(1.38, 4.98, -0.78);
-
-    // Compute world coordinates for chimney smoke emitter
-    smokeOriginWorld.set(1.38, 5.15, -0.78);
-    home.updateMatrixWorld(true);
-    smokeOriginWorld.applyMatrix4(home.matrixWorld);
 
     // Front Porch Canopy + Wooden Deck + Steps
     const porchDeck = new THREE.Mesh(
@@ -1768,8 +1935,6 @@ export function buildTownScene(): TownWorld {
       dormerBody,
       dormerRoof,
       dormerWin,
-      chimney,
-      chimneyCap,
       porchDeck,
       porchStep,
       porchRoof,
@@ -1813,20 +1978,6 @@ export function buildTownScene(): TownWorld {
     colliders.push({type: 'circle', id: 'home_mailbox', x: mailWorld.x, z: mailWorld.z, r: 0.58});
     mergeStaticGroupByMaterial(home);
     group.add(home);
-
-    // Lightweight 1-draw-call InstancedMesh chimney smoke
-    const smokeGeo = new THREE.SphereGeometry(0.26, 7, 6);
-    const smokeMat = new THREE.MeshStandardMaterial({
-      color: '#FFFFFF',
-      roughness: 0.9,
-      transparent: true,
-      opacity: 0.52,
-      depthWrite: false,
-    });
-    chimneySmokeMesh = new THREE.InstancedMesh(smokeGeo, smokeMat, SMOKE_COUNT);
-    chimneySmokeMesh.frustumCulled = false;
-    chimneySmokeMesh.renderOrder = 8;
-    group.add(chimneySmokeMesh);
   }
 
   // ========== BIỂN "NHIỆM VỤ NGÀY" TRƯỚC SÂN NHÀ ==========
@@ -4775,11 +4926,30 @@ export function buildTownScene(): TownWorld {
         champagneMat,
       );
       backBand.position.set(-60.42, 3.82, -2.5);
-      // Rear Service Door & Safety Bollards
-      const svcFrame = new THREE.Mesh(new RoundedBoxGeometry(0.26, 2.55, 2.2, 2, 0.04), darkSteelMat);
-      svcFrame.position.set(-60.42, 1.48, -2.5);
-      const svcDoor = new THREE.Mesh(new RoundedBoxGeometry(0.28, 2.35, 1.88, 1, 0.02), silverSteelMat);
-      svcDoor.position.set(-60.46, 1.44, -2.5);
+      // Rear Service Door & Safety Bollards (depth-stepped layers so zero Z-fighting)
+      const svcBack = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.38, 1.94), darkSteelMat);
+      svcBack.position.set(-60.44, 1.44, -2.5);
+      const svcJambL = new THREE.Mesh(new RoundedBoxGeometry(0.14, 2.55, 0.16, 2, 0.03), darkSteelMat);
+      svcJambL.position.set(-60.49, 1.48, -3.52);
+      const svcJambR = svcJambL.clone();
+      svcJambR.position.z = -1.48;
+      const svcLintel = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.2, 2.24, 2, 0.03), darkSteelMat);
+      svcLintel.position.set(-60.49, 2.66, -2.5);
+      [-2.98, -2.02].forEach((lz) => {
+        const doorLeaf = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.32, 0.92), silverSteelMat);
+        doorLeaf.position.set(-60.53, 1.44, lz);
+        const porthole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.11, 10), skyGlassMat);
+        porthole.rotation.z = Math.PI / 2;
+        porthole.position.set(-60.55, 1.88, lz);
+        mallStatic.add(doorLeaf, porthole);
+      });
+      const svcMullion = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.34, 0.06), darkSteelMat);
+      svcMullion.position.set(-60.56, 1.44, -2.5);
+      [-2.62, -2.38].forEach((hz) => {
+        const hdl = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.34, 0.045), goldAccentMat);
+        hdl.position.set(-60.59, 1.32, hz);
+        mallStatic.add(hdl);
+      });
       const svcCanopy = new THREE.Mesh(new RoundedBoxGeometry(1.1, 0.16, 2.6, 2, 0.03), silverSteelMat);
       svcCanopy.position.set(-60.95, 2.95, -2.5);
       [-3.95, -1.05].forEach((bolZ) => {
@@ -4795,7 +4965,7 @@ export function buildTownScene(): TownWorld {
         vent.position.set(-58.2, 8.62, hz);
         mallStatic.add(hvac, vent);
       });
-      mallStatic.add(backUpperMid, backBand, svcFrame, svcDoor, svcCanopy);
+      mallStatic.add(backUpperMid, backBand, svcBack, svcJambL, svcJambR, svcLintel, svcMullion, svcCanopy);
     }
 
     // Fire Extinguisher Station ("Bình Cứu Hỏa") on South-East Mall Wall & South Wall
@@ -5084,30 +5254,52 @@ export function buildTownScene(): TownWorld {
     spireBeacon.position.set(MALL_CENTER.x - 0.85, 38.55, MALL_CENTER.z);
     mallStatic.add(crownCap, crownSpire, spireBeacon);
 
-    // Sleek Metallic Horizontal Floor Rings (skipping Skydeck junction 24.15..25.65 so rings never bleed onto white deck!)
+    // Sleek Hollow White Structural Collar Rings Around Tapered Tower (zero inward clipping or sinking!)
+    const whiteRingMat = getMat('#F6FAFE', 0.34, 0.25);
     for (let lvl = 1; lvl <= 9; lvl++) {
       const y = 7.65 + lvl * 2.55;
       if (y > 31.8) break;
-      if (y >= MALL_DECK_Y - 0.85 && y <= MALL_DECK_Y + 0.65) continue;
-      const v = (y - TOWER_BASE_Y) / (TOWER_H - TOWER_BASE_Y);
-      const rx = THREE.MathUtils.lerp(5.2, 2.45, Math.pow(v, 0.88)) + 0.08;
-      const rz = THREE.MathUtils.lerp(6.05, 2.95, Math.pow(v, 0.88)) + 0.08;
-      const shiftX = v * 0.42;
+      if (y >= MALL_DECK_Y - 1.15 && y <= MALL_DECK_Y + 0.85) continue;
       const bandShape = new THREE.Shape();
-      for (let s = 0; s <= 36; s++) {
-        const theta = (s / 36) * Math.PI * 2;
-        let bx = Math.cos(theta) * rx + shiftX;
-        const bz = Math.sin(theta) * rz;
-        if (bx > FLAT_LOCAL_X + 0.08) bx = FLAT_LOCAL_X + 0.08;
-        if (s === 0) bandShape.moveTo(bx, -bz);
-        else bandShape.lineTo(bx, -bz);
+      const innerHole = new THREE.Path();
+      const B_SEGS = 40;
+      for (let s = 0; s <= B_SEGS; s++) {
+        const theta = (s / B_SEGS) * Math.PI * 2;
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+        // Estimate exact tower surface radius at (y, cosT) accounting for sloped tower crown height!
+        const vRough = THREE.MathUtils.clamp((y - TOWER_BASE_Y) / (TOWER_H - TOWER_BASE_Y), 0, 1);
+        const rxRough = THREE.MathUtils.lerp(5.2, 2.45, Math.pow(vRough, 0.88));
+        const lxApprox = Math.min(FLAT_LOCAL_X, cosT * rxRough + vRough * 0.42);
+        const maxTopY = TOWER_H + (FLAT_LOCAL_X - lxApprox) * 0.48;
+        const v = THREE.MathUtils.clamp((y - TOWER_BASE_Y) / (maxTopY - TOWER_BASE_Y), 0, 1);
+        const rx = THREE.MathUtils.lerp(5.2, 2.45, Math.pow(v, 0.88));
+        const rz = THREE.MathUtils.lerp(6.05, 2.95, Math.pow(v, 0.88));
+        const shiftX = v * 0.42;
+
+        const outRx = rx + 0.095;
+        const outRz = rz + 0.095;
+        const inRx = Math.max(0.4, rx - 0.14);
+        const inRz = Math.max(0.4, rz - 0.14);
+
+        const obx = Math.min(FLAT_LOCAL_X + 0.095, cosT * outRx + shiftX);
+        const obz = sinT * outRz;
+        if (s === 0) bandShape.moveTo(obx, -obz);
+        else bandShape.lineTo(obx, -obz);
+
+        const thetaRev = (1 - s / B_SEGS) * Math.PI * 2;
+        const ibx = Math.min(FLAT_LOCAL_X - 0.14, Math.cos(thetaRev) * inRx + shiftX);
+        const ibz = Math.sin(thetaRev) * inRz;
+        if (s === 0) innerHole.moveTo(ibx, -ibz);
+        else innerHole.lineTo(ibx, -ibz);
       }
+      bandShape.holes.push(innerHole);
       const bandGeo = new THREE.ExtrudeGeometry(bandShape, {
         depth: 0.16,
         bevelEnabled: false,
       });
       bandGeo.rotateX(-Math.PI / 2);
-      const bandMesh = new THREE.Mesh(bandGeo, silverSteelMat);
+      const bandMesh = new THREE.Mesh(bandGeo, whiteRingMat);
       bandMesh.position.set(MALL_CENTER.x, y, MALL_CENTER.z);
       mallStatic.add(bandMesh);
     }
@@ -5460,6 +5652,57 @@ export function buildTownScene(): TownWorld {
         group.add(chairHit);
         clickTargets.push(chairHit);
       });
+    }
+
+    // Rooftop Furnishing 3: Static Clay Parachute Jump Stand ("Điểm Nhảy Dù") on South-East Skydeck
+    {
+      const px = -41.9;
+      const pz = 2.6;
+      const pStand = new THREE.Group();
+      pStand.position.set(px, MALL_DECK_Y, pz);
+
+      const padRing = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.72, 0.06, 18), getMat('#66C7E8', 0.52));
+      padRing.position.y = 0.03;
+      const padCenter = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.075, 16), getMat('#FFF6E3', 0.65));
+      padCenter.position.y = 0.04;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.062, 1.52, 8), darkSteelMat);
+      pole.position.y = 0.78;
+      const poleCap = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), goldAccentMat);
+      poleCap.position.y = 1.56;
+
+      // Mini Sculpted Coral & Cream Parachute Emblem atop Stand
+      const miniChute = new THREE.Mesh(
+        new THREE.SphereGeometry(0.38, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.55),
+        getMat('#F26B5B', 0.45),
+      );
+      miniChute.scale.set(1.08, 0.76, 1.08);
+      miniChute.position.set(0, 1.62, 0);
+      const miniStripe = new THREE.Mesh(
+        new THREE.SphereGeometry(0.386, 8, 6, 0, Math.PI * 0.48, 0, Math.PI * 0.54),
+        getMat('#FFF6E3', 0.48),
+      );
+      miniStripe.scale.set(1.08, 0.76, 1.08);
+      miniStripe.position.set(0, 1.62, 0);
+
+      // Folded Parachute Backpack prop beside pole
+      const pack = new THREE.Mesh(new RoundedBoxGeometry(0.36, 0.44, 0.24, 2, 0.06), getMat('#4E9B8F', 0.62));
+      pack.position.set(0.28, 0.24, 0.14);
+      pack.rotation.y = -0.35;
+      pStand.add(padRing, padCenter, pole, poleCap, miniChute, miniStripe, pack);
+      mallStatic.add(pStand);
+
+      const standHit = new THREE.Mesh(
+        new THREE.BoxGeometry(1.15, 2.1, 1.15),
+        new THREE.MeshBasicMaterial({visible: false}),
+      );
+      standHit.position.set(px, MALL_DECK_Y + 1.0, pz);
+      standHit.userData = {
+        kind: 'mall_parachute',
+        tx: -42.85,
+        tz: 2.15,
+      };
+      group.add(standHit);
+      clickTargets.push(standHit);
     }
 
     // 5. Exposed Exterior Glass Observation Elevator Shaft + Animated Panoramic Cabin (y = 0.04 <-> 25.0)
@@ -7203,13 +7446,21 @@ export function buildTownScene(): TownWorld {
         }
         colliders.push({type: 'circle', x: rx, z: rz, r: rs * 0.88});
         if (i % 4 === 0) {
-          westInsectAnchors.push({x: rx, y: gy + rs * 0.72, z: rz, habitat: 'rock'});
+          westInsectAnchors.push({
+            x: rx,
+            y: gy + rs * 0.72,
+            z: rz,
+            habitat: 'rock',
+            zone: rx <= -63.5 ? 'riverside' : 'outer',
+          });
         }
       });
       ecoRockIM.instanceMatrix.needsUpdate = true;
       ecoMossIM.instanceMatrix.needsUpdate = true;
       ecoRockIM.computeBoundingSphere();
       ecoMossIM.computeBoundingSphere();
+      ecoRockIM.userData = {noShadowBlock: true};
+      ecoMossIM.userData = {noShadowBlock: true};
       eco.add(ecoRockIM, ecoMossIM);
 
       // B. Static Instanced River Grasses & Reeds (Cỏ sông tĩnh — zero animation cost!)
@@ -7248,13 +7499,20 @@ export function buildTownScene(): TownWorld {
         riverGrassIM.setMatrixAt(i, _instDummy.matrix);
         _instColor.set(rgPalette[i % rgPalette.length]);
         riverGrassIM.setColorAt(i, _instColor);
-        if (i % 7 === 0) {
-          westInsectAnchors.push({x: gx, y: 0.25, z: gz, habitat: 'water_edge'});
+        if (i % 5 === 0) {
+          westInsectAnchors.push({
+            x: gx,
+            y: 0.25,
+            z: gz,
+            habitat: 'water_edge',
+            zone: 'riverside',
+          });
         }
       });
       riverGrassIM.instanceMatrix.needsUpdate = true;
       if (riverGrassIM.instanceColor) riverGrassIM.instanceColor.needsUpdate = true;
       riverGrassIM.computeBoundingSphere();
+      riverGrassIM.userData = {noShadowBlock: true};
       eco.add(riverGrassIM);
 
       // C. Purple-Blooming Water Hyacinth Clusters (Lục bình hoa tím tĩnh ven sông)
@@ -7334,6 +7592,9 @@ export function buildTownScene(): TownWorld {
       hyLeafIM.renderOrder = 4;
       hyBloomIM.renderOrder = 4;
       hyGoldIM.renderOrder = 4;
+      hyLeafIM.userData = {noShadowBlock: true};
+      hyBloomIM.userData = {noShadowBlock: true};
+      hyGoldIM.userData = {noShadowBlock: true};
       eco.add(hyLeafIM, hyBloomIM, hyGoldIM);
 
       // D. Mountain Overlook & Riverbank Fairy-Tale Wildflowers (Static InstancedMesh)
@@ -7377,8 +7638,14 @@ export function buildTownScene(): TownWorld {
         wfCenterIM.setMatrixAt(i, _instDummy.matrix);
         _instColor.set(col);
         wfTopIM.setColorAt(i, _instColor);
-        if (i % 8 === 0) {
-          westInsectAnchors.push({x: fx, y: fy + 0.28, z: fz, habitat: 'flower'});
+        if (i % 6 === 0) {
+          westInsectAnchors.push({
+            x: fx,
+            y: fy + 0.28,
+            z: fz,
+            habitat: 'flower',
+            zone: fx <= -63.5 ? 'riverside' : 'outer',
+          });
         }
       });
       wfTopIM.instanceMatrix.needsUpdate = true;
@@ -7386,6 +7653,8 @@ export function buildTownScene(): TownWorld {
       if (wfTopIM.instanceColor) wfTopIM.instanceColor.needsUpdate = true;
       wfTopIM.computeBoundingSphere();
       wfCenterIM.computeBoundingSphere();
+      wfTopIM.userData = {noShadowBlock: true};
+      wfCenterIM.userData = {noShadowBlock: true};
       eco.add(wfTopIM, wfCenterIM);
 
       // E. Woodland Trees Framing West Meadow, Trailhead & Mountain Summit Overlook
@@ -7441,6 +7710,7 @@ export function buildTownScene(): TownWorld {
           z: tz + Math.cos(barkAng) * barkR,
           habitat: 'tree',
           clingAngle: barkAng,
+          zone: tx <= -63.5 ? 'riverside' : 'outer',
         });
       });
       wtIM.instanceMatrix.needsUpdate = true;
@@ -7451,6 +7721,9 @@ export function buildTownScene(): TownWorld {
       wtIM.computeBoundingSphere();
       wlIM.computeBoundingSphere();
       wuIM.computeBoundingSphere();
+      wtIM.userData = {isTreeShadowCaster: true};
+      wlIM.userData = {isTreeShadowCaster: true};
+      wuIM.userData = {isTreeShadowCaster: true};
       eco.add(wtIM, wlIM, wuIM);
     }
 
@@ -8386,22 +8659,29 @@ export function buildTownScene(): TownWorld {
       patio.add(chair);
     });
 
-    // Tall Sculpted Cherry Blossom Tree beside the tea patio (6.5m+ tall!)
-    const {trunkGeo: patSakTrunkGeo, blossomGeo: patSakBlossomGeo} = createSakuraGeometries();
+    // Grand Sculpted Cherry Blossom Tree beside the tea patio (8m+ tall with fuller blooms!)
+    const {
+      trunkGeo: patSakTrunkGeo,
+      blossomGeo: patSakBlossomGeo,
+      accentBloomGeo: patSakAccentGeo,
+      accentCenterGeo: patSakCenterGeo,
+    } = createSakuraGeometries();
     const patSakura = new THREE.Group();
     patSakura.position.set(-3.6, 0.02, -2.7);
     patSakura.rotation.y = 0.52;
-    patSakura.scale.setScalar(1.92);
+    patSakura.scale.setScalar(2.38);
     const patSakTrunk = new THREE.Mesh(patSakTrunkGeo, getMat('#5C3E32', 0.82));
     const patSakBlossom = new THREE.Mesh(patSakBlossomGeo, getMat('#FFB7CD', 0.64));
-    patSakura.add(patSakTrunk, patSakBlossom);
+    const patSakAccent = new THREE.Mesh(patSakAccentGeo, getMat('#F579A5', 0.52));
+    const patSakCenter = new THREE.Mesh(patSakCenterGeo, getMat('#FFE48F', 0.46));
+    patSakura.add(patSakTrunk, patSakBlossom, patSakAccent, patSakCenter);
     patio.add(patSakura);
     colliders.push({
       type: 'circle',
       id: 'patio_sakura_tree',
       x: patioCenter.x - 3.6,
       z: patioCenter.z - 2.7,
-      r: 0.65,
+      r: 0.78,
     });
 
     // Static fallen pink cherry petals scattered on stone patio & surrounding grass
@@ -8440,7 +8720,7 @@ export function buildTownScene(): TownWorld {
       fallingPetalSeeds.push({
         x: patioCenter.x - 1.6 + Math.cos(a) * r,
         z: patioCenter.z - 1.1 + Math.sin(a) * r,
-        h0: 4.4 + (i % 5) * 0.32,
+        h0: 5.1 + (i % 5) * 0.36,
         speed: 0.14 + (i % 4) * 0.025,
         phase: i * 0.43,
         r: 0.35 + (i % 3) * 0.18,
@@ -8524,34 +8804,34 @@ export function buildTownScene(): TownWorld {
 
   // [x, z, scale, hasLantern, lanternAngleRad]
   const oakTreesRaw: [number, number, number, boolean?, number?][] = [
-    [-13.5, -5.8, 1.14, true, 0.78],
-    [13.8, -5.8, 1.16, true, 2.36],
-    [-13.8, 6.2, 1.15, true, -0.78],
-    [13.8, 6.2, 1.15, true, -2.36],
-    [-10.2, 17.5, 1.12, true, 0.2],
-    [10.5, 17.5, 1.14, true, Math.PI - 0.2],
-    [9.6, -24.4, 1.12, true, -0.55],
-    [-44.5, -18.5, 1.24, true, 0.5],
-    [51.5, -18.5, 1.24, true, 2.6],
-    [-44.5, 16.5, 1.22, true, -0.45],
-    [45.0, 16.5, 1.24, true, -2.5],
-    [-37.5, 36.0, 1.2, true, 0.7],
-    [36.5, 35.5, 1.22, true, 2.45],
-    [-8.8, 56.5, 1.24, true, -1.2],
-    [12.8, 53.5, 1.24, true, -2.0],
-    [-69.0, 4.0, 1.28, true, 0.1],
-    [56.5, -4.8, 1.26, true, Math.PI - 0.1],
-    [-55.0, 29.5, 1.26, true, -0.3],
-    [55.5, 29.0, 1.28, true, -Math.PI + 0.3],
-    [-40.5, 59.5, 1.26, true, 0.9],
-    [40.5, 55.5, 1.26, true, 2.2],
-    [25.5, 48.0, 1.24, true, 2.7],
-    [-62.0, -34.0, 1.28, true, 0.5],
-    [62.5, -34.5, 1.26, true, 2.6],
-    [-60.5, 42.0, 1.24, true, -0.5],
-    [60.5, 41.5, 1.24, true, -2.5],
-    [-22.0, 62.5, 1.26, true, 1.1],
-    [22.5, 61.5, 1.28, true, 2.0],
+    [-13.5, -5.8, 1.44, true, 0.78],
+    [13.8, -5.8, 1.24, true, 2.36],
+    [-13.8, 6.2, 1.22, true, -0.78],
+    [13.8, 6.2, 1.48, true, -2.36],
+    [-10.2, 17.5, 1.18, true, 0.2],
+    [10.5, 17.5, 1.46, true, Math.PI - 0.2],
+    [9.6, -24.4, 1.16, true, -0.55],
+    [-44.5, -18.5, 1.56, true, 0.5],
+    [51.5, -18.5, 1.32, true, 2.6],
+    [-44.5, 16.5, 1.26, true, -0.45],
+    [45.0, 16.5, 1.54, true, -2.5],
+    [-37.5, 36.0, 1.48, true, 0.7],
+    [36.5, 35.5, 1.26, true, 2.45],
+    [-8.8, 56.5, 1.58, true, -1.2],
+    [12.8, 53.5, 1.28, true, -2.0],
+    [-69.0, 4.0, 1.62, true, 0.1],
+    [56.5, -4.8, 1.34, true, Math.PI - 0.1],
+    [-55.0, 29.5, 1.32, true, -0.3],
+    [55.5, 29.0, 1.64, true, -Math.PI + 0.3],
+    [-40.5, 59.5, 1.58, true, 0.9],
+    [40.5, 55.5, 1.32, true, 2.2],
+    [25.5, 48.0, 1.52, true, 2.7],
+    [-62.0, -34.0, 1.66, true, 0.5],
+    [62.5, -34.5, 1.34, true, 2.6],
+    [-60.5, 42.0, 1.56, true, -0.5],
+    [60.5, 41.5, 1.32, true, -2.5],
+    [-22.0, 62.5, 1.7, true, 1.1],
+    [22.5, 61.5, 1.54, true, 2.0],
   ];
   const oakTrees = oakTreesRaw.filter(([tx, tz]) => !isInWestRiverOrCliffZone(tx, tz));
 
@@ -8636,6 +8916,9 @@ export function buildTownScene(): TownWorld {
     qTrunkIM.computeBoundingSphere();
     qLowerIM.computeBoundingSphere();
     qUpperIM.computeBoundingSphere();
+    qTrunkIM.userData = {isTreeShadowCaster: true};
+    qLowerIM.userData = {isTreeShadowCaster: true};
+    qUpperIM.userData = {isTreeShadowCaster: true};
     group.add(qTrunkIM, qLowerIM, qUpperIM);
   });
 
@@ -8668,6 +8951,8 @@ export function buildTownScene(): TownWorld {
     eggsIM.instanceMatrix.needsUpdate = true;
     twigNestIM.computeBoundingSphere();
     eggsIM.computeBoundingSphere();
+    twigNestIM.userData = {noShadowBlock: true};
+    eggsIM.userData = {noShadowBlock: true};
     group.add(twigNestIM, eggsIM);
   }
 
@@ -8682,29 +8967,29 @@ export function buildTownScene(): TownWorld {
   const branchLeafUpMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.68});
 
   const branchedTreesRaw: [number, number, number, boolean?, number?][] = [
-    [-8.2, -9.2, 1.1, true, -0.4],
-    [8.4, -9.2, 1.12, true, -Math.PI + 0.4],
-    [-8.2, 31.5, 1.14, true, 0.3],
-    [8.4, 31.5, 1.12, true, Math.PI - 0.3],
-    [19.4, -18.8, 1.1, true, 2.55],
-    [-18.8, 6.8, 1.14, true, -0.35],
-    [18.8, 6.8, 1.14, true, -2.8],
-    [-43.5, -13.5, 1.2, true, 0.25],
-    [43.0, -5.5, 1.2, true, Math.PI - 0.25],
-    [-42.0, 29.5, 1.22, true, -0.4],
-    [42.0, 29.5, 1.22, true, -2.7],
-    [-27.5, -34.0, 1.24, true, -0.6],
-    [27.5, -33.5, 1.24, true, -2.5],
-    [-66.0, 13.5, 1.26, true, 0.15],
-    [60.5, 11.5, 1.26, true, Math.PI - 0.15],
-    [-48.5, -36.0, 1.28, true, -0.65],
-    [49.0, -36.5, 1.28, true, -2.45],
-    [-33.5, 18.0, 1.18, true, 0.3],
-    [34.0, 18.0, 1.18, true, 2.8],
-    [-52.0, 56.0, 1.24, true, 0.5],
-    [52.5, 55.5, 1.24, true, 2.6],
-    [-18.5, -48.5, 1.22, true, -0.7],
-    [18.5, -48.5, 1.22, true, -2.4],
+    [-8.2, -9.2, 1.16, true, -0.4],
+    [8.4, -9.2, 1.38, true, -Math.PI + 0.4],
+    [-8.2, 31.5, 1.42, true, 0.3],
+    [8.4, 31.5, 1.18, true, Math.PI - 0.3],
+    [19.4, -18.8, 1.36, true, 2.55],
+    [-18.8, 6.8, 1.2, true, -0.35],
+    [18.8, 6.8, 1.42, true, -2.8],
+    [-43.5, -13.5, 1.26, true, 0.25],
+    [43.0, -5.5, 1.46, true, Math.PI - 0.25],
+    [-42.0, 29.5, 1.5, true, -0.4],
+    [42.0, 29.5, 1.26, true, -2.7],
+    [-27.5, -34.0, 1.3, true, -0.6],
+    [27.5, -33.5, 1.52, true, -2.5],
+    [-66.0, 13.5, 1.56, true, 0.15],
+    [60.5, 11.5, 1.32, true, Math.PI - 0.15],
+    [-48.5, -36.0, 1.54, true, -0.65],
+    [49.0, -36.5, 1.34, true, -2.45],
+    [-33.5, 18.0, 1.24, true, 0.3],
+    [34.0, 18.0, 1.44, true, 2.8],
+    [-52.0, 56.0, 1.52, true, 0.5],
+    [52.5, 55.5, 1.28, true, 2.6],
+    [-18.5, -48.5, 1.46, true, -0.7],
+    [18.5, -48.5, 1.26, true, -2.4],
   ];
   const branchedTrees = branchedTreesRaw.filter(([tx, tz]) => !isInWestRiverOrCliffZone(tx, tz));
 
@@ -8763,6 +9048,9 @@ export function buildTownScene(): TownWorld {
   branchTrunkIM.computeBoundingSphere();
   branchLowIM.computeBoundingSphere();
   branchUpIM.computeBoundingSphere();
+  branchTrunkIM.userData = {isTreeShadowCaster: true};
+  branchLowIM.userData = {isTreeShadowCaster: true};
+  branchUpIM.userData = {isTreeShadowCaster: true};
   group.add(branchTrunkIM, branchLowIM, branchUpIM);
 
   // Berry Clusters on Tree Canopies (Quả mọng đỏ / vàng trên một số cây)
@@ -8795,6 +9083,7 @@ export function buildTownScene(): TownWorld {
     treeBerryIM.instanceMatrix.needsUpdate = true;
     if (treeBerryIM.instanceColor) treeBerryIM.instanceColor.needsUpdate = true;
     treeBerryIM.computeBoundingSphere();
+    treeBerryIM.userData = {noShadowBlock: true};
     group.add(treeBerryIM);
   }
 
@@ -8897,6 +9186,10 @@ export function buildTownScene(): TownWorld {
     treeLampBulbIM.computeBoundingSphere();
     treeLampHaloIM.computeBoundingSphere();
     treeLampPoolIM.computeBoundingSphere();
+    treeLampBracketIM.userData = {noShadowBlock: true};
+    treeLampBulbIM.userData = {noShadowBlock: true};
+    treeLampHaloIM.userData = {noShadowBlock: true};
+    treeLampPoolIM.userData = {noShadowBlock: true};
     group.add(treeLampBracketIM, treeLampBulbIM, treeLampHaloIM, treeLampPoolIM);
   }
 
@@ -9001,6 +9294,9 @@ export function buildTownScene(): TownWorld {
   pineTrunkIM.computeBoundingSphere();
   pineLowerIM.computeBoundingSphere();
   pineUpperIM.computeBoundingSphere();
+  pineTrunkIM.userData = {isTreeShadowCaster: true};
+  pineLowerIM.userData = {isTreeShadowCaster: true};
+  pineUpperIM.userData = {isTreeShadowCaster: true};
   group.add(pineTrunkIM, pineLowerIM, pineUpperIM);
 
   // ========== 4. SAKURA (HOA ĐÀO) TREES & PETALS ON THE GENTLE SCENIC HILL ==========
@@ -9061,6 +9357,10 @@ export function buildTownScene(): TownWorld {
   sakuraBlossomIM.computeBoundingSphere();
   sakuraAccentIM.computeBoundingSphere();
   sakuraCenterIM.computeBoundingSphere();
+  sakuraTrunkIM.userData = {isTreeShadowCaster: true};
+  sakuraBlossomIM.userData = {isTreeShadowCaster: true};
+  sakuraAccentIM.userData = {noShadowBlock: true};
+  sakuraCenterIM.userData = {noShadowBlock: true};
   group.add(sakuraTrunkIM, sakuraBlossomIM, sakuraAccentIM, sakuraCenterIM);
 
   // Static fallen sakura petals scattered across the gentle hill summit & slopes (1 draw call)
@@ -9087,21 +9387,22 @@ export function buildTownScene(): TownWorld {
   }
   petalIM.instanceMatrix.needsUpdate = true;
   petalIM.computeBoundingSphere();
+  petalIM.userData = {noShadowBlock: true};
   group.add(petalIM);
 
   // ========== 5. SMALL ORNAMENTAL AQUATIC POND, INTERACTIVE OUTDOOR ZONE, FLOWER BEDS & RICH FLORA ==========
-  // 5A. Small Scenic Ornamental Pond with Moss, Algae & Aquatic Reeds (Ao nhỏ có cây thủy sinh, rong rêu tại x=13.8, z=13.8)
+  // 5A. Enlarged Scenic Ornamental Pond + Static Clay Waterwheel ("Con Quay Nước") + Jetty & Lakeside Props at (14.4, 14.0)
   {
-    const MINI_POND_X = 13.8;
-    const MINI_POND_Z = 13.8;
+    const MINI_POND_X = 14.4;
+    const MINI_POND_Z = 14.0;
     const miniPond = new THREE.Group();
     miniPond.position.set(MINI_POND_X, 0.02, MINI_POND_Z);
 
     const evalMiniPondR = (th: number) =>
-      2.65 + 0.36 * Math.cos(th * 2 + 0.4) + 0.22 * Math.sin(th * 3 - 0.5);
+      3.85 + 0.42 * Math.cos(th * 2 + 0.4) + 0.25 * Math.sin(th * 3 - 0.5);
 
     const pondShape = new THREE.Shape();
-    const MP_SEGS = 32;
+    const MP_SEGS = 40;
     for (let i = 0; i <= MP_SEGS; i++) {
       const th = (i / MP_SEGS) * Math.PI * 2;
       const r = evalMiniPondR(th);
@@ -9111,13 +9412,13 @@ export function buildTownScene(): TownWorld {
       else pondShape.lineTo(px, py);
     }
 
-    const pondBedGeo = new THREE.ShapeGeometry(pondShape, 20);
+    const pondBedGeo = new THREE.ShapeGeometry(pondShape, 24);
     pondBedGeo.rotateX(-Math.PI / 2);
     const pondBedMesh = new THREE.Mesh(pondBedGeo, getMat('#28574A', 0.92));
     pondBedMesh.position.y = 0.015;
     pondBedMesh.renderOrder = 0;
 
-    const pondWaterGeo = new THREE.ShapeGeometry(pondShape, 20);
+    const pondWaterGeo = new THREE.ShapeGeometry(pondShape, 24);
     pondWaterGeo.rotateX(-Math.PI / 2);
     const miniPondWaterMat = new THREE.MeshStandardMaterial({
       color: '#45B8D4',
@@ -9131,16 +9432,16 @@ export function buildTownScene(): TownWorld {
     const pondWaterMesh = new THREE.Mesh(pondWaterGeo, miniPondWaterMat);
     pondWaterMesh.position.y = 0.075;
     pondWaterMesh.renderOrder = 3;
+    pondWaterMesh.userData = {isWaterMesh: true};
     miniPond.add(pondBedMesh, pondWaterMesh);
 
-    // Underwater & bankside moss/algae cushions (Rong rêu)
     const mossMat = getMat('#3D7F44', 0.88);
     const algaeMat = getMat('#2F6B3A', 0.9);
-    for (let m = 0; m < 12; m++) {
-      const th = (m / 12) * Math.PI * 2 + 0.25;
-      const rad = evalMiniPondR(th) * (0.45 + (m % 3) * 0.16);
+    for (let m = 0; m < 16; m++) {
+      const th = (m / 16) * Math.PI * 2 + 0.25;
+      const rad = evalMiniPondR(th) * (0.42 + (m % 3) * 0.16);
       const mossPatch = new THREE.Mesh(
-        new THREE.SphereGeometry(0.28 + (m % 3) * 0.09, 7, 5),
+        new THREE.SphereGeometry(0.32 + (m % 3) * 0.1, 7, 5),
         m % 2 === 0 ? mossMat : algaeMat,
       );
       mossPatch.scale.set(1.4, 0.18, 1.15);
@@ -9148,42 +9449,40 @@ export function buildTownScene(): TownWorld {
       miniPond.add(mossPatch);
     }
 
-    // Natural mossy stone rim (18 stones around the small pond)
     const stoneRimMat = getMat('#8E99A2', 0.84);
-    for (let s = 0; s < 18; s++) {
-      const th = (s / 18) * Math.PI * 2;
+    for (let s = 0; s < 26; s++) {
+      const th = (s / 26) * Math.PI * 2;
       const rad = evalMiniPondR(th) * 0.98;
-      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32 + (s % 3) * 0.09, 0), stoneRimMat);
-      rock.scale.set(1.25, 0.56, 1.05);
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.36 + (s % 3) * 0.09, 0), stoneRimMat);
+      rock.scale.set(1.28, 0.56, 1.05);
       rock.position.set(Math.cos(th) * rad, 0.12, Math.sin(th) * rad);
       rock.rotation.y = th + s * 0.5;
       miniPond.add(rock);
       if (s % 3 === 0) {
-        const capMoss = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), mossMat);
+        const capMoss = new THREE.Mesh(new THREE.SphereGeometry(0.24, 6, 5), mossMat);
         capMoss.scale.set(1.1, 0.35, 0.95);
         capMoss.position.set(Math.cos(th) * rad, 0.24, Math.sin(th) * rad);
         miniPond.add(capMoss);
       }
     }
 
-    // Swaying aquatic cattails & reed clusters (Cây thủy sinh ven ao)
     const reedLeafMat = getMat('#4E9A54', 0.72);
     const cattailHeadMat = getMat('#784A29', 0.82);
-    [0.45, 1.25, 2.35, 3.4, 4.45, 5.5].forEach((th, idx) => {
+    [0.35, 1.05, 1.85, 2.55, 3.25, 3.95, 4.65, 5.35, 5.95].forEach((th, idx) => {
       const rad = evalMiniPondR(th) * 0.86;
       const clump = new THREE.Group();
       clump.position.set(Math.cos(th) * rad, 0.04, Math.sin(th) * rad);
       for (let b = 0; b < 4; b++) {
-        const blade = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.68 + b * 0.12, 4), reedLeafMat);
-        blade.position.set((b - 1.5) * 0.07, 0.34, ((b % 2) - 0.5) * 0.06);
+        const blade = new THREE.Mesh(new THREE.ConeGeometry(0.048, 0.72 + b * 0.12, 4), reedLeafMat);
+        blade.position.set((b - 1.5) * 0.07, 0.36, ((b % 2) - 0.5) * 0.06);
         blade.rotation.set((b % 2 === 0 ? 0.14 : -0.12), b * 0.9, (b - 1.5) * 0.11);
         clump.add(blade);
       }
       if (idx % 2 === 0) {
-        const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.018, 0.92, 5), reedLeafMat);
-        stalk.position.y = 0.46;
-        const head = new THREE.Mesh(new THREE.CapsuleGeometry(0.042, 0.18, 5, 7), cattailHeadMat);
-        head.position.y = 0.84;
+        const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.018, 0.96, 5), reedLeafMat);
+        stalk.position.y = 0.48;
+        const head = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.18, 5, 7), cattailHeadMat);
+        head.position.y = 0.88;
         clump.add(stalk, head);
       }
       miniPond.add(clump);
@@ -9193,18 +9492,24 @@ export function buildTownScene(): TownWorld {
     const padMat = getMat('#5FB860', 0.66);
     const lotusMat = glossyClayMat('#FFB7C9', 0.32);
     [
-      [-0.75, -0.45, 0.34, true],
-      [0.65, -0.68, 0.28, false],
-      [-0.35, 0.85, 0.31, true],
-      [0.85, 0.52, 0.26, false],
+      [-1.15, -0.65, 0.38, true],
+      [0.95, -1.05, 0.32, false],
+      [-0.55, 1.25, 0.35, true],
+      [1.25, 0.85, 0.3, false],
+      [-1.45, 0.65, 0.28, false],
+      [0.25, -1.55, 0.33, true],
+      [1.75, -0.25, 0.29, false],
     ].forEach(([lx, lz, lr, hasFlower], i) => {
-      const pad = new THREE.Mesh(new THREE.CylinderGeometry(lr as number, lr as number, 0.025, 12, 1, false, 0, Math.PI * 1.82), padMat);
+      const pad = new THREE.Mesh(
+        new THREE.CylinderGeometry(lr as number, lr as number, 0.025, 12, 1, false, 0, Math.PI * 1.82),
+        padMat,
+      );
       pad.position.set(lx as number, 0.085, lz as number);
       pad.rotation.y = i * 1.4;
       pad.renderOrder = 4;
       miniPond.add(pad);
       if (hasFlower) {
-        const lotus = new THREE.Mesh(new THREE.SphereGeometry(0.11, 7, 6), lotusMat);
+        const lotus = new THREE.Mesh(new THREE.SphereGeometry(0.12, 7, 6), lotusMat);
         lotus.scale.set(1.15, 0.72, 1.15);
         lotus.position.set(lx as number, 0.13, lz as number);
         lotus.renderOrder = 4;
@@ -9212,7 +9517,136 @@ export function buildTownScene(): TownWorld {
       }
     });
 
-    colliders.push({type: 'circle', id: 'mini_pond', x: MINI_POND_X, z: MINI_POND_Z, r: 2.95});
+    // Static Clay Waterwheel ("Con Quay Nước") + Bamboo Water Chute on NW Bank (-2.75, -2.55) — Zero Animation!
+    {
+      const wheelTimberDark = getMat('#6D4529', 0.82);
+      const wheelTimberWarm = getMat('#A86F3F', 0.74);
+      const wheelPaddleMat = getMat('#C68C56', 0.68);
+      const wheelBambooMat = getMat('#78A852', 0.72);
+      const wheelPourMat = glossyClayMat('#78D6EC', 0.22);
+      const wheelFoamMat = getMat('#F2FBFF', 0.45);
+
+      const ww = new THREE.Group();
+      ww.position.set(-2.75, 0.02, -2.55);
+      ww.rotation.y = Math.PI * 0.28;
+
+      [-0.44, 0.44].forEach((sz) => {
+        const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.075, 1.35, 7), wheelTimberDark);
+        legL.position.set(-0.24, 0.56, sz);
+        legL.rotation.z = -0.34;
+        const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.075, 1.35, 7), wheelTimberDark);
+        legR.position.set(0.24, 0.56, sz);
+        legR.rotation.z = 0.34;
+        ww.add(legL, legR);
+      });
+      const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 1.08, 10), wheelTimberDark);
+      axle.rotation.x = Math.PI / 2;
+      axle.position.y = 0.96;
+      ww.add(axle);
+
+      [-0.24, 0.24].forEach((rz) => {
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(0.84, 0.055, 7, 20), wheelTimberWarm);
+        rim.position.set(0, 0.96, rz);
+        ww.add(rim);
+      });
+      for (let p = 0; p < 10; p++) {
+        const a = (p / 10) * Math.PI * 2;
+        if (p % 2 === 0) {
+          const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.045, 1.68, 0.06), wheelTimberDark);
+          spoke.position.set(0, 0.96, 0);
+          spoke.rotation.z = a;
+          ww.add(spoke);
+        }
+        const paddle = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.05, 0.56, 1, 0.015), wheelPaddleMat);
+        paddle.position.set(Math.cos(a) * 0.86, 0.96 + Math.sin(a) * 0.86, 0);
+        paddle.rotation.z = a;
+        ww.add(paddle);
+      }
+
+      // Bamboo Chute & Static Pouring Water Ribbon + White Splash Foam
+      const chutePost = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 1.85, 7), wheelTimberDark);
+      chutePost.position.set(-1.38, 0.92, 0);
+      const chutePipe = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.125, 1.48, 8), wheelBambooMat);
+      chutePipe.rotation.z = Math.PI / 2 - 0.18;
+      chutePipe.position.set(-0.88, 1.78, 0);
+      const waterArc = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.11, 0.98, 7), wheelPourMat);
+      waterArc.rotation.z = 0.28;
+      waterArc.position.set(-0.08, 1.28, 0);
+      ww.add(chutePost, chutePipe, waterArc);
+
+      [
+        [0.12, 0.08, 0.15, 0.12],
+        [0.34, 0.07, -0.18, 0.1],
+        [0.42, 0.09, 0.08, 0.14],
+      ].forEach(([fx, fy, fz, fr]) => {
+        const foam = new THREE.Mesh(new THREE.SphereGeometry(fr, 6, 5), wheelFoamMat);
+        foam.scale.set(1.2, 0.48, 1.2);
+        foam.position.set(fx, fy, fz);
+        ww.add(foam);
+      });
+      miniPond.add(ww);
+    }
+
+    // Tiny Wooden Lakeside Jetty + Water Buckets + Fish Creel Basket + Stone Lantern
+    {
+      const dockPlankMat = getMat('#B8824D', 0.72);
+      const dockPostMat = getMat('#6E492D', 0.84);
+      const jetty = new THREE.Group();
+      jetty.position.set(-2.25, 0.02, 3.05);
+      jetty.rotation.y = 0.62;
+      for (let k = 0; k < 3; k++) {
+        const plank = new THREE.Mesh(new RoundedBoxGeometry(1.12, 0.08, 0.42, 1, 0.02), dockPlankMat);
+        plank.position.set(0, 0.18, -0.44 + k * 0.46);
+        jetty.add(plank);
+      }
+      [
+        [-0.46, -0.44],
+        [0.46, -0.44],
+        [-0.46, 0.44],
+        [0.46, 0.44],
+      ].forEach(([px, pz]) => {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.48, 7), dockPostMat);
+        post.position.set(px, 0.2, pz);
+        jetty.add(post);
+      });
+
+      const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.24, 9), dockPlankMat);
+      b1.position.set(0.32, 0.34, -0.12);
+      const b1Water = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.135, 0.02, 8), miniPondWaterMat);
+      b1Water.position.set(0.32, 0.43, -0.12);
+      const creel = new THREE.Mesh(new RoundedBoxGeometry(0.36, 0.22, 0.26, 2, 0.06), getMat('#C49558', 0.78));
+      creel.position.set(-0.28, 0.32, 0.22);
+      jetty.add(b1, b1Water, creel);
+      miniPond.add(jetty);
+
+      // Carved Lakeside Stone Lantern on NE Bank (2.95, 0.04, -2.45)
+      const lantern = new THREE.Group();
+      lantern.position.set(2.95, 0.02, -2.45);
+      const lBase = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.2, 6), stoneRimMat);
+      lBase.position.y = 0.1;
+      const lPost = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.56, 6), stoneRimMat);
+      lPost.position.y = 0.48;
+      const lanternBulbMat = new THREE.MeshStandardMaterial({
+        color: '#FFF4C8',
+        emissive: '#FFBE55',
+        emissiveIntensity: 0.22,
+        roughness: 0.25,
+      });
+      lampBulbs.push(lanternBulbMat);
+      const lCore = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.24, 6), lanternBulbMat);
+      lCore.position.y = 0.88;
+      const lRoof = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.22, 6), stoneRimMat);
+      lRoof.position.y = 1.1;
+      lantern.add(lBase, lPost, lCore, lRoof);
+      miniPond.add(lantern);
+    }
+
+    colliders.push({type: 'circle', id: 'mini_pond', x: MINI_POND_X, z: MINI_POND_Z, r: 4.25});
+    miniPond.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        obj.userData.noShadowBlock = true;
+      }
+    });
     group.add(miniPond);
   }
 
@@ -9572,6 +10006,9 @@ export function buildTownScene(): TownWorld {
     bedFoliageIM.computeBoundingSphere();
     bedBloomIM.computeBoundingSphere();
     bedCenterIM.computeBoundingSphere();
+    bedFoliageIM.userData = {noShadowBlock: true};
+    bedBloomIM.userData = {noShadowBlock: true};
+    bedCenterIM.userData = {noShadowBlock: true};
     group.add(bedFoliageIM, bedBloomIM, bedCenterIM);
   }
 
@@ -9626,6 +10063,17 @@ export function buildTownScene(): TownWorld {
     [44.5, -42.0, '#F7A8B8', 0.96],
     [-68.0, -10.5, '#8ECAE6', 0.98],
     [60.5, 2.5, '#FF9EBB', 0.98],
+    // East riverbank & distant outer bushes
+    [-73.5, -24.0, '#FF9EBB', 0.96],
+    [-74.0, -34.0, '#A8D8EA', 0.94],
+    [-73.5, 16.5, '#F7A8B8', 0.98],
+    [-72.0, 26.5, '#D0A6FF', 0.96],
+    [-70.5, 36.0, '#8ECAE6', 0.94],
+    [-65.0, -44.0, '#F28482', 0.96],
+    [64.5, 35.0, '#FFAD88', 0.96],
+    [64.0, -28.0, '#9CE0FF', 0.96],
+    [-16.0, -56.0, '#FF9EBB', 0.92],
+    [16.5, -55.5, '#A8D8EA', 0.94],
   ];
   const bushCoords = bushCoordsRaw.filter(([bx, bz]) => !isInWestRiverOrCliffZone(bx, bz));
   const bushBodyParts: THREE.BufferGeometry[] = [];
@@ -9674,6 +10122,9 @@ export function buildTownScene(): TownWorld {
   bushBodyIM.computeBoundingSphere();
   bushBlossomIM.computeBoundingSphere();
   bushCenterIM.computeBoundingSphere();
+  bushBodyIM.userData = {noShadowBlock: true};
+  bushBlossomIM.userData = {noShadowBlock: true};
+  bushCenterIM.userData = {noShadowBlock: true};
   group.add(bushBodyIM, bushBlossomIM, bushCenterIM);
 
   // C. Large Sculpted Multi-Mound Park & Woodland Bushes (Bụi cây lớn phủ rộng ra vùng ngoài)
@@ -9724,6 +10175,11 @@ export function buildTownScene(): TownWorld {
     [15.0, 60.0, 1.32, '#55AB5E'],
     [-56.0, -44.0, 1.4, '#4A9D54'],
     [56.5, -43.5, 1.4, '#54AC5D'],
+    // East riverbank & distant outer shrubs
+    [-74.5, -29.0, 1.36, '#4CA256'],
+    [-71.5, 22.0, 1.38, '#55AB5E'],
+    [-69.0, 39.5, 1.34, '#4E9F57'],
+    [64.0, -14.0, 1.38, '#58AF61'],
   ];
   const bigBushCoords = bigBushCoordsRaw.filter(([bx, bz]) => !isInWestRiverOrCliffZone(bx, bz));
   const bigBushIM = new THREE.InstancedMesh(bigBushGeo, bigBushMat, bigBushCoords.length);
@@ -9741,6 +10197,7 @@ export function buildTownScene(): TownWorld {
   bigBushIM.instanceMatrix.needsUpdate = true;
   if (bigBushIM.instanceColor) bigBushIM.instanceColor.needsUpdate = true;
   bigBushIM.computeBoundingSphere();
+  bigBushIM.userData = {noShadowBlock: true};
   group.add(bigBushIM);
 
   // Static 5-petal wildflower clusters scattered generously across inner & outer meadows (quadrant frustum-culled!)
@@ -9784,7 +10241,7 @@ export function buildTownScene(): TownWorld {
     if (Math.abs(px - 23.5) < 1.6 && pz > -13 && pz < 27) return true;
     if (Math.hypot(px - patioCenter.x, pz - patioCenter.z) < 5.0) return true;
     if (Math.hypot(px - LAKE_CENTER.x, pz - LAKE_CENTER.z) < 12.2) return true;
-    if (Math.hypot(px - 13.8, pz - 13.8) < 3.55) return true;
+    if (Math.hypot(px - 14.4, pz - 14.0) < 5.0) return true;
     if (Math.hypot(px - 14.5, pz + 21.0) < 4.6) return true;
     if (Math.hypot(px + 32, pz + 22.5) < 7.4) return true;
     if (Math.hypot(px - 32, pz + 22.5) < 6.5) return true;
@@ -9842,6 +10299,9 @@ export function buildTownScene(): TownWorld {
     qBase.computeBoundingSphere();
     qTop.computeBoundingSphere();
     qCenter.computeBoundingSphere();
+    qBase.userData = {noShadowBlock: true};
+    qTop.userData = {noShadowBlock: true};
+    qCenter.userData = {noShadowBlock: true};
     group.add(qBase, qTop, qCenter);
   });
 
@@ -9893,6 +10353,7 @@ export function buildTownScene(): TownWorld {
     qTuft.instanceMatrix.needsUpdate = true;
     if (qTuft.instanceColor) qTuft.instanceColor.needsUpdate = true;
     qTuft.computeBoundingSphere();
+    qTuft.userData = {noShadowBlock: true};
     group.add(qTuft);
   });
 
@@ -9948,6 +10409,7 @@ export function buildTownScene(): TownWorld {
     qTall.instanceMatrix.needsUpdate = true;
     if (qTall.instanceColor) qTall.instanceColor.needsUpdate = true;
     qTall.computeBoundingSphere();
+    qTall.userData = {noShadowBlock: true};
     group.add(qTall);
   });
 
@@ -9984,6 +10446,13 @@ export function buildTownScene(): TownWorld {
     [55.5, -31.5, 0.56],
     [-26.0, -45.0, 0.54],
     [26.5, -44.5, 0.54],
+    // East riverbank small stones
+    [-73.2, -19.5, 0.56],
+    [-73.8, -32.0, 0.54],
+    [-72.0, 14.5, 0.56],
+    [-69.8, 30.0, 0.58],
+    [62.5, 16.5, 0.56],
+    [62.0, -18.5, 0.56],
   ];
   const smallRockCoords = smallRockCoordsRaw.filter(([rx, rz]) => !isInWestRiverOrCliffZone(rx, rz));
   const p1 = new THREE.DodecahedronGeometry(0.55, 0);
@@ -10004,6 +10473,7 @@ export function buildTownScene(): TownWorld {
   });
   pebbleIM.instanceMatrix.needsUpdate = true;
   pebbleIM.computeBoundingSphere();
+  pebbleIM.userData = {noShadowBlock: true};
   group.add(pebbleIM);
 
   // Hero Large Mossy Boulders (Tảng đá lớn có rêu phủ tự nhiên)
@@ -10045,6 +10515,10 @@ export function buildTownScene(): TownWorld {
     [26.0, 62.0, 1.16],
     [-46.0, -49.5, 1.22],
     [46.5, -49.0, 1.2],
+    // East riverbank & outer landmark boulders
+    [-74.5, -22.5, 1.18],
+    [-70.5, 29.0, 1.16],
+    [64.5, 2.5, 1.18],
   ];
   const largeRockCoords = largeRockCoordsRaw.filter(([rx, rz]) => !isInWestRiverOrCliffZone(rx, rz));
   const heroBoulderIM = new THREE.InstancedMesh(heroBoulderGeo, heroBoulderMat, largeRockCoords.length);
@@ -10062,6 +10536,8 @@ export function buildTownScene(): TownWorld {
   heroMossIM.instanceMatrix.needsUpdate = true;
   heroBoulderIM.computeBoundingSphere();
   heroMossIM.computeBoundingSphere();
+  heroBoulderIM.userData = {noShadowBlock: true};
+  heroMossIM.userData = {noShadowBlock: true};
   group.add(heroBoulderIM, heroMossIM);
 
   // Large Hero Meadow Flower Clusters (Cụm hoa 5 cánh rõ nét phủ rộng ra vùng ngoài thu hút bướm/ong)
@@ -10132,6 +10608,9 @@ export function buildTownScene(): TownWorld {
   bfMoundIM.computeBoundingSphere();
   bfBloomIM.computeBoundingSphere();
   bfCenterIM.computeBoundingSphere();
+  bfMoundIM.userData = {noShadowBlock: true};
+  bfBloomIM.userData = {noShadowBlock: true};
+  bfCenterIM.userData = {noShadowBlock: true};
   group.add(bfMoundIM, bfBloomIM, bfCenterIM);
 
   // ========== COZY LIFE-SIM REPEATABLE MAP PROPS (STATIC INSTANCED MESHES — ZERO LAG) ==========
@@ -10173,6 +10652,8 @@ export function buildTownScene(): TownWorld {
   if (mushCapIM.instanceColor) mushCapIM.instanceColor.needsUpdate = true;
   mushStemIM.computeBoundingSphere();
   mushCapIM.computeBoundingSphere();
+  mushStemIM.userData = {noShadowBlock: true};
+  mushCapIM.userData = {noShadowBlock: true};
   group.add(mushStemIM, mushCapIM);
 
   // 2. Mossy Fallen Logs (Khúc gỗ mục phủ rêu ngoài đồng cỏ & bìa rừng — điểm đậu côn trùng)
@@ -10229,6 +10710,8 @@ export function buildTownScene(): TownWorld {
   fallenLogMossIM.instanceMatrix.needsUpdate = true;
   fallenLogWoodIM.computeBoundingSphere();
   fallenLogMossIM.computeBoundingSphere();
+  fallenLogWoodIM.userData = {noShadowBlock: true};
+  fallenLogMossIM.userData = {noShadowBlock: true};
   group.add(fallenLogWoodIM, fallenLogMossIM);
 
   // 3. Rural Wooden Split-Rail Fences along scenic outer meadow paths (Hàng rào gỗ đồng quê)
@@ -10270,6 +10753,7 @@ export function buildTownScene(): TownWorld {
   });
   woodenFenceIM.instanceMatrix.needsUpdate = true;
   woodenFenceIM.computeBoundingSphere();
+  woodenFenceIM.userData = {noShadowBlock: true};
   group.add(woodenFenceIM);
 
   // 5. Wooden Trail Direction Signposts at outer path junctions (Biển chỉ đường gỗ ngã ba)
@@ -10306,18 +10790,24 @@ export function buildTownScene(): TownWorld {
   });
   signpostIM.instanceMatrix.needsUpdate = true;
   signpostIM.computeBoundingSphere();
+  signpostIM.userData = {noShadowBlock: true};
   group.add(signpostIM);
 
-  // Town Insect Habitats & Live 3D Bug Manager (Côn trùng khắp trung tâm lẫn vùng ngoài)
+  // Town Insect Habitats & Live 3D Bug Manager (Inner plaza + Outer meadows + West Riverside)
   const insectAnchors: InsectAnchor[] = [];
+  const resolveAnchorZone = (x: number, z: number): 'inner' | 'outer' | 'riverside' => {
+    if (x <= -63.5) return 'riverside';
+    if (Math.hypot(x, z) >= 28) return 'outer';
+    return 'inner';
+  };
   bigFlowerCoords.forEach(([fx, fz]) => {
-    insectAnchors.push({x: fx, y: getTownGroundHeight(fx, fz) + 0.34, z: fz, habitat: 'flower'});
+    insectAnchors.push({x: fx, y: getTownGroundHeight(fx, fz) + 0.34, z: fz, habitat: 'flower', zone: resolveAnchorZone(fx, fz)});
   });
   bushCoords.forEach(([bx, bz]) => {
-    insectAnchors.push({x: bx, y: getTownGroundHeight(bx, bz) + 0.44, z: bz, habitat: 'bush'});
+    insectAnchors.push({x: bx, y: getTownGroundHeight(bx, bz) + 0.44, z: bz, habitat: 'bush', zone: resolveAnchorZone(bx, bz)});
   });
   bigBushCoords.forEach(([bx, bz]) => {
-    insectAnchors.push({x: bx, y: getTownGroundHeight(bx, bz) + 0.56, z: bz, habitat: 'bush'});
+    insectAnchors.push({x: bx, y: getTownGroundHeight(bx, bz) + 0.56, z: bz, habitat: 'bush', zone: resolveAnchorZone(bx, bz)});
   });
   oakTrees.forEach(([tx, tz, ts], i) => {
     const gy = getTownGroundHeight(tx, tz);
@@ -10329,6 +10819,7 @@ export function buildTownScene(): TownWorld {
       z: tz + Math.cos(clingAng) * trunkSurfaceR,
       habitat: 'tree',
       clingAngle: clingAng,
+      zone: resolveAnchorZone(tx, tz),
     });
   });
   branchedTrees.forEach(([tx, tz, ts], i) => {
@@ -10341,6 +10832,7 @@ export function buildTownScene(): TownWorld {
       z: tz + Math.cos(clingAng) * trunkSurfaceR,
       habitat: 'tree',
       clingAngle: clingAng,
+      zone: resolveAnchorZone(tx, tz),
     });
   });
   pineCoords.forEach(([px, pz, ps], i) => {
@@ -10354,24 +10846,25 @@ export function buildTownScene(): TownWorld {
         z: pz + Math.cos(clingAng) * trunkSurfaceR,
         habitat: 'tree',
         clingAngle: clingAng,
+        zone: resolveAnchorZone(px, pz),
       });
     }
   });
   fallenLogCoords.forEach(([lx, lz]) => {
-    insectAnchors.push({x: lx, y: getTownGroundHeight(lx, lz) + 0.45, z: lz, habitat: 'tree'});
+    insectAnchors.push({x: lx, y: getTownGroundHeight(lx, lz) + 0.45, z: lz, habitat: 'tree', zone: resolveAnchorZone(lx, lz)});
   });
   smallRockCoords.forEach(([rx, rz]) => {
-    insectAnchors.push({x: rx, y: getTownGroundHeight(rx, rz) + 0.35, z: rz, habitat: 'rock'});
+    insectAnchors.push({x: rx, y: getTownGroundHeight(rx, rz) + 0.35, z: rz, habitat: 'rock', zone: resolveAnchorZone(rx, rz)});
   });
   largeRockCoords.forEach(([rx, rz]) => {
-    insectAnchors.push({x: rx, y: getTownGroundHeight(rx, rz) + 0.92, z: rz, habitat: 'rock'});
+    insectAnchors.push({x: rx, y: getTownGroundHeight(rx, rz) + 0.92, z: rz, habitat: 'rock', zone: resolveAnchorZone(rx, rz)});
   });
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2;
     const sr = getLakeShoreRadius(a) + 0.85;
     const wx = LAKE_CENTER.x + Math.cos(a) * sr;
     const wz = LAKE_CENTER.z + Math.sin(a) * sr;
-    insectAnchors.push({x: wx, y: 0.25, z: wz, habitat: 'water_edge'});
+    insectAnchors.push({x: wx, y: 0.25, z: wz, habitat: 'water_edge', zone: 'outer'});
   }
   insectAnchors.push(...westInsectAnchors);
   const insectManager = new TownInsectManager(group, insectAnchors);
@@ -10384,7 +10877,6 @@ export function buildTownScene(): TownWorld {
 
   // Precomputed bounding spheres for fast zero-allocation frustum culling
   const _fountainSphere = new THREE.Sphere(new THREE.Vector3(0, 1.5, 0), 3.6);
-  const _smokeSphere = new THREE.Sphere(smokeOriginWorld.clone().add(new THREE.Vector3(0, 1.4, 0)), 3.8);
   const _windmillSphere = new THREE.Sphere(new THREE.Vector3(42.8, 5.8, -23.2), 5.2);
   const _petalsSphere = new THREE.Sphere(new THREE.Vector3(patioCenter.x - 1.6, 2.5, patioCenter.z - 1.1), 5.4);
   const _reedsSphere = new THREE.Sphere(new THREE.Vector3(LAKE_CENTER.x, 0.5, LAKE_CENTER.z), 12.5);
@@ -10398,7 +10890,6 @@ export function buildTownScene(): TownWorld {
   let useExternalFishingFrame = false;
   let prevTownElapsed = 0;
   let fountainAccum = 0;
-  let smokeAccum = 0;
   let petalAccum = 0;
   let reedAccum = 0;
   let fireflyAccum = 0;
@@ -10561,29 +11052,7 @@ export function buildTownScene(): TownWorld {
       fountainDropsMesh.instanceMatrix.needsUpdate = true;
     }
 
-    // 2. Gentle chimney smoke (frustum + distance throttled, zero allocations)
-    if (
-      chimneySmokeMesh &&
-      (!frustum || frustum.intersectsSphere(_smokeSphere)) &&
-      shouldAnimateAtDist(_smokeSphere.center, smokeAccum, (v) => {
-        smokeAccum = v;
-      })
-    ) {
-      for (let i = 0; i < SMOKE_COUNT; i++) {
-        const t = (elapsed * 0.28 + i / SMOKE_COUNT) % 1;
-        const sx = smokeOriginWorld.x + Math.sin(t * Math.PI * 2 + i) * 0.28 + t * 0.42;
-        const sy = smokeOriginWorld.y + t * 2.8;
-        const sz = smokeOriginWorld.z + Math.cos(t * Math.PI * 1.6 + i) * 0.2 - t * 0.25;
-        const s = Math.sin(t * Math.PI) * (0.85 + t * 1.05);
-        _smokeDummy.position.set(sx, sy, sz);
-        _smokeDummy.scale.setScalar(Math.max(0.001, s));
-        _smokeDummy.updateMatrix();
-        chimneySmokeMesh.setMatrixAt(i, _smokeDummy.matrix);
-      }
-      chimneySmokeMesh.instanceMatrix.needsUpdate = true;
-    }
-
-    // 3. Spin Windmill Sails beside the Conservatory Greenhouse
+    // 2. Spin Windmill Sails beside the Conservatory Greenhouse
     if (
       windmillSailHub &&
       (!frustum || frustum.intersectsSphere(_windmillSphere)) &&

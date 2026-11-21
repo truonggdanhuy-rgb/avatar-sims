@@ -18,6 +18,7 @@ export interface InsectAnchor {
   z: number;
   habitat: InsectHabitat;
   clingAngle?: number;
+  zone?: 'inner' | 'outer' | 'riverside';
 }
 
 export interface InsectCatchEvaluation {
@@ -60,10 +61,18 @@ interface ActiveInsect {
   respawnTimer: number;
   wingSpeed: number;
   animAccum: number;
+  homeZone: 'inner' | 'outer' | 'riverside';
 }
 
-const ACTIVE_INSECT_COUNT = 44;
+const ACTIVE_INSECT_COUNT = 48;
 const _cullSphere = new THREE.Sphere();
+
+function classifyAnchorZone(a: InsectAnchor): 'inner' | 'outer' | 'riverside' {
+  if (a.zone) return a.zone;
+  if (a.x <= -63.5) return 'riverside';
+  if (Math.hypot(a.x, a.z) >= 28) return 'outer';
+  return 'inner';
+}
 
 function buildAlertBadge(
   matRed: THREE.MeshBasicMaterial,
@@ -354,24 +363,34 @@ export class TownInsectManager {
     this.parent = parent;
     this.anchors = anchors.length > 0 ? anchors : [{x: 12, y: 0.4, z: 12, habitat: 'flower'}];
 
-    const innerAnchors = this.anchors.filter((a) => Math.hypot(a.x, a.z) < 28);
-    const outerAnchors = this.anchors.filter((a) => Math.hypot(a.x, a.z) >= 28);
+    const riversideAnchors = this.anchors.filter((a) => classifyAnchorZone(a) === 'riverside');
+    const outerAnchors = this.anchors.filter((a) => classifyAnchorZone(a) === 'outer');
+    const innerAnchors = this.anchors.filter((a) => classifyAnchorZone(a) === 'inner');
 
     const chosenAnchors: InsectAnchor[] = [];
     const targetCount = Math.min(ACTIVE_INSECT_COUNT, Math.max(12, this.anchors.length));
-    const outerGoal = Math.min(outerAnchors.length, Math.ceil(targetCount * 0.52));
 
-    for (let i = 0; i < outerGoal; i++) {
-      const idx = Math.floor((i * outerAnchors.length) / outerGoal);
-      chosenAnchors.push(outerAnchors[idx]);
-    }
+    const sampleFromPool = (pool: InsectAnchor[], goal: number) => {
+      if (pool.length === 0 || goal <= 0) return;
+      for (let i = 0; i < goal; i++) {
+        const idx = Math.floor((i * pool.length) / goal);
+        chosenAnchors.push(pool[idx]);
+      }
+    };
 
-    const innerGoal = targetCount - chosenAnchors.length;
-    const innerPool = innerAnchors.length > 0 ? innerAnchors : this.anchors;
-    for (let i = 0; i < innerGoal; i++) {
-      const idx = Math.floor((i * innerPool.length) / Math.max(1, innerGoal));
-      chosenAnchors.push(innerPool[idx]);
-    }
+    const riversideGoal = Math.min(riversideAnchors.length, 14);
+    const outerGoal = Math.min(outerAnchors.length, 18);
+    sampleFromPool(riversideAnchors, riversideGoal);
+    sampleFromPool(outerAnchors, outerGoal);
+
+    const remaining = Math.max(0, targetCount - chosenAnchors.length);
+    const fallbackPool =
+      innerAnchors.length > 0
+        ? innerAnchors
+        : outerAnchors.length > 0
+          ? outerAnchors
+          : this.anchors;
+    sampleFromPool(fallbackPool, remaining);
 
     chosenAnchors.forEach((anchor) => {
       const species = pickRandomInsectSpecies(anchor.habitat);
@@ -380,7 +399,21 @@ export class TownInsectManager {
     });
   }
 
-  private pickAnchorForHabitat(habitat: InsectHabitat, avoid?: InsectAnchor): InsectAnchor {
+  private pickAnchorForHabitat(
+    habitat: InsectHabitat,
+    avoid?: InsectAnchor,
+    preferZone?: 'inner' | 'outer' | 'riverside',
+  ): InsectAnchor {
+    if (preferZone) {
+      const sameZoneHab = this.anchors.filter(
+        (a) => classifyAnchorZone(a) === preferZone && a.habitat === habitat && a !== avoid,
+      );
+      if (sameZoneHab.length > 0) return sameZoneHab[Math.floor(Math.random() * sameZoneHab.length)];
+      const sameZone = this.anchors.filter(
+        (a) => classifyAnchorZone(a) === preferZone && a !== avoid,
+      );
+      if (sameZone.length > 0) return sameZone[Math.floor(Math.random() * sameZone.length)];
+    }
     const same = this.anchors.filter((a) => a.habitat === habitat && a !== avoid);
     if (same.length > 0) return same[Math.floor(Math.random() * same.length)];
     const other = this.anchors.filter((a) => a !== avoid);
@@ -388,17 +421,25 @@ export class TownInsectManager {
     return this.anchors[0];
   }
 
-  private pickDartAnchor(from: THREE.Vector3, habitat: InsectHabitat): InsectAnchor {
+  private pickDartAnchor(
+    from: THREE.Vector3,
+    habitat: InsectHabitat,
+    preferZone?: 'inner' | 'outer' | 'riverside',
+  ): InsectAnchor {
     const candidates = this.anchors.filter((a) => {
       const d = Math.hypot(a.x - from.x, a.z - from.z);
-      return d >= 4.2 && d <= 10.5;
+      return d >= 4.2 && d <= 11.5;
     });
     if (candidates.length > 0) {
-      const pref = candidates.filter((a) => a.habitat === habitat);
-      const pool = pref.length > 0 ? pref : candidates;
+      const zoneCands = preferZone
+        ? candidates.filter((a) => classifyAnchorZone(a) === preferZone)
+        : candidates;
+      const basePool = zoneCands.length > 0 ? zoneCands : candidates;
+      const pref = basePool.filter((a) => a.habitat === habitat);
+      const pool = pref.length > 0 ? pref : basePool;
       return pool[Math.floor(Math.random() * pool.length)];
     }
-    return this.pickAnchorForHabitat(habitat);
+    return this.pickAnchorForHabitat(habitat, undefined, preferZone);
   }
 
   private applyAnchorPosture(
@@ -471,6 +512,7 @@ export class TownInsectManager {
       respawnTimer: 0,
       wingSpeed: built.wingSpeed,
       animAccum: (this.nextId * 0.019) % 0.08,
+      homeZone: classifyAnchorZone(anchor),
     };
   }
 
@@ -484,6 +526,7 @@ export class TownInsectManager {
     inst.rightWing = next.rightWing;
     inst.alertGroup = next.alertGroup;
     inst.anchor = newAnchor;
+    inst.homeZone = next.homeZone;
     inst.pos.copy(next.pos);
     inst.rotY = next.rotY;
     inst.isFlyingHover = next.isFlyingHover;
@@ -507,7 +550,7 @@ export class TownInsectManager {
       return 'escaped';
     }
 
-    const nextAnchor = this.pickDartAnchor(inst.pos, inst.species.habitat);
+    const nextAnchor = this.pickDartAnchor(inst.pos, inst.species.habitat, inst.homeZone);
     inst.anchor = nextAnchor;
     inst.dartStart.copy(inst.pos);
     const isNextBark =
@@ -545,7 +588,7 @@ export class TownInsectManager {
       if (inst.state === 'respawning') {
         inst.respawnTimer -= dt;
         if (inst.respawnTimer <= 0) {
-          const nextAnchor = this.pickAnchorForHabitat(inst.anchor.habitat, inst.anchor);
+          const nextAnchor = this.pickAnchorForHabitat(inst.anchor.habitat, inst.anchor, inst.homeZone);
           const nextSpecies = pickRandomInsectSpecies(nextAnchor.habitat);
           this.rebuildInsectVisual(inst, nextSpecies, nextAnchor);
         }

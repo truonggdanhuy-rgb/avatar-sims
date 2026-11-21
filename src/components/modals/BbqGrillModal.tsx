@@ -80,7 +80,7 @@ export const BbqGrillModal: React.FC<BbqGrillModalProps> = ({
             <div>
               <h2 className="text-base font-black tracking-tight">Lò Nướng BBQ Cắm Trại</h2>
               <p className="text-[11px] font-bold text-amber-100">
-                Chế biến đồ ăn cầm tay · Hồi +20% Độ no mỗi món
+                Chế biến đồ ăn cầm tay · Hồi +20% đến +30% Độ no tùy món
               </p>
             </div>
           </div>

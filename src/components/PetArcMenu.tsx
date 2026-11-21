@@ -9,10 +9,12 @@ import {
 } from 'lucide-react';
 import {
   getPetXpForNextLevel,
+  isPetTooHungry,
   MAX_PET_INTIMACY,
   PET_CATALOG,
   PET_FEED_HUNGER_THRESHOLD,
   PET_PLAY_HAPPINESS_THRESHOLD,
+  PET_STARVING_THRESHOLD,
 } from '../data/petCatalog';
 import {OwnedPetState, PetSupplies} from '../types/game';
 import {soundFX} from '../utils/sound';
@@ -51,6 +53,7 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
   const hungerPct = Math.max(0, Math.min(100, Math.round(pet.hunger ?? 75)));
   const happinessPct = Math.max(0, Math.min(100, Math.round(pet.happiness ?? 75)));
   const isFull = hungerPct >= PET_FEED_HUNGER_THRESHOLD;
+  const isStarving = isPetTooHungry(pet);
   const isPlayXpReady = happinessPct < PET_PLAY_HAPPINESS_THRESHOLD;
 
   const mainRadius = 60;
@@ -64,9 +67,13 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
     };
   };
 
-  const canFeedOrCure = pet.sick
-    ? supplies.petMedicine > 0
-    : supplies.petFood > 0 && !isFull;
+  // Khi thú cưng đói quá (<= 25%), ưu tiên tuyệt đối cho ăn kể cả khi đang ốm, và khóa mọi hành động khác
+  const careIsFeed = isStarving || !pet.sick;
+  const canFeedOrCure = careIsFeed
+    ? supplies.petFood > 0 && !isFull
+    : supplies.petMedicine > 0;
+  const canHoldAction = spec.canHold && !isStarving;
+  const canPlayAction = !isStarving;
 
   const actions = [
     {
@@ -89,25 +96,29 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
       key: 'hold',
       title: !spec.canHold
         ? 'Thú cưng này không hỗ trợ đi quanh'
-        : spec.holdMode === 'fly_orbit'
-          ? 'Bay lượn quanh người'
-          : 'Đi quanh người',
-      bgClass: !spec.canHold
+        : isStarving
+          ? `Bé đang đói quá (≤${PET_STARVING_THRESHOLD}%), hãy cho ăn trước!`
+          : spec.holdMode === 'fly_orbit'
+            ? 'Bay lượn quanh người'
+            : 'Đi quanh người',
+      bgClass: !canHoldAction
         ? 'bg-[#DDD6CB] text-[#857A6E]'
         : 'bg-[#5FA86B] text-white',
-      disabled: !spec.canHold,
-      slash: !spec.canHold,
+      disabled: !canHoldAction,
+      slash: !canHoldAction,
       badge: !spec.canHold
         ? 'Không'
-        : spec.holdMode === 'fly_orbit'
-          ? 'Bay quanh'
-          : 'Đi quanh',
-      badgeClass: !spec.canHold
+        : isStarving
+          ? 'Đói quá'
+          : spec.holdMode === 'fly_orbit'
+            ? 'Bay quanh'
+            : 'Đi quanh',
+      badgeClass: !canHoldAction
         ? 'border-[#B8AFA3]/60 bg-[#F2EDE4]/95 text-[#7D7368]'
         : 'border-[#5FA86B]/60 bg-[#F2FBF4]/95 text-[#286335]',
       icon: <HeartHandshake className="h-4 w-4" />,
       onClick: () => {
-        if (!spec.canHold) return;
+        if (!canHoldAction) return;
         soundFX.sparkle();
         onHoldPet(pet.id);
         onClose();
@@ -115,7 +126,7 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
     },
     {
       key: 'care',
-      title: pet.sick
+      title: !careIsFeed
         ? supplies.petMedicine > 0
           ? `Cho uống thuốc (còn x${supplies.petMedicine})`
           : 'Hết thuốc! Mua ở cửa hàng Ivan'
@@ -124,7 +135,7 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
           : supplies.petFood > 0
             ? `Cho ăn (còn x${supplies.petFood})`
             : 'Hết thức ăn! Mua ở cửa hàng Ivan',
-      bgClass: pet.sick
+      bgClass: !careIsFeed
         ? canFeedOrCure
           ? 'bg-[#D94E67] text-white'
           : 'bg-[#D6CFC5] text-[#8E8478]'
@@ -133,22 +144,22 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
           : 'bg-[#D6CFC5] text-[#8E8478]',
       disabled: !canFeedOrCure,
       slash: false,
-      badge: pet.sick
+      badge: !careIsFeed
         ? `Thuốc x${supplies.petMedicine}`
         : isFull
           ? 'Đã no'
           : `Ăn x${supplies.petFood}`,
-      badgeClass: pet.sick
+      badgeClass: !careIsFeed
         ? canFeedOrCure
           ? 'border-[#D94E67]/60 bg-[#FFF3F5]/95 text-[#A4253D]'
           : 'border-[#B8AFA3]/60 bg-[#F2EDE4]/95 text-[#7D7368]'
         : canFeedOrCure
           ? 'border-[#E89149]/60 bg-[#FFF8F0]/95 text-[#9B4D10]'
           : 'border-[#B8AFA3]/60 bg-[#F2EDE4]/95 text-[#7D7368]',
-      icon: pet.sick ? <Cross className="h-4 w-4" /> : <Utensils className="h-4 w-4" />,
+      icon: !careIsFeed ? <Cross className="h-4 w-4" /> : <Utensils className="h-4 w-4" />,
       onClick: () => {
         if (!canFeedOrCure) return;
-        if (pet.sick) {
+        if (!careIsFeed) {
           soundFX.sparkle();
           onCurePet(pet.id);
         } else {
@@ -159,16 +170,21 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
     },
     {
       key: 'play',
-      title: isPlayXpReady
-        ? 'Chơi đùa cùng thú cưng (+35% Vui vẻ · +1 Thân mật)'
-        : 'Chơi đùa cùng thú cưng (Vui vẻ >= 90% nên không + thân mật)',
-      bgClass: 'bg-[#4BA0D8] text-white',
-      disabled: false,
-      slash: false,
-      badge: isPlayXpReady && !isMaxIntimacy ? 'Chơi +1' : 'Chơi',
-      badgeClass: 'border-[#4BA0D8]/60 bg-[#F2FAFF]/95 text-[#1B6494]',
+      title: isStarving
+        ? `Bé đang đói quá (≤${PET_STARVING_THRESHOLD}%), hãy cho ăn trước!`
+        : isPlayXpReady
+          ? 'Chơi đùa cùng thú cưng (+35% Vui vẻ · +1 Thân mật)'
+          : 'Chơi đùa cùng thú cưng (Vui vẻ >= 90% nên không + thân mật)',
+      bgClass: canPlayAction ? 'bg-[#4BA0D8] text-white' : 'bg-[#D6CFC5] text-[#8E8478]',
+      disabled: !canPlayAction,
+      slash: !canPlayAction,
+      badge: isStarving ? 'Đói quá' : isPlayXpReady && !isMaxIntimacy ? 'Chơi +1' : 'Chơi',
+      badgeClass: canPlayAction
+        ? 'border-[#4BA0D8]/60 bg-[#F2FAFF]/95 text-[#1B6494]'
+        : 'border-[#B8AFA3]/60 bg-[#F2EDE4]/95 text-[#7D7368]',
       icon: <Sparkles className="h-4 w-4" />,
       onClick: () => {
+        if (!canPlayAction) return;
         soundFX.sparkle();
         onPlayWithPet(pet.id);
         onClose();
@@ -293,7 +309,11 @@ export const PetArcMenu: React.FC<PetArcMenuProps> = ({
               </div>
             </div>
 
-            {pet.sick ? (
+            {isStarving ? (
+              <div className="rounded bg-[#FFF1DC] px-1.5 py-0.5 text-center text-[9.5px] font-black text-[#B85814]">
+                Đang đói quá! Chỉ có thể cho ăn lúc này
+              </div>
+            ) : pet.sick ? (
               <div className="rounded bg-[#FCE4E8] px-1.5 py-0.5 text-center text-[9.5px] font-black text-[#C93B4B]">
                 Đang bị bệnh! Hãy cho uống thuốc
               </div>

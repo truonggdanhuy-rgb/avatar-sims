@@ -9,6 +9,12 @@ import {
 export const MAX_PET_INTIMACY = 10;
 export const PET_FEED_HUNGER_THRESHOLD = 90;
 export const PET_PLAY_HAPPINESS_THRESHOLD = 90;
+export const PET_STARVING_THRESHOLD = 25;
+
+export function isPetTooHungry(pet: Pick<OwnedPetState, 'hunger'>): boolean {
+  const curHunger = typeof pet.hunger === 'number' ? pet.hunger : 75;
+  return curHunger <= PET_STARVING_THRESHOLD;
+}
 
 export const PET_CATALOG: Record<PetSpeciesId, PetSpeciesDefinition> = {
   brown_puppy: {
@@ -224,6 +230,13 @@ export function applyPetPlayCare(pet: OwnedPetState): {
   gainedXp: boolean;
   message: string;
 } {
+  if (isPetTooHungry(pet)) {
+    return {
+      pet,
+      gainedXp: false,
+      message: `${pet.name} đang quá đói (≤${PET_STARVING_THRESHOLD}%), chỉ có thể cho ăn lúc này!`,
+    };
+  }
   const curHappy = typeof pet.happiness === 'number' ? pet.happiness : 75;
   if (curHappy >= PET_PLAY_HAPPINESS_THRESHOLD) {
     return {
