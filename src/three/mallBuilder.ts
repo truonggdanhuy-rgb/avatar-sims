@@ -14,7 +14,8 @@ import type {TownAnchor, WorldCollider} from './townBuilder';
 
 export const MALL_HALF_W = 32;
 export const MALL_HALF_D = 26;
-export const MALL_UPPER_Y = 6.2;
+export const MALL_UPPER_Y = 8.4;
+export const MALL_WALL_H = 19.6;
 export const MALL_ATRIUM_HALF_W = 16.0;
 export const MALL_ATRIUM_HALF_D = 12.0;
 
@@ -37,7 +38,7 @@ export interface MallEscalatorLane {
   travelRotY: number;
 }
 
-// Dual UP + DOWN Escalators on BOTH Left (-X) and Right (+X) wings of May Mall Grand Lobby
+// Fixed bidirectional UP + DOWN Escalators on BOTH Left (-X) and Right (+X) wings of May Mall Grand Lobby
 export const MALL_ESCALATOR_LANES: MallEscalatorLane[] = [
   {
     id: 'esc_left_up',
@@ -45,16 +46,16 @@ export const MALL_ESCALATOR_LANES: MallEscalatorLane[] = [
     dir: 'up',
     startFloor: 1,
     endFloor: 2,
-    startX: -17.6,
+    startX: -16.8,
     startY: 0,
-    startZ: -1.75,
-    endX: -26.0,
+    startZ: -1.8,
+    endX: -27.2,
     endY: MALL_UPPER_Y,
-    endZ: -1.75,
-    approachX: -16.1,
-    approachZ: -1.75,
-    exitX: -27.4,
-    exitZ: -1.75,
+    endZ: -1.8,
+    approachX: -15.3,
+    approachZ: -1.8,
+    exitX: -28.6,
+    exitZ: -1.8,
     travelRotY: -Math.PI / 2,
   },
   {
@@ -63,16 +64,16 @@ export const MALL_ESCALATOR_LANES: MallEscalatorLane[] = [
     dir: 'down',
     startFloor: 2,
     endFloor: 1,
-    startX: -26.0,
+    startX: -27.2,
     startY: MALL_UPPER_Y,
-    startZ: 1.75,
-    endX: -17.6,
+    startZ: 1.8,
+    endX: -16.8,
     endY: 0,
-    endZ: 1.75,
-    approachX: -27.4,
-    approachZ: 1.75,
-    exitX: -16.1,
-    exitZ: 1.75,
+    endZ: 1.8,
+    approachX: -28.6,
+    approachZ: 1.8,
+    exitX: -15.3,
+    exitZ: 1.8,
     travelRotY: Math.PI / 2,
   },
   {
@@ -81,16 +82,16 @@ export const MALL_ESCALATOR_LANES: MallEscalatorLane[] = [
     dir: 'up',
     startFloor: 1,
     endFloor: 2,
-    startX: 17.6,
+    startX: 16.8,
     startY: 0,
-    startZ: -1.75,
-    endX: 26.0,
+    startZ: -1.8,
+    endX: 27.2,
     endY: MALL_UPPER_Y,
-    endZ: -1.75,
-    approachX: 16.1,
-    approachZ: -1.75,
-    exitX: 27.4,
-    exitZ: -1.75,
+    endZ: -1.8,
+    approachX: 15.3,
+    approachZ: -1.8,
+    exitX: 28.6,
+    exitZ: -1.8,
     travelRotY: Math.PI / 2,
   },
   {
@@ -99,16 +100,16 @@ export const MALL_ESCALATOR_LANES: MallEscalatorLane[] = [
     dir: 'down',
     startFloor: 2,
     endFloor: 1,
-    startX: 26.0,
+    startX: 27.2,
     startY: MALL_UPPER_Y,
-    startZ: 1.75,
-    endX: 17.6,
+    startZ: 1.8,
+    endX: 16.8,
     endY: 0,
-    endZ: 1.75,
-    approachX: 27.4,
-    approachZ: 1.75,
-    exitX: 16.1,
-    exitZ: 1.75,
+    endZ: 1.8,
+    approachX: 28.6,
+    approachZ: 1.8,
+    exitX: 15.3,
+    exitZ: 1.8,
     travelRotY: -Math.PI / 2,
   },
 ];
@@ -131,16 +132,16 @@ export function clampMallFloorPoint(x: number, z: number, floor: 1 | 2): {x: num
       }
     }
 
-    // Keep away from the Left & Right escalator stairwell wells (17.2 <= |x| <= 26.15 && |z| < 3.65)
+    // Keep away from the Left & Right escalator stairwell wells (16.4 <= |x| <= 27.35 && |z| < 3.85)
     const absX = Math.abs(cx);
-    if (absX > 17.1 && absX < 26.15 && Math.abs(cz) < 3.65) {
+    if (absX > 16.4 && absX < 27.35 && Math.abs(cz) < 3.85) {
       const sign = cx >= 0 ? 1 : -1;
-      const dOuter = 26.15 - absX;
-      const dSide = 3.65 - Math.abs(cz);
+      const dOuter = 27.35 - absX;
+      const dSide = 3.85 - Math.abs(cz);
       if (dOuter <= dSide) {
-        cx = sign * 26.15;
+        cx = sign * 27.35;
       } else {
-        cz = (cz >= 0 ? 1 : -1) * 3.65;
+        cz = (cz >= 0 ? 1 : -1) * 3.85;
       }
     }
   }
@@ -653,87 +654,76 @@ export function buildMallInteriorScene(): SubzoneWorld {
     opacity: 0.34,
     depthWrite: false,
   });
-  const skylightGlassMat = new THREE.MeshStandardMaterial({
-    color: '#DDF6FF',
+  const windowPaneMat = new THREE.MeshStandardMaterial({
+    color: '#D5F1FF',
     emissive: '#8ED8F8',
-    emissiveIntensity: 0.14,
+    emissiveIntensity: 0.16,
     roughness: 0.18,
-    transparent: true,
-    opacity: 0.42,
-    side: THREE.DoubleSide,
+  });
+  const ceilingLightMat = new THREE.MeshStandardMaterial({
+    color: '#FFFDF5',
+    emissive: '#FFE8A3',
+    emissiveIntensity: 0.85,
+    roughness: 0.18,
   });
 
-  // ========== 1. MASSIVE GROUND FLOOR (64m x 52m) + INLAID CENTRAL MEDALLION ==========
+  // ========== 1. MASSIVE GROUND FLOOR (64m x 52m) + NON-OVERLAPPING INLAID CENTRAL MEDALLION ==========
   const floor1Tex = createCheckerFloorTexture('#F7F2E7', '#ECE4D3');
   floor1Tex.repeat.set(18, 15);
   disposables.push(floor1Tex);
   const groundMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(MALL_HALF_W * 2, MALL_HALF_D * 2),
+    new THREE.BoxGeometry(MALL_HALF_W * 2, 0.5, MALL_HALF_D * 2),
     new THREE.MeshStandardMaterial({map: floor1Tex, roughness: 0.56, metalness: 0.04}),
   );
-  groundMesh.rotation.x = -Math.PI / 2;
+  groundMesh.position.y = -0.25;
   groundMesh.userData = {kind: 'ground', mallFloor: 1};
   group.add(groundMesh);
 
-  const subFloor = new THREE.Mesh(
-    new THREE.BoxGeometry(MALL_HALF_W * 2 + 1.2, 0.5, MALL_HALF_D * 2 + 1.2),
-    creamTrimMat,
-  );
-  subFloor.position.y = -0.26;
-  group.add(subFloor);
-
-  // Decorative plaza medallion ring under the vehicle showroom
+  // Decorative plaza medallion ring under the vehicle showroom (clean vertical offsets — zero Z-fighting)
   const plazaRingOuter = new THREE.Mesh(
-    new THREE.CylinderGeometry(8.6, 8.6, 0.025, 48),
+    new THREE.CylinderGeometry(8.6, 8.6, 0.04, 48),
     clayMat('#DFEEF7', 0.55),
   );
-  plazaRingOuter.position.set(0.6, 0.01, 0);
+  plazaRingOuter.position.set(0.6, 0.025, 0);
   const plazaRingInner = new THREE.Mesh(
-    new THREE.CylinderGeometry(6.8, 6.8, 0.032, 48),
+    new THREE.CylinderGeometry(6.8, 6.8, 0.04, 48),
     clayMat('#FFF9EF', 0.52),
   );
-  plazaRingInner.position.set(0.6, 0.015, 0);
+  plazaRingInner.position.set(0.6, 0.055, 0);
   group.add(plazaRingOuter, plazaRingInner);
 
-  // ========== 2. MASSIVE UPPER FLOOR 2 MEZZANINE (HUGE OPEN SPACE AROUND CENTRAL ATRIUM) ==========
+  // ========== 2. MASSIVE UPPER FLOOR 2 MEZZANINE (DISJOINT NON-OVERLAPPING DECK PANELS) ==========
   const floor2Tex = createCheckerFloorTexture('#F6F0E4', '#E6DCC8');
   floor2Tex.repeat.set(14, 12);
   disposables.push(floor2Tex);
   const floor2Mat = new THREE.MeshStandardMaterial({map: floor2Tex, roughness: 0.58, metalness: 0.04});
 
-  // Build Floor 2 slab out of clean walkable panels leaving Atrium + 2 Escalator Stairwells cleanly open!
   const floor2WalkGroup = new THREE.Group();
   const makeFloor2DeckPanel = (cx: number, cz: number, w: number, d: number) => {
-    // Visual + raycast deck panel
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.42, d), floor2Mat);
-    slab.position.set(cx, MALL_UPPER_Y - 0.21, cz);
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.48, d), floor2Mat);
+    slab.position.set(cx, MALL_UPPER_Y - 0.24, cz);
     slab.userData = {kind: 'ground', mallFloor: 2};
     floor2WalkGroup.add(slab);
-
-    // Warm cream soffit underneath Floor 2
-    const soffit = new THREE.Mesh(new THREE.BoxGeometry(w, 0.14, d), creamTrimMat);
-    soffit.position.set(cx, MALL_UPPER_Y - 0.48, cz);
-    group.add(soffit);
   };
 
-  // North Huge Promenade Wing (z = -26..-12, full 64m wide! Ideal for future restaurant & shops)
+  // Disjoint deck rectangles leaving Central Atrium & Escalator Wells cleanly open with ZERO overlap
+  // North & South Full Promenade Wings (z = -26..-12 and +12..+26, full 64m wide)
   makeFloor2DeckPanel(0, -19.0, MALL_HALF_W * 2, 14.0);
-  // South Promenade Wing (z = +12..+26, full 64m wide)
   makeFloor2DeckPanel(0, 19.0, MALL_HALF_W * 2, 14.0);
-  // West Outer Wing behind Left Escalators (x = -32..-26, z = -12..+12)
-  makeFloor2DeckPanel(-29.0, 0, 6.0, 24.0);
-  // West Mid Wing North & South of Left Escalator Well (x = -26..-16, z = -12..-3.4 & +3.4..+12)
-  makeFloor2DeckPanel(-21.0, -7.7, 10.0, 8.6);
-  makeFloor2DeckPanel(-21.0, 7.7, 10.0, 8.6);
-  // West Thin Strip Between Atrium Rail & Escalator Landing (x = -17.4..-16.0, z = -3.4..+3.4)
-  makeFloor2DeckPanel(-16.7, 0, 1.4, 6.8);
-  // East Outer Wing behind Right Escalators (x = +26..+32, z = -12..+12)
-  makeFloor2DeckPanel(29.0, 0, 6.0, 24.0);
-  // East Mid Wing North & South of Right Escalator Well (x = +16..+26, z = -12..-3.4 & +3.4..+12)
-  makeFloor2DeckPanel(21.0, -7.7, 10.0, 8.6);
-  makeFloor2DeckPanel(21.0, 7.7, 10.0, 8.6);
-  // East Thin Strip Between Atrium Rail & Escalator Landing (x = +16.0..+17.4, z = -3.4..+3.4)
-  makeFloor2DeckPanel(16.7, 0, 1.4, 6.8);
+  // West Outer Wing behind Left Escalators (x = -32..-27.2, z = -12..+12)
+  makeFloor2DeckPanel(-29.6, 0, 4.8, 24.0);
+  // West Mid Wings North & South of Left Escalator Well (x = -27.2..-16.8, z = -12..-3.6 & +3.6..+12)
+  makeFloor2DeckPanel(-22.0, -7.8, 10.4, 8.4);
+  makeFloor2DeckPanel(-22.0, 7.8, 10.4, 8.4);
+  // West Inner Strip Between Atrium Rail & Escalator Landing (x = -16.8..-16.0, z = -12..+12)
+  makeFloor2DeckPanel(-16.4, 0, 0.8, 24.0);
+  // East Outer Wing behind Right Escalators (x = +27.2..+32, z = -12..+12)
+  makeFloor2DeckPanel(29.6, 0, 4.8, 24.0);
+  // East Mid Wings North & South of Right Escalator Well (x = +16.8..+27.2, z = -12..-3.6 & +3.6..+12)
+  makeFloor2DeckPanel(22.0, -7.8, 10.4, 8.4);
+  makeFloor2DeckPanel(22.0, 7.8, 10.4, 8.4);
+  // East Inner Strip Between Atrium Rail & Escalator Landing (x = +16.0..+16.8, z = -12..+12)
+  makeFloor2DeckPanel(16.4, 0, 0.8, 24.0);
 
   group.add(floor2WalkGroup);
 
@@ -748,14 +738,14 @@ export function buildMallInteriorScene(): SubzoneWorld {
     const midX = (x0 + x1) * 0.5;
     const midZ = (z0 + z1) * 0.5;
 
-    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.96, len), glassRailMat);
-    glass.position.set(midX, baseY + 0.52, midZ);
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.94, Math.max(0.1, len - 0.08)), glassRailMat);
+    glass.position.set(midX, baseY + 0.56, midZ);
     glass.rotation.y = ang;
-    const topCap = new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.06, len + 0.08, 1, 0.02), silverMat);
-    topCap.position.set(midX, baseY + 1.03, midZ);
+    const topCap = new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.06, len + 0.04, 1, 0.02), silverMat);
+    topCap.position.set(midX, baseY + 1.06, midZ);
     topCap.rotation.y = ang;
-    const curb = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, len + 0.08), creamTrimMat);
-    curb.position.set(midX, baseY + 0.06, midZ);
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, Math.max(0.1, len - 0.02)), creamTrimMat);
+    curb.position.set(midX, baseY + 0.07, midZ);
     curb.rotation.y = ang;
     railStatic.add(glass, topCap, curb);
 
@@ -765,7 +755,7 @@ export function buildMallInteriorScene(): SubzoneWorld {
       const px = THREE.MathUtils.lerp(x0, x1, t);
       const pz = THREE.MathUtils.lerp(z0, z1, t);
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.04, 1.04, 7), darkMetalMat);
-      post.position.set(px, baseY + 0.52, pz);
+      post.position.set(px, baseY + 0.54, pz);
       railStatic.add(post);
     }
   };
@@ -776,22 +766,22 @@ export function buildMallInteriorScene(): SubzoneWorld {
   addBalustrade(-MALL_ATRIUM_HALF_W, -MALL_ATRIUM_HALF_D, -MALL_ATRIUM_HALF_W, MALL_ATRIUM_HALF_D);
   addBalustrade(MALL_ATRIUM_HALF_W, -MALL_ATRIUM_HALF_D, MALL_ATRIUM_HALF_W, MALL_ATRIUM_HALF_D);
 
-  // Side railings framing Left & Right Escalator Wells on Floor 2 (leaving x = ±26.0 open for boarding!)
+  // Side railings framing Left & Right Escalator Wells on Floor 2 (leaving x = ±27.2 open for boarding/exit)
   [-1, 1].forEach((side) => {
-    const innerX = side * 17.4;
-    const outerX = side * 26.0;
+    const innerX = side * 16.8;
+    const outerX = side * 27.2;
     const minX = Math.min(innerX, outerX);
     const maxX = Math.max(innerX, outerX);
-    addBalustrade(minX, -3.45, maxX, -3.45);
-    addBalustrade(minX, 3.45, maxX, 3.45);
-    addBalustrade(innerX, -3.45, innerX, 3.45);
+    addBalustrade(minX, -3.6, maxX, -3.6);
+    addBalustrade(minX, 3.6, maxX, 3.6);
+    addBalustrade(innerX, -3.6, innerX, 3.6);
     colliders.push({
       type: 'box',
       id: `mall_f2_esc_well_${side < 0 ? 'l' : 'r'}`,
-      x: side * 21.6,
+      x: side * 22.0,
       z: 0,
-      hw: 4.2,
-      hd: 3.45,
+      hw: 5.0,
+      hd: 3.6,
     });
   });
 
@@ -805,23 +795,24 @@ export function buildMallInteriorScene(): SubzoneWorld {
     hd: MALL_ATRIUM_HALF_D + 0.15,
   });
 
-  // Architectural Wood Fascia Band Lining Inner Atrium Rim
+  // Architectural Wood Fascia Band Lining Inner Atrium Rim (recessed slightly below MALL_UPPER_Y so zero coplanar Z-fighting!)
   [
-    [0, -MALL_ATRIUM_HALF_D, MALL_ATRIUM_HALF_W * 2 + 0.4, 0.3],
-    [0, MALL_ATRIUM_HALF_D, MALL_ATRIUM_HALF_W * 2 + 0.4, 0.3],
-    [-MALL_ATRIUM_HALF_W, 0, 0.3, MALL_ATRIUM_HALF_D * 2],
-    [MALL_ATRIUM_HALF_W, 0, 0.3, MALL_ATRIUM_HALF_D * 2],
+    [0, -(MALL_ATRIUM_HALF_D - 0.12), MALL_ATRIUM_HALF_W * 2 - 0.24, 0.22],
+    [0, MALL_ATRIUM_HALF_D - 0.12, MALL_ATRIUM_HALF_W * 2 - 0.24, 0.22],
+    [-(MALL_ATRIUM_HALF_W - 0.12), 0, 0.22, MALL_ATRIUM_HALF_D * 2 - 0.48],
+    [MALL_ATRIUM_HALF_W - 0.12, 0, 0.22, MALL_ATRIUM_HALF_D * 2 - 0.48],
   ].forEach(([fx, fz, fw, fd]) => {
-    const trim = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.56, fd), warmWoodMat);
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.44, fd), warmWoodMat);
     trim.position.set(fx, MALL_UPPER_Y - 0.28, fz);
     railStatic.add(trim);
   });
   mergeStaticGroupByMaterial(railStatic);
   group.add(railStatic);
 
-  // ========== 4. GRAND PERIMETER WALLS, LUXURY SHELL ARCADE & VAULTED SKYLIGHT ==========
+  // ========== 4. TALL PERIMETER WALLS, NON-Z-FIGHTING WINDOWS & FULLY ENCLOSED CEILING WITH LIGHTS ==========
   const shellGroup = new THREE.Group();
-  const WALL_H = 13.6;
+  const ceilingLightsGroup = new THREE.Group();
+  const WALL_H = MALL_WALL_H;
 
   // Perimeter Walls (North, West, East solid; South has wide sunlit glass portal!)
   const wallN = new THREE.Mesh(new THREE.BoxGeometry(MALL_HALF_W * 2 + 0.8, WALL_H, 0.6), pearlWallMat);
@@ -831,76 +822,106 @@ export function buildMallInteriorScene(): SubzoneWorld {
   const wallE = wallW.clone();
   wallE.position.x = MALL_HALF_W + 0.2;
 
-  // South Wall with Central Glass Entrance Gap (x = -3.4..+3.4, y = 0..4.4 open)
+  // South Wall with Central Glass Entrance Gap (x = -3.4..+3.4, y = 0..4.8 open)
   const wallSL = new THREE.Mesh(new THREE.BoxGeometry(MALL_HALF_W - 3.2, WALL_H, 0.6), pearlWallMat);
   wallSL.position.set(-(MALL_HALF_W + 3.2) * 0.5, WALL_H * 0.5, MALL_HALF_D + 0.2);
   const wallSR = wallSL.clone();
   wallSR.position.x = (MALL_HALF_W + 3.2) * 0.5;
-  const wallSCrown = new THREE.Mesh(new THREE.BoxGeometry(6.8, WALL_H - 4.4, 0.6), pearlWallMat);
-  wallSCrown.position.set(0, 4.4 + (WALL_H - 4.4) * 0.5, MALL_HALF_D + 0.2);
+  const wallSCrown = new THREE.Mesh(new THREE.BoxGeometry(6.8, WALL_H - 4.8, 0.6), pearlWallMat);
+  wallSCrown.position.set(0, 4.8 + (WALL_H - 4.8) * 0.5, MALL_HALF_D + 0.2);
   shellGroup.add(wallN, wallW, wallE, wallSL, wallSR, wallSCrown);
 
-  // Structural Columns Supporting Floor 2 Mezzanine & Skylight Rib Vault
+  // Structural Columns Supporting Floor 2 Mezzanine & Enclosed Coffered Ceiling
   for (let cx = -24; cx <= 24; cx += 16) {
     [-12.2, 12.2].forEach((cz) => {
-      if (Math.abs(cx) === 8) return; // keep central showroom vista wide open
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, WALL_H - 0.4, 14), upperWallMat);
-      col.position.set(cx, (WALL_H - 0.4) * 0.5, cz);
-      const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.62, 0.55, 14), creamTrimMat);
-      plinth.position.set(cx, 0.275, cz);
-      const goldBand = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.14, 14), goldMat);
-      goldBand.position.set(cx, MALL_UPPER_Y - 0.25, cz);
+      if (Math.abs(cx) === 8) return;
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, WALL_H - 0.3, 14), upperWallMat);
+      col.position.set(cx, (WALL_H - 0.3) * 0.5, cz);
+      const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.62, 0.58, 14), creamTrimMat);
+      plinth.position.set(cx, 0.29, cz);
+      const goldBand = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.16, 14), goldMat);
+      goldBand.position.set(cx, MALL_UPPER_Y - 0.26, cz);
       shellGroup.add(col, plinth, goldBand);
       colliders.push({type: 'circle', id: `mall_f1_col_${cx}_${cz}`, x: cx, z: cz, r: 0.62});
       colliders.push({type: 'circle', id: `mall_f2_col_${cx}_${cz}`, x: cx, z: cz, r: 0.62});
     });
   }
 
-  // Empty Placeholder Future-Shop Alcove Frames along Ground North/East/West walls + Floor 2 Clerestory Windows
+  // Ground Storefront Alcoves + Floor 2 Clerestory Windows (clean staggered Z offsets — ZERO Z-fighting!)
   [-24, -12, 0, 12, 24].forEach((bx) => {
-    const bayFrame = new THREE.Mesh(new RoundedBoxGeometry(9.4, 4.2, 0.24, 2, 0.04), creamTrimMat);
-    bayFrame.position.set(bx, 2.2, -MALL_HALF_D + 0.12);
-    const bayPane = new THREE.Mesh(new THREE.BoxGeometry(8.6, 3.5, 0.12), skyAccentMat);
-    bayPane.position.set(bx, 2.15, -MALL_HALF_D + 0.18);
+    // North Floor 1 Future-Shop Windows
+    const bayFrame = new THREE.Mesh(new RoundedBoxGeometry(9.4, 4.4, 0.18, 2, 0.04), creamTrimMat);
+    bayFrame.position.set(bx, 2.35, -MALL_HALF_D + 0.22);
+    const bayPane = new THREE.Mesh(new THREE.BoxGeometry(8.5, 3.6, 0.08), skyAccentMat);
+    bayPane.position.set(bx, 2.35, -MALL_HALF_D + 0.36);
     shellGroup.add(bayFrame, bayPane);
 
-    // Bright upper clerestory light windows on Floor 2 North & South walls
-    const f2WinN = new THREE.Mesh(new RoundedBoxGeometry(8.4, 3.1, 0.18, 2, 0.04), skylightGlassMat);
-    f2WinN.position.set(bx, MALL_UPPER_Y + 3.4, -MALL_HALF_D + 0.12);
-    shellGroup.add(f2WinN);
+    // North Floor 2 Upper Clerestory Windows
+    const f2WinFrameN = new THREE.Mesh(new RoundedBoxGeometry(9.2, 3.6, 0.16, 2, 0.04), creamTrimMat);
+    f2WinFrameN.position.set(bx, MALL_UPPER_Y + 4.8, -MALL_HALF_D + 0.21);
+    const f2WinPaneN = new THREE.Mesh(new THREE.BoxGeometry(8.4, 2.9, 0.06), windowPaneMat);
+    f2WinPaneN.position.set(bx, MALL_UPPER_Y + 4.8, -MALL_HALF_D + 0.33);
+    shellGroup.add(f2WinFrameN, f2WinPaneN);
+
+    // South Floor 2 Upper Clerestory Windows
+    const f2WinFrameS = new THREE.Mesh(new RoundedBoxGeometry(9.2, 3.6, 0.16, 2, 0.04), creamTrimMat);
+    f2WinFrameS.position.set(bx, MALL_UPPER_Y + 4.8, MALL_HALF_D - 0.21);
+    const f2WinPaneS = new THREE.Mesh(new THREE.BoxGeometry(8.4, 2.9, 0.06), windowPaneMat);
+    f2WinPaneS.position.set(bx, MALL_UPPER_Y + 4.8, MALL_HALF_D - 0.33);
+    shellGroup.add(f2WinFrameS, f2WinPaneS);
   });
 
-  // Grand Translucent Skylight Roof + Arched White Trusses over the Central Atrium (y = 13.6..17.8)
-  const skylightRoof = new THREE.Mesh(
-    new THREE.CylinderGeometry(16.8, 16.8, 52.4, 20, 1, true, -Math.PI * 0.5, Math.PI),
-    skylightGlassMat,
+  // Fully Enclosed Coffered Ceiling across ENTIRE 64m x 52m Interior (Zero open skylight or stray bands!)
+  const mainCeiling = new THREE.Mesh(
+    new THREE.BoxGeometry(MALL_HALF_W * 2 + 0.8, 0.4, MALL_HALF_D * 2 + 0.8),
+    upperWallMat,
   );
-  skylightRoof.rotation.z = Math.PI / 2;
-  skylightRoof.rotation.y = Math.PI / 2;
-  skylightRoof.scale.set(1, 0.28, 1);
-  skylightRoof.position.set(0, WALL_H - 0.1, 0);
-  shellGroup.add(skylightRoof);
+  mainCeiling.position.set(0, WALL_H + 0.2, 0);
+  shellGroup.add(mainCeiling);
 
-  // Perimeter Roof Soffit Deck over side mezzanine bays so interior looks fully enclosed & cozy
-  [
-    [0, -19.5, MALL_HALF_W * 2, 13.0],
-    [0, 19.5, MALL_HALF_W * 2, 13.0],
-    [-24.2, 0, 15.6, 26.0],
-    [24.2, 0, 15.6, 26.0],
-  ].forEach(([rx, rz, rw, rd]) => {
-    const roofCap = new THREE.Mesh(new THREE.BoxGeometry(rw, 0.32, rd), upperWallMat);
-    roofCap.position.set(rx, WALL_H, rz);
-    shellGroup.add(roofCap);
-  });
-  for (let rz = -20; rz <= 20; rz += 10) {
-    const rib = new THREE.Mesh(new THREE.BoxGeometry(33.5, 0.28, 0.36), silverMat);
-    rib.position.set(0, WALL_H - 0.15, rz);
-    shellGroup.add(rib);
+  // Architectural Coffer Crossbeams along Ceiling
+  for (let bz = -18; bz <= 18; bz += 9) {
+    const beamX = new THREE.Mesh(new THREE.BoxGeometry(MALL_HALF_W * 2, 0.34, 0.56), creamTrimMat);
+    beamX.position.set(0, WALL_H - 0.17, bz);
+    shellGroup.add(beamX);
   }
-  mergeStaticGroupByMaterial(shellGroup);
-  group.add(shellGroup);
+  for (let bx = -24; bx <= 24; bx += 12) {
+    const beamZ = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.34, MALL_HALF_D * 2), creamTrimMat);
+    beamZ.position.set(bx, WALL_H - 0.17, 0);
+    shellGroup.add(beamZ);
+  }
 
-  // ========== 5. ANIMATED LEFT & RIGHT DUAL ESCALATORS (UP + DOWN ON BOTH SIDES) ==========
+  // Rows of Sleek Recessed Ceiling Lights (Đèn trần) + Central Atrium Accent Rings
+  [-21, -9, 9, 21].forEach((lz) => {
+    [-22, -11, 0, 11, 22].forEach((lx) => {
+      const bezel = new THREE.Mesh(new RoundedBoxGeometry(3.8, 0.12, 2.2, 2, 0.03), silverMat);
+      bezel.position.set(lx, WALL_H - 0.08, lz);
+      const diffuser = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.08, 1.8), ceilingLightMat);
+      diffuser.position.set(lx, WALL_H - 0.16, lz);
+      shellGroup.add(bezel);
+      ceilingLightsGroup.add(diffuser);
+    });
+  });
+
+  // Grand Atrium Luminous Pendant Halos Hanging High Beneath the Closed Ceiling (y = WALL_H - 2.2)
+  [-9, 0, 9].forEach((hx) => {
+    const ringHousing = new THREE.Mesh(new THREE.TorusGeometry(2.35, 0.12, 10, 32), silverMat);
+    ringHousing.rotation.x = Math.PI / 2;
+    ringHousing.position.set(hx, WALL_H - 2.2, 0);
+    const ringGlow = new THREE.Mesh(new THREE.TorusGeometry(2.35, 0.09, 8, 32), ceilingLightMat);
+    ringGlow.rotation.x = Math.PI / 2;
+    ringGlow.position.set(hx, WALL_H - 2.31, 0);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 8), silverMat);
+    stem.position.set(hx, WALL_H - 1.1, 0);
+    shellGroup.add(ringHousing, stem);
+    ceilingLightsGroup.add(ringGlow);
+  });
+
+  mergeStaticGroupByMaterial(shellGroup);
+  mergeStaticGroupByMaterial(ceilingLightsGroup);
+  group.add(shellGroup, ceilingLightsGroup);
+
+  // ========== 5. ANIMATED LEFT & RIGHT FIXED ESCALATORS (1 UP + 1 DOWN PER SIDE) ==========
   const escStatic = new THREE.Group();
   const arrowUpTex = createDirectionArrowTexture('up');
   const arrowDownTex = createDirectionArrowTexture('down');
@@ -913,11 +934,11 @@ export function buildMallInteriorScene(): SubzoneWorld {
     stepCount: number;
   }
   const escAnimList: EscalatorAnimMeta[] = [];
-  const STEPS_PER_LANE = 22;
+  const STEPS_PER_LANE = 26;
 
   MALL_ESCALATOR_LANES.forEach((lane) => {
-    const xLow = lane.side === 'left' ? -17.6 : 17.6;
-    const xHigh = lane.side === 'left' ? -26.0 : 26.0;
+    const xLow = lane.side === 'left' ? -16.8 : 16.8;
+    const xHigh = lane.side === 'left' ? -27.2 : 27.2;
     const zMid = lane.startZ;
     const dx = xHigh - xLow;
     const dy = MALL_UPPER_Y;
@@ -927,47 +948,51 @@ export function buildMallInteriorScene(): SubzoneWorld {
     const midY = dy * 0.5;
 
     // Sloped stainless truss spine
-    const truss = new THREE.Mesh(new RoundedBoxGeometry(diagLen + 0.6, 0.42, 1.56, 2, 0.04), silverMat);
-    truss.position.set(midX, midY - 0.22, zMid);
+    const truss = new THREE.Mesh(new RoundedBoxGeometry(diagLen + 0.6, 0.44, 1.56, 2, 0.04), silverMat);
+    truss.position.set(midX, midY - 0.24, zMid);
     truss.rotation.z = slopePitch;
     escStatic.add(truss);
 
-    // Lower Floor 1 & Upper Floor 2 silver landing comb plates
+    // Lower Floor 1 & Upper Floor 2 silver landing comb plates (clean 1cm offset above floor top)
     const plateLow = new THREE.Mesh(new RoundedBoxGeometry(1.35, 0.08, 1.62, 1, 0.02), darkMetalMat);
-    plateLow.position.set(xLow + (lane.side === 'left' ? 0.45 : -0.45), 0.03, zMid);
+    plateLow.position.set(xLow + (lane.side === 'left' ? 0.45 : -0.45), 0.05, zMid);
     const plateHigh = new THREE.Mesh(new RoundedBoxGeometry(1.35, 0.08, 1.62, 1, 0.02), darkMetalMat);
-    plateHigh.position.set(xHigh + (lane.side === 'left' ? -0.45 : 0.45), MALL_UPPER_Y + 0.03, zMid);
+    plateHigh.position.set(xHigh + (lane.side === 'left' ? -0.45 : 0.45), MALL_UPPER_Y + 0.05, zMid);
     escStatic.add(plateLow, plateHigh);
 
     // Dual sloped glass balustrades + dark moving handrails
     [-0.78, 0.78].forEach((oz) => {
-      const glassWall = new THREE.Mesh(new THREE.BoxGeometry(diagLen + 0.4, 0.92, 0.05), glassRailMat);
-      glassWall.position.set(midX, midY + 0.44, zMid + oz);
+      const glassWall = new THREE.Mesh(new THREE.BoxGeometry(diagLen + 0.4, 0.94, 0.05), glassRailMat);
+      glassWall.position.set(midX, midY + 0.46, zMid + oz);
       glassWall.rotation.z = slopePitch;
       const handRail = new THREE.Mesh(
         new RoundedBoxGeometry(diagLen + 0.9, 0.085, 0.11, 2, 0.03),
         darkMetalMat,
       );
-      handRail.position.set(midX, midY + 0.94, zMid + oz);
+      handRail.position.set(midX, midY + 0.96, zMid + oz);
       handRail.rotation.z = slopePitch;
       escStatic.add(glassWall, handRail);
     });
 
-    // Illuminated Floor Entry Arrow Pads (at boarding end of each lane!)
+    // Illuminated Fixed-Direction Arrow Pads at Boarding & Exit Ends (zero floating text!)
     const padTexMat = lane.dir === 'up' ? arrowUpMat : arrowDownMat;
-    const arrowPad = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.95), padTexMat);
-    arrowPad.rotation.x = -Math.PI / 2;
-    arrowPad.rotation.z = lane.side === 'left' ? Math.PI / 2 : -Math.PI / 2;
+    const arrowPadStart = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96), padTexMat);
+    arrowPadStart.rotation.x = -Math.PI / 2;
+    arrowPadStart.rotation.z = lane.side === 'left' ? Math.PI / 2 : -Math.PI / 2;
     if (lane.startFloor === 1) {
-      arrowPad.position.set(lane.approachX + (lane.side === 'left' ? -0.45 : 0.45), 0.025, zMid);
+      arrowPadStart.position.set(lane.approachX + (lane.side === 'left' ? -0.32 : 0.32), 0.03, zMid);
     } else {
-      arrowPad.position.set(lane.approachX + (lane.side === 'left' ? 0.45 : -0.45), MALL_UPPER_Y + 0.025, zMid);
+      arrowPadStart.position.set(
+        lane.approachX + (lane.side === 'left' ? 0.32 : -0.32),
+        MALL_UPPER_Y + 0.03,
+        zMid,
+      );
     }
-    group.add(arrowPad);
+    group.add(arrowPadStart);
 
     // Click proxy along escalator lane & entry pad
     const hitSlope = new THREE.Mesh(
-      new THREE.BoxGeometry(diagLen + 1.6, 1.95, 1.7),
+      new THREE.BoxGeometry(diagLen + 1.8, 2.1, 1.75),
       new THREE.MeshBasicMaterial({visible: false}),
     );
     hitSlope.position.set(midX, midY + 0.65, zMid);
@@ -976,36 +1001,25 @@ export function buildMallInteriorScene(): SubzoneWorld {
     group.add(hitSlope);
     clickTargets.push(hitSlope);
 
-    // Anchor label on entry end of each escalator
-    labelAnchors.push({
-      id: `mall_esc_lbl_${lane.id}`,
-      label: lane.dir === 'up' ? 'Thang Cuốn Lên ▲' : 'Thang Cuốn Xuống ▼',
-      worldPos: new THREE.Vector3(
-        lane.startX,
-        lane.startY + 1.45,
-        lane.startZ,
-      ),
-    });
-
     escAnimList.push({lane, stepCount: STEPS_PER_LANE});
   });
 
-  // Floor 1 colliders guarding under the diagonal escalator belly so avatars don't clip through low slope
+  // Floor 1 colliders guarding under the diagonal escalator belly
   [-1, 1].forEach((side) => {
     colliders.push({
       type: 'box',
       id: `mall_f1_esc_block_${side < 0 ? 'l' : 'r'}`,
       x: side * 22.0,
       z: 0,
-      hw: 4.35,
-      hd: 3.45,
+      hw: 5.05,
+      hd: 3.55,
     });
   });
   mergeStaticGroupByMaterial(escStatic);
   group.add(escStatic);
 
-  // Single InstancedMesh for ALL 88 Escalator Moving Steps across Left & Right UP/DOWN lanes!
-  const stepGeo = new RoundedBoxGeometry(0.46, 0.24, 1.38, 1, 0.015);
+  // Single InstancedMesh for ALL 104 Escalator Moving Steps across Left & Right Fixed UP/DOWN lanes!
+  const stepGeo = new RoundedBoxGeometry(0.48, 0.3, 1.38, 1, 0.015);
   const stepMat = clayMat('#7D8B99', 0.55, 0.35);
   const totalEscSteps = escAnimList.length * STEPS_PER_LANE;
   const escStepsIM = new THREE.InstancedMesh(stepGeo, stepMat, totalEscSteps);
@@ -1015,28 +1029,28 @@ export function buildMallInteriorScene(): SubzoneWorld {
   // ========== 6. GRAND LOBBY SHOWROOM DAIS, TUN NPC, FUTURISTIC BLUE MINI CONVERTIBLE, BIKE & SKATEBOARD RACK ==========
   const showcaseGroup = new THREE.Group();
 
-  // Central Low Sleek Showroom Dais (walkable perimeter, props collidable)
+  // Central Low Sleek Showroom Dais (strictly stacked heights — zero Z-fighting)
   const daisX = 0.8;
   const daisZ = -1.2;
   const daisBase = new THREE.Mesh(
-    new RoundedBoxGeometry(10.8, 0.12, 5.4, 3, 0.05),
+    new RoundedBoxGeometry(10.8, 0.11, 5.4, 3, 0.04),
     clayMat('#EDE6D8', 0.5),
   );
-  daisBase.position.set(daisX, 0.06, daisZ);
+  daisBase.position.set(daisX, 0.08, daisZ);
   const daisTop = new THREE.Mesh(
     new RoundedBoxGeometry(10.4, 0.06, 5.0, 3, 0.03),
     clayMat('#FAF8F2', 0.42),
   );
-  daisTop.position.set(daisX, 0.14, daisZ);
+  daisTop.position.set(daisX, 0.165, daisZ);
 
   // Circular Spotlight Plinth directly under the Futuristic Blue Convertible Car
   const carX = -0.35;
   const carZ = -1.1;
   const turntablePad = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.75, 1.85, 0.12, 32),
+    new THREE.CylinderGeometry(1.75, 1.85, 0.11, 32),
     clayMat('#DCEFFF', 0.32),
   );
-  turntablePad.position.set(carX, 0.21, carZ);
+  turntablePad.position.set(carX, 0.245, carZ);
   const turntableRim = new THREE.Mesh(
     new THREE.TorusGeometry(1.78, 0.032, 8, 40),
     new THREE.MeshStandardMaterial({
@@ -1047,12 +1061,12 @@ export function buildMallInteriorScene(): SubzoneWorld {
     }),
   );
   turntableRim.rotation.x = Math.PI / 2;
-  turntableRim.position.set(carX, 0.26, carZ);
+  turntableRim.position.set(carX, 0.295, carZ);
   showcaseGroup.add(daisBase, daisTop, turntablePad, turntableRim);
 
   // Hero Prop 1: Futuristic Cute 1-Seater Blue Luxury Convertible Car
   const carGroup = buildFuturisticMiniConvertible();
-  carGroup.position.set(carX, 0.27, carZ);
+  carGroup.position.set(carX, 0.3, carZ);
   carGroup.rotation.y = 0.42;
   group.add(carGroup);
   addMallProxy(
@@ -1068,7 +1082,7 @@ export function buildMallInteriorScene(): SubzoneWorld {
   const bikeX = 2.45;
   const bikeZ = -0.65;
   const bikeGroup = buildShowroomBicycle();
-  bikeGroup.position.set(bikeX, 0.17, bikeZ);
+  bikeGroup.position.set(bikeX, 0.2, bikeZ);
   bikeGroup.rotation.y = -0.52;
   showcaseGroup.add(bikeGroup);
   addMallProxy(
@@ -1084,7 +1098,7 @@ export function buildMallInteriorScene(): SubzoneWorld {
   const skateX = 4.65;
   const skateZ = -1.1;
   const skateRackGroup = buildSkateboardRack();
-  skateRackGroup.position.set(skateX, 0.17, skateZ);
+  skateRackGroup.position.set(skateX, 0.2, skateZ);
   skateRackGroup.rotation.y = -0.34;
   showcaseGroup.add(skateRackGroup);
   addMallProxy(
@@ -1193,30 +1207,30 @@ export function buildMallInteriorScene(): SubzoneWorld {
   mergeStaticGroupByMaterial(lobbyDecor);
   group.add(lobbyDecor);
 
-  // ========== 8. GRAND SOUTH GLASS EXIT PORTAL (Z = +25.4 -> BACK TO TOWN) ==========
+  // ========== 8. GRAND SOUTH GLASS EXIT PORTAL (Z = +25.4 -> BACK TO TOWN, NO EXIT LABEL) ==========
   const exitPortal = new THREE.Group();
-  const exitRug = new THREE.Mesh(
-    new RoundedBoxGeometry(4.2, 0.03, 3.6, 2, 0.015),
-    clayMat('#B9464E', 0.82),
-  );
-  exitRug.position.set(0, 0.015, MALL_HALF_D - 2.2);
   const exitTrim = new THREE.Mesh(
-    new RoundedBoxGeometry(4.45, 0.022, 3.85, 2, 0.01),
+    new RoundedBoxGeometry(4.45, 0.036, 3.85, 2, 0.012),
     goldMat,
   );
-  exitTrim.position.set(0, 0.011, MALL_HALF_D - 2.2);
+  exitTrim.position.set(0, 0.022, MALL_HALF_D - 2.2);
+  const exitRug = new THREE.Mesh(
+    new RoundedBoxGeometry(4.12, 0.04, 3.52, 2, 0.015),
+    clayMat('#B9464E', 0.82),
+  );
+  exitRug.position.set(0, 0.046, MALL_HALF_D - 2.2);
 
   [-3.2, 3.2].forEach((px) => {
-    const jamb = new THREE.Mesh(new RoundedBoxGeometry(0.32, 4.3, 0.42, 2, 0.04), creamTrimMat);
-    jamb.position.set(px, 2.15, MALL_HALF_D - 0.15);
+    const jamb = new THREE.Mesh(new RoundedBoxGeometry(0.32, 4.7, 0.42, 2, 0.04), creamTrimMat);
+    jamb.position.set(px, 2.35, MALL_HALF_D - 0.15);
     exitPortal.add(jamb);
   });
   const header = new THREE.Mesh(new RoundedBoxGeometry(6.8, 0.42, 0.48, 2, 0.04), creamTrimMat);
-  header.position.set(0, 4.25, MALL_HALF_D - 0.15);
-  const doorGlass = new THREE.Mesh(new THREE.BoxGeometry(5.9, 3.9, 0.08), glassRailMat);
-  doorGlass.position.set(0, 2.0, MALL_HALF_D - 0.15);
-  const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.9, 0.12), silverMat);
-  mullion.position.set(0, 2.0, MALL_HALF_D - 0.15);
+  header.position.set(0, 4.65, MALL_HALF_D - 0.15);
+  const doorGlass = new THREE.Mesh(new THREE.BoxGeometry(5.9, 4.3, 0.08), glassRailMat);
+  doorGlass.position.set(0, 2.2, MALL_HALF_D - 0.15);
+  const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.12, 4.3, 0.12), silverMat);
+  mullion.position.set(0, 2.2, MALL_HALF_D - 0.15);
 
   exitPortal.add(exitTrim, exitRug, header, doorGlass, mullion);
   mergeStaticGroupByMaterial(exitPortal);
@@ -1224,29 +1238,25 @@ export function buildMallInteriorScene(): SubzoneWorld {
 
   addMallProxy(
     group,
-    [5.8, 3.6, 2.2],
-    [0, 1.8, MALL_HALF_D - 0.85],
+    [5.8, 3.8, 2.2],
+    [0, 1.9, MALL_HALF_D - 0.85],
     {kind: 'exit', tx: 0, tz: MALL_HALF_D - 2.6},
     clickTargets,
   );
-  labelAnchors.push({
-    id: 'mall_exit',
-    label: 'Ra Thị Trấn',
-    worldPos: new THREE.Vector3(0, 2.8, MALL_HALF_D - 0.8),
-  });
 
-  // Keep walkable area inside Floor 1 clean around walls
+  // Keep walkable area inside Floor 1 & Floor 2 clean around walls
   const floor1RayMeshes: THREE.Object3D[] = [groundMesh];
   const floor2RayMeshes: THREE.Object3D[] = floor2WalkGroup.children;
 
-  // Dynamic Update: Tun idle breathing + smooth continuous escalator step loop!
+  // Dynamic Update: Tun idle breathing + smooth continuous fixed escalator step loop!
   const _stepDummy = new THREE.Object3D();
   const update = (elapsed: number, timeOfDay: TimeOfDay) => {
     updateAvatarRigAnimation(tunRig, 'idle', elapsed, false);
     const isNight = timeOfDay === 'night';
     warmLampMat.emissiveIntensity = isNight ? 1.1 : 0.36;
-    skylightGlassMat.emissive.set(isNight ? '#305B8C' : '#8ED8F8');
-    skylightGlassMat.emissiveIntensity = isNight ? 0.24 : 0.14;
+    ceilingLightMat.emissiveIntensity = isNight ? 1.15 : 0.85;
+    windowPaneMat.emissive.set(isNight ? '#3B6DA6' : '#8ED8F8');
+    windowPaneMat.emissiveIntensity = isNight ? 0.28 : 0.16;
 
     // Smoothly scroll all 4 escalator lanes in 1 shared InstancedMesh
     let instIdx = 0;

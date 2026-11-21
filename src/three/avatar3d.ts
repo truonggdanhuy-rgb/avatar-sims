@@ -1959,6 +1959,8 @@ export function buildAvatarRig(
   const leftElbow = leftArmRig.elbowPivot;
   const rightElbow = rightArmRig.elbowPivot;
 
+  leftArm.userData.baseZ = leftArm.rotation.z;
+  rightArm.userData.baseZ = rightArm.rotation.z;
   bodyPivot.add(leftArm, rightArm);
 
   let rodBobberObj: THREE.Object3D | undefined;
@@ -1970,6 +1972,7 @@ export function buildAvatarRig(
     const hoodieClearZ = isHoodie ? 0.06 : 0;
     rightArm.rotation.x = poseCfg.armX;
     rightArm.rotation.z = poseCfg.armZ + hoodieClearZ;
+    rightArm.userData.baseZ = rightArm.rotation.z;
     rightElbow.rotation.x = poseCfg.elbowX;
     rightElbow.rotation.z = poseCfg.elbowZ;
 
@@ -3329,8 +3332,10 @@ export function updateAvatarRigAnimation(
 
   if (pose !== 'parachute') {
     rig.bodyPivot.rotation.z = 0;
-    rig.leftArm.rotation.z = 0;
-    rig.rightArm.rotation.z = 0;
+    rig.leftArm.rotation.z =
+      (rig.leftArm.userData.baseZ as number | undefined) ?? -HAND_POSES.none.armZ;
+    rig.rightArm.rotation.z =
+      (rig.rightArm.userData.baseZ as number | undefined) ?? HAND_POSES.none.armZ;
   }
 
   if (pose === 'walk') {

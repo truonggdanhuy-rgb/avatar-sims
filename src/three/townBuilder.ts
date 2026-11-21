@@ -39,7 +39,7 @@ export const TOWN_ZONE_ENTRANCES: Record<
   boutique: {tx: -32.0, tz: 23.5, exitRotY: 0},
   arcade: {tx: 32.0, tz: 23.5, exitRotY: 0},
   fishing: {tx: -19.6, tz: 38.6, exitRotY: 0},
-  petshop: {tx: 9.6, tz: 44.2, exitRotY: 0},
+  petshop: {tx: 16.2, tz: 44.2, exitRotY: 0},
   mall: {tx: -45.6, tz: -6.5, exitRotY: Math.PI / 2},
 };
 
@@ -1688,7 +1688,7 @@ export function buildTownScene(): TownWorld {
     [0, 0.16, 0, 2.3],
     [-32, 0.05, -18.2, 1.9],
     [-19.6, 0.05, 38.0, 1.7],
-    [9.6, 0.05, 42.4, 1.8],
+    [16.2, 0.05, 42.4, 1.8],
     [-32, 0.05, 22.0, 1.8],
     [32, 0.05, 22.0, 1.8],
     [-5.1, 0.16, -4.8, 1.05],
@@ -1696,7 +1696,7 @@ export function buildTownScene(): TownWorld {
     [-5.1, 0.16, 4.8, 1.05],
     [5.1, 0.16, 4.8, 1.05],
     [-21.18, TOWN_LAKE_WATER_Y + 0.02, 44.3, 1.45],
-    [17.8, 0.05, 42.4, 2.1],
+    [32.0, 0.05, 42.8, 2.3],
     [-73.0, 0.05, -3.55, 1.35],
     [-72.6, 0.05, 5.2, 1.35],
     [SHIP_STALL_POS.x, 0.05, SHIP_STALL_POS.z + 2.8, 2.1],
@@ -4291,12 +4291,14 @@ export function buildTownScene(): TownWorld {
     group.add(stall);
   }
 
-  // ========== DISTRICT 6: TRẠM BƯU ĐIỆN & ĐỒNG HỒ (Taller Belfry Clock Tower & Post Office, 2 Tiers) ==========
+  // ========== DISTRICT 6: TRẠM BƯU ĐIỆN & ĐỒNG HỒ (Enlarged Broad Belfry Clock Tower Aligned with Arcade) ==========
   {
+    const CLOCK_X = 32.0;
+    const CLOCK_Z = 38.4;
     const kiosk = new THREE.Group();
-    kiosk.position.set(17.8, 0, 39.0);
+    kiosk.position.set(CLOCK_X, 0, CLOCK_Z);
     kiosk.rotation.y = 0;
-    kiosk.scale.setScalar(1.88);
+    kiosk.scale.setScalar(2.08);
 
     const stoneBaseMat2 = getMat('#C8B8A4', 0.78);
     const brickLowerMat = getMat('#D88C6F', 0.74);
@@ -4305,84 +4307,84 @@ export function buildTownScene(): TownWorld {
     const woodDoorMat = getMat('#7D5333', 0.68);
     const goldMat = glossyClayMat('#FFD166', 0.24);
 
-    const base = new THREE.Mesh(new RoundedBoxGeometry(3.2, 0.36, 2.9, 2, 0.06), stoneBaseMat2);
-    base.position.y = 0.18;
+    const base = new THREE.Mesh(new RoundedBoxGeometry(3.72, 0.4, 3.24, 2, 0.06), stoneBaseMat2);
+    base.position.y = 0.2;
 
     const lowerStory = new THREE.Mesh(
-      new RoundedBoxGeometry(2.42, 1.72, 2.26, 2, 0.08),
+      new RoundedBoxGeometry(2.92, 1.88, 2.66, 2, 0.08),
       brickLowerMat,
     );
-    lowerStory.position.y = 1.18;
+    lowerStory.position.y = 1.28;
 
     // 4 Corner stone pilasters for grand post-office silhouette
     [
-      [-1.16, 1.08],
-      [1.16, 1.08],
-      [-1.16, -1.08],
-      [1.16, -1.08],
+      [-1.4, 1.26],
+      [1.4, 1.26],
+      [-1.4, -1.26],
+      [1.4, -1.26],
     ].forEach(([px, pz]) => {
-      const pilaster = new THREE.Mesh(new RoundedBoxGeometry(0.22, 1.74, 0.22, 2, 0.03), stoneBaseMat2);
-      pilaster.position.set(px, 1.18, pz);
+      const pilaster = new THREE.Mesh(new RoundedBoxGeometry(0.26, 1.9, 0.26, 2, 0.03), stoneBaseMat2);
+      pilaster.position.set(px, 1.28, pz);
       kiosk.add(pilaster);
     });
 
     const midLedge = new THREE.Mesh(
-      new RoundedBoxGeometry(2.68, 0.2, 2.5, 2, 0.04),
+      new RoundedBoxGeometry(3.22, 0.24, 2.94, 2, 0.04),
       stoneBaseMat2,
     );
-    midLedge.position.y = 2.08;
+    midLedge.position.y = 2.26;
 
     const tower = new THREE.Mesh(
-      new RoundedBoxGeometry(1.94, 2.15, 1.94, 2, 0.08),
+      new RoundedBoxGeometry(2.42, 2.34, 2.42, 2, 0.08),
       creamUpperMat,
     );
-    tower.position.y = 3.07;
+    tower.position.y = 3.36;
 
     const belfryTrim = new THREE.Mesh(
-      new RoundedBoxGeometry(2.14, 0.16, 2.14, 2, 0.04),
+      new RoundedBoxGeometry(2.68, 0.2, 2.68, 2, 0.04),
       stoneBaseMat2,
     );
-    belfryTrim.position.y = 4.14;
+    belfryTrim.position.y = 4.52;
     kiosk.add(belfryTrim);
 
-    const spire = new THREE.Mesh(new THREE.ConeGeometry(1.64, 2.25, 4), spireMat);
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(2.04, 2.45, 4), spireMat);
     spire.rotation.y = Math.PI / 4;
-    spire.position.y = 5.18;
+    spire.position.y = 5.64;
 
-    const spireFinial = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 10), goldMat);
-    spireFinial.position.y = 6.38;
+    const spireFinial = new THREE.Mesh(new THREE.SphereGeometry(0.27, 10, 10), goldMat);
+    spireFinial.position.y = 6.94;
 
     // Grand Clock Face + Rim + 12 Brass Tick Marks + Hands
     const clockFace = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.6, 0.6, 0.1, 18),
+      new THREE.CylinderGeometry(0.74, 0.74, 0.1, 20),
       getMat('#FFFFFF', 0.35),
     );
     clockFace.rotation.x = Math.PI / 2;
-    clockFace.position.set(0, 3.12, 0.98);
+    clockFace.position.set(0, 3.42, 1.22);
 
     const clockRim = new THREE.Mesh(
-      new THREE.TorusGeometry(0.62, 0.08, 8, 20),
+      new THREE.TorusGeometry(0.76, 0.09, 8, 22),
       getMat('#6E4E34', 0.58),
     );
-    clockRim.position.set(0, 3.12, 1.0);
+    clockRim.position.set(0, 3.42, 1.24);
 
     for (let h = 0; h < 12; h++) {
       const ang = (h / 12) * Math.PI * 2;
-      const tick = new THREE.Mesh(new THREE.SphereGeometry(0.032, 6, 6), goldMat);
-      tick.position.set(Math.sin(ang) * 0.48, 3.12 + Math.cos(ang) * 0.48, 1.04);
+      const tick = new THREE.Mesh(new THREE.SphereGeometry(0.038, 6, 6), goldMat);
+      tick.position.set(Math.sin(ang) * 0.58, 3.42 + Math.cos(ang) * 0.58, 1.28);
       kiosk.add(tick);
     }
 
-    const handHour = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.3, 0.04), getMat('#2B2D42', 0.5));
-    handHour.position.set(0, 3.24, 1.05);
-    const handMin = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.045, 0.04), getMat('#2B2D42', 0.5));
-    handMin.position.set(0.15, 3.12, 1.05);
+    const handHour = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.36, 0.045), getMat('#2B2D42', 0.5));
+    handHour.position.set(0, 3.56, 1.29);
+    const handMin = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.052, 0.045), getMat('#2B2D42', 0.5));
+    handMin.position.set(0.18, 3.42, 1.29);
 
     // Post-office arched door + striped canopy + warm twin wall lanterns + royal red postbox + parcel crate
-    const doorCanopy = createExtrudedRoof(1.48, 0.44, 0.78, spireMat);
-    doorCanopy.position.set(0, 1.84, 1.32);
-    const door = new THREE.Mesh(new RoundedBoxGeometry(0.92, 1.38, 0.16, 2, 0.04), woodDoorMat);
-    door.position.set(0, 1.0, 1.15);
+    const doorCanopy = createExtrudedRoof(1.8, 0.5, 0.9, spireMat);
+    doorCanopy.position.set(0, 1.98, 1.54);
+    const door = new THREE.Mesh(new RoundedBoxGeometry(1.12, 1.52, 0.18, 2, 0.04), woodDoorMat);
+    door.position.set(0, 1.08, 1.34);
 
     const postLanternMat = new THREE.MeshStandardMaterial({
       color: '#FFF4C2',
@@ -4391,24 +4393,24 @@ export function buildTownScene(): TownWorld {
       roughness: 0.25,
     });
     lampBulbs.push(postLanternMat);
-    [-0.72, 0.72].forEach((lx) => {
-      const lOrb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), postLanternMat);
-      lOrb.position.set(lx, 1.48, 1.24);
+    [-0.86, 0.86].forEach((lx) => {
+      const lOrb = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), postLanternMat);
+      lOrb.position.set(lx, 1.58, 1.44);
       kiosk.add(lOrb);
     });
 
     const postbox = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.34, 0.62, 7, 10),
+      new THREE.CapsuleGeometry(0.36, 0.64, 7, 10),
       glossyClayMat('#D94F4F', 0.3),
     );
-    postbox.scale.setScalar(1.12);
-    postbox.position.set(1.4, 0.78, 0.68);
+    postbox.scale.setScalar(1.15);
+    postbox.position.set(1.68, 0.82, 0.78);
 
     const parcel = new THREE.Mesh(
-      new RoundedBoxGeometry(0.5, 0.42, 0.44, 2, 0.04),
+      new RoundedBoxGeometry(0.54, 0.44, 0.46, 2, 0.04),
       getMat('#D9A566', 0.78),
     );
-    parcel.position.set(-1.36, 0.56, 0.75);
+    parcel.position.set(-1.62, 0.6, 0.84);
 
     kiosk.add(
       base,
@@ -4428,19 +4430,19 @@ export function buildTownScene(): TownWorld {
     );
     addInteractionProxy(
       kiosk,
-      [4.4, 6.8, 3.8],
-      2.8,
-      {kind: 'settings', tx: 17.8, tz: 43.8},
+      [4.9, 7.4, 4.2],
+      3.1,
+      {kind: 'settings', tx: CLOCK_X, tz: 43.8},
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'settings', x: 17.8, z: 39.0, hw: 3.25, hd: 2.88, rotY: 0});
+    colliders.push({type: 'box', id: 'settings', x: CLOCK_X, z: CLOCK_Z, hw: 4.15, hd: 3.65, rotY: 0});
     mergeStaticGroupByMaterial(kiosk);
     group.add(kiosk);
   }
 
   // ========== DISTRICT 6B: CỬA HÀNG THÚ CƯNG ("Pets" Hanging Side Sign + Large Puppy on Roof) ==========
   {
-    const PET_X = 9.6;
+    const PET_X = 16.2;
     const PET_Z = 39.0;
     const petShop = new THREE.Group();
     petShop.position.set(PET_X, 0, PET_Z);
@@ -8483,9 +8485,9 @@ export function buildTownScene(): TownWorld {
 
     // Far-South Spurs stopping cleanly ~1.8m BEFORE the Fishing Bridge, Pet Shop & Clock Tower
     addSteppingTrail(-22.5, 34.8, -1.6, 34.8);
-    addSteppingTrail(1.6, 46.2, 22.0, 46.2);
-    addSteppingTrail(9.6, 46.2, 9.6, 44.6);
-    addSteppingTrail(17.8, 46.2, 17.8, 44.5);
+    addSteppingTrail(1.6, 46.2, 32.0, 46.2);
+    addSteppingTrail(16.2, 46.2, 16.2, 44.6);
+    addSteppingTrail(32.0, 46.2, 32.0, 44.5);
 
     const stoneGeo = new THREE.CylinderGeometry(0.42, 0.48, 0.055, 9);
     const stoneMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.84});
@@ -8818,7 +8820,7 @@ export function buildTownScene(): TownWorld {
     [-44.5, 16.5, 1.26, true, -0.45],
     [45.0, 16.5, 1.54, true, -2.5],
     [-37.5, 36.0, 1.48, true, 0.7],
-    [36.5, 35.5, 1.26, true, 2.45],
+    [40.5, 36.2, 1.26, true, 2.45],
     [-8.8, 56.5, 1.58, true, -1.2],
     [12.8, 53.5, 1.28, true, -2.0],
     [-69.0, 4.0, 1.62, true, 0.1],
@@ -10132,7 +10134,7 @@ export function buildTownScene(): TownWorld {
     [-35.0, 40.5, '#A8D8EA', 0.88],
     [-11.8, 50.5, '#F7A8B8', 0.85],
     [26.2, 43.2, '#FF9EBB', 0.9],
-    [28.5, 37.2, '#F28482', 0.92],
+    [25.0, 34.8, '#F28482', 0.92],
     [-8.4, -27.2, '#F7A8B8', 0.88],
     [-19.2, -16.2, '#A8D8EA', 0.84],
     [-21.5, 4.2, '#D0A6FF', 0.82],
@@ -10142,7 +10144,7 @@ export function buildTownScene(): TownWorld {
     [-15.2, 9.6, '#FFAD88', 0.8],
     [15.6, 9.8, '#F28482', 0.78],
     [-20.5, 32.5, '#F7A8B8', 0.76],
-    [13.9, 36.2, '#A8D8EA', 0.82],
+    [10.8, 36.2, '#A8D8EA', 0.82],
     [9.4, 15.8, '#F7A8B8', 0.86],
     [18.2, 16.4, '#A8D8EA', 0.88],
     [-29.5, 7.5, '#FF9EBB', 0.9],
@@ -10256,7 +10258,7 @@ export function buildTownScene(): TownWorld {
     [-35.8, 49.5, 1.25, '#4B9F55'],
     [-12.5, 42.5, 1.14, '#54AA5D'],
     [15.0, 48.2, 1.26, '#4E9F57'],
-    [32.5, 45.8, 1.3, '#57AE60'],
+    [39.0, 45.2, 1.3, '#57AE60'],
     [-22.5, -38.5, 1.35, '#4A9D54'],
     [22.8, -38.0, 1.34, '#54AC5D'],
     [-51.0, 12.5, 1.38, '#4D9E56'],
@@ -10338,7 +10340,7 @@ export function buildTownScene(): TownWorld {
     if (Math.abs(pz + 12.5) < 1.8 && px > -34 && px < 34) return true;
     if (Math.abs(pz - 26.8) < 1.8 && px > -34 && px < 34) return true;
     if (Math.abs(pz - 35.2) < 1.6 && px > -21 && px < 2) return true;
-    if (Math.abs(pz - 46.2) < 1.6 && px > -2 && px < 26) return true;
+    if (Math.abs(pz - 46.2) < 1.6 && px > -2 && px < 34) return true;
     if (Math.abs(px) < 1.8 && pz > -21 && pz < 53) return true;
     if (Math.abs(px + 23.5) < 1.6 && pz > -13 && pz < 27) return true;
     if (Math.abs(px - 23.5) < 1.6 && pz > -13 && pz < 47.5) return true;
@@ -10352,8 +10354,8 @@ export function buildTownScene(): TownWorld {
     if (Math.hypot(px - 42.8, pz + 23.2) < 3.6) return true;
     if (Math.hypot(px + 32, pz - 18.0) < 6.2) return true;
     if (Math.hypot(px - 32, pz - 18.0) < 6.6) return true;
-    if (Math.hypot(px - 17.8, pz - 39.0) < 5.2) return true;
-    if (Math.hypot(px - 9.6, pz - 39.0) < 5.0) return true;
+    if (Math.hypot(px - 32.0, pz - 38.4) < 6.2) return true;
+    if (Math.hypot(px - 16.2, pz - 39.0) < 5.0) return true;
     if (Math.hypot(px + 16.8, pz - 37.2) < 3.4) return true;
     if (px >= -64.5 && px <= -36.5 && pz >= -13.0 && pz <= 8.5) return true;
     if (isInWestRiverOrCliffZone(px, pz, 1.5)) return true;

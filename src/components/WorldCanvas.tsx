@@ -60,10 +60,13 @@ import {
 } from '../three/subzonesBuilder';
 import {
   clampMallFloorPoint,
+  MALL_ATRIUM_HALF_D,
+  MALL_ATRIUM_HALF_W,
   MALL_ESCALATOR_LANES,
   MALL_HALF_D,
   MALL_HALF_W,
   MALL_UPPER_Y,
+  MALL_WALL_H,
   MallEscalatorLane,
 } from '../three/mallBuilder';
 import {
@@ -388,12 +391,12 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
 
   if (zone === 'mall') {
     if (isPortrait) {
-      return {fov: 48, pos: [0, 12.2, 16.5] as const, look: [0, 1.0, 0] as const};
+      return {fov: 50, pos: [0, 7.2, 8.8] as const, look: [0, 1.0, 0] as const};
     }
     if (isSquare) {
-      return {fov: 44, pos: [0, 11.4, 15.0] as const, look: [0, 1.0, 0] as const};
+      return {fov: 46, pos: [0, 6.8, 8.2] as const, look: [0, 1.0, 0] as const};
     }
-    return {fov: 40, pos: [0, 10.5, 13.5] as const, look: [0, 1.0, 0] as const};
+    return {fov: 43, pos: [0, 6.2, 7.2] as const, look: [0, 1.0, 0] as const};
   }
 
   if (isPortrait) {
@@ -1744,7 +1747,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       floor: 1 as 1 | 2,
       ridingLane: null as MallEscalatorLane | null,
       progress: 0,
-      duration: 2.8,
+      duration: 3.4,
       cooldown: 0,
     };
     const parachuteCtrl = {
@@ -2205,9 +2208,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         boatState.moving = false;
         setIsBoatingHud(false);
         if (zoneChanged) playPetTimer = 0;
-        controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : z === 'mall' ? 4.8 : 4.5;
+        controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : z === 'mall' ? 3.6 : 4.5;
         controls.maxDistance =
-          z === 'garden' || z === 'home' ? 26 : z === 'mall' ? 24 : z === 'petshop' ? 22 : 18;
+          z === 'garden' || z === 'home' ? 26 : z === 'mall' ? 16.5 : z === 'petshop' ? 22 : 18;
         controls.minPolarAngle = Math.PI * 0.16;
         controls.maxPolarAngle = z === 'mall' ? Math.PI * 0.48 : Math.PI * 0.45;
         activeSubzone = buildSubzoneScene(z, {
@@ -2278,7 +2281,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             playerPos.rotY = Math.PI;
           } else if (z === 'mall') {
             playerPos.x = 0;
-            playerPos.z = 21.8;
+            playerPos.z = 18.8;
             playerPos.rotY = Math.PI;
           } else {
             playerPos.x = 0;
@@ -4070,15 +4073,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (kind === 'mall_escalator') {
             soundFX.tap();
             if (stateRef.current.zone !== 'mall' || mallState.ridingLane) return;
-            const rawLane = MALL_ESCALATOR_LANES.find((l) => l.id === data.laneId);
-            if (!rawLane) return;
-            const lane =
-              rawLane.startFloor === mallState.floor
-                ? rawLane
-                : MALL_ESCALATOR_LANES.find(
-                    (l) => l.side === rawLane.side && l.startFloor === mallState.floor,
-                  );
+            const lane = MALL_ESCALATOR_LANES.find((l) => l.id === data.laneId);
             if (!lane) return;
+            if (mallState.floor !== lane.startFloor) {
+              showBubble(
+                lane.dir === 'up'
+                  ? 'Thang cuốn này cố định đi LÊN từ Tầng 1! Hãy chọn thang đi XUỐNG bên cạnh nhé.'
+                  : 'Thang cuốn này cố định đi XUỐNG từ Tầng 2! Hãy chọn thang đi LÊN bên cạnh nhé.',
+              );
+              return;
+            }
             startWalkTo(lane.approachX, lane.approachZ, 'idle', undefined, () => {
               if (mallState.ridingLane || mallState.floor !== lane.startFloor) return;
               soundFX.tap();
@@ -5172,6 +5176,61 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         if (camera.position.y < minCamY) {
           camera.position.y = minCamY;
         }
+      } else if (z === 'mall') {
+        const tx = controls.target.x;
+        const ty = controls.target.y;
+        const tz = controls.target.z;
+        const dx = camera.position.x - tx;
+        const dy = camera.position.y - ty;
+        const dz = camera.position.z - tz;
+        const minFloorCamY =
+          mallState.floor === 2 && !mallState.ridingLane ? MALL_UPPER_Y + 0.72 : 0.65;
+        const maxCamX = MALL_HALF_W - 0.95;
+        const maxCamZ = MALL_HALF_D - 0.95;
+        const maxCamY = MALL_WALL_H - 0.95;
+
+        let maxT = 1.0;
+        if (dx > 0.001 && tx + dx > maxCamX) maxT = Math.min(maxT, (maxCamX - tx) / dx);
+        if (dx < -0.001 && tx + dx < -maxCamX) maxT = Math.min(maxT, (-maxCamX - tx) / dx);
+        if (dz > 0.001 && tz + dz > maxCamZ) maxT = Math.min(maxT, (maxCamZ - tz) / dz);
+        if (dz < -0.001 && tz + dz < -maxCamZ) maxT = Math.min(maxT, (-maxCamZ - tz) / dz);
+        if (dy > 0.001 && ty + dy > maxCamY) maxT = Math.min(maxT, (maxCamY - ty) / dy);
+        if (dy < -0.001 && ty + dy < minFloorCamY) maxT = Math.min(maxT, (minFloorCamY - ty) / dy);
+
+        // When player is on Floor 1, prevent camera ray from rising above/behind Floor 2 mezzanine deck
+        if (mallState.floor === 1 && !mallState.ridingLane) {
+          const isCamBlockedByF2 = (t: number) => {
+            const rx = tx + dx * t;
+            const ry = ty + dy * t;
+            const rz = tz + dz * t;
+            if (ry < MALL_UPPER_Y - 0.95) return false;
+            return (
+              Math.abs(rx) > MALL_ATRIUM_HALF_W - 0.55 || Math.abs(rz) > MALL_ATRIUM_HALF_D - 0.55
+            );
+          };
+          if (isCamBlockedByF2(maxT)) {
+            let lo = 0.28;
+            let hi = maxT;
+            for (let it = 0; it < 7; it++) {
+              const mid = (lo + hi) * 0.5;
+              if (isCamBlockedByF2(mid)) {
+                hi = mid;
+              } else {
+                lo = mid;
+              }
+            }
+            maxT = lo;
+          }
+        }
+
+        maxT = Math.max(0.28, maxT);
+        if (maxT < 0.999) {
+          camera.position.set(
+            THREE.MathUtils.clamp(tx + dx * maxT, -maxCamX, maxCamX),
+            THREE.MathUtils.clamp(ty + dy * maxT, minFloorCamY, maxCamY),
+            THREE.MathUtils.clamp(tz + dz * maxT, -maxCamZ, maxCamZ),
+          );
+        }
       }
       camera.updateMatrixWorld();
       _projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -5944,11 +6003,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 ) {
                   continue;
                 }
-              } else if (a.id === 'mall_exit' && mallState.floor !== 1) {
-                continue;
-              } else if (a.id.startsWith('mall_esc_lbl_')) {
-                if (a.id.endsWith('_up') && mallState.floor !== 1) continue;
-                if (a.id.endsWith('_down') && mallState.floor !== 2) continue;
               }
             }
             _projVec.copy(a.worldPos).project(camera);
