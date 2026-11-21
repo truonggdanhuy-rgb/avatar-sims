@@ -36,10 +36,11 @@ export const TOWN_ZONE_ENTRANCES: Record<
 > = {
   home: {tx: -32.0, tz: -15.3, exitRotY: 0},
   garden: {tx: 32.0, tz: -16.4, exitRotY: 0},
-  boutique: {tx: -32.0, tz: 23.2, exitRotY: 0},
-  arcade: {tx: 32.0, tz: 23.1, exitRotY: 0},
+  boutique: {tx: -32.0, tz: 23.5, exitRotY: 0},
+  arcade: {tx: 32.0, tz: 23.5, exitRotY: 0},
   fishing: {tx: -19.6, tz: 38.6, exitRotY: 0},
-  petshop: {tx: 11.8, tz: 43.85, exitRotY: 0},
+  petshop: {tx: 9.6, tz: 44.2, exitRotY: 0},
+  mall: {tx: -45.6, tz: -6.5, exitRotY: Math.PI / 2},
 };
 
 export const LAKE_CENTER = {x: -23.0, z: 46.8};
@@ -1687,7 +1688,7 @@ export function buildTownScene(): TownWorld {
     [0, 0.16, 0, 2.3],
     [-32, 0.05, -18.2, 1.9],
     [-19.6, 0.05, 38.0, 1.7],
-    [11.8, 0.05, 42.0, 1.8],
+    [9.6, 0.05, 42.4, 1.8],
     [-32, 0.05, 22.0, 1.8],
     [32, 0.05, 22.0, 1.8],
     [-5.1, 0.16, -4.8, 1.05],
@@ -1695,7 +1696,7 @@ export function buildTownScene(): TownWorld {
     [-5.1, 0.16, 4.8, 1.05],
     [5.1, 0.16, 4.8, 1.05],
     [-21.18, TOWN_LAKE_WATER_Y + 0.02, 44.3, 1.45],
-    [22.5, 0.05, -39.5, 2.35],
+    [17.8, 0.05, 42.4, 2.1],
     [-73.0, 0.05, -3.55, 1.35],
     [-72.6, 0.05, 5.2, 1.35],
     [SHIP_STALL_POS.x, 0.05, SHIP_STALL_POS.z + 2.8, 2.1],
@@ -2879,7 +2880,7 @@ export function buildTownScene(): TownWorld {
   // ========== DISTRICT 4: TIỆM MINIGAME (Multi-Tier Retro-Modern Arcade Palace + Crown GAME Marquee) ==========
   {
     const arcade = new THREE.Group();
-    arcade.position.set(32, 0, 17.5);
+    arcade.position.set(32, 0, 18.0);
     arcade.rotation.y = 0;
     arcade.scale.setScalar(1.52);
 
@@ -3433,7 +3434,7 @@ export function buildTownScene(): TownWorld {
       },
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'arcade', x: 32, z: 17.5, hw: 5.1, hd: 3.95, rotY: 0});
+    colliders.push({type: 'box', id: 'arcade', x: 32, z: 18.0, hw: 5.1, hd: 3.95, rotY: 0});
     mergeStaticGroupByMaterial(arcade);
     group.add(arcade);
   }
@@ -4293,7 +4294,7 @@ export function buildTownScene(): TownWorld {
   // ========== DISTRICT 6: TRẠM BƯU ĐIỆN & ĐỒNG HỒ (Taller Belfry Clock Tower & Post Office, 2 Tiers) ==========
   {
     const kiosk = new THREE.Group();
-    kiosk.position.set(24, 0, 39.5);
+    kiosk.position.set(17.8, 0, 39.0);
     kiosk.rotation.y = 0;
     kiosk.scale.setScalar(1.88);
 
@@ -4429,18 +4430,18 @@ export function buildTownScene(): TownWorld {
       kiosk,
       [4.4, 6.8, 3.8],
       2.8,
-      {kind: 'settings', tx: 24, tz: 44.1},
+      {kind: 'settings', tx: 17.8, tz: 43.8},
       clickTargets,
     );
-    colliders.push({type: 'box', id: 'settings', x: 24, z: 39.5, hw: 3.25, hd: 2.88, rotY: 0});
+    colliders.push({type: 'box', id: 'settings', x: 17.8, z: 39.0, hw: 3.25, hd: 2.88, rotY: 0});
     mergeStaticGroupByMaterial(kiosk);
     group.add(kiosk);
   }
 
   // ========== DISTRICT 6B: CỬA HÀNG THÚ CƯNG ("Pets" Hanging Side Sign + Large Puppy on Roof) ==========
   {
-    const PET_X = 11.8;
-    const PET_Z = 38.6;
+    const PET_X = 9.6;
+    const PET_Z = 39.0;
     const petShop = new THREE.Group();
     petShop.position.set(PET_X, 0, PET_Z);
     petShop.scale.setScalar(1.72);
@@ -6606,16 +6607,16 @@ export function buildTownScene(): TownWorld {
       eco.add(shoalGroup);
 
       // Bank colliders keeping walkers on shore (leaving Bridge z=6.8..10.2 & Dock z=-3.3..-0.3 open!)
-      for (let z = -66; z <= 64; z += 2.5) {
+      for (let z = -66; z <= 64; z += 3.2) {
         const cx = getWestRiverCenterX(z);
         const hw = getWestRiverHalfWidth(z);
-        const inBridgeBand = z >= 6.7 && z <= 10.3;
-        const inDockBand = z >= -3.4 && z <= -0.2;
+        const inBridgeBand = z >= 6.5 && z <= 10.5;
+        const inDockBand = z >= -3.6 && z <= -0.1;
         if (!inBridgeBand && !inDockBand) {
-          colliders.push({type: 'circle', x: cx + hw - 0.3, z, r: 1.35});
+          colliders.push({type: 'circle', x: cx + hw - 0.3, z, r: 1.55});
         }
         if (!inBridgeBand) {
-          colliders.push({type: 'circle', x: cx - hw + 0.3, z, r: 1.35});
+          colliders.push({type: 'circle', x: cx - hw + 0.3, z, r: 1.55});
         }
       }
     }
@@ -8472,6 +8473,7 @@ export function buildTownScene(): TownWorld {
     addSteppingTrail(-23.5, 1.6, -23.5, 25.2);
     addSteppingTrail(23.5, -11.0, 23.5, -1.6);
     addSteppingTrail(23.5, 1.6, 23.5, 25.2);
+    addSteppingTrail(23.5, 28.4, 23.5, 46.2);
 
     // South Street (z = 26.8) + short approach spurs that STOP cleanly before Boutique & Arcade
     addSteppingTrail(-32.0, 26.8, -1.6, 26.8);
@@ -8479,11 +8481,11 @@ export function buildTownScene(): TownWorld {
     addSteppingTrail(-32.0, 25.3, -32.0, 25.0);
     addSteppingTrail(32.0, 25.3, 32.0, 25.0);
 
-    // Far-South Spurs stopping cleanly ~1.8m BEFORE the Fishing Bridge, Pet Shop & Post Office
+    // Far-South Spurs stopping cleanly ~1.8m BEFORE the Fishing Bridge, Pet Shop & Clock Tower
     addSteppingTrail(-22.5, 34.8, -1.6, 34.8);
-    addSteppingTrail(1.6, 46.2, 24.0, 46.2);
-    addSteppingTrail(11.8, 46.2, 11.8, 44.2);
-    addSteppingTrail(24.0, 44.8, 24.0, 44.5);
+    addSteppingTrail(1.6, 46.2, 22.0, 46.2);
+    addSteppingTrail(9.6, 46.2, 9.6, 44.6);
+    addSteppingTrail(17.8, 46.2, 17.8, 44.5);
 
     const stoneGeo = new THREE.CylinderGeometry(0.42, 0.48, 0.055, 9);
     const stoneMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.84});
@@ -8832,8 +8834,109 @@ export function buildTownScene(): TownWorld {
     [60.5, 41.5, 1.32, true, -2.5],
     [-22.0, 62.5, 1.7, true, 1.1],
     [22.5, 61.5, 1.54, true, 2.0],
+    // South Main Avenue Trees (x = ±3.85 flanking the untouched central path; lamps point outward onto x = 0 walkway)
+    [-3.85, 11.5, 1.1, true, 0],
+    [3.85, 11.5, 1.1, true, Math.PI],
+    [-3.85, 17.2, 1.1, true, 0],
+    [3.85, 17.2, 1.1, true, Math.PI],
+    [-3.85, 22.9, 1.1, true, 0],
+    [3.85, 22.9, 1.1, true, Math.PI],
+    [-3.85, 30.8, 1.1, true, 0],
+    [3.85, 30.8, 1.1, true, Math.PI],
+    [-3.85, 37.6, 1.1, true, 0],
+    [3.85, 37.6, 1.1, true, Math.PI],
+    [-3.85, 43.4, 1.1, true, 0],
+    [3.85, 43.4, 1.1, true, Math.PI],
+    [-3.85, 49.2, 1.1, true, 0],
+    [3.85, 49.2, 1.1, true, Math.PI],
   ];
   const oakTrees = oakTreesRaw.filter(([tx, tz]) => !isInWestRiverOrCliffZone(tx, tz));
+
+  // South Main Avenue Thin Cords + Colorful Hanging Pennant Flags (merged + 1 InstancedMesh = ~2 draw calls!)
+  {
+    const avenueBlocks: [number, number[]][] = [
+      [-3.85, [11.5, 17.2, 22.9]],
+      [3.85, [11.5, 17.2, 22.9]],
+      [-3.85, [30.8, 37.6, 43.4, 49.2]],
+      [3.85, [30.8, 37.6, 43.4, 49.2]],
+    ];
+    const cordParts: THREE.BufferGeometry[] = [];
+    const flagRecords: {pos: THREE.Vector3; rotZ: number; color: string}[] = [];
+    const flagPalette = ['#FF6B8B', '#FFD166', '#5BC8F8', '#7AD88D', '#C09BFF', '#FF9F68'];
+    let colorIdx = 0;
+
+    for (const [ax, zs] of avenueBlocks) {
+      const inwardOffset = ax < 0 ? 0.14 : -0.14;
+      const cx = ax + inwardOffset;
+      for (let i = 0; i < zs.length - 1; i++) {
+        const z0 = zs[i];
+        const z1 = zs[i + 1];
+        const y0 = getTownGroundHeight(cx, z0) + 2.28;
+        const y1 = getTownGroundHeight(cx, z1) + 2.28;
+        const span = z1 - z0;
+        const curve = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(cx, y0, z0),
+          new THREE.Vector3(cx, (y0 + y1) * 0.5 - 0.32, (z0 + z1) * 0.5),
+          new THREE.Vector3(cx, y1, z1),
+        );
+        const tube = new THREE.TubeGeometry(curve, 12, 0.014, 5, false);
+        cordParts.push(tube);
+
+        const flagsOnSpan = span > 6.2 ? 7 : 6;
+        for (let f = 1; f <= flagsOnSpan; f++) {
+          const t = f / (flagsOnSpan + 1);
+          const pt = curve.getPoint(t);
+          const tan = curve.getTangent(t);
+          const slopePitch = Math.atan2(tan.y, tan.z);
+          flagRecords.push({
+            pos: new THREE.Vector3(pt.x, pt.y - 0.01, pt.z),
+            rotZ: slopePitch * 0.45,
+            color: flagPalette[colorIdx % flagPalette.length],
+          });
+          colorIdx++;
+        }
+      }
+    }
+
+    if (cordParts.length > 0) {
+      const mergedCordGeo = mergeParts(cordParts);
+      const cordMat = getMat('#4E463F', 0.82);
+      const cordMesh = new THREE.Mesh(mergedCordGeo, cordMat);
+      cordMesh.userData = {noShadowBlock: true};
+      group.add(cordMesh);
+    }
+
+    if (flagRecords.length > 0) {
+      const pennantShape = new THREE.Shape();
+      pennantShape.moveTo(-0.11, 0);
+      pennantShape.lineTo(0.11, 0);
+      pennantShape.lineTo(0, -0.24);
+      pennantShape.closePath();
+      const flagGeo = new THREE.ShapeGeometry(pennantShape, 1);
+      // Orient pennant edge along Z axis so it hangs parallel to the North-South avenue
+      flagGeo.rotateY(Math.PI / 2);
+      const flagMat = new THREE.MeshStandardMaterial({
+        color: '#FFFFFF',
+        roughness: 0.56,
+        side: THREE.DoubleSide,
+      });
+      const flagIM = new THREE.InstancedMesh(flagGeo, flagMat, flagRecords.length);
+      flagRecords.forEach((rec, i) => {
+        _instDummy.position.copy(rec.pos);
+        _instDummy.rotation.set(rec.rotZ, 0, 0);
+        _instDummy.scale.setScalar(1);
+        _instDummy.updateMatrix();
+        flagIM.setMatrixAt(i, _instDummy.matrix);
+        _instColor.set(rec.color);
+        flagIM.setColorAt(i, _instColor);
+      });
+      flagIM.instanceMatrix.needsUpdate = true;
+      if (flagIM.instanceColor) flagIM.instanceColor.needsUpdate = true;
+      flagIM.computeBoundingSphere();
+      flagIM.userData = {noShadowBlock: true};
+      group.add(flagIM);
+    }
+  }
 
   const oakLowerPalette = ['#4E9756', '#56A25E', '#488E50', '#5CA863'];
   const oakUpperPalette = ['#6BBC73', '#75C67D', '#64B46C', '#7ECD85'];
@@ -9206,7 +9309,7 @@ export function buildTownScene(): TownWorld {
   const pineCoordsRaw: [number, number, number][] = [
     // Explorable Outer Meadows (showing players the world extends far!)
     [-8.5, 44.5, 1.32],
-    [6.2, 44.5, 1.34],
+    [6.6, 52.5, 1.34],
     [-31.5, 60.5, 1.42],
     [28.5, 55.0, 1.4],
     [-5.2, 64.5, 1.48],
@@ -10028,7 +10131,7 @@ export function buildTownScene(): TownWorld {
     [25.5, 21.8, '#9CE0FF', 0.9],
     [-35.0, 40.5, '#A8D8EA', 0.88],
     [-11.8, 50.5, '#F7A8B8', 0.85],
-    [19.2, 37.5, '#FF9EBB', 0.9],
+    [26.2, 43.2, '#FF9EBB', 0.9],
     [28.5, 37.2, '#F28482', 0.92],
     [-8.4, -27.2, '#F7A8B8', 0.88],
     [-19.2, -16.2, '#A8D8EA', 0.84],
@@ -10039,13 +10142,13 @@ export function buildTownScene(): TownWorld {
     [-15.2, 9.6, '#FFAD88', 0.8],
     [15.6, 9.8, '#F28482', 0.78],
     [-20.5, 32.5, '#F7A8B8', 0.76],
-    [16.6, 41.0, '#A8D8EA', 0.82],
+    [13.9, 36.2, '#A8D8EA', 0.82],
     [9.4, 15.8, '#F7A8B8', 0.86],
     [18.2, 16.4, '#A8D8EA', 0.88],
     [-29.5, 7.5, '#FF9EBB', 0.9],
     [29.5, 7.5, '#F28482', 0.9],
-    [-5.5, 39.5, '#F7A8B8', 0.88],
-    [6.5, 40.2, '#A8D8EA', 0.86],
+    [-6.8, 39.5, '#F7A8B8', 0.88],
+    [5.6, 33.8, '#A8D8EA', 0.86],
     [-46.0, 10.5, '#D0A6FF', 0.94],
     [46.5, 5.0, '#F7A8B8', 0.94],
     // Outer meadow & edge shrubs
@@ -10238,7 +10341,8 @@ export function buildTownScene(): TownWorld {
     if (Math.abs(pz - 46.2) < 1.6 && px > -2 && px < 26) return true;
     if (Math.abs(px) < 1.8 && pz > -21 && pz < 53) return true;
     if (Math.abs(px + 23.5) < 1.6 && pz > -13 && pz < 27) return true;
-    if (Math.abs(px - 23.5) < 1.6 && pz > -13 && pz < 27) return true;
+    if (Math.abs(px - 23.5) < 1.6 && pz > -13 && pz < 47.5) return true;
+    if (Math.abs(Math.abs(px) - 3.85) < 1.15 && pz >= 10 && pz <= 51) return true;
     if (Math.hypot(px - patioCenter.x, pz - patioCenter.z) < 5.0) return true;
     if (Math.hypot(px - LAKE_CENTER.x, pz - LAKE_CENTER.z) < 12.2) return true;
     if (Math.hypot(px - 14.4, pz - 14.0) < 5.0) return true;
@@ -10247,9 +10351,9 @@ export function buildTownScene(): TownWorld {
     if (Math.hypot(px - 32, pz + 22.5) < 6.5) return true;
     if (Math.hypot(px - 42.8, pz + 23.2) < 3.6) return true;
     if (Math.hypot(px + 32, pz - 18.0) < 6.2) return true;
-    if (Math.hypot(px - 32, pz - 17.5) < 6.6) return true;
-    if (Math.hypot(px - 24, pz - 39.5) < 5.2) return true;
-    if (Math.hypot(px - 11.8, pz - 38.6) < 5.0) return true;
+    if (Math.hypot(px - 32, pz - 18.0) < 6.6) return true;
+    if (Math.hypot(px - 17.8, pz - 39.0) < 5.2) return true;
+    if (Math.hypot(px - 9.6, pz - 39.0) < 5.0) return true;
     if (Math.hypot(px + 16.8, pz - 37.2) < 3.4) return true;
     if (px >= -64.5 && px <= -36.5 && pz >= -13.0 && pz <= 8.5) return true;
     if (isInWestRiverOrCliffZone(px, pz, 1.5)) return true;

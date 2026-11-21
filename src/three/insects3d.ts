@@ -11,6 +11,7 @@ import {
   InsectSpeciesDefinition,
   InsectSpeciesId,
 } from '../types/game';
+import {mergeStaticGroupByMaterial} from './materials';
 
 export interface InsectAnchor {
   x: number;
@@ -174,6 +175,7 @@ function createInsectMeshForSpecies(
     rightWing.add(rwMesh, rDot);
 
     bodyGroup.add(leftWing, rightWing);
+    mergeStaticGroupByMaterial(bodyGroup, new Set([leftWing, rightWing]));
     const scale = spec.rarity === 'rare' ? 1.15 : 0.96;
     bodyGroup.scale.setScalar(scale);
     return {bodyGroup, leftWing, rightWing, isFlyingHover: true, wingSpeed: 12.5};
@@ -212,6 +214,7 @@ function createInsectMeshForSpecies(
     rightWing.add(rw1, rw2);
 
     bodyGroup.add(leftWing, rightWing);
+    mergeStaticGroupByMaterial(bodyGroup, new Set([leftWing, rightWing]));
     return {bodyGroup, leftWing, rightWing, isFlyingHover: true, wingSpeed: 22};
   }
 
@@ -240,6 +243,7 @@ function createInsectMeshForSpecies(
     const rightWing = new THREE.Mesh(wGeo, wingMat);
     rightWing.position.set(0.01, 0.036, 0.015);
     bodyGroup.add(leftWing, rightWing);
+    mergeStaticGroupByMaterial(bodyGroup, new Set([leftWing, rightWing]));
     return {bodyGroup, leftWing, rightWing, isFlyingHover: true, wingSpeed: 28};
   }
 
@@ -261,6 +265,7 @@ function createInsectMeshForSpecies(
     const rightWing = new THREE.Mesh(wGeo, wingMat);
     rightWing.position.set(0, 0.022, 0.01);
     bodyGroup.add(body, glow, leftWing, rightWing);
+    mergeStaticGroupByMaterial(bodyGroup, new Set([leftWing, rightWing]));
     return {bodyGroup, leftWing, rightWing, isFlyingHover: true, wingSpeed: 18};
   }
 
@@ -290,6 +295,7 @@ function createInsectMeshForSpecies(
       horn.position.set(0, 0.068, 0.135);
       bodyGroup.add(horn);
     }
+    mergeStaticGroupByMaterial(bodyGroup);
     return {bodyGroup, isFlyingHover: false, wingSpeed: 0};
   }
 
@@ -311,6 +317,7 @@ function createInsectMeshForSpecies(
         bodyGroup.add(arm);
       });
     }
+    mergeStaticGroupByMaterial(bodyGroup);
     return {bodyGroup, isFlyingHover: false, wingSpeed: 0};
   }
 
@@ -346,6 +353,7 @@ function createInsectMeshForSpecies(
     });
   }
 
+  mergeStaticGroupByMaterial(bodyGroup);
   return {bodyGroup, isFlyingHover: false, wingSpeed: 0};
 }
 
@@ -663,11 +671,11 @@ export class TownInsectManager {
         continue;
       }
 
-      // Distance culling beyond 46m from camera/viewer (no visual animation or draw cost)
+      // Distance culling beyond 30m from camera/viewer (slashes riverside/forest draw calls)
       const cdx = inst.pos.x - refX;
       const cdz = inst.pos.z - refZ;
       const camDistSq = cdx * cdx + cdz * cdz;
-      if (camDistSq > 46 * 46) {
+      if (camDistSq > 30 * 30) {
         inst.root.visible = false;
         continue;
       }
@@ -682,8 +690,8 @@ export class TownInsectManager {
         inst.root.visible = true;
       }
 
-      // Distance-based animation update throttling: full 60Hz <22m, ~12.5Hz at 22..46m
-      const isFar = camDistSq > 22 * 22;
+      // Distance-based animation update throttling: full 60Hz <16m, ~12.5Hz at 16..30m
+      const isFar = camDistSq > 16 * 16;
       if (isFar) {
         inst.animAccum += dt;
         if (inst.animAccum < 0.08) continue;
@@ -697,7 +705,7 @@ export class TownInsectManager {
         const oy = Math.sin(t * 2.1) * 0.09;
         inst.root.position.set(inst.pos.x + ox, inst.pos.y + oy, inst.pos.z + oz);
         inst.root.rotation.y = Math.atan2(Math.cos(t) * 0.34, -Math.sin(t * 0.85) * 0.28);
-        if (inst.leftWing && inst.rightWing && camDistSq < 30 * 30) {
+        if (inst.leftWing && inst.rightWing && camDistSq < 22 * 22) {
           const flap = Math.sin(elapsed * inst.wingSpeed + inst.phase) * 0.72;
           inst.leftWing.rotation.z = -flap;
           inst.rightWing.rotation.z = flap;

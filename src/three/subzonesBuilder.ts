@@ -34,6 +34,7 @@ import {
   glossyClayMat,
   mergeStaticGroupByMaterial,
 } from './materials';
+import {buildMallInteriorScene} from './mallBuilder';
 import {createTreeGeometries, TownAnchor, WorldCollider} from './townBuilder';
 
 export interface HouseDoorHandle {
@@ -73,6 +74,7 @@ export interface SubzoneUpdateContext {
 export interface SubzoneWorld {
   group: THREE.Group;
   groundMesh: THREE.Mesh;
+  groundMeshes?: THREE.Object3D[];
   clickTargets: THREE.Object3D[];
   labelAnchors: TownAnchor[];
   colliders: WorldCollider[];
@@ -199,6 +201,9 @@ export function buildSubzoneScene(
     pondFish?: PondFishState[];
   },
 ): SubzoneWorld {
+  if (zone === 'mall') {
+    return buildMallInteriorScene();
+  }
   const group = new THREE.Group();
   const clickTargets: THREE.Object3D[] = [];
   const labelAnchors: TownAnchor[] = [];

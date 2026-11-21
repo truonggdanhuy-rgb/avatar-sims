@@ -84,6 +84,7 @@ const ZONE_LABELS: Record<ZoneId, string> = {
   arcade: 'Tiệm Game',
   fishing: 'Hồ Câu Cá',
   petshop: 'Cửa Hàng Pets',
+  mall: 'May Mall',
 };
 
 function formatDeviceTime(): string {

@@ -149,6 +149,30 @@ export const SHIP_AVATAR: AvatarConfig = {
   handheldColor: '#E8B84B',
 };
 
+export const TUN_AVATAR: AvatarConfig = {
+  name: 'Tun',
+  skinTone: '#F6CCA8',
+  hairBack: 'boy_1',
+  hairFront: 'side_sweep',
+  hairColor: '#2E2528',
+  eyeStyle: 'bright',
+  eyeColor: '#2E6F9E',
+  expression: 'sweet_smile',
+  blush: true,
+  top: 'cardigan_vest',
+  topColor: '#3A82B8',
+  bottom: 'wide_trousers',
+  bottomColor: '#2B3545',
+  shoes: 'sneakers',
+  shoeColor: '#F3F6FA',
+  headItem: 'cap',
+  headItemColor: '#3A82B8',
+  accessory: 'none',
+  accessoryColor: '#4A3628',
+  handheld: 'none',
+  handheldColor: '#E8B84B',
+};
+
 export const FASHION_CATEGORIES: {key: ShopCategory; label: string}[] = [
   {key: 'tops', label: 'Áo'},
   {key: 'bottoms', label: 'Quần'},

@@ -5,7 +5,8 @@ export type ZoneId =
   | 'fishing'
   | 'arcade'
   | 'boutique'
-  | 'petshop';
+  | 'petshop'
+  | 'mall';
 
 export type TimeOfDay = 'morning' | 'night';
 

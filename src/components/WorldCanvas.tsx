@@ -59,6 +59,14 @@ import {
   SubzoneWorld,
 } from '../three/subzonesBuilder';
 import {
+  clampMallFloorPoint,
+  MALL_ESCALATOR_LANES,
+  MALL_HALF_D,
+  MALL_HALF_W,
+  MALL_UPPER_Y,
+  MallEscalatorLane,
+} from '../three/mallBuilder';
+import {
   buildTownScene,
   clampPointToMallDeck,
   getLakeShoreRadius,
@@ -378,6 +386,16 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
     return {fov, pos: [0, 9.4, 14.2] as const, look: [0, 0.85, -0.4] as const};
   }
 
+  if (zone === 'mall') {
+    if (isPortrait) {
+      return {fov: 48, pos: [0, 12.2, 16.5] as const, look: [0, 1.0, 0] as const};
+    }
+    if (isSquare) {
+      return {fov: 44, pos: [0, 11.4, 15.0] as const, look: [0, 1.0, 0] as const};
+    }
+    return {fov: 40, pos: [0, 10.5, 13.5] as const, look: [0, 1.0, 0] as const};
+  }
+
   if (isPortrait) {
     return {fov, pos: [0, 6.8, 10.6] as const, look: [0, 0.75, -0.35] as const};
   }
@@ -399,6 +417,14 @@ function getZoneWalkBounds(zone: ZoneId) {
   }
   if (zone === 'petshop') {
     return {minX: -7.5, maxX: 7.5, minZ: -6.1, maxZ: 6.15};
+  }
+  if (zone === 'mall') {
+    return {
+      minX: -(MALL_HALF_W - 1.3),
+      maxX: MALL_HALF_W - 1.3,
+      minZ: -(MALL_HALF_D - 1.3),
+      maxZ: MALL_HALF_D - 1.3,
+    };
   }
   return {minX: -3.45, maxX: 3.45, minZ: -4.05, maxZ: 4.05};
 }
@@ -900,7 +926,7 @@ const ASTAR_DIRS: readonly [number, number, number][] = [
   [-1, -1, Math.SQRT2],
 ];
 
-function findSmartPath(
+function findSmartPathSingle(
   nav: NavGrid | null,
   colliders: WorldCollider[],
   startX: number,
@@ -989,7 +1015,7 @@ function findSmartPath(
 
   let found = false;
   let iter = 0;
-  while (heapSize > 0 && iter < 9000) {
+  while (heapSize > 0 && iter < 3200) {
     iter++;
     const cur = popHeap();
     if (closed[cur] === sid) continue;
@@ -1072,6 +1098,34 @@ function findSmartPath(
   }
 
   return smoothed.length > 0 ? smoothed : [{x: goalX, z: goalZ}];
+}
+
+function findSmartPath(
+  nav: NavGrid | null,
+  colliders: WorldCollider[],
+  startX: number,
+  startZ: number,
+  goalX: number,
+  goalZ: number,
+): NavPoint[] {
+  // Fast cross-river bridge routing in town so A* never explores thousands of riverbank cells
+  if (nav && nav.minX < -100) {
+    const startRiverX = getWestRiverCenterX(startZ);
+    const goalRiverX = getWestRiverCenterX(goalZ);
+    const sSide = startX - startRiverX;
+    const gSide = goalX - goalRiverX;
+    if ((sSide < -5 && gSide > 5) || (sSide > 5 && gSide < -5)) {
+      const bridgeMidX = getWestRiverCenterX(WEST_BRIDGE_Z);
+      const eastPortal = {x: bridgeMidX + 11.2, z: WEST_BRIDGE_Z};
+      const westPortal = {x: bridgeMidX - 11.2, z: WEST_BRIDGE_Z};
+      const entry = sSide > 0 ? eastPortal : westPortal;
+      const exit = sSide > 0 ? westPortal : eastPortal;
+      const segA = findSmartPathSingle(nav, colliders, startX, startZ, entry.x, entry.z);
+      const segB = findSmartPathSingle(nav, colliders, exit.x, exit.z, goalX, goalZ);
+      return [...segA, entry, exit, ...segB];
+    }
+  }
+  return findSmartPathSingle(nav, colliders, startX, startZ, goalX, goalZ);
 }
 
 export const WorldCanvas: React.FC<WorldCanvasProps> = ({
@@ -1686,6 +1740,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       duration: 4.4,
       y: 0.04,
     };
+    const mallState = {
+      floor: 1 as 1 | 2,
+      ridingLane: null as MallEscalatorLane | null,
+      progress: 0,
+      duration: 2.8,
+      cooldown: 0,
+    };
     const parachuteCtrl = {
       active: false,
       worldY: MALL_DECK_Y,
@@ -1725,18 +1786,35 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let currentAnchors: TownAnchor[] = [];
     let currentClickTargets: THREE.Object3D[] = [];
     let currentColliders: WorldCollider[] = [];
+    const getActiveColliders = (zNow = stateRef.current.zone): WorldCollider[] => {
+      if (zNow === 'mall') {
+        return mallState.floor === 2
+          ? currentColliders.filter((c) => c.id?.startsWith('mall_f2_'))
+          : currentColliders.filter((c) => !c.id?.startsWith('mall_f2_'));
+      }
+      return currentColliders;
+    };
     let currentShadowBlockers: THREE.Mesh[] = [];
     let currentShadowBlockerBoxes: THREE.Box3[] = [];
+    let currentTreeCanopies: {x: number; z: number; rSq: number}[] = [];
     const _shadowBoxHitVec = new THREE.Vector3();
     let currentNavGrid: NavGrid | null = null;
+    let mallFloor2NavGrid: NavGrid | null = null;
     let currentPlazaRadius = 6.8;
     let currentGrounds: THREE.Object3D[] = [];
     let currentWallSurfaces: HouseWallSurface[] = [];
     let prevGroundY = 0.14;
 
-    const collectShadowBlockers = (root: THREE.Object3D): {meshes: THREE.Mesh[]; boxes: THREE.Box3[]} => {
+    const collectShadowBlockers = (
+      root: THREE.Object3D,
+    ): {meshes: THREE.Mesh[]; boxes: THREE.Box3[]; canopies: {x: number; z: number; rSq: number}[]} => {
       const meshes: THREE.Mesh[] = [];
       const boxes: THREE.Box3[] = [];
+      const canopies: {x: number; z: number; rSq: number}[] = [];
+      const tmpMat = new THREE.Matrix4();
+      const tmpPos = new THREE.Vector3();
+      const tmpQuat = new THREE.Quaternion();
+      const tmpScale = new THREE.Vector3();
       root.updateMatrixWorld(true);
       const visit = (obj: THREE.Object3D) => {
         if (!obj.visible) return;
@@ -1744,13 +1822,27 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const mesh = obj as THREE.Mesh;
         if (mesh.isMesh) {
           const ud = mesh.userData || {};
-          if (
+          if ((mesh as THREE.InstancedMesh).isInstancedMesh) {
+            // Pre-extract fast 2D canopy shade disks once on load (zero per-click InstancedMesh raycasts!)
+            if (ud.isTreeShadowCaster) {
+              const im = mesh as THREE.InstancedMesh;
+              if (!im.geometry.boundingSphere) im.geometry.computeBoundingSphere();
+              const baseR = im.geometry.boundingSphere ? im.geometry.boundingSphere.radius * 0.72 : 1.8;
+              if (baseR >= 1.1) {
+                for (let i = 0; i < im.count; i++) {
+                  im.getMatrixAt(i, tmpMat);
+                  tmpMat.decompose(tmpPos, tmpQuat, tmpScale);
+                  const r = baseR * Math.max(tmpScale.x, tmpScale.z);
+                  canopies.push({x: tmpPos.x, z: tmpPos.z, rSq: r * r});
+                }
+              }
+            }
+          } else if (
             !ud.isWaterMesh &&
             !ud.isWaterSurface &&
             !ud.isFishingVisual &&
             !ud.noShadowBlock &&
-            (ud.kind !== 'ground' || ud.isMallDeck) &&
-            (!(mesh as THREE.InstancedMesh).isInstancedMesh || ud.isTreeShadowCaster)
+            (ud.kind !== 'ground' || ud.isMallDeck)
           ) {
             const mat = mesh.material;
             const visibleMat = Array.isArray(mat)
@@ -1769,7 +1861,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       };
       visit(root);
-      return {meshes, boxes};
+      return {meshes, boxes, canopies};
     };
 
     const petCompanion = {
@@ -1824,6 +1916,18 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
       if (zNow === 'garden' && px > 9.35 && px < 15.9 && Math.abs(pz - 3.0) < 0.98) {
         return 0.36;
+      }
+      if (zNow === 'mall') {
+        if (mallState.ridingLane) {
+          const eased =
+            mallState.progress * mallState.progress * (3 - 2 * mallState.progress);
+          return THREE.MathUtils.lerp(
+            mallState.ridingLane.startY,
+            mallState.ridingLane.endY,
+            eased,
+          );
+        }
+        return mallState.floor === 2 ? MALL_UPPER_Y : 0.02;
       }
       return 0.02;
     };
@@ -2024,7 +2128,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const shadowData = collectShadowBlockers(activeTown.group);
         currentShadowBlockers = shadowData.meshes;
         currentShadowBlockerBoxes = shadowData.boxes;
+        currentTreeCanopies = shadowData.canopies;
         currentNavGrid = buildNavGrid('town', currentColliders);
+        mallFloor2NavGrid = null;
         currentPlazaRadius = activeTown.plazaRadius;
         currentGrounds = activeTown.groundMeshes;
         activeDoorsRef.current = [];
@@ -2034,6 +2140,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           mallElev.progress = 0;
           mallElev.y = 0.04;
           activeTown.setMallElevatorY?.(0.04);
+          mallState.floor = 1;
+          mallState.ridingLane = null;
+          mallState.progress = 0;
+          mallState.cooldown = 0;
           parachuteCtrl.active = false;
           parachuteCtrl.worldY = MALL_DECK_Y;
           setIsParachutingHud(false);
@@ -2095,10 +2205,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         boatState.moving = false;
         setIsBoatingHud(false);
         if (zoneChanged) playPetTimer = 0;
-        controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : 4.5;
-        controls.maxDistance = z === 'garden' || z === 'home' ? 26 : z === 'petshop' ? 22 : 18;
+        controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : z === 'mall' ? 4.8 : 4.5;
+        controls.maxDistance =
+          z === 'garden' || z === 'home' ? 26 : z === 'mall' ? 24 : z === 'petshop' ? 22 : 18;
         controls.minPolarAngle = Math.PI * 0.16;
-        controls.maxPolarAngle = Math.PI * 0.45;
+        controls.maxPolarAngle = z === 'mall' ? Math.PI * 0.48 : Math.PI * 0.45;
         activeSubzone = buildSubzoneScene(z, {
           plots: pl,
           fishingState: legacyFs,
@@ -2123,8 +2234,24 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         currentColliders = activeSubzone.colliders;
         currentShadowBlockers = [];
         currentShadowBlockerBoxes = [];
-        currentNavGrid = buildNavGrid(z, currentColliders);
-        currentGrounds = [activeSubzone.groundMesh];
+        currentTreeCanopies = [];
+        if (z === 'mall') {
+          currentNavGrid = buildNavGrid(
+            'mall',
+            currentColliders.filter((c) => !c.id?.startsWith('mall_f2_')),
+          );
+          mallFloor2NavGrid = buildNavGrid(
+            'mall',
+            currentColliders.filter((c) => c.id?.startsWith('mall_f2_')),
+          );
+        } else {
+          currentNavGrid = buildNavGrid(z, currentColliders);
+          mallFloor2NavGrid = null;
+        }
+        currentGrounds =
+          activeSubzone.groundMeshes && activeSubzone.groundMeshes.length > 0
+            ? activeSubzone.groundMeshes
+            : [activeSubzone.groundMesh];
         activeDoorsRef.current = activeSubzone.doors ?? [];
         currentWallSurfaces = activeSubzone.wallSurfaces ?? [];
         if (zoneChanged) {
@@ -2132,6 +2259,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           activeSeat = null;
           jumpY = 0;
           jumpVel = 0;
+          mallState.floor = 1;
+          mallState.ridingLane = null;
+          mallState.progress = 0;
+          mallState.cooldown = 0;
           if (z === 'home') {
             playerPos.x = -1.8;
             playerPos.z = 5.2;
@@ -2144,6 +2275,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           } else if (z === 'petshop') {
             playerPos.x = 0;
             playerPos.z = 4.6;
+            playerPos.rotY = Math.PI;
+          } else if (z === 'mall') {
+            playerPos.x = 0;
+            playerPos.z = 21.8;
             playerPos.rotY = Math.PI;
           } else {
             playerPos.x = 0;
@@ -2160,10 +2295,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       activeZoneLoaded = z;
       syncPetCompanion(zoneChanged);
       refreshClickTargetsWithPet();
-      try {
-        renderer.compile(scene, camera);
-      } catch {
-        // ignore shader pre-compile issues
+      if (!isSoftwareGl) {
+        try {
+          renderer.compile(scene, camera);
+        } catch {
+          // ignore shader pre-compile issues
+        }
       }
     };
 
@@ -2192,7 +2329,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             : mallElev.state === 'riding_up' || mallElev.state === 'riding_down'
               ? mallElev.y + 0.06
               : getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius)
-          : 0;
+          : stateRef.current.zone === 'mall'
+            ? mallState.floor === 2
+              ? MALL_UPPER_Y
+              : 0.02
+            : 0;
       playerRig.root.position.set(playerPos.x, curY, playerPos.z);
       playerRig.root.rotation.y = playerPos.rotY;
       playerRig.root.add(playerProxy);
@@ -2408,7 +2549,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       if (!activeTown) return true;
 
-      // Overhead shade ray (trees, bridge, pier, dock, cliff rocks, lanterns)
+      // Analytical tree canopy shade check (zero CPU InstancedMesh raycasts!)
+      for (let i = 0; i < currentTreeCanopies.length; i++) {
+        const c = currentTreeCanopies[i];
+        const dx = targetX - c.x;
+        const dz = targetZ - c.z;
+        if (dx * dx + dz * dz < c.rSq) return false;
+      }
+
+      // Overhead shade ray (bridge, pier, dock, cliff rocks, buildings)
       _shadowOrigin.set(targetX, waterY + 0.12, targetZ);
       _shadowRay.set(_shadowOrigin, _shadowUpDir);
       _shadowRay.near = 0.04;
@@ -2621,9 +2770,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const b = getZoneWalkBounds(stateRef.current.zone);
       const clampedX = THREE.MathUtils.clamp(x, b.minX, b.maxX);
       const clampedZ = THREE.MathUtils.clamp(z, b.minZ, b.maxZ);
+      const zNowWalk = stateRef.current.zone;
+      const activeNav =
+        zNowWalk === 'mall' && mallState.floor === 2 ? mallFloor2NavGrid : currentNavGrid;
+      const activeCols = getActiveColliders(zNowWalk);
       const waypoints = findSmartPath(
-        currentNavGrid,
-        currentColliders,
+        activeNav,
+        activeCols,
         playerPos.x,
         playerPos.z,
         clampedX,
@@ -3908,10 +4061,84 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               return;
             }
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.enterDoor();
+              callbacksRef.current.onChangeZone('mall');
+            });
+            return;
+          }
+
+          if (kind === 'mall_escalator') {
+            soundFX.tap();
+            if (stateRef.current.zone !== 'mall' || mallState.ridingLane) return;
+            const rawLane = MALL_ESCALATOR_LANES.find((l) => l.id === data.laneId);
+            if (!rawLane) return;
+            const lane =
+              rawLane.startFloor === mallState.floor
+                ? rawLane
+                : MALL_ESCALATOR_LANES.find(
+                    (l) => l.side === rawLane.side && l.startFloor === mallState.floor,
+                  );
+            if (!lane) return;
+            startWalkTo(lane.approachX, lane.approachZ, 'idle', undefined, () => {
+              if (mallState.ridingLane || mallState.floor !== lane.startFloor) return;
               soundFX.tap();
+              mallState.ridingLane = lane;
+              mallState.progress = 0;
+              activeTarget = null;
+              activeSeat = null;
+              jumpY = 0;
+              jumpVel = 0;
+            });
+            return;
+          }
+
+          if (kind === 'npc_tun') {
+            soundFX.tap();
+            if (stateRef.current.zone === 'mall' && mallState.floor === 2) {
+              showBubble('Hãy xuống thang cuốn về Tầng 1 để trò chuyện với Tun nhé!');
+              return;
+            }
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              playerPos.rotY = Math.atan2(-1.45 - playerPos.x, 0.25 - playerPos.z);
               showBubble(
-                'Cửa vào May Mall (Map bên trong sắp ra mắt)! Hiện bạn có thể đi thang máy kính lên Sân Thượng.',
+                'Xin chào! Mình là Tun, nhân viên May Mall. Xe hơi mini, xe đạp & ván trượt thú cưỡi sắp mở bán sớm nhé!',
+                -1.45,
+                2.25,
+                0.25,
               );
+            });
+            return;
+          }
+
+          if (kind === 'mall_display_car') {
+            soundFX.tap();
+            if (stateRef.current.zone === 'mall' && mallState.floor === 2) return;
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              showBubble(
+                'Siêu xe mini tương lai mui trần 1 chỗ ngồi màu xanh dương — sắp mở bán tại May Mall!',
+              );
+            });
+            return;
+          }
+
+          if (kind === 'mall_display_bike') {
+            soundFX.tap();
+            if (stateRef.current.zone === 'mall' && mallState.floor === 2) return;
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              showBubble('Xe đạp thể thao trưng bày tại sảnh chính — hiện chưa mở bán!');
+            });
+            return;
+          }
+
+          if (kind === 'mall_display_skate') {
+            soundFX.tap();
+            if (stateRef.current.zone === 'mall' && mallState.floor === 2) return;
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              showBubble('Quầy 2 ván trượt năng động — sắp mở bán tại sảnh May Mall!');
             });
             return;
           }
@@ -3978,17 +4205,24 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
-          const groundHit = groundHits.find((h) => !h.object.userData?.isMallDeck);
+          const groundHit =
+            stateRef.current.zone === 'mall'
+              ? groundHits.find((h) => h.object.userData?.mallFloor === mallState.floor)
+              : groundHits.find((h) => !h.object.userData?.isMallDeck);
           if (!groundHit) return;
           const pt = groundHit.point;
           const b = getZoneWalkBounds(stateRef.current.zone);
           const clampedX = THREE.MathUtils.clamp(pt.x, b.minX, b.maxX);
           const clampedZ = THREE.MathUtils.clamp(pt.z, b.minZ, b.maxZ);
+          const floorPoint =
+            stateRef.current.zone === 'mall'
+              ? clampMallFloorPoint(clampedX, clampedZ, mallState.floor)
+              : {x: clampedX, z: clampedZ};
           const onBedNow = stateRef.current.zone === 'town' && prevGroundY + jumpY >= 0.86;
           const safeTarget = resolvePointAgainstColliders(
-            clampedX,
-            clampedZ,
-            currentColliders,
+            floorPoint.x,
+            floorPoint.z,
+            getActiveColliders(stateRef.current.zone),
             PLAYER_RADIUS,
             onBedNow,
           );
@@ -4092,7 +4326,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let frameId = 0;
     let hiddenTimerId = 0;
     let disposed = false;
-    let frameSkip = 0;
     let lastTagPush = 0;
     let lastHadTags = false;
     let lastTagSnapshot: ProjectedTag[] = [];
@@ -4103,6 +4336,49 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let lastBiteAlertY = -9999;
     const clock = new THREE.Clock();
 
+    const scheduleNextFrame = () => {
+      if (disposed) return;
+      if (isSoftwareGl) {
+        const gl = renderer.getContext() as WebGL2RenderingContext;
+        if (typeof gl.fenceSync === 'function') {
+          const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+          if (sync) {
+            gl.flush();
+            const pollSync = () => {
+              if (disposed) {
+                try {
+                  gl.deleteSync(sync);
+                } catch {
+                  // ignore
+                }
+                return;
+              }
+              const status = gl.clientWaitSync(sync, 0, 0);
+              if (status === gl.TIMEOUT_EXPIRED) {
+                hiddenTimerId = window.setTimeout(pollSync, 16);
+              } else {
+                try {
+                  gl.deleteSync(sync);
+                } catch {
+                  // ignore
+                }
+                hiddenTimerId = window.setTimeout(() => {
+                  if (!disposed) frameId = requestAnimationFrame(tick);
+                }, 48);
+              }
+            };
+            hiddenTimerId = window.setTimeout(pollSync, 24);
+            return;
+          }
+        }
+        hiddenTimerId = window.setTimeout(() => {
+          if (!disposed) frameId = requestAnimationFrame(tick);
+        }, 80);
+      } else {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
     function tick() {
       if (disposed) return;
       if (document.hidden) {
@@ -4112,15 +4388,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }, 250);
         return;
       }
-      frameId = requestAnimationFrame(tick);
-      if (isSoftwareGl && ((frameSkip++ & 1) === 1)) {
-        return;
-      }
       const delta = Math.min(clock.getDelta(), 0.05);
       const elapsed = clock.getElapsedTime();
       const {zone: z, timeOfDay: tod, avatar: av} = stateRef.current;
 
-      const isIndoor = z === 'home' || z === 'boutique' || z === 'arcade' || z === 'petshop';
+      const isIndoor =
+        z === 'home' || z === 'boutique' || z === 'arcade' || z === 'petshop' || z === 'mall';
       const isHomeDark = z === 'home' && !houseLightsOnRef.current;
       const targetBg = isHomeDark
         ? 0x0c1324
@@ -4224,7 +4497,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         camera.fov = THREE.MathUtils.damp(camera.fov, camCfg.fov, 6, delta);
         camera.updateProjectionMatrix();
         const spawnGroundY =
-          z === 'town' ? getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius) : 0;
+          z === 'town'
+            ? getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius)
+            : z === 'mall' && mallState.floor === 2
+              ? MALL_UPPER_Y
+              : 0;
         _camLookTarget.set(playerPos.x, spawnGroundY + 0.92, playerPos.z);
         _camPosTarget.set(
           playerPos.x + (camCfg.pos[0] - camCfg.look[0]),
@@ -4248,6 +4525,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const isRidingMallElevator =
         z === 'town' && (mallElev.state === 'riding_up' || mallElev.state === 'riding_down');
       const isOnMallDeck = z === 'town' && mallElev.state === 'deck';
+      const isRidingEscalator = z === 'mall' && mallState.ridingLane !== null;
+      if (z === 'mall' && !isRidingEscalator) {
+        mallState.cooldown = Math.max(0, mallState.cooldown - delta);
+      }
 
       if (isRidingMallElevator) {
         mallElev.progress = Math.min(1, mallElev.progress + delta / mallElev.duration);
@@ -4285,8 +4566,39 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
+      if (isRidingEscalator && mallState.ridingLane) {
+        const lane = mallState.ridingLane;
+        mallState.progress = Math.min(1, mallState.progress + delta / mallState.duration);
+        const eased =
+          mallState.progress * mallState.progress * (3 - 2 * mallState.progress);
+        playerPos.x = THREE.MathUtils.lerp(lane.startX, lane.endX, eased);
+        playerPos.z = THREE.MathUtils.lerp(lane.startZ, lane.endZ, eased);
+        playerPos.rotY = lane.travelRotY;
+        playerPos.pose = 'idle';
+        activeTarget = null;
+        activeSeat = null;
+        jumpY = 0;
+        jumpVel = 0;
+        playPetTimer = 0;
+        if (mallState.progress >= 1) {
+          mallState.floor = lane.endFloor;
+          const landed = clampMallFloorPoint(lane.exitX, lane.exitZ, lane.endFloor);
+          playerPos.x = landed.x;
+          playerPos.z = landed.z;
+          mallState.ridingLane = null;
+          mallState.progress = 0;
+          mallState.cooldown = 1.4;
+          prevGroundY = lane.endFloor === 2 ? MALL_UPPER_Y : 0.02;
+        }
+      }
+
       // Jump vertical physics
-      if (!isRidingMallElevator && !parachuteCtrl.active && (jumpY > 0 || jumpVel !== 0)) {
+      if (
+        !isRidingMallElevator &&
+        !isRidingEscalator &&
+        !parachuteCtrl.active &&
+        (jumpY > 0 || jumpVel !== 0)
+      ) {
         jumpY += jumpVel * delta;
         jumpVel -= JUMP_GRAVITY * delta;
         if (jumpY <= 0) {
@@ -4297,13 +4609,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
         }
       }
-      const isAirborne = !isRidingMallElevator && !parachuteCtrl.active && jumpY > 0.01;
+      const isAirborne =
+        !isRidingMallElevator && !isRidingEscalator && !parachuteCtrl.active && jumpY > 0.01;
 
       const onFlowerBedLevel = z === 'town' && !isOnMallDeck && prevGroundY + jumpY >= 0.86;
 
-      let groundOffset = 0.02;
+      let groundOffset = z === 'mall' && mallState.floor === 2 ? MALL_UPPER_Y : 0.02;
       const joy = joystickInputRef.current;
-      const joyMag = !isRidingMallElevator && joy.active ? Math.hypot(joy.x, joy.y) : 0;
+      const joyMag =
+        !isRidingMallElevator && !isRidingEscalator && joy.active ? Math.hypot(joy.x, joy.y) : 0;
       let moveHorizSpeed = 0;
       let isCreepingNow = false;
 
@@ -4510,7 +4824,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           prevGroundY = parachuteCtrl.worldY;
         }
       } else {
-        if (isRidingMallElevator) {
+        if (isRidingMallElevator || isRidingEscalator) {
           activeTarget = null;
         } else if (netSwingCtrl.active) {
           activeTarget = null;
@@ -4557,7 +4871,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           const speed =
             (isCreepingNow
               ? 0.68
-              : (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : 3.6) * Math.min(1, joyMag)) *
+              : (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : z === 'mall' ? 4.8 : 3.6) *
+                Math.min(1, joyMag)) *
             hungerSpeedMult;
           const stepLen = speed * delta;
           const rawX = playerPos.x + (moveDirX / moveLen) * stepLen;
@@ -4573,13 +4888,18 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const resolved = resolvePointAgainstColliders(
               rawX,
               rawZ,
-              currentColliders,
+              getActiveColliders(z),
               PLAYER_RADIUS,
               onFlowerBedLevel,
             );
             const b = getZoneWalkBounds(z);
             nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
             nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
+            if (z === 'mall') {
+              const mp = clampMallFloorPoint(nextX, nextZ, mallState.floor);
+              nextX = mp.x;
+              nextZ = mp.z;
+            }
           }
           const dmx = nextX - playerPos.x;
           const dmz = nextZ - playerPos.z;
@@ -4620,9 +4940,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const dx = wp.x - playerPos.x;
             const dz = wp.z - playerPos.z;
             const dist = Math.hypot(dx, dz);
-            // Apply hunger slowdown uniformly (also apply hungerSpeedMult to future mounts)
+              // Apply hunger slowdown uniformly (also apply hungerSpeedMult to future mounts)
             const hungerSpeedMult = getMovementSpeedMultiplier(stateRef.current.stats);
-            const speed = (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : 3.6) * hungerSpeedMult;
+            const speed =
+              (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : z === 'mall' ? 4.8 : 3.6) *
+              hungerSpeedMult;
 
             if (isFinalWp && dist < 0.16) {
               if (activeTarget.seat && !isAirborne) {
@@ -4654,10 +4976,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 nextX = deckClamped.x;
                 nextZ = deckClamped.z;
               } else {
+                const activeCols = getActiveColliders(z);
                 let resolved = resolvePointAgainstColliders(
                   rawX,
                   rawZ,
-                  currentColliders,
+                  activeCols,
                   PLAYER_RADIUS,
                   onFlowerBedLevel,
                 );
@@ -4669,14 +4992,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                   const optA = resolvePointAgainstColliders(
                     playerPos.x + perpX * stepLen * 0.9,
                     playerPos.z + perpZ * stepLen * 0.9,
-                    currentColliders,
+                    activeCols,
                     PLAYER_RADIUS,
                     onFlowerBedLevel,
                   );
                   const optB = resolvePointAgainstColliders(
                     playerPos.x - perpX * stepLen * 0.9,
                     playerPos.z - perpZ * stepLen * 0.9,
-                    currentColliders,
+                    activeCols,
                     PLAYER_RADIUS,
                     onFlowerBedLevel,
                   );
@@ -4688,6 +5011,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 const b = getZoneWalkBounds(z);
                 nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
                 nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
+                if (z === 'mall') {
+                  const mp = clampMallFloorPoint(nextX, nextZ, mallState.floor);
+                  nextX = mp.x;
+                  nextZ = mp.z;
+                }
               }
 
               const moveX = nextX - playerPos.x;
@@ -4754,8 +5082,33 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           activeTown?.setOutdoorSwingSeated?.(Boolean(playerPos.pose === 'sit' && activeSeat?.isSwing));
         }
 
+        if (z === 'mall' && !isRidingEscalator && mallState.cooldown <= 0 && !activeTarget) {
+          for (let i = 0; i < MALL_ESCALATOR_LANES.length; i++) {
+            const lane = MALL_ESCALATOR_LANES[i];
+            if (lane.startFloor !== mallState.floor) continue;
+            if (Math.hypot(playerPos.x - lane.approachX, playerPos.z - lane.approachZ) < 0.85) {
+              soundFX.tap();
+              mallState.ridingLane = lane;
+              mallState.progress = 0;
+              activeTarget = null;
+              activeSeat = null;
+              jumpY = 0;
+              jumpVel = 0;
+              break;
+            }
+          }
+        }
+
         if (isRidingMallElevator) {
           groundOffset = mallElev.y + 0.06;
+        } else if (isRidingEscalator && mallState.ridingLane) {
+          const eased =
+            mallState.progress * mallState.progress * (3 - 2 * mallState.progress);
+          groundOffset = THREE.MathUtils.lerp(
+            mallState.ridingLane.startY,
+            mallState.ridingLane.endY,
+            eased,
+          );
         } else if ((playerPos.pose === 'sit' || playerPos.pose === 'bath') && activeSeat) {
           groundOffset = activeSeat.seatY - 0.245;
         } else if (playerPos.pose === 'sleep' && activeSeat?.isBed) {
@@ -4770,10 +5123,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
         } else if (z === 'garden' && playerPos.x > 9.35 && playerPos.x < 15.9 && Math.abs(playerPos.z - 3.0) < 0.98) {
           groundOffset = 0.36;
+        } else if (z === 'mall') {
+          groundOffset = mallState.floor === 2 ? MALL_UPPER_Y : 0.02;
         }
 
         // Preserve world elevation smoothly when landing onto or stepping off elevated flower beds
-        if (isRidingMallElevator) {
+        if (isRidingMallElevator || isRidingEscalator) {
           prevGroundY = groundOffset;
           jumpY = 0;
         } else {
@@ -5201,6 +5556,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           Math.abs(playerPos.z - 3.0) < 0.98
         ) {
           petGy = 0.36;
+        } else if (z === 'mall') {
+          petGy = isRidingEscalator
+            ? groundOffset
+            : mallState.floor === 2
+              ? MALL_UPPER_Y
+              : 0.02;
         }
         playerRig.heldPetRig.root.position.y = petGy - (groundOffset + jumpY);
       }
@@ -5573,6 +5934,23 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             if (a.id === 'campsite_bbq_tag' && (z !== 'town' || nowMs >= bbqLabelHideAtMs)) {
               continue;
             }
+            if (z === 'mall') {
+              // Strict close-proximity nameplate for NPC Tun ("lại thật gần mới hiện tên")
+              if (a.id === 'npc_tun') {
+                if (
+                  mallState.floor !== 1 ||
+                  mallState.ridingLane !== null ||
+                  Math.hypot(playerPos.x - a.worldPos.x, playerPos.z - a.worldPos.z) > 2.85
+                ) {
+                  continue;
+                }
+              } else if (a.id === 'mall_exit' && mallState.floor !== 1) {
+                continue;
+              } else if (a.id.startsWith('mall_esc_lbl_')) {
+                if (a.id.endsWith('_up') && mallState.floor !== 1) continue;
+                if (a.id.endsWith('_down') && mallState.floor !== 2) continue;
+              }
+            }
             _projVec.copy(a.worldPos).project(camera);
             if (_projVec.z <= 1) {
               nextTags.push({
@@ -5713,12 +6091,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
+      scheduleNextFrame();
     }
 
-    try {
-      renderer.compile(scene, camera);
-    } catch {
-      // ignore shader pre-compile issues
+    if (!isSoftwareGl) {
+      try {
+        renderer.compile(scene, camera);
+      } catch {
+        // ignore shader pre-compile issues
+      }
     }
     tick();
 
@@ -6523,7 +6904,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       {/* Broken Rod Repair Confirmation Modal */}
       {brokenRodPrompt && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setBrokenRodPrompt(null)}
         >
           <div
@@ -6598,7 +6979,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       {/* Broken Bug Net Repair Confirmation Modal */}
       {brokenNetPrompt && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setBrokenNetPrompt(null)}
         >
           <div
@@ -6829,7 +7210,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           <div
             ref={joystickBaseRef}
             style={{opacity: 0, transform: 'translate(-50%, -50%)'}}
-            className="pointer-events-none absolute top-1/2 left-1/2 h-24 w-24 rounded-full border-2 border-white/75 bg-[#4A3525]/25 shadow-lg backdrop-blur-[2px] transition-opacity duration-100"
+            className="pointer-events-none absolute top-1/2 left-1/2 h-24 w-24 rounded-full border-2 border-white/75 bg-[#4A3525]/25 shadow-lg transition-opacity duration-100"
           >
             <div
               ref={joystickKnobRef}
