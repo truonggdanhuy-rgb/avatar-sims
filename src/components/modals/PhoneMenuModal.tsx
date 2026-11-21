@@ -44,6 +44,7 @@ import {
   PetSupplyId,
   RiverFishSpeciesId,
   TimeOfDay,
+  WoodenBoatState,
   ZoneId,
 } from '../../types/game';
 import {
@@ -74,6 +75,7 @@ import {
   MountCarIcon,
   PetCatFaceIcon,
   RodAndNetIcon,
+  WoodenBoatIcon,
   WoodenRodIcon,
 } from '../FishingIcons';
 import {
@@ -94,6 +96,7 @@ interface PhoneMenuModalProps {
   storageCapacity: number;
   fishingRod: FishingRodState;
   bugNet: BugNetState;
+  woodenBoat: WoodenBoatState;
   fishDex: Partial<Record<RiverFishSpeciesId, FishDexRecord>>;
   insectDex: Partial<Record<InsectSpeciesId, InsectDexRecord>>;
   ownedPets: OwnedPetState[];
@@ -105,7 +108,7 @@ interface PhoneMenuModalProps {
   showJumpButton: boolean;
   teleportCooldownSec: number;
   initialTab?: 'menu' | 'account' | 'guide' | 'bag' | 'fishdex';
-  initialBagSubTab?: 'list' | 'tools' | 'pets' | 'mounts';
+  initialBagSubTab?: 'list' | 'tools' | 'pets' | 'boats' | 'mounts';
   onToggleEquipRod: () => void;
   onToggleEquipNet: () => void;
   onToggleSummonPet: (petId: string) => void;
@@ -125,7 +128,7 @@ interface PhoneMenuModalProps {
 }
 
 type PhoneTab = 'menu' | 'account' | 'guide' | 'bag' | 'fishdex';
-type BagSubTab = 'list' | 'tools' | 'pets' | 'mounts';
+type BagSubTab = 'list' | 'tools' | 'pets' | 'boats' | 'mounts';
 
 const ZONE_LABELS: Record<ZoneId, string> = {
   town: 'Thị Trấn',
@@ -163,6 +166,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   storageCapacity,
   fishingRod,
   bugNet,
+  woodenBoat,
   fishDex,
   insectDex,
   ownedPets,
@@ -718,7 +722,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                       ? 'Cần & Vợt'
                       : bagSubTab === 'pets'
                         ? 'Pets'
-                        : 'Cưỡi'}
+                        : bagSubTab === 'boats'
+                          ? 'Thuyền'
+                          : 'Cưỡi'}
                 </span>
                 <span className="w-16" />
               </div>
@@ -729,7 +735,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                     <div className="mb-3 text-[11px] font-bold text-[#7B6247]">
                       Chọn mục trong túi đồ:
                     </div>
-                    <div className="grid grid-cols-3 gap-2.5">
+                    <div className="grid grid-cols-2 gap-2.5">
                       {/* Icon 1: Combined Fishing Rod + Bug Net icon */}
                       <button
                         type="button"
@@ -777,7 +783,29 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                         </span>
                       </button>
 
-                      {/* Icon 3: Cưỡi (Vehicle / Car Icon) */}
+                      {/* Icon 3: Thuyền (Wooden Boat Icon) */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFX.tap();
+                          setBagSubTab('boats');
+                        }}
+                        className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-2.5 transition hover:border-[#2E82A8] active:scale-95"
+                      >
+                        {woodenBoat.owned && (
+                          <span className="absolute -top-1.5 right-1 rounded-full bg-[#2E82A8] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
+                            Đã có
+                          </span>
+                        )}
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
+                          <WoodenBoatIcon className="h-10 w-10" />
+                        </div>
+                        <span className="text-[11px] font-extrabold text-[#4A3525]">
+                          Thuyền
+                        </span>
+                      </button>
+
+                      {/* Icon 4: Cưỡi (Vehicle / Car Icon) */}
                       <button
                         type="button"
                         onClick={() => {
@@ -1430,6 +1458,41 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </div>
                 );
               })()}
+
+              {bagSubTab === 'boats' && (
+                <div className="space-y-2.5">
+                  <div className="rounded-2xl border-2 border-[#BFE0EE] bg-white p-3.5 space-y-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#BFE0EE] bg-[#EAF6FA]">
+                        <WoodenBoatIcon className="h-11 w-11" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-black text-[#264B5E]">Thuyền Gỗ</span>
+                          {woodenBoat.owned ? (
+                            <span className="rounded-full bg-[#DCEFF8] px-2 py-0.5 text-[10px] font-black text-[#246A8A]">
+                              Đã sở hữu
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-[#F1E8D8] px-2 py-0.5 text-[10px] font-black text-[#8A7154]">
+                              Chưa có
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-bold text-[#467A94]">
+                          {woodenBoat.owned
+                            ? 'Bấm biển hiệu hình thuyền ở bến sông Khu Sinh Thái để chèo thuyền & câu cá!'
+                            : 'Ghé Sạp Thuyền của NPC Ship ở Khu Sinh Thái phía Tây (320 Xu) để mua.'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-[#DCEBF2] bg-[#F4FAFD] px-3 py-2 text-[11px] font-semibold leading-relaxed text-[#436D82]">
+                      Hiện tại dùng để chèo dọc sông Khu Sinh Thái (vừa đứng trên thuyền vừa quăng cần câu cá). Sau này sẽ mở khóa tính năng bơi thuyền ra <b>Biển</b>!
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {bagSubTab === 'mounts' && (
                 <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#BBD6EA] bg-[#F2F8FC] p-5 text-center">

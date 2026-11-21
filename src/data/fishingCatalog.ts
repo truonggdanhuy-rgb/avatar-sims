@@ -5,11 +5,20 @@ import {
   FishingRodState,
   RiverFishSpeciesId,
   ToolId,
+  WoodenBoatState,
 } from '../types/game';
 
 export const WOODEN_ROD_PRICE = 100;
 export const WOODEN_ROD_MAX_DURABILITY = 25;
 export const WOODEN_ROD_FULL_REPAIR_COST = 36;
+export const WOODEN_BOAT_PRICE = 320;
+
+export function createInitialWoodenBoat(): WoodenBoatState {
+  return {
+    owned: false,
+    purchasedAt: null,
+  };
+}
 
 export interface FishRarityBehavior {
   label: string;

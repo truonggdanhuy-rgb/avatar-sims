@@ -248,6 +248,56 @@ export function MountCarIcon({className = 'w-11 h-11'}: {className?: string}) {
 }
 
 /**
+ * Handcrafted Wooden Rowboat icon for Ship's shop & Bag Thuyền tab
+ */
+export function WoodenBoatIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Gentle water ripples under keel */}
+      <path
+        d="M8 50 Q16 47 24 50 T40 50 T56 50"
+        stroke="#62B6CB"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14 55 Q23 52.5 32 55 T50 55"
+        stroke="#92D5E6"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      {/* Oar resting diagonally */}
+      <path d="M26 24 L49 46" stroke="#D9A368" strokeWidth="3.2" strokeLinecap="round" />
+      <ellipse
+        cx="50"
+        cy="47"
+        rx="5.2"
+        ry="2.6"
+        transform="rotate(42 50 47)"
+        fill="#E8BC82"
+        stroke="#8C5629"
+        strokeWidth="1.6"
+      />
+      {/* Wooden hull */}
+      <path
+        d="M8 34 C12 45 20 48 32 48 C44 48 52 45 56 34 L50 31 H14 L8 34 Z"
+        fill="#C98344"
+        stroke="#78421B"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
+      {/* Inner gunwale & bench seats */}
+      <path d="M12 34 H52" stroke="#EAB87D" strokeWidth="3" strokeLinecap="round" />
+      <rect x="20" y="29" width="8" height="4" rx="1.2" fill="#A6642D" stroke="#78421B" strokeWidth="1.4" />
+      <rect x="35" y="29" width="8" height="4" rx="1.2" fill="#A6642D" stroke="#78421B" strokeWidth="1.4" />
+      {/* Little bow pennant */}
+      <path d="M15 31 V16" stroke="#78421B" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M16 17 L27 21 L16 25 Z" fill="#52A9C9" stroke="#2D6A85" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
  * Custom recognizable illustration for each of the 8 River Fish species
  */
 export function FishIllustration({

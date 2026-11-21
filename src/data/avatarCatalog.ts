@@ -125,6 +125,30 @@ export const IVAN_AVATAR: AvatarConfig = {
   handheldColor: '#E8B84B',
 };
 
+export const SHIP_AVATAR: AvatarConfig = {
+  name: 'Ship',
+  skinTone: '#F1BF96',
+  hairBack: 'boy_4',
+  hairFront: 'neat_fringe',
+  hairColor: '#34241D',
+  eyeStyle: 'bright',
+  eyeColor: '#2D5F7D',
+  expression: 'joy_open',
+  blush: false,
+  top: 'sailor_blouse',
+  topColor: '#3772A8',
+  bottom: 'wide_trousers',
+  bottomColor: '#F3EAD8',
+  shoes: 'loafers',
+  shoeColor: '#69432B',
+  headItem: 'beret',
+  headItemColor: '#2A5985',
+  accessory: 'none',
+  accessoryColor: '#4A3628',
+  handheld: 'none',
+  handheldColor: '#E8B84B',
+};
+
 export const FASHION_CATEGORIES: {key: ShopCategory; label: string}[] = [
   {key: 'tops', label: 'Áo'},
   {key: 'bottoms', label: 'Quần'},

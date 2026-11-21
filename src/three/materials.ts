@@ -480,7 +480,9 @@ export type SignAtlasRegionId =
   | 'koi_stall'
   | 'pet_shop'
   | 'farm_kitchen'
-  | 'farm_shop';
+  | 'farm_shop'
+  | 'ship_stall'
+  | 'river_boat_sign';
 
 interface AtlasRectPx {
   x: number;
@@ -496,6 +498,8 @@ const SIGN_ATLAS_RECTS: Record<SignAtlasRegionId, AtlasRectPx> = {
   pet_shop: {x: 16, y: 288, w: 480, h: 240},
   farm_kitchen: {x: 528, y: 288, w: 480, h: 150},
   farm_shop: {x: 528, y: 464, w: 480, h: 150},
+  ship_stall: {x: 16, y: 560, w: 480, h: 220},
+  river_boat_sign: {x: 528, y: 636, w: 480, h: 220},
 };
 
 let _signAtlasMat: THREE.MeshStandardMaterial | null = null;
@@ -712,9 +716,229 @@ export function getSignTextureAtlas(): THREE.CanvasTexture {
       '#4A2F19',
     );
 
+    // 6. NPC Ship Stall Boat Emblem Sign
+    {
+      const {x, y, w, h} = SIGN_ATLAS_RECTS.ship_stall;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(w / 512, h / 240);
+      ctx.fillStyle = '#F4FBFF';
+      ctx.fillRect(0, 0, 512, 240);
+      ctx.strokeStyle = '#316E8E';
+      ctx.lineWidth = 12;
+      ctx.strokeRect(12, 12, 488, 216);
+      ctx.strokeStyle = '#D99E57';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(24, 24, 464, 192);
+      // Boat emblem on left
+      ctx.save();
+      ctx.translate(116, 114);
+      ctx.fillStyle = '#C98344';
+      ctx.beginPath();
+      ctx.moveTo(-48, 8);
+      ctx.lineTo(48, 8);
+      ctx.quadraticCurveTo(36, 36, 0, 36);
+      ctx.quadraticCurveTo(-36, 36, -48, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#754119';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.fillStyle = '#754119';
+      ctx.fillRect(-3, -44, 6, 52);
+      ctx.fillStyle = '#4AAED0';
+      ctx.beginPath();
+      ctx.moveTo(3, -42);
+      ctx.lineTo(38, -8);
+      ctx.lineTo(3, -2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#FFE4A3';
+      ctx.beginPath();
+      ctx.moveTo(-3, -36);
+      ctx.lineTo(-30, -6);
+      ctx.lineTo(-3, -2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#204A63';
+      ctx.font = '900 44px "Nunito", "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('TIỆM CỦA SHIP', 330, 96);
+      ctx.fillStyle = '#B86E2E';
+      ctx.font = 'bold 28px "Nunito", "Segoe UI", system-ui, sans-serif';
+      ctx.fillText('Thuyền Gỗ · Bến Sông', 330, 152);
+      ctx.restore();
+    }
+
+    // 7. Riverside Dock Boat Boarding Sign
+    {
+      const {x, y, w, h} = SIGN_ATLAS_RECTS.river_boat_sign;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(w / 512, h / 240);
+      ctx.fillStyle = '#FFF7E4';
+      ctx.fillRect(0, 0, 512, 240);
+      ctx.strokeStyle = '#7D4D27';
+      ctx.lineWidth = 12;
+      ctx.strokeRect(12, 12, 488, 216);
+      ctx.strokeStyle = '#4CA6C9';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(24, 24, 464, 192);
+      // Waves + Rowboat illustration
+      ctx.strokeStyle = '#4CA6C9';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(90, 126);
+      ctx.quadraticCurveTo(150, 114, 210, 126);
+      ctx.quadraticCurveTo(270, 138, 330, 126);
+      ctx.quadraticCurveTo(380, 116, 424, 126);
+      ctx.stroke();
+      ctx.fillStyle = '#C98344';
+      ctx.strokeStyle = '#754119';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(154, 88);
+      ctx.lineTo(358, 88);
+      ctx.quadraticCurveTo(334, 122, 256, 122);
+      ctx.quadraticCurveTo(178, 122, 154, 88);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Little oars
+      ctx.strokeStyle = '#E8B878';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(222, 82);
+      ctx.lineTo(192, 128);
+      ctx.moveTo(292, 82);
+      ctx.lineTo(322, 128);
+      ctx.stroke();
+      ctx.fillStyle = '#332011';
+      ctx.font = '900 42px "Nunito", "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('XUỐNG THUYỀN', 256, 180);
+      ctx.restore();
+    }
+
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
+    return tex;
+  });
+}
+
+export function createRiverWaterTexture(repX = 4, repY = 38): THREE.CanvasTexture {
+  return getOrBuildCachedTexture(
+    'river_water_128',
+    () => {
+      const size = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d')!;
+
+      // Calm, natural riverside teal-blue base (no blinding cyan glare)
+      const baseGrad = ctx.createLinearGradient(0, 0, size, 0);
+      baseGrad.addColorStop(0, '#3689A3');
+      baseGrad.addColorStop(0.5, '#2A7A96');
+      baseGrad.addColorStop(1, '#3689A3');
+      ctx.fillStyle = baseGrad;
+      ctx.fillRect(0, 0, size, size);
+
+      // Subtle shaded flow bands
+      ctx.strokeStyle = 'rgba(18, 66, 88, 0.22)';
+      ctx.lineWidth = 4;
+      for (let i = 0; i < 4; i++) {
+        const y = i * 32 + 16;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.bezierCurveTo(40, y + 6, 88, y - 6, 128, y);
+        ctx.stroke();
+      }
+
+      // Soft muted aqua current ripples
+      ctx.strokeStyle = 'rgba(186, 232, 242, 0.14)';
+      ctx.lineWidth = 2.2;
+      for (let i = 0; i < 6; i++) {
+        const y = i * 21 + 8;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.bezierCurveTo(34, y - 5, 94, y + 5, 128, y);
+        ctx.stroke();
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(repX, repY);
+      return tex;
+    },
+    repX,
+    repY,
+  );
+}
+
+export function createWaterfallTexture(): THREE.CanvasTexture {
+  return getOrBuildCachedTexture('waterfall_128', () => {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.clearRect(0, 0, size, size);
+
+    // Feathered water column with soft natural alpha edges (never a hard glass slab)
+    const grad = ctx.createLinearGradient(0, 0, size, 0);
+    grad.addColorStop(0.0, 'rgba(72, 154, 182, 0.0)');
+    grad.addColorStop(0.12, 'rgba(84, 170, 198, 0.58)');
+    grad.addColorStop(0.32, 'rgba(116, 198, 220, 0.84)');
+    grad.addColorStop(0.5, 'rgba(136, 212, 230, 0.88)');
+    grad.addColorStop(0.68, 'rgba(116, 198, 220, 0.84)');
+    grad.addColorStop(0.88, 'rgba(84, 170, 198, 0.58)');
+    grad.addColorStop(1.0, 'rgba(72, 154, 182, 0.0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    // Organic broken whitewater foam ribbons
+    const streams = [
+      {x: 18, w: 6, y0: 6, h: 52, a: 0.42},
+      {x: 32, w: 10, y0: 0, h: 128, a: 0.62},
+      {x: 48, w: 7, y0: 28, h: 74, a: 0.52},
+      {x: 62, w: 13, y0: 0, h: 128, a: 0.72},
+      {x: 82, w: 8, y0: 14, h: 86, a: 0.58},
+      {x: 96, w: 10, y0: 0, h: 128, a: 0.6},
+      {x: 110, w: 5, y0: 40, h: 56, a: 0.38},
+    ];
+    for (const s of streams) {
+      const sg = ctx.createLinearGradient(s.x, 0, s.x + s.w, 0);
+      sg.addColorStop(0, 'rgba(246, 253, 255, 0)');
+      sg.addColorStop(0.5, `rgba(246, 253, 255, ${s.a})`);
+      sg.addColorStop(1, 'rgba(246, 253, 255, 0)');
+      ctx.fillStyle = sg;
+      ctx.fillRect(s.x, s.y0, s.w, s.h);
+      if (s.y0 + s.h > size) {
+        ctx.fillRect(s.x, 0, s.w, s.y0 + s.h - size);
+      }
+    }
+
+    // Fine vertical droplet streaks for cascading texture
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+    for (let i = 0; i < 24; i++) {
+      const dx = 14 + ((i * 23) % 100);
+      const dy = (i * 19) % 104;
+      ctx.fillRect(dx, dy, 2, 16 + (i % 3) * 8);
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1, 2.5);
     return tex;
   });
 }

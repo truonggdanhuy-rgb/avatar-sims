@@ -454,6 +454,11 @@ export interface BugNetState {
   maxDurability: number;
 }
 
+export interface WoodenBoatState {
+  owned: boolean;
+  purchasedAt: number | null;
+}
+
 export type FishWaterType = 'river' | 'sea';
 
 export type FishRarity = 'common' | 'rare';

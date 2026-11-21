@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {TimeOfDay, ZoneId} from '../types/game';
-import {KOI_AVATAR} from '../data/avatarCatalog';
+import {KOI_AVATAR, SHIP_AVATAR} from '../data/avatarCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from './avatar3d';
 import {
   createFishingSpotVisuals,
@@ -18,6 +18,7 @@ import {
   createAtlasPlaneGeometry,
   createGrassTexture,
   createStoneWalkwayTexture,
+  createWaterfallTexture,
   getSharedSignAtlasMaterial,
   getWarmGlowTexture,
   glossyClayMat,
@@ -43,6 +44,117 @@ export const TOWN_ZONE_ENTRANCES: Record<
 
 export const LAKE_CENTER = {x: -23.0, z: 46.8};
 export const TOWN_LAKE_WATER_Y = -0.26;
+export const RIVER_WATER_Y = TOWN_LAKE_WATER_Y;
+
+export const WEST_RIVER_NAV_MIN_Z = -60;
+export const WEST_RIVER_NAV_MAX_Z = 56;
+export const WEST_RIVER_VISUAL_HALF_LEN = 250;
+export const WEST_BRIDGE_Z = 8.5;
+export const WEST_BRIDGE_HALF_SPAN = 9.6;
+export const SHIP_STALL_POS = {x: -68.2, z: -12.6};
+export const SHIP_STALL_INTERACT = {tx: -68.2, tz: -8.6};
+export const RIVER_DOCK_POS = {x: -74.6, z: -1.8};
+export const RIVER_BOARD_INTERACT = {tx: -74.0, tz: -0.4};
+export const RIVER_BOAT_SPAWN = {x: -79.8, z: -1.8, rotY: Math.PI};
+
+export function getWestRiverCenterX(z: number): number {
+  return -86.5 + Math.sin(z * 0.032) * 3.4 + Math.cos(z * 0.014) * 1.4;
+}
+
+export function getWestRiverHalfWidth(z: number): number {
+  return 7.6 + 2.8 * Math.exp(-((z + 8) * (z + 8)) / 190);
+}
+
+export function getWestRiverNavBounds(z: number): {minX: number; maxX: number} {
+  const cx = getWestRiverCenterX(z);
+  const hw = getWestRiverHalfWidth(z);
+  let minX = cx - hw + 2.1;
+  let maxX = cx + hw - 2.1;
+  if (z >= -16 && z <= -2) {
+    minX = Math.max(minX, cx - hw + 3.2);
+  }
+  if (z >= -4.1 && z <= 0.2) {
+    maxX = Math.min(maxX, -78.4);
+  }
+  return {minX, maxX};
+}
+
+export function getWestRiverBridgeHeight(x: number, z: number): number | null {
+  if (Math.abs(z - WEST_BRIDGE_Z) > 1.32) return null;
+  const midX = getWestRiverCenterX(WEST_BRIDGE_Z);
+  const dx = x - midX;
+  if (Math.abs(dx) > WEST_BRIDGE_HALF_SPAN) return null;
+  const u = dx / WEST_BRIDGE_HALF_SPAN;
+  return 0.03 + 2.34 * Math.pow(Math.max(0, Math.cos(u * Math.PI * 0.5)), 1.35);
+}
+
+const WEST_TRAIL_WAYPOINTS: [number, number, number][] = [
+  [-100.5, 19.5, 0.02],
+  [-106.5, 15.0, 2.2],
+  [-113.5, 9.5, 5.4],
+  [-117.5, 3.0, 8.6],
+  [-118.5, -4.5, 11.2],
+];
+
+function smoothStep(edge0: number, edge1: number, x: number): number {
+  const t = THREE.MathUtils.clamp((x - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function closestPointOnWestTrail(x: number, z: number): {dist: number; elev: number} {
+  let bestDist = Infinity;
+  let bestElev = 0.02;
+  for (let i = 0; i < WEST_TRAIL_WAYPOINTS.length - 1; i++) {
+    const [ax, az, ay] = WEST_TRAIL_WAYPOINTS[i];
+    const [bx, bz, by] = WEST_TRAIL_WAYPOINTS[i + 1];
+    const vx = bx - ax;
+    const vz = bz - az;
+    const lenSq = vx * vx + vz * vz;
+    const t = lenSq > 0 ? THREE.MathUtils.clamp(((x - ax) * vx + (z - az) * vz) / lenSq, 0, 1) : 0;
+    const px = ax + vx * t;
+    const pz = az + vz * t;
+    const d = Math.hypot(x - px, z - pz);
+    if (d < bestDist) {
+      bestDist = d;
+      bestElev = THREE.MathUtils.lerp(ay, by, t);
+    }
+  }
+  return {dist: bestDist, elev: bestElev};
+}
+
+export function getWestMountainHeight(x: number, z: number): number {
+  // Fast bounding skip
+  if (x > -95.2 || x < -146.0 || z < -39.0 || z > 25.0) return 0;
+
+  // 1. Walkable gentle trail ramp + scenic summit overlook
+  const {dist: trailDist, elev: trailElev} = closestPointOnWestTrail(x, z);
+  const trailWidth = 4.6;
+  const trailSkirt = 13.5;
+  const trailW = 1 - smoothStep(trailWidth, trailSkirt, trailDist);
+  const trailHeight = trailElev * trailW;
+
+  // Flat summit overlook around (-118.5, -4.5)
+  const dSummit = Math.hypot(x - -118.5, z - -4.5);
+  const summitW = 1 - smoothStep(4.8, 16.0, dSummit);
+  const summitHeight = 11.2 * summitW;
+
+  // 2. Massive rocky waterfall cliff massif overlooking river plunge pool at (-105, -11)
+  const dxC = (x - -107.0) / 13.5;
+  const dzC = (z - -11.5) / 16.0;
+  const dCliff = Math.hypot(dxC, dzC);
+  const cliffHeight = dCliff < 1.15 ? 18.2 * Math.pow(Math.max(0, 1 - dCliff / 1.15), 1.35) : 0;
+
+  // Secondary shoulder ridge at (-126, -15)
+  const dxS = (x - -126.5) / 15.0;
+  const dzS = (z - -13.5) / 18.5;
+  const dShoulder = Math.hypot(dxS, dzS);
+  const shoulderHeight = dShoulder < 1.0 ? 14.5 * Math.pow(Math.max(0, 1 - dShoulder), 1.45) : 0;
+
+  // Keep east bank outside cliff edge cleanly grounded
+  const riverRightStop = smoothStep(-96.2, -98.8, x);
+  const raw = Math.max(trailHeight, summitHeight, cliffHeight, shoulderHeight);
+  return raw * riverRightStop;
+}
 
 export const MALL_CENTER = {x: -54.2, z: -2.5};
 export const MALL_ELEVATOR_CAB_POS = {x: -47.85, z: -2.5};
@@ -110,6 +222,20 @@ export function getTownGroundHeight(
     }
     return 0.24;
   }
+  // Walkable Arched Bridge over West River (z ≈ 8.5)
+  const bridgeH = getWestRiverBridgeHeight(x, z);
+  if (bridgeH !== null) {
+    return bridgeH;
+  }
+  // Walkable East Riverbank Boat Dock planks
+  if (x >= -77.6 && x <= -73.8 && z >= -3.1 && z <= -0.5) {
+    return 0.22;
+  }
+  // Walkable West Waterfall Mountain & gentle climbing slope
+  if (x <= -95.2 && x >= -146.0 && z >= -39.0 && z <= 25.0) {
+    const mh = getWestMountainHeight(x, z);
+    if (mh > 0.02) return 0.02 + mh;
+  }
   // Raised May Mall Travertine Forecourt Terrace (prevents ground grass Z-fighting)
   if (x >= -61.45 && x <= -44.05 && z >= -10.55 && z <= 5.55) {
     return 0.21;
@@ -165,6 +291,14 @@ export interface TownWorld {
   setOutdoorSwingSeated?: (seated: boolean) => void;
   getOutdoorSwingSeatPose?: () => {x: number; y: number; z: number; pitch: number} | null;
   setMallElevatorY?: (y: number) => void;
+  setRiverBoatPose?: (
+    active: boolean,
+    x?: number,
+    z?: number,
+    rotY?: number,
+    moving?: boolean,
+    elapsed?: number,
+  ) => void;
   updateInsects?: (
     playerX: number,
     playerY: number,
@@ -657,6 +791,16 @@ export function buildTownScene(): TownWorld {
   const signAtlasMat = getSharedSignAtlasMaterial();
   const warmGlowTex = getWarmGlowTexture();
   let koiRig: AvatarRig | null = null;
+  let shipRig: AvatarRig | null = null;
+
+  const isInWestRiverOrCliffZone = (x: number, z: number, pad = 2.6): boolean => {
+    if (x > -58) return false;
+    if (Math.abs(x - getWestRiverCenterX(z)) < getWestRiverHalfWidth(z) + pad) return true;
+    if (x >= -77.8 && x <= -61.5 && z >= -17.0 && z <= 12.2) return true;
+    if (x >= -101.8 && x <= -91.0 && z >= 5.2 && z <= 21.5) return true;
+    if (x >= -146.5 && x <= -94.0 && z >= -39.5 && z <= 25.5) return true;
+    return false;
+  };
 
   // ========== 1. EXPANDED TERRAIN (WITH PUNCHED LAKE BASIN) + GENTLE SCENIC HILL ==========
   const terrainShape = new THREE.Shape();
@@ -673,6 +817,31 @@ export function buildTownScene(): TownWorld {
     else lakeHolePath.lineTo(sx, sy);
   }
   terrainShape.holes.push(lakeHolePath);
+
+  // Punch curved West River channel spanning nearly the entire ground disc for endless horizon illusion
+  const RIVER_HOLE_Z_STEPS = 72;
+  const riverHolePath = new THREE.Path();
+  for (let i = 0; i <= RIVER_HOLE_Z_STEPS; i++) {
+    const z = THREE.MathUtils.lerp(
+      WEST_RIVER_VISUAL_HALF_LEN,
+      -WEST_RIVER_VISUAL_HALF_LEN,
+      i / RIVER_HOLE_Z_STEPS,
+    );
+    const rx = getWestRiverCenterX(z) + getWestRiverHalfWidth(z);
+    if (i === 0) riverHolePath.moveTo(rx, -z);
+    else riverHolePath.lineTo(rx, -z);
+  }
+  for (let i = 0; i <= RIVER_HOLE_Z_STEPS; i++) {
+    const z = THREE.MathUtils.lerp(
+      -WEST_RIVER_VISUAL_HALF_LEN,
+      WEST_RIVER_VISUAL_HALF_LEN,
+      i / RIVER_HOLE_Z_STEPS,
+    );
+    const lx = getWestRiverCenterX(z) - getWestRiverHalfWidth(z);
+    riverHolePath.lineTo(lx, -z);
+  }
+  riverHolePath.closePath();
+  terrainShape.holes.push(riverHolePath);
 
   const terrainGeo = new THREE.ShapeGeometry(terrainShape, 48);
   terrainGeo.rotateX(-Math.PI / 2);
@@ -1017,6 +1186,10 @@ export function buildTownScene(): TownWorld {
     [5.1, 0.16, 4.8, 1.05],
     [-21.18, TOWN_LAKE_WATER_Y + 0.02, 44.3, 1.45],
     [22.5, 0.05, -39.5, 2.35],
+    [-73.0, 0.05, -3.55, 1.35],
+    [-72.6, 0.05, 5.2, 1.35],
+    [SHIP_STALL_POS.x, 0.05, SHIP_STALL_POS.z + 2.8, 2.1],
+    [-118.0, 11.24, -4.0, 1.4],
   ];
   const districtNightPoolIM = new THREE.InstancedMesh(
     districtNightPoolGeo,
@@ -2826,9 +2999,10 @@ export function buildTownScene(): TownWorld {
       new THREE.MeshStandardMaterial({vertexColors: true, roughness: 0.88}),
     );
     basinMesh.renderOrder = 0;
+    basinMesh.userData = {isWaterSurface: true};
     lake.add(basinMesh);
 
-    // 2. Recessed Translucent Glossy Water Surface (sits at y = -0.26, visibly below y = 0 ground)
+    // 2. Recessed Translucent Calm Water Surface (sits at y = -0.26, visibly below y = 0 ground)
     const waterShape = new THREE.Shape();
     for (let s = 0; s <= BANK_SEGS; s++) {
       const theta = (s / BANK_SEGS) * Math.PI * 2;
@@ -2841,12 +3015,12 @@ export function buildTownScene(): TownWorld {
     const waterGeo = new THREE.ShapeGeometry(waterShape, 32);
     waterGeo.rotateX(-Math.PI / 2);
     lakeWaterMat = new THREE.MeshStandardMaterial({
-      color: '#3BB0D8',
-      roughness: 0.1,
-      metalness: 0.08,
-      envMapIntensity: 0.95,
+      color: '#3496B5',
+      roughness: 0.68,
+      metalness: 0.0,
+      envMapIntensity: 0.1,
       transparent: true,
-      opacity: 0.78,
+      opacity: 0.82,
       depthWrite: false,
     });
     const waterMesh = new THREE.Mesh(waterGeo, lakeWaterMat);
@@ -2854,8 +3028,7 @@ export function buildTownScene(): TownWorld {
     waterMesh.renderOrder = 3;
     waterMesh.userData = {
       kind: 'town_lake_fish',
-      tx: PIER_X,
-      tz: 43.4,
+      isWaterMesh: true,
     };
     lake.add(waterMesh);
     clickTargets.push(waterMesh);
@@ -2875,15 +3048,16 @@ export function buildTownScene(): TownWorld {
     const deepMesh = new THREE.Mesh(
       deepGeo,
       new THREE.MeshStandardMaterial({
-        color: '#217BA1',
-        roughness: 0.14,
+        color: '#1E6C8C',
+        roughness: 0.44,
         transparent: true,
-        opacity: 0.45,
+        opacity: 0.46,
         depthWrite: false,
       }),
     );
     deepMesh.position.y = LAKE_WATER_Y - 0.18;
     deepMesh.renderOrder = 1;
+    deepMesh.userData = {isWaterSurface: true};
     lake.add(deepMesh);
 
     // 3. Walkable Timber Bridge / Fishing Pier extending out over the recessed water
@@ -4845,6 +5019,1727 @@ export function buildTownScene(): TownWorld {
     group.add(mallStatic);
   }
 
+  // ========== DISTRICT 9: KHU SINH THÁI SÔNG THÁC, CẦU CONG, SẠP THUYỀN NPC SHIP & NÚI THÁC NƯỚC ==========
+  let riverWaterMat: THREE.MeshStandardMaterial | null = null;
+  let waterfallTex: THREE.CanvasTexture | null = null;
+  let waterfallFoamRing: THREE.Mesh | null = null;
+  let midLedgeMistRing: THREE.Mesh | null = null;
+  let waterfallSplashIM: THREE.InstancedMesh | null = null;
+  const waterfallSplashSeeds: {
+    x: number;
+    y: number;
+    z: number;
+    r: number;
+    phase: number;
+    speed: number;
+    hop: number;
+  }[] = [];
+  let mooredRiverBoat: THREE.Group | null = null;
+  let activeRiverBoat: THREE.Group | null = null;
+  let activeBoatOarL: THREE.Object3D | null = null;
+  let activeBoatOarR: THREE.Object3D | null = null;
+  const westInsectAnchors: InsectAnchor[] = [];
+
+  {
+    const eco = new THREE.Group();
+
+    // 1. Climbable West Waterfall Mountain & Single Gentle Trail Mesh
+    {
+      const mW = 54;
+      const mD = 66;
+      const mCenterX = -120.5;
+      const mCenterZ = -7.0;
+      const mGeo = new THREE.PlaneGeometry(mW, mD, 34, 42);
+      mGeo.rotateX(-Math.PI / 2);
+      const pos = mGeo.attributes.position;
+      const colors = new Float32Array(pos.count * 3);
+      const cGrass = new THREE.Color('#70BA57');
+      const cTrail = new THREE.Color('#DCC496');
+      const cRock = new THREE.Color('#6E7781');
+      const tmp = new THREE.Color();
+
+      for (let i = 0; i < pos.count; i++) {
+        const lx = pos.getX(i);
+        const lz = pos.getZ(i);
+        const wx = mCenterX + lx;
+        const wz = mCenterZ + lz;
+        const h = getWestMountainHeight(wx, wz);
+        const y = h > 0.025 ? 0.02 + h : -0.08;
+        pos.setY(i, y);
+
+        const {dist: trailDist} = closestPointOnWestTrail(wx, wz);
+        const hx = getWestMountainHeight(wx + 0.9, wz) - getWestMountainHeight(wx - 0.9, wz);
+        const hz = getWestMountainHeight(wx, wz + 0.9) - getWestMountainHeight(wx, wz - 0.9);
+        const slope = Math.hypot(hx, hz) / 1.8;
+
+        if (trailDist < 3.1 && h > 0.08) {
+          const blend = smoothStep(1.8, 3.1, trailDist);
+          tmp.copy(cTrail).lerp(cGrass, blend * 0.65);
+        } else if (slope > 0.65 || (wx > -107.2 && wz < 0.8 && h > 1.3)) {
+          tmp.copy(cRock);
+        } else {
+          tmp.copy(cGrass);
+        }
+        colors[i * 3] = tmp.r;
+        colors[i * 3 + 1] = tmp.g;
+        colors[i * 3 + 2] = tmp.b;
+      }
+      mGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      mGeo.computeVertexNormals();
+      const mountainMat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.9,
+        metalness: 0.0,
+      });
+      const westMountainMesh = new THREE.Mesh(mGeo, mountainMat);
+      westMountainMesh.position.set(mCenterX, 0, mCenterZ);
+      westMountainMesh.userData = {kind: 'ground'};
+      pierWalkableMeshes.push(westMountainMesh);
+      group.add(westMountainMesh);
+
+      // Scenic Overlook Stone-Plinth & Carved Cedar Balustrade + Rest Bench + Twin Lanterns (-118.5, 11.2, -4.5)
+      const ovX = -118.5;
+      const ovZ = -4.5;
+      const ovY = getTownGroundHeight(ovX, ovZ);
+      const ovStoneMat = getMat('#89929B', 0.86);
+      const ovPostMat = getMat('#7B4E2B', 0.76);
+      const ovRailMat = getMat('#A36E3F', 0.7);
+      const ovCapMat = getMat('#58361B', 0.78);
+      const ovBenchMat = getMat('#C48D58', 0.7);
+      const ovGroup = new THREE.Group();
+
+      const ovPts: [number, number, number][] = [];
+      const OV_COUNT = 7;
+      for (let s = 0; s < OV_COUNT; s++) {
+        const ang = THREE.MathUtils.lerp(-Math.PI * 0.44, Math.PI * 0.38, s / (OV_COUNT - 1));
+        const px = ovX + Math.cos(ang) * 4.65;
+        const pz = ovZ + Math.sin(ang) * 4.65;
+        const py = getTownGroundHeight(px, pz);
+        ovPts.push([px, py, pz]);
+
+        const postGrp = new THREE.Group();
+        postGrp.position.set(px, py, pz);
+        postGrp.rotation.y = -ang;
+
+        const plinth = new THREE.Mesh(new RoundedBoxGeometry(0.36, 0.28, 0.36, 2, 0.04), ovStoneMat);
+        plinth.position.y = 0.08;
+        const timber = new THREE.Mesh(new RoundedBoxGeometry(0.18, 0.92, 0.18, 2, 0.03), ovPostMat);
+        timber.position.y = 0.64;
+        const neck = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.06, 0.22, 1, 0.015), ovCapMat);
+        neck.position.y = 1.08;
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.12, 4), ovCapMat);
+        cap.rotation.y = Math.PI / 4;
+        cap.position.y = 1.17;
+        postGrp.add(plinth, timber, neck, cap);
+        ovGroup.add(postGrp);
+        colliders.push({type: 'circle', x: px, z: pz, r: 0.48});
+      }
+
+      for (let s = 0; s < OV_COUNT - 1; s++) {
+        const [px, py, pz] = ovPts[s];
+        const [nx, ny, nz] = ovPts[s + 1];
+        const dx = nx - px;
+        const dy = ny - py;
+        const dz = nz - pz;
+        const horiz = Math.hypot(dx, dz);
+        const segLen = Math.hypot(horiz, dy);
+        const yaw = Math.atan2(dx, dz);
+        const pitch = -Math.atan2(dy, Math.max(0.01, horiz));
+
+        const spanGrp = new THREE.Group();
+        spanGrp.position.set((px + nx) * 0.5, (py + ny) * 0.5, (pz + nz) * 0.5);
+        spanGrp.rotation.order = 'YXZ';
+        spanGrp.rotation.y = yaw;
+        spanGrp.rotation.x = pitch;
+
+        const topRail = new THREE.Mesh(
+          new RoundedBoxGeometry(0.145, 0.105, segLen + 0.06, 2, 0.025),
+          ovRailMat,
+        );
+        topRail.position.y = 0.96;
+        const midRail = new THREE.Mesh(
+          new RoundedBoxGeometry(0.11, 0.085, segLen + 0.04, 2, 0.02),
+          ovPostMat,
+        );
+        midRail.position.y = 0.52;
+        spanGrp.add(topRail, midRail);
+
+        // Two turned wooden balusters per span
+        [-0.28, 0.28].forEach((frac) => {
+          const bal = new THREE.Mesh(new RoundedBoxGeometry(0.085, 0.42, 0.085, 1, 0.015), ovRailMat);
+          bal.position.set(0, 0.74, frac * horiz);
+          spanGrp.add(bal);
+        });
+        ovGroup.add(spanGrp);
+      }
+
+      // Summit overlook timber bench with stone footings
+      const bench = new THREE.Group();
+      bench.position.set(ovX - 1.5, ovY, ovZ + 0.5);
+      bench.rotation.y = Math.PI * 0.48;
+      const bSeat = new THREE.Mesh(new RoundedBoxGeometry(1.65, 0.11, 0.54, 2, 0.03), ovBenchMat);
+      bSeat.position.y = 0.44;
+      const bBack = new THREE.Mesh(new RoundedBoxGeometry(1.65, 0.46, 0.09, 2, 0.02), ovBenchMat);
+      bBack.position.set(0, 0.74, -0.23);
+      [-0.64, 0.64].forEach((lx) => {
+        const leg = new THREE.Mesh(new RoundedBoxGeometry(0.12, 0.44, 0.48, 2, 0.02), ovPostMat);
+        leg.position.set(lx, 0.22, 0);
+        bench.add(leg);
+      });
+      bench.add(bSeat, bBack);
+      ovGroup.add(bench);
+      colliders.push({type: 'circle', x: ovX - 1.5, z: ovZ + 0.5, r: 0.82});
+
+      // Warm hanging wooden lantern post on summit overlook
+      const ovPlinth = new THREE.Mesh(new RoundedBoxGeometry(0.38, 0.26, 0.38, 2, 0.04), ovStoneMat);
+      ovPlinth.position.set(ovX + 1.4, ovY + 0.1, ovZ - 2.6);
+      const ovPost = new THREE.Mesh(new RoundedBoxGeometry(0.16, 2.35, 0.16, 2, 0.03), ovPostMat);
+      ovPost.position.set(ovX + 1.4, ovY + 1.25, ovZ - 2.6);
+      const ovArm = new THREE.Mesh(new RoundedBoxGeometry(0.68, 0.08, 0.08, 2, 0.02), ovPostMat);
+      ovArm.position.set(ovX + 1.68, ovY + 2.34, ovZ - 2.6);
+      const ovCap = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.13, 6), ovCapMat);
+      ovCap.position.set(ovX + 1.94, ovY + 2.1, ovZ - 2.6);
+      const ovBulbMat = new THREE.MeshStandardMaterial({
+        color: '#FFF4C2',
+        emissive: '#FFCC66',
+        emissiveIntensity: 0.35,
+        roughness: 0.25,
+      });
+      lampBulbs.push(ovBulbMat);
+      const ovBulb = new THREE.Mesh(new THREE.SphereGeometry(0.145, 9, 9), ovBulbMat);
+      ovBulb.position.set(ovX + 1.94, ovY + 1.96, ovZ - 2.6);
+      ovGroup.add(ovPlinth, ovPost, ovArm, ovCap, ovBulb);
+      colliders.push({type: 'circle', x: ovX + 1.4, z: ovZ - 2.6, r: 0.34});
+      mergeStaticGroupByMaterial(ovGroup);
+      eco.add(ovGroup);
+
+      // Safety colliders along the sheer cliff rim so players don't drop straight down the waterfall cliff
+      const cliffGuardPts: [number, number, number][] = [
+        [-101.5, -2.5, 2.2],
+        [-101.0, -7.0, 2.6],
+        [-101.2, -12.0, 2.6],
+        [-103.5, -17.0, 2.8],
+        [-108.5, -21.0, 2.8],
+        [-114.5, -18.5, 2.6],
+        [-119.5, -13.5, 2.5],
+        [-125.5, -14.0, 3.0],
+        [-131.5, -9.5, 2.8],
+      ];
+      cliffGuardPts.forEach(([cx, cz, cr], idx) => {
+        colliders.push({type: 'circle', id: `west_cliff_guard_${idx}`, x: cx, z: cz, r: cr});
+      });
+    }
+
+    // 2. Sculpted Craggy Waterfall Cliff Gorge + Mountain Canyon Stream + Two-Tier Natural Cascade
+    {
+      const cliffGroup = new THREE.Group();
+      const graniteMat = getMat('#717983', 0.9);
+      const slateMat = getMat('#59626D', 0.92);
+      const wetRockMat = getMat('#404952', 0.56);
+      const cliffMossMat = getMat('#4E9250', 0.86);
+      const cliffShrubMat = getMat('#3D7D44', 0.84);
+
+      const createSculptedCragGeo = (
+        seed: number,
+        sx: number,
+        sy: number,
+        sz: number,
+        detail = 1,
+      ) => {
+        const base = new THREE.IcosahedronGeometry(1.0, detail);
+        const nonIdx = base.toNonIndexed();
+        base.dispose();
+        const p = nonIdx.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          let vx = p.getX(i);
+          let vy = p.getY(i);
+          let vz = p.getZ(i);
+          // Horizontal strata steps + angular faceted crag noise
+          const strata = Math.sin(vy * 5.2 + seed) * 0.08;
+          const crag =
+            Math.sin(vx * 3.4 + vz * 2.1 + seed) * 0.14 +
+            Math.cos(vz * 3.8 - vx * 1.9 + seed * 1.7) * 0.12;
+          // Flatter stepped tops & wider stable bases
+          if (vy > 0.38) vy = 0.38 + (vy - 0.38) * 0.52;
+          const baseFlare = vy < -0.2 ? 1.14 : 1.0;
+          const radScale = (1 + strata + crag) * baseFlare;
+          p.setXYZ(i, vx * radScale * sx, vy * sy, vz * radScale * sz);
+        }
+        nonIdx.computeVertexNormals();
+        return nonIdx;
+      };
+
+      // Sculpted crag spires & cliff strata framing a central canyon gorge around z = -9.0
+      const cragSpecs: [
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        'granite' | 'slate' | 'wet',
+        boolean,
+      ][] = [
+        // Towering North Canyon Buttress (flanking z = -15.5..-11.6)
+        [-106.8, 7.2, -14.8, 4.6, 8.6, 4.2, 0.35, 'granite', true],
+        [-103.0, 5.2, -13.2, 3.5, 6.2, 3.2, 1.2, 'slate', true],
+        [-100.2, 2.8, -12.6, 2.7, 3.6, 2.6, 2.1, 'wet', false],
+        [-109.5, 11.4, -14.2, 5.2, 6.6, 4.8, 0.85, 'granite', true],
+        // Towering South Canyon Buttress (flanking z = -6.4..-2.5)
+        [-106.2, 6.8, -3.4, 4.4, 8.0, 4.0, -0.45, 'slate', true],
+        [-102.6, 4.8, -4.8, 3.4, 5.8, 3.0, 1.9, 'granite', true],
+        [-99.8, 2.6, -5.4, 2.6, 3.4, 2.5, -1.2, 'wet', false],
+        [-108.8, 11.0, -4.2, 5.0, 6.4, 4.6, 2.6, 'slate', true],
+        // Back Gorge Cliff Wall & Upper Headwater Peak (behind the canyon spring at x = -111..-105)
+        [-111.5, 13.6, -9.0, 5.4, 7.4, 6.2, 0.4, 'granite', true],
+        [-107.5, 9.6, -9.0, 4.2, 5.2, 4.4, 1.5, 'slate', false],
+        // Wet Dark Stone Gorge Lip & Backing Wall Behind Upper & Lower Cascades
+        [-102.0, 9.4, -9.0, 2.6, 5.2, 2.7, 0.15, 'wet', false],
+        [-99.2, 3.2, -9.0, 2.5, 3.6, 2.9, -0.25, 'wet', false],
+        // Mid-Cliff Wet Rock Splash Shelf & Flanking Ledge Boulders
+        [-98.6, 5.6, -11.1, 2.1, 1.9, 1.8, 0.7, 'wet', true],
+        [-98.5, 5.5, -6.9, 2.0, 1.8, 1.8, -0.8, 'wet', true],
+        // Plunge Pool Ring Wet Boulders at River Shoreline
+        [-96.8, 0.9, -12.6, 2.3, 1.8, 2.1, 0.5, 'wet', true],
+        [-96.4, 0.8, -5.5, 2.2, 1.7, 2.0, 1.8, 'wet', true],
+        [-98.4, 1.2, -15.5, 2.5, 2.1, 2.4, 2.3, 'granite', true],
+        [-98.0, 1.1, -2.4, 2.3, 1.9, 2.2, -1.6, 'slate', true],
+      ];
+
+      cragSpecs.forEach(([bx, by, bz, sx, sy, sz, seed, tone, addMoss], idx) => {
+        const mat =
+          tone === 'wet' ? wetRockMat : tone === 'slate' ? slateMat : graniteMat;
+        const crag = new THREE.Mesh(createSculptedCragGeo(seed, sx, sy, sz, 1), mat);
+        crag.position.set(bx, by, bz);
+        crag.rotation.y = (idx * 0.73) % (Math.PI * 2);
+        cliffGroup.add(crag);
+
+        if (addMoss) {
+          const mossCap = new THREE.Mesh(
+            createSculptedCragGeo(seed + 4.2, sx * 0.74, sy * 0.16, sz * 0.72, 1),
+            cliffMossMat,
+          );
+          mossCap.position.set(bx - 0.1, by + sy * 0.44, bz);
+          mossCap.rotation.y = idx * 0.9;
+          cliffGroup.add(mossCap);
+
+          if (idx % 2 === 0) {
+            const tuft = new THREE.Mesh(new THREE.DodecahedronGeometry(0.65, 0), cliffShrubMat);
+            tuft.scale.set(1.25, 0.75, 1.15);
+            tuft.position.set(bx + sx * 0.25, by + sy * 0.52, bz + (idx % 4 === 0 ? 0.4 : -0.4));
+            cliffGroup.add(tuft);
+          }
+        }
+      });
+
+      // Carved Dark Stone Sill Lip at Gorge Mouth (-101.6, 12.95, -9.0) + Mid-Cliff Shelf Stone
+      const gorgeLip = new THREE.Mesh(
+        createSculptedCragGeo(9.1, 1.3, 0.72, 2.3, 1),
+        wetRockMat,
+      );
+      gorgeLip.position.set(-101.8, 12.6, -9.0);
+      const midShelf = new THREE.Mesh(
+        createSculptedCragGeo(11.4, 1.55, 0.85, 2.7, 1),
+        wetRockMat,
+      );
+      midShelf.position.set(-98.6, 6.05, -9.0);
+      cliffGroup.add(gorgeLip, midShelf);
+
+      // Stone Gorge Streambed Underlay tucked inside the Mountain Cleft (x: -108.5 -> -101.6)
+      const streamBed = new THREE.Mesh(
+        new RoundedBoxGeometry(6.8, 0.65, 3.2, 2, 0.12),
+        wetRockMat,
+      );
+      streamBed.position.set(-105.0, 12.88, -9.0);
+      streamBed.rotation.z = -0.06;
+      cliffGroup.add(streamBed);
+
+      mergeStaticGroupByMaterial(cliffGroup);
+      eco.add(cliffGroup);
+
+      // Stationary Smooth Mountain Canyon Stream tucked inside the rock cleft (-108.2 -> -101.4)
+      const streamMat = new THREE.MeshStandardMaterial({
+        color: '#3890AA',
+        roughness: 0.82,
+        metalness: 0.0,
+        envMapIntensity: 0.05,
+      });
+      const streamGeo = new THREE.PlaneGeometry(7.0, 2.85, 8, 2);
+      streamGeo.rotateX(-Math.PI / 2);
+      const sPos = streamGeo.attributes.position;
+      for (let i = 0; i < sPos.count; i++) {
+        const sx = sPos.getX(i);
+        const u = (sx + 3.5) / 7.0;
+        sPos.setY(i, THREE.MathUtils.lerp(13.45, 13.02, u));
+      }
+      streamGeo.computeVertexNormals();
+      const canyonStreamMesh = new THREE.Mesh(streamGeo, streamMat);
+      canyonStreamMesh.position.set(-104.8, 0, -9.0);
+      canyonStreamMesh.renderOrder = 2;
+      canyonStreamMesh.userData = {isWaterSurface: true};
+      eco.add(canyonStreamMesh);
+
+      // Stationary Two-Tier Natural Waterfall Cascade (no UV scroll; only splash bubbles animate below!)
+      waterfallTex = createWaterfallTexture();
+      const wfMat = new THREE.MeshStandardMaterial({
+        color: '#D5F2FA',
+        map: waterfallTex,
+        roughness: 0.78,
+        metalness: 0.0,
+        envMapIntensity: 0.04,
+        emissive: '#3D8FA6',
+        emissiveIntensity: 0.02,
+        transparent: true,
+        opacity: 0.92,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+
+      const buildCascadeTier = (
+        x0: number,
+        y0: number,
+        x1: number,
+        y1: number,
+        w0: number,
+        w1: number,
+        rows: number,
+      ) => {
+        const verts: number[] = [];
+        const uvs: number[] = [];
+        const idx: number[] = [];
+        for (let r = 0; r <= rows; r++) {
+          const t = r / rows;
+          const x = THREE.MathUtils.lerp(x0, x1, Math.pow(t, 0.78));
+          const y = THREE.MathUtils.lerp(y0, y1, t * t * 0.72 + t * 0.28);
+          const w = THREE.MathUtils.lerp(w0, w1, t);
+          verts.push(x, y, -9.0 - w * 0.5);
+          verts.push(x, y, -9.0 + w * 0.5);
+          uvs.push(0, t * 1.4);
+          uvs.push(1, t * 1.4);
+        }
+        for (let r = 0; r < rows; r++) {
+          const a = r * 2;
+          const b = a + 1;
+          const c = a + 2;
+          const d = a + 3;
+          idx.push(a, c, b, b, c, d);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geo.setIndex(idx);
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo, wfMat);
+        mesh.renderOrder = 4;
+        mesh.userData = {isWaterSurface: true};
+        return mesh;
+      };
+
+      // Tier 1: Gorge lip -> Mid-Cliff Splash Ledge; Tier 2: Mid-Cliff Ledge -> River Plunge Pool
+      const wfUpper = buildCascadeTier(-101.4, 13.06, -98.35, 6.45, 2.85, 3.65, 8);
+      const wfLower = buildCascadeTier(-98.3, 6.52, -94.8, RIVER_WATER_Y - 0.14, 3.7, 4.75, 9);
+      eco.add(wfUpper, wfLower);
+
+      // Animated Bubbling Whitewater Splash (1 single InstancedMesh — pauses automatically when far away!)
+      for (let f = 0; f < 6; f++) {
+        waterfallSplashSeeds.push({
+          x: -98.3 + Math.sin(f * 1.6) * 0.28,
+          y: 6.46,
+          z: -10.55 + f * 0.62,
+          r: 0.72 + (f % 3) * 0.18,
+          phase: f * 1.05,
+          speed: 3.1 + (f % 3) * 0.55,
+          hop: 0.12,
+        });
+      }
+      for (let f = 0; f < 14; f++) {
+        const row = f % 2;
+        waterfallSplashSeeds.push({
+          x: -95.0 + row * 0.65 + Math.sin(f * 1.7) * 0.36,
+          y: RIVER_WATER_Y + 0.03,
+          z: -11.35 + (f / 13) * 4.7,
+          r: 0.78 + (f % 4) * 0.22,
+          phase: f * 0.78,
+          speed: 2.9 + (f % 4) * 0.5,
+          hop: 0.18,
+        });
+      }
+      const splashGeo = new THREE.IcosahedronGeometry(0.46, 0);
+      splashGeo.scale(1.15, 0.52, 1.05);
+      const splashMat = getMat('#EEF9FC', 0.72);
+      waterfallSplashIM = new THREE.InstancedMesh(splashGeo, splashMat, waterfallSplashSeeds.length);
+      waterfallSplashSeeds.forEach((s, idx) => {
+        _instDummy.position.set(s.x, s.y, s.z);
+        _instDummy.rotation.set(0, idx * 0.8, 0);
+        _instDummy.scale.setScalar(s.r);
+        _instDummy.updateMatrix();
+        waterfallSplashIM!.setMatrixAt(idx, _instDummy.matrix);
+      });
+      waterfallSplashIM.instanceMatrix.needsUpdate = true;
+      waterfallSplashIM.computeBoundingSphere();
+      waterfallSplashIM.userData = {isWaterSurface: true};
+      eco.add(waterfallSplashIM);
+
+      const midMistGeo = new THREE.RingGeometry(1.1, 2.05, 16);
+      midMistGeo.rotateX(-Math.PI / 2);
+      midLedgeMistRing = new THREE.Mesh(
+        midMistGeo,
+        new THREE.MeshBasicMaterial({
+          color: '#E8F9FD',
+          transparent: true,
+          opacity: 0.3,
+          depthWrite: false,
+        }),
+      );
+      midLedgeMistRing.position.set(-98.3, 6.42, -9.0);
+      midLedgeMistRing.renderOrder = 4;
+      midLedgeMistRing.userData = {isWaterSurface: true};
+
+      const foamRingGeo = new THREE.RingGeometry(2.15, 3.25, 20);
+      foamRingGeo.rotateX(-Math.PI / 2);
+      waterfallFoamRing = new THREE.Mesh(
+        foamRingGeo,
+        new THREE.MeshBasicMaterial({
+          color: '#E8F9FD',
+          transparent: true,
+          opacity: 0.34,
+          depthWrite: false,
+        }),
+      );
+      waterfallFoamRing.position.set(-94.7, RIVER_WATER_Y + 0.028, -9.0);
+      waterfallFoamRing.renderOrder = 4;
+      waterfallFoamRing.userData = {isWaterSurface: true};
+      eco.add(midLedgeMistRing, waterfallFoamRing);
+    }
+
+    // 3. Long Curved River Shore Collar & Smooth Non-Glaring Opaque Water Ribbon (Zero Texture/Alpha Overdraw)
+    {
+      const R_SEGS = 64;
+      const bankVerts: number[] = [];
+      const bankCols: number[] = [];
+      const bankIdx: number[] = [];
+      const tmpC = new THREE.Color();
+
+      const BANK_PROFILE: [number, number, string][] = [
+        [1.03, 0.015, '#68AE55'],
+        [0.95, -0.18, '#AD9F86'],
+        [0.86, -0.32, '#4D786F'],
+      ];
+      const bCount = BANK_PROFILE.length;
+      [-1, 1].forEach((side) => {
+        const baseVertOffset = bankVerts.length / 3;
+        for (let i = 0; i <= R_SEGS; i++) {
+          const z = THREE.MathUtils.lerp(
+            -WEST_RIVER_VISUAL_HALF_LEN,
+            WEST_RIVER_VISUAL_HALF_LEN,
+            i / R_SEGS,
+          );
+          const cx = getWestRiverCenterX(z);
+          const hw = getWestRiverHalfWidth(z);
+          for (let p = 0; p < bCount; p++) {
+            const [scale, ry, hex] = BANK_PROFILE[p];
+            tmpC.set(hex);
+            bankVerts.push(cx + side * scale * hw, ry, z);
+            bankCols.push(tmpC.r, tmpC.g, tmpC.b);
+          }
+        }
+        for (let i = 0; i < R_SEGS; i++) {
+          const rowA = baseVertOffset + i * bCount;
+          const rowB = baseVertOffset + (i + 1) * bCount;
+          for (let p = 0; p < bCount - 1; p++) {
+            const a = rowA + p;
+            const b = rowA + p + 1;
+            const c = rowB + p;
+            const d = rowB + p + 1;
+            if (side > 0) {
+              bankIdx.push(a, c, b, b, c, d);
+            } else {
+              bankIdx.push(a, b, c, b, d, c);
+            }
+          }
+        }
+      });
+      const bedGeo = new THREE.BufferGeometry();
+      bedGeo.setAttribute('position', new THREE.Float32BufferAttribute(bankVerts, 3));
+      bedGeo.setAttribute('color', new THREE.Float32BufferAttribute(bankCols, 3));
+      bedGeo.setIndex(bankIdx);
+      bedGeo.computeVertexNormals();
+      const riverBedMesh = new THREE.Mesh(
+        bedGeo,
+        new THREE.MeshStandardMaterial({vertexColors: true, roughness: 0.9}),
+      );
+      riverBedMesh.renderOrder = 0;
+      riverBedMesh.userData = {isWaterSurface: true};
+      eco.add(riverBedMesh);
+
+      // Single-Pass Smooth Matte Opaque Water Ribbon (calm, soft gradient, zero glare & zero animation cost)
+      const W_BANDS: [number, string][] = [
+        [-0.95, '#48A2B8'],
+        [-0.45, '#31849F'],
+        [0.45, '#31849F'],
+        [0.95, '#48A2B8'],
+      ];
+      const wColsCount = W_BANDS.length;
+      const wVerts: number[] = [];
+      const wColors: number[] = [];
+      const wIdx: number[] = [];
+      for (let i = 0; i <= R_SEGS; i++) {
+        const t = i / R_SEGS;
+        const z = THREE.MathUtils.lerp(-WEST_RIVER_VISUAL_HALF_LEN, WEST_RIVER_VISUAL_HALF_LEN, t);
+        const cx = getWestRiverCenterX(z);
+        const hw = getWestRiverHalfWidth(z);
+        for (let k = 0; k < wColsCount; k++) {
+          const [scale, hex] = W_BANDS[k];
+          tmpC.set(hex);
+          wVerts.push(cx + hw * scale, RIVER_WATER_Y, z);
+          wColors.push(tmpC.r, tmpC.g, tmpC.b);
+        }
+        if (i < R_SEGS) {
+          const rA = i * wColsCount;
+          const rB = (i + 1) * wColsCount;
+          for (let k = 0; k < wColsCount - 1; k++) {
+            const a = rA + k;
+            const b = rA + k + 1;
+            const c = rB + k;
+            const d = rB + k + 1;
+            wIdx.push(a, c, b, b, c, d);
+          }
+        }
+      }
+      const wGeo = new THREE.BufferGeometry();
+      wGeo.setAttribute('position', new THREE.Float32BufferAttribute(wVerts, 3));
+      wGeo.setAttribute('color', new THREE.Float32BufferAttribute(wColors, 3));
+      wGeo.setIndex(wIdx);
+      wGeo.computeVertexNormals();
+
+      riverWaterMat = new THREE.MeshStandardMaterial({
+        color: '#FFFFFF',
+        vertexColors: true,
+        roughness: 0.88,
+        metalness: 0.0,
+        envMapIntensity: 0.04,
+      });
+      const riverWaterMesh = new THREE.Mesh(wGeo, riverWaterMat);
+      riverWaterMesh.renderOrder = 1;
+      riverWaterMesh.userData = {kind: 'river_water', isWaterMesh: true};
+      eco.add(riverWaterMesh);
+      clickTargets.push(riverWaterMesh);
+
+      // Scenic Boulder Riffle Shoals & Wooden Rope Buoys framing navigable river limits (merged!)
+      const shoalGroup = new THREE.Group();
+      const shoalRockMat = getMat('#7E8893', 0.86);
+      const buoyWoodMat = getMat('#9E6A3B', 0.76);
+      const buoyFloatMat = getMat('#E87D5A', 0.65);
+      const ropeMat = getMat('#DEC59A', 0.84);
+      [WEST_RIVER_NAV_MIN_Z - 1.6, WEST_RIVER_NAV_MAX_Z + 1.6].forEach((limZ) => {
+        const cx = getWestRiverCenterX(limZ);
+        const hw = getWestRiverHalfWidth(limZ);
+        for (let s = -3; s <= 3; s++) {
+          const sx = cx + s * (hw * 0.25);
+          if (Math.abs(s) >= 2) {
+            const sr = new THREE.Mesh(new THREE.DodecahedronGeometry(0.65, 0), shoalRockMat);
+            sr.scale.set(1.2, 0.58, 1.0);
+            sr.position.set(sx, RIVER_WATER_Y + 0.08, limZ + (s % 2) * 0.4);
+            shoalGroup.add(sr);
+          } else {
+            const buoy = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.55, 8), buoyWoodMat);
+            buoy.position.set(sx, RIVER_WATER_Y + 0.14, limZ);
+            const cap = new THREE.Mesh(new THREE.SphereGeometry(0.14, 7, 6), buoyFloatMat);
+            cap.position.set(sx, RIVER_WATER_Y + 0.42, limZ);
+            shoalGroup.add(buoy, cap);
+          }
+        }
+        const ropeSpan = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.025, 0.025, hw * 1.15, 6),
+          ropeMat,
+        );
+        ropeSpan.rotation.z = Math.PI / 2;
+        ropeSpan.position.set(cx, RIVER_WATER_Y + 0.34, limZ);
+        shoalGroup.add(ropeSpan);
+      });
+      mergeStaticGroupByMaterial(shoalGroup);
+      eco.add(shoalGroup);
+
+      // Bank colliders keeping walkers on shore (leaving Bridge z=6.8..10.2 & Dock z=-3.3..-0.3 open!)
+      for (let z = -66; z <= 64; z += 2.5) {
+        const cx = getWestRiverCenterX(z);
+        const hw = getWestRiverHalfWidth(z);
+        const inBridgeBand = z >= 6.7 && z <= 10.3;
+        const inDockBand = z >= -3.4 && z <= -0.2;
+        if (!inBridgeBand && !inDockBand) {
+          colliders.push({type: 'circle', x: cx + hw - 0.3, z, r: 1.35});
+        }
+        if (!inBridgeBand) {
+          colliders.push({type: 'circle', x: cx - hw + 0.3, z, r: 1.35});
+        }
+      }
+    }
+
+    // 4. Curved Fairy-Tale Arched Bridge over the River (z = 8.5)
+    {
+      const bridgeGroup = new THREE.Group();
+      const midX = getWestRiverCenterX(WEST_BRIDGE_Z);
+      const bridgeWoodMat = getMat('#BC854E', 0.72);
+      const bridgeAltMat = getMat('#A77240', 0.74);
+      const bridgeDarkMat = getMat('#704827', 0.78);
+      const bridgeStoneMat = getMat('#B7AFA3', 0.84);
+      const BRIDGE_SEGS = 24;
+      const span = WEST_BRIDGE_HALF_SPAN * 2;
+      const deckW = 2.55;
+
+      // Stone abutment pedestals at both shores
+      [-1, 1].forEach((side) => {
+        const endX = midX + side * (WEST_BRIDGE_HALF_SPAN - 0.35);
+        const abut = new THREE.Mesh(new RoundedBoxGeometry(1.15, 0.7, deckW + 0.35, 2, 0.05), bridgeStoneMat);
+        abut.position.set(endX, 0.14, WEST_BRIDGE_Z);
+        bridgeGroup.add(abut);
+      });
+
+      // Stepped curved planks + twin curved arch rails & posts
+      for (let i = 0; i <= BRIDGE_SEGS; i++) {
+        const t = i / BRIDGE_SEGS;
+        const x = midX - WEST_BRIDGE_HALF_SPAN + t * span;
+        const y = getWestRiverBridgeHeight(x, WEST_BRIDGE_Z) ?? 0.04;
+        const nextX = midX - WEST_BRIDGE_HALF_SPAN + Math.min(1, t + 1 / BRIDGE_SEGS) * span;
+        const nextY = getWestRiverBridgeHeight(nextX, WEST_BRIDGE_Z) ?? 0.04;
+        const pitchZ = Math.atan2(nextY - y, Math.max(0.01, nextX - x));
+
+        if (i < BRIDGE_SEGS) {
+          const plank = new THREE.Mesh(
+            new RoundedBoxGeometry(span / BRIDGE_SEGS - 0.04, 0.11, deckW, 1, 0.02),
+            i % 2 === 0 ? bridgeWoodMat : bridgeAltMat,
+          );
+          plank.position.set((x + nextX) * 0.5, (y + nextY) * 0.5 - 0.05, WEST_BRIDGE_Z);
+          plank.rotation.z = pitchZ;
+          bridgeGroup.add(plank);
+
+          // Twin structural arch stringers beneath deck
+          [-0.95, 0.95].forEach((oz) => {
+            const beam = new THREE.Mesh(
+              new RoundedBoxGeometry(span / BRIDGE_SEGS + 0.08, 0.24, 0.16, 1, 0.02),
+              bridgeDarkMat,
+            );
+            beam.position.set((x + nextX) * 0.5, (y + nextY) * 0.5 - 0.18, WEST_BRIDGE_Z + oz);
+            beam.rotation.z = pitchZ;
+            bridgeGroup.add(beam);
+          });
+        }
+
+        if (i % 3 === 0) {
+          const isCenterPost = i === BRIDGE_SEGS / 2;
+          [-1.18, 1.18].forEach((oz) => {
+            const post = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.07, 0.085, isCenterPost ? 1.15 : 0.88, 8),
+              bridgeDarkMat,
+            );
+            post.position.set(x, y + (isCenterPost ? 0.55 : 0.42), WEST_BRIDGE_Z + oz);
+            bridgeGroup.add(post);
+
+            if (isCenterPost) {
+              const lanternCap = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.1, 7), bridgeDarkMat);
+              lanternCap.position.set(x, y + 1.18, WEST_BRIDGE_Z + oz);
+              const bLampMat = new THREE.MeshStandardMaterial({
+                color: '#FFF4C2',
+                emissive: '#FFCC66',
+                emissiveIntensity: 0.35,
+                roughness: 0.25,
+              });
+              lampBulbs.push(bLampMat);
+              const bLamp = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), bLampMat);
+              bLamp.position.set(x, y + 1.07, WEST_BRIDGE_Z + oz);
+              bridgeGroup.add(lanternCap, bLamp);
+            }
+          });
+        }
+        if (i < BRIDGE_SEGS) {
+          const segLen = Math.hypot(nextX - x, nextY - y);
+          [-1.18, 1.18].forEach((oz) => {
+            const rail = new THREE.Mesh(
+              new RoundedBoxGeometry(segLen + 0.04, 0.07, 0.08, 1, 0.015),
+              bridgeWoodMat,
+            );
+            rail.position.set((x + nextX) * 0.5, (y + nextY) * 0.5 + 0.78, WEST_BRIDGE_Z + oz);
+            rail.rotation.z = pitchZ;
+            bridgeGroup.add(rail);
+          });
+        }
+      }
+
+      // Smooth invisible curved walkable bridge raycast surface
+      const bWalkGeo = new THREE.PlaneGeometry(span, deckW, 20, 2);
+      bWalkGeo.rotateX(-Math.PI / 2);
+      const bAttr = bWalkGeo.attributes.position;
+      for (let i = 0; i < bAttr.count; i++) {
+        const wx = midX + bAttr.getX(i);
+        const h = getWestRiverBridgeHeight(wx, WEST_BRIDGE_Z) ?? 0.04;
+        bAttr.setY(i, h);
+      }
+      bWalkGeo.computeVertexNormals();
+      const bWalkMesh = new THREE.Mesh(bWalkGeo, new THREE.MeshBasicMaterial({visible: false}));
+      bWalkMesh.position.set(midX, 0, WEST_BRIDGE_Z);
+      bWalkMesh.userData = {kind: 'ground'};
+      pierWalkableMeshes.push(bWalkMesh);
+      bridgeGroup.add(bWalkMesh);
+
+      // Bridge side railing colliders (keep both ends wide open!)
+      colliders.push({
+        type: 'box',
+        id: 'west_bridge_rail_n',
+        x: midX,
+        z: WEST_BRIDGE_Z - 1.38,
+        hw: WEST_BRIDGE_HALF_SPAN - 0.5,
+        hd: 0.24,
+      });
+      colliders.push({
+        type: 'box',
+        id: 'west_bridge_rail_s',
+        x: midX,
+        z: WEST_BRIDGE_Z + 1.38,
+        hw: WEST_BRIDGE_HALF_SPAN - 0.5,
+        hd: 0.24,
+      });
+
+      mergeStaticGroupByMaterial(bridgeGroup, new Set([bWalkMesh]));
+      eco.add(bridgeGroup);
+    }
+
+    // 5. East Bank Boat Dock, 2 Hanging Wooden Lanterns, Boat Signboard & Crafted Clinker Wooden Rowboats
+    const buildWoodenRowboat = (withOarPivots = false) => {
+      const boat = new THREE.Group();
+      const oakHull = getMat('#A46233', 0.68);
+      const oakInner = getMat('#C88E56', 0.72);
+      const oakTrim = getMat('#DDA86F', 0.62);
+      const oakDark = getMat('#5D351A', 0.78);
+      const brassMat = getMat('#D8A94B', 0.34, 0.72);
+      const ropeHempMat = getMat('#DCC194', 0.86);
+      const cushionRed = getMat('#C65943', 0.74);
+      const sailBlue = getMat('#3D8EB8', 0.58);
+
+      // Curved lofted boat shell (hollow U-profile from curved transom stern z=-1.18 to pointed prow z=+1.52)
+      const STATIONS = 11;
+      const PROW_Z = 1.52;
+      const STERN_Z = -1.18;
+      const hullHalfW = (t: number) => {
+        if (t > 0.58) {
+          const u = (1 - t) / 0.42;
+          return 0.64 * Math.pow(Math.max(0.02, u), 0.62);
+        }
+        if (t < 0.22) {
+          return THREE.MathUtils.lerp(0.46, 0.62, t / 0.22);
+        }
+        return 0.62 + 0.03 * Math.sin(((t - 0.22) / 0.36) * Math.PI);
+      };
+      const sheerLift = (t: number) => Math.pow(Math.max(0, (t - 0.55) / 0.45), 1.7) * 0.2 + (t < 0.2 ? 0.04 : 0);
+
+      // Build curved outer hull & inner cockpit lining with 7 cross-section ring points per station
+      const makeHullShellGeo = (wallOffset: number, yOffset: number) => {
+        const verts: number[] = [];
+        const indices: number[] = [];
+        const RING = 7;
+        for (let i = 0; i <= STATIONS; i++) {
+          const t = i / STATIONS;
+          const z = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t);
+          const hw = Math.max(0.03, hullHalfW(t) + wallOffset);
+          const sheerY = 0.38 + sheerLift(t) + yOffset;
+          const chineY = 0.11 + sheerLift(t) * 0.35 + yOffset;
+          const keelY = 0.02 + sheerLift(t) * 0.28 + yOffset;
+          const pts: [number, number][] = [
+            [-hw, sheerY],
+            [-hw * 0.84, chineY],
+            [-hw * 0.42, keelY + 0.02],
+            [0, keelY],
+            [hw * 0.42, keelY + 0.02],
+            [hw * 0.84, chineY],
+            [hw, sheerY],
+          ];
+          for (const [px, py] of pts) {
+            verts.push(px, py, z);
+          }
+        }
+        for (let i = 0; i < STATIONS; i++) {
+          const rA = i * RING;
+          const rB = (i + 1) * RING;
+          for (let j = 0; j < RING - 1; j++) {
+            const a = rA + j;
+            const b = rA + j + 1;
+            const c = rB + j;
+            const d = rB + j + 1;
+            indices.push(a, c, b, b, c, d);
+          }
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        geo.setIndex(indices);
+        geo.computeVertexNormals();
+        return geo;
+      };
+
+      const outerShell = new THREE.Mesh(makeHullShellGeo(0, 0), oakHull);
+      const innerShell = new THREE.Mesh(makeHullShellGeo(-0.055, 0.045), oakInner);
+      (outerShell.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+      (innerShell.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+      boat.add(outerShell, innerShell);
+
+      // Curved stern transom board + dark oak keel spine + bow stempost
+      const transom = new THREE.Mesh(new RoundedBoxGeometry(0.94, 0.36, 0.1, 2, 0.03), oakDark);
+      transom.position.set(0, 0.22, STERN_Z + 0.03);
+      transom.rotation.x = -0.14;
+      const keelSpine = new THREE.Mesh(new RoundedBoxGeometry(0.11, 0.08, 2.38, 2, 0.02), oakDark);
+      keelSpine.position.set(0, 0.01, 0.06);
+      const stemPost = new THREE.Mesh(new RoundedBoxGeometry(0.11, 0.48, 0.18, 2, 0.03), oakDark);
+      stemPost.rotation.x = 0.56;
+      stemPost.position.set(0, 0.34, PROW_Z - 0.08);
+      boat.add(transom, keelSpine, stemPost);
+
+      // Left & Right Curved Gunwale Rub Rails
+      [-1, 1].forEach((side) => {
+        for (let i = 0; i < STATIONS; i++) {
+          const t0 = i / STATIONS;
+          const t1 = (i + 1) / STATIONS;
+          const z0 = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t0);
+          const z1 = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t1);
+          const x0 = side * hullHalfW(t0);
+          const x1 = side * hullHalfW(t1);
+          const y0 = 0.4 + sheerLift(t0);
+          const y1 = 0.4 + sheerLift(t1);
+          const segLen = Math.hypot(x1 - x0, y1 - y0, z1 - z0);
+          const rail = new THREE.Mesh(new RoundedBoxGeometry(0.085, 0.075, segLen + 0.04, 1, 0.02), oakTrim);
+          rail.position.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5);
+          rail.lookAt(x1, y1, z1);
+          boat.add(rail);
+        }
+      });
+
+      // Slatted Floorboards (5 lengthwise planks) + 4 Curved Interior Timber Ribs
+      for (let s = -2; s <= 2; s++) {
+        const plank = new THREE.Mesh(
+          new RoundedBoxGeometry(0.11, 0.035, 1.82 - Math.abs(s) * 0.14, 1, 0.01),
+          s % 2 === 0 ? oakTrim : oakInner,
+        );
+        plank.position.set(s * 0.145, 0.1, -0.05);
+        boat.add(plank);
+      }
+      [-0.78, -0.22, 0.32, 0.82].forEach((rz) => {
+        const rib = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.04, 0.06, 1, 0.015), oakDark);
+        rib.position.set(0, 0.085, rz);
+        boat.add(rib);
+      });
+
+      // Triangular Carved Foredeck (Boong Mũi) + Mooring Rope Coil & Brass Cleat
+      const foreDeck = new THREE.Mesh(new THREE.ConeGeometry(0.54, 0.68, 4), oakTrim);
+      foreDeck.rotation.x = Math.PI / 2;
+      foreDeck.rotation.y = Math.PI / 4;
+      foreDeck.scale.set(0.95, 1, 0.14);
+      foreDeck.position.set(0, 0.38, 1.18);
+      const ropeCoil = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.028, 6, 12), ropeHempMat);
+      ropeCoil.rotation.x = Math.PI / 2;
+      ropeCoil.position.set(-0.1, 0.43, 1.06);
+      const cleat = new THREE.Mesh(new RoundedBoxGeometry(0.14, 0.035, 0.04, 1, 0.01), brassMat);
+      cleat.position.set(0.12, 0.43, 1.14);
+      boat.add(foreDeck, ropeCoil, cleat);
+
+      // Aft Captain Bench with Cozy Quilted Cushion + Mid Rowing Thwart
+      const aftBench = new THREE.Mesh(new RoundedBoxGeometry(1.06, 0.075, 0.4, 2, 0.02), oakTrim);
+      aftBench.position.set(0, 0.28, -0.58);
+      const cushion = new THREE.Mesh(new RoundedBoxGeometry(0.74, 0.06, 0.32, 2, 0.025), cushionRed);
+      cushion.position.set(0, 0.33, -0.58);
+      const midThwart = new THREE.Mesh(new RoundedBoxGeometry(1.14, 0.07, 0.3, 2, 0.02), oakTrim);
+      midThwart.position.set(0, 0.27, 0.26);
+      boat.add(aftBench, cushion, midThwart);
+
+      // Crooked Bow Lantern Post + Warm Glowing Harbor Lantern + Pennant Flag
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.034, 0.72, 7), oakDark);
+      mast.position.set(0, 0.72, 1.32);
+      const bowArm = new THREE.Mesh(new RoundedBoxGeometry(0.05, 0.05, 0.24, 1, 0.01), oakDark);
+      bowArm.position.set(0, 1.02, 1.42);
+      const bowCap = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.07, 6), oakDark);
+      bowCap.position.set(0, 0.94, 1.5);
+      const bowBulbMat = new THREE.MeshStandardMaterial({
+        color: '#FFF4C2',
+        emissive: '#FFCC66',
+        emissiveIntensity: 0.45,
+        roughness: 0.25,
+      });
+      lampBulbs.push(bowBulbMat);
+      const bowBulb = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), bowBulbMat);
+      bowBulb.position.set(0, 0.85, 1.5);
+      const flag = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.3, 3), sailBlue);
+      flag.rotation.z = -Math.PI / 2;
+      flag.position.set(0.14, 0.96, 1.32);
+      boat.add(mast, bowArm, bowCap, bowBulb, flag);
+
+      // Brass Oarlocks + Sculpted Tapered Wooden Oars
+      let oarLPivot: THREE.Group | null = null;
+      let oarRPivot: THREE.Group | null = null;
+      [-1, 1].forEach((side) => {
+        const oarlock = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.09, 6), brassMat);
+        oarlock.position.set(side * 0.62, 0.44, 0.14);
+        boat.add(oarlock);
+
+        const pivot = new THREE.Group();
+        pivot.position.set(side * 0.62, 0.47, 0.14);
+        const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.24, 6), oakDark);
+        grip.rotation.z = side * 1.16;
+        grip.position.set(-side * 0.14, 0.06, 0);
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.026, 1.28, 7), oakTrim);
+        shaft.rotation.z = side * 1.16;
+        shaft.position.set(side * 0.44, -0.17, 0);
+        const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.12, 7), oakDark);
+        collar.rotation.z = side * 1.16;
+        collar.position.set(side * 0.02, -0.01, 0);
+        const blade = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.028, 0.48, 2, 0.01), oakHull);
+        blade.rotation.z = side * 1.16;
+        blade.position.set(side * 0.98, -0.41, 0);
+        pivot.add(grip, collar, shaft, blade);
+        boat.add(pivot);
+        if (side < 0) oarLPivot = pivot;
+        else oarRPivot = pivot;
+      });
+
+      const skipSet = new Set<THREE.Object3D>();
+      if (withOarPivots) {
+        if (oarLPivot) skipSet.add(oarLPivot);
+        if (oarRPivot) skipSet.add(oarRPivot);
+      }
+      mergeStaticGroupByMaterial(boat, skipSet);
+      return {boat, oarLPivot, oarRPivot};
+    };
+
+    {
+      const dockGroup = new THREE.Group();
+      const dockWoodMat = getMat('#C48F59', 0.72);
+      const dockAltMat = getMat('#B17D4B', 0.74);
+      const dockDarkMat = getMat('#734A28', 0.78);
+
+      // Walkable pier deck extending onto East shoreline (x: -77.6..-73.8, z: -3.1..-0.5)
+      const dockDeck = new THREE.Mesh(
+        new RoundedBoxGeometry(3.85, 0.18, 2.6, 2, 0.04),
+        dockWoodMat,
+      );
+      dockDeck.position.set(-75.7, 0.14, -1.8);
+      dockDeck.userData = {kind: 'ground'};
+      pierWalkableMeshes.push(dockDeck);
+      dockGroup.add(dockDeck);
+
+      for (let px = -77.45; px <= -73.95; px += 0.42) {
+        const plank = new THREE.Mesh(
+          new RoundedBoxGeometry(0.32, 0.035, 2.55, 1, 0.01),
+          Math.round(px * 3) % 2 === 0 ? dockWoodMat : dockAltMat,
+        );
+        plank.position.set(px, 0.235, -1.8);
+        dockGroup.add(plank);
+      }
+      [
+        [-77.4, -2.95],
+        [-77.4, -0.65],
+        [-75.7, -2.95],
+        [-75.7, -0.65],
+        [-74.0, -2.95],
+        [-74.0, -0.65],
+      ].forEach(([px, pz]) => {
+        const piling = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.11, 1.55, 8), dockDarkMat);
+        piling.position.set(px, -0.1, pz);
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.08, 8), dockWoodMat);
+        cap.position.set(px, 0.68, pz);
+        dockGroup.add(piling, cap);
+      });
+      colliders.push({type: 'box', id: 'river_dock_stop', x: -77.9, z: -1.8, hw: 0.28, hd: 1.4});
+
+      // 2 Hanging Wooden Post Lanterns along the riverbank (cắm 2 đèn gỗ treo)
+      const addHangingWoodenLantern = (lx: number, lz: number, rotY: number) => {
+        const lp = new THREE.Group();
+        lp.position.set(lx, 0.02, lz);
+        lp.rotation.y = rotY;
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.105, 2.75, 8), dockDarkMat);
+        post.position.y = 1.36;
+        const arm = new THREE.Mesh(new RoundedBoxGeometry(0.75, 0.08, 0.08, 2, 0.02), dockDarkMat);
+        arm.position.set(0.32, 2.66, 0);
+        const brace = new THREE.Mesh(new RoundedBoxGeometry(0.45, 0.06, 0.06, 1, 0.015), dockDarkMat);
+        brace.rotation.z = 0.72;
+        brace.position.set(0.2, 2.42, 0);
+        const cord = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.015, 0.015, 0.26, 6),
+          getMat('#2C241E', 0.6),
+        );
+        cord.position.set(0.62, 2.5, 0);
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.13, 8), dockDarkMat);
+        cap.position.set(0.62, 2.34, 0);
+        const bulbMat = new THREE.MeshStandardMaterial({
+          color: '#FFF4C2',
+          emissive: '#FFCC66',
+          emissiveIntensity: 0.35,
+          roughness: 0.25,
+        });
+        lampBulbs.push(bulbMat);
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.155, 9, 9), bulbMat);
+        bulb.position.set(0.62, 2.19, 0);
+        lp.add(post, arm, brace, cord, cap, bulb);
+        dockGroup.add(lp);
+        colliders.push({type: 'circle', x: lx, z: lz, r: 0.34});
+      };
+      addHangingWoodenLantern(-73.0, -3.55, -0.35);
+      addHangingWoodenLantern(-72.6, 5.2, 0.45);
+
+      // Interactive Boat Boarding Signboard (Biển hiệu hình chiếc thuyền — bấm để xuống thuyền)
+      const boardGroup = new THREE.Group();
+      boardGroup.position.set(-74.6, 0.02, -0.15);
+      boardGroup.rotation.y = Math.PI * 0.45;
+      const bPost = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 1.55, 8), dockDarkMat);
+      bPost.position.y = 0.78;
+      const bFrame = new THREE.Mesh(new RoundedBoxGeometry(1.48, 0.76, 0.1, 2, 0.03), dockDarkMat);
+      bFrame.position.y = 1.48;
+      const bFaceFront = new THREE.Mesh(
+        createAtlasPlaneGeometry(1.36, 0.64, 'river_boat_sign'),
+        signAtlasMat,
+      );
+      bFaceFront.position.set(0, 1.48, 0.056);
+      const bFaceBack = new THREE.Mesh(
+        createAtlasPlaneGeometry(1.36, 0.64, 'river_boat_sign'),
+        signAtlasMat,
+      );
+      bFaceBack.rotation.y = Math.PI;
+      bFaceBack.position.set(0, 1.48, -0.056);
+      boardGroup.add(bPost, bFrame, bFaceFront, bFaceBack);
+      addInteractionProxy(
+        boardGroup,
+        [1.65, 2.0, 0.9],
+        1.0,
+        {
+          kind: 'river_boat_board',
+          tx: RIVER_BOARD_INTERACT.tx,
+          tz: RIVER_BOARD_INTERACT.tz,
+        },
+        clickTargets,
+      );
+      colliders.push({type: 'circle', id: 'river_boat_board', x: -74.6, z: -0.15, r: 0.48});
+      dockGroup.add(boardGroup);
+
+      mergeStaticGroupByMaterial(dockGroup, new Set([dockDeck]));
+      eco.add(dockGroup);
+
+      // Moored Wooden Boat floating right beside the dock
+      const mooredBuilt = buildWoodenRowboat(false);
+      mooredRiverBoat = mooredBuilt.boat;
+      mooredRiverBoat.position.set(-78.8, RIVER_WATER_Y + 0.05, -2.25);
+      mooredRiverBoat.rotation.y = 0.22;
+      addInteractionProxy(
+        mooredRiverBoat,
+        [1.8, 1.5, 3.0],
+        0.55,
+        {
+          kind: 'river_boat_board',
+          tx: RIVER_BOARD_INTERACT.tx,
+          tz: RIVER_BOARD_INTERACT.tz,
+        },
+        clickTargets,
+      );
+      eco.add(mooredRiverBoat);
+
+      // Active Steerable Boat (shown when player embarks onto the river)
+      const activeBuilt = buildWoodenRowboat(true);
+      activeRiverBoat = activeBuilt.boat;
+      activeBoatOarL = activeBuilt.oarLPivot;
+      activeBoatOarR = activeBuilt.oarRPivot;
+      activeRiverBoat.visible = false;
+      eco.add(activeRiverBoat);
+    }
+
+    // 6. NPC Ship's Spacious Nautical Boathouse Shop with Large Roof Boat Logo (Tiệm Thuyền của Ship)
+    {
+      const stall = new THREE.Group();
+      stall.position.set(SHIP_STALL_POS.x, 0.02, SHIP_STALL_POS.z);
+      stall.rotation.y = 0; // Faces +Z toward river promenade & boat dock!
+
+      const timberDark = getMat('#663D20', 0.78);
+      const timberWarm = getMat('#B87F49', 0.68);
+      const counterTopMat = getMat('#EFE0C4', 0.56);
+      const awningSeaBlue = getMat('#3479A1', 0.58);
+      const awningCream = getMat('#FBF4E6', 0.64);
+      const wallCreamMat = getMat('#F4ECE0', 0.72);
+      const wainscotNavyMat = getMat('#366887', 0.74);
+      const roofSlateMat = getMat('#3F6C8C', 0.76);
+      const brassTrimMat = getMat('#DCA94A', 0.35, 0.72);
+      const buoyWhiteMat = getMat('#FAF8F2', 0.55);
+      const buoyRedMat = getMat('#D95843', 0.55);
+
+      // Raised Timber Wharf Deck (6.6m x 4.6m) + Corner Pilings & Wide Front Steps
+      const deck = new THREE.Mesh(
+        new RoundedBoxGeometry(6.6, 0.24, 4.6, 2, 0.05),
+        getMat('#BE8D5B', 0.76),
+      );
+      deck.position.y = 0.12;
+      stall.add(deck);
+
+      for (let px = -3.05; px <= 3.05; px += 0.51) {
+        const plank = new THREE.Mesh(
+          new RoundedBoxGeometry(0.42, 0.03, 4.48, 1, 0.01),
+          Math.round(px * 3) % 2 === 0 ? timberWarm : getMat('#AE7844', 0.74),
+        );
+        plank.position.set(px, 0.25, 0);
+        stall.add(plank);
+      }
+
+      const frontStep = new THREE.Mesh(
+        new RoundedBoxGeometry(3.4, 0.14, 0.72, 2, 0.03),
+        getMat('#B48252', 0.76),
+      );
+      frontStep.position.set(0, 0.06, 2.58);
+      stall.add(frontStep);
+
+      // Corner & Mid Wharf Pilings / Bollards
+      [
+        [-3.05, -2.05],
+        [0, -2.05],
+        [3.05, -2.05],
+        [-3.05, 2.05],
+        [3.05, 2.05],
+      ].forEach(([px, pz]) => {
+        const post = new THREE.Mesh(new RoundedBoxGeometry(0.22, 3.15, 0.22, 2, 0.03), timberDark);
+        post.position.set(px, 1.72, pz);
+        stall.add(post);
+      });
+      [-2.95, 2.95].forEach((bx) => {
+        const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.62, 8), timberDark);
+        bollard.position.set(bx, 0.45, 2.18);
+        const bCap = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.08, 8), timberWarm);
+        bCap.position.set(bx, 0.76, 2.18);
+        stall.add(bollard, bCap);
+      });
+
+      // Back Wall & Half-Side Nautical Walls with Glowing Porthole Windows
+      const backLower = new THREE.Mesh(
+        new RoundedBoxGeometry(6.15, 1.15, 0.18, 2, 0.03),
+        wainscotNavyMat,
+      );
+      backLower.position.set(0, 0.82, -2.05);
+      const backUpper = new THREE.Mesh(
+        new RoundedBoxGeometry(6.15, 1.85, 0.16, 2, 0.03),
+        wallCreamMat,
+      );
+      backUpper.position.set(0, 2.32, -2.05);
+      stall.add(backLower, backUpper);
+
+      [-2.98, 2.98].forEach((sx) => {
+        const sideLower = new THREE.Mesh(
+          new RoundedBoxGeometry(0.16, 1.12, 3.9, 2, 0.03),
+          wainscotNavyMat,
+        );
+        sideLower.position.set(sx, 0.8, -0.1);
+        const sideUpperBack = new THREE.Mesh(
+          new RoundedBoxGeometry(0.15, 1.82, 1.85, 2, 0.03),
+          wallCreamMat,
+        );
+        sideUpperBack.position.set(sx, 2.26, -1.12);
+        stall.add(sideLower, sideUpperBack);
+      });
+
+      // Two Brass Porthole Windows on Back Wall
+      [-1.75, 1.75].forEach((wx) => {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.065, 8, 16), brassTrimMat);
+        ring.position.set(wx, 2.24, -1.94);
+        const portGlassMat = new THREE.MeshStandardMaterial({
+          color: '#BCE6FA',
+          emissive: '#FFE499',
+          emissiveIntensity: 0.25,
+          roughness: 0.2,
+        });
+        windowMeshes.push(portGlassMat);
+        const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.06, 14), portGlassMat);
+        glass.rotation.x = Math.PI / 2;
+        glass.position.set(wx, 2.24, -1.96);
+        stall.add(ring, glass);
+      });
+
+      // Upper Timber Perimeter Beams
+      const beamF = new THREE.Mesh(new RoundedBoxGeometry(6.42, 0.16, 0.16, 2, 0.03), timberDark);
+      beamF.position.set(0, 3.24, 2.05);
+      const beamB = beamF.clone();
+      beamB.position.z = -2.05;
+      stall.add(beamF, beamB);
+
+      // Coastal Pitched Roof Over Main Boathouse Body
+      const gableRoof = createExtrudedRoof(6.95, 1.55, 3.95, roofSlateMat);
+      gableRoof.position.set(0, 4.02, -0.2);
+      const roofRidge = new THREE.Mesh(new RoundedBoxGeometry(0.18, 0.14, 4.3, 2, 0.03), timberDark);
+      roofRidge.position.set(0, 4.84, -0.2);
+      stall.add(gableRoof, roofRidge);
+
+      // Wide Sloped Blue-Cream Striped Front Awning Over Counter & Porch
+      const canopyGroup = new THREE.Group();
+      canopyGroup.position.set(0, 3.22, 1.85);
+      canopyGroup.rotation.x = 0.22;
+      const canopyFrame = new THREE.Mesh(
+        new RoundedBoxGeometry(6.75, 0.09, 2.2, 2, 0.03),
+        timberWarm,
+      );
+      canopyFrame.position.y = -0.04;
+      canopyGroup.add(canopyFrame);
+      const stripeCount = 11;
+      const stripeW = 6.6 / stripeCount;
+      for (let i = 0; i < stripeCount; i++) {
+        const stripe = new THREE.Mesh(
+          new RoundedBoxGeometry(stripeW - 0.015, 0.12, 2.16, 2, 0.03),
+          i % 2 === 0 ? awningSeaBlue : awningCream,
+        );
+        stripe.position.set(-6.6 / 2 + stripeW * (i + 0.5), 0.03, 0);
+        const scallop = new THREE.Mesh(
+          new THREE.CylinderGeometry(stripeW * 0.48, stripeW * 0.48, 0.07, 10),
+          i % 2 === 0 ? awningSeaBlue : awningCream,
+        );
+        scallop.rotation.x = Math.PI / 2;
+        scallop.position.set(-6.6 / 2 + stripeW * (i + 0.5), -0.04, 1.08);
+        canopyGroup.add(stripe, scallop);
+      }
+      stall.add(canopyGroup);
+
+      // Prominent Oversized Double-Sided "TIỆM CỦA SHIP" Signboard + Large 3D Sailboat Crest
+      const topSignBoard = new THREE.Mesh(
+        new RoundedBoxGeometry(2.88, 1.28, 0.14, 2, 0.04),
+        timberDark,
+      );
+      topSignBoard.position.set(0, 4.18, 2.08);
+      const topSignFront = new THREE.Mesh(
+        createAtlasPlaneGeometry(2.68, 1.12, 'ship_stall'),
+        signAtlasMat,
+      );
+      topSignFront.position.set(0, 4.18, 2.155);
+      const topSignBack = new THREE.Mesh(
+        createAtlasPlaneGeometry(2.68, 1.12, 'ship_stall'),
+        signAtlasMat,
+      );
+      topSignBack.rotation.y = Math.PI;
+      topSignBack.position.set(0, 4.18, 2.005);
+      stall.add(topSignBoard, topSignFront, topSignBack);
+
+      // Large 3D Boat Crest Above the Signboard
+      const crestHull = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.48, 0.24, 6),
+        getMat('#B56F36', 0.65),
+      );
+      crestHull.scale.set(1.9, 1, 0.72);
+      crestHull.position.set(0, 4.96, 2.08);
+      const crestMast = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.04, 0.85, 6), timberDark);
+      crestMast.position.set(0, 5.42, 2.08);
+      const crestSail = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.68, 3), awningSeaBlue);
+      crestSail.rotation.y = Math.PI * 0.5;
+      crestSail.position.set(0.08, 5.5, 2.08);
+      stall.add(crestHull, crestMast, crestSail);
+
+      // 3 Warm Hanging Harbor Lanterns Along Front Awning
+      [-2.55, 0, 2.55].forEach((lx) => {
+        const lampCap = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.11, 7), timberDark);
+        lampCap.position.set(lx, 2.86, 2.38);
+        const shipLampMat = new THREE.MeshStandardMaterial({
+          color: '#FFF4C2',
+          emissive: '#FFCC66',
+          emissiveIntensity: 0.35,
+          roughness: 0.25,
+        });
+        lampBulbs.push(shipLampMat);
+        const shipLantern = new THREE.Mesh(new THREE.SphereGeometry(0.145, 9, 9), shipLampMat);
+        shipLantern.position.set(lx, 2.72, 2.38);
+        stall.add(lampCap, shipLantern);
+      });
+
+      // Wide 4.25m Front Wooden Counter + Nautical Props
+      const counterBody = new THREE.Mesh(
+        new RoundedBoxGeometry(4.25, 0.9, 0.84, 2, 0.05),
+        timberWarm,
+      );
+      counterBody.position.set(0.1, 0.68, 0.82);
+      const counterTop = new THREE.Mesh(
+        new RoundedBoxGeometry(4.48, 0.11, 0.98, 2, 0.03),
+        counterTopMat,
+      );
+      counterTop.position.set(0.1, 1.16, 0.82);
+      stall.add(counterBody, counterTop);
+
+      // Display Wooden Boat Model + Brass Compass + Coiled Rope on Counter
+      const miniBoat = new THREE.Mesh(new RoundedBoxGeometry(0.84, 0.16, 0.36, 2, 0.05), timberDark);
+      miniBoat.position.set(-1.15, 1.29, 0.84);
+      miniBoat.rotation.y = 0.28;
+      const miniSail = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 3), awningSeaBlue);
+      miniSail.position.set(-1.15, 1.6, 0.84);
+      const compassBase = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.14, 0.08, 10), brassTrimMat);
+      compassBase.position.set(0.15, 1.25, 0.86);
+      const ropeCoil = new THREE.Mesh(
+        new THREE.TorusGeometry(0.22, 0.055, 7, 14),
+        getMat('#E0C79C', 0.82),
+      );
+      ropeCoil.rotation.x = Math.PI / 2;
+      ropeCoil.position.set(1.45, 1.27, 0.84);
+      stall.add(miniBoat, miniSail, compassBase, ropeCoil);
+
+      // Mounted Red-and-White Lifebuoy Ring on Left Pillar + Barrel & Leaning Oars
+      const buoyRing = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.085, 8, 16), buoyWhiteMat);
+      buoyRing.position.set(-3.05, 1.95, 2.2);
+      stall.add(buoyRing);
+      [0, Math.PI / 2, Math.PI, Math.PI * 1.5].forEach((ba) => {
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.2, 0.2), buoyRedMat);
+        band.position.set(-3.05 + Math.cos(ba) * 0.32, 1.95 + Math.sin(ba) * 0.32, 2.2);
+        band.rotation.z = ba;
+        stall.add(band);
+      });
+
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.32, 0.78, 10), timberWarm);
+      barrel.position.set(2.48, 0.62, 1.38);
+      const crate = new THREE.Mesh(new RoundedBoxGeometry(0.75, 0.58, 0.72, 2, 0.04), timberWarm);
+      crate.position.set(-2.42, 0.52, 1.44);
+      stall.add(barrel, crate);
+
+      [-0.5, -0.1, 0.3].forEach((oz, oi) => {
+        const oar = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.026, 0.03, 2.05, 6),
+          getMat(oi % 2 === 0 ? '#D49A5C' : '#B87C44', 0.65),
+        );
+        oar.position.set(-2.78, 1.22, oz);
+        oar.rotation.z = -0.16;
+        stall.add(oar);
+      });
+
+      // Display Wooden Boat Hull on Trestles Inside Right Bay (showcasing Ship's boat craftsmanship!)
+      const displayBoat = new THREE.Mesh(new RoundedBoxGeometry(0.88, 0.26, 2.15, 2, 0.08), getMat('#A46233', 0.68));
+      displayBoat.position.set(2.22, 0.68, -0.35);
+      displayBoat.rotation.y = -0.22;
+      [-0.75, 0.1].forEach((tz) => {
+        const trestle = new THREE.Mesh(new RoundedBoxGeometry(0.85, 0.34, 0.12, 1, 0.02), timberDark);
+        trestle.position.set(2.22, 0.4, tz);
+        stall.add(trestle);
+      });
+      stall.add(displayBoat);
+
+      // NPC Ship behind the wide counter facing +Z toward approaching players
+      shipRig = buildAvatarRig(SHIP_AVATAR);
+      shipRig.root.position.set(0.05, 0.26, -0.28);
+      shipRig.root.rotation.y = 0;
+      updateAvatarRigAnimation(shipRig, 'idle', 0, false);
+      stall.add(shipRig.root);
+
+      addInteractionProxy(
+        stall,
+        [6.8, 4.6, 5.0],
+        2.0,
+        {
+          kind: 'ship_shop',
+          tx: SHIP_STALL_INTERACT.tx,
+          tz: SHIP_STALL_INTERACT.tz,
+        },
+        clickTargets,
+      );
+      colliders.push({
+        type: 'box',
+        id: 'ship_stall',
+        x: SHIP_STALL_POS.x,
+        z: SHIP_STALL_POS.z,
+        hw: 3.45,
+        hd: 2.48,
+        rotY: 0,
+      });
+
+      mergeStaticGroupByMaterial(stall, new Set([shipRig.root]));
+      eco.add(stall);
+    }
+
+    // 7. Static Fairy-Tale Instanced Eco-Decor (Mossy Rocks, River Grasses, Purple Water Hyacinths & Meadow Flora)
+    {
+      // A. Mossy Riverside Boulders (Tảng đá & đá bám rêu tĩnh ven sông + chân thác)
+      const rockParts = [
+        new THREE.DodecahedronGeometry(0.85, 0).scale(1.26, 0.78, 1.08).translate(0, 0.34, 0),
+        new THREE.DodecahedronGeometry(0.5, 0).scale(1.12, 0.74, 0.96).translate(-0.72, 0.18, 0.3),
+      ];
+      const ecoRockGeo = mergeParts(rockParts);
+      const ecoRockMat = getMat('#8994A0', 0.86);
+      const ecoMossGeo = new THREE.SphereGeometry(0.62, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.5);
+      ecoMossGeo.scale(1.18, 0.32, 1.04);
+      ecoMossGeo.translate(0.02, 0.82, 0);
+      const ecoMossMat = getMat('#54A358', 0.84);
+
+      const riverRockSpots: [number, number, number, boolean][] = [];
+      for (let i = 0; i < 42; i++) {
+        const z = THREE.MathUtils.lerp(-58, 54, i / 41);
+        const side = i % 2 === 0 ? 1 : -1;
+        // Skip dock opening on east shore & bridge abutment
+        if (Math.abs(z - WEST_BRIDGE_Z) < 2.8) continue;
+        if (side > 0 && z > -4.2 && z < 0.8) continue;
+        const cx = getWestRiverCenterX(z);
+        const hw = getWestRiverHalfWidth(z);
+        const rx = cx + side * (hw + 0.55 + (i % 3) * 0.45);
+        const sc = 0.68 + (i % 4) * 0.24;
+        const hasMoss = i % 3 !== 1;
+        riverRockSpots.push([rx, z, sc, hasMoss]);
+      }
+      // Extra scenic rocks by waterfall lagoon & trailhead
+      riverRockSpots.push(
+        [-97.0, -15.4, 1.35, true],
+        [-96.8, -2.5, 1.28, true],
+        [-98.6, 18.2, 1.12, true],
+        [-103.5, 20.8, 1.05, true],
+      );
+
+      const ecoRockIM = new THREE.InstancedMesh(ecoRockGeo, ecoRockMat, riverRockSpots.length);
+      const mossSpots = riverRockSpots.filter(([, , , m]) => m);
+      const ecoMossIM = new THREE.InstancedMesh(ecoMossGeo, ecoMossMat, mossSpots.length);
+
+      let mIdx = 0;
+      riverRockSpots.forEach(([rx, rz, rs, hasMoss], i) => {
+        const gy = getTownGroundHeight(rx, rz) - 0.05;
+        _instDummy.position.set(rx, gy, rz);
+        _instDummy.rotation.set(0, (i * 1.47) % (Math.PI * 2), 0);
+        _instDummy.scale.setScalar(rs);
+        _instDummy.updateMatrix();
+        ecoRockIM.setMatrixAt(i, _instDummy.matrix);
+        if (hasMoss) {
+          ecoMossIM.setMatrixAt(mIdx++, _instDummy.matrix);
+        }
+        colliders.push({type: 'circle', x: rx, z: rz, r: rs * 0.88});
+        if (i % 4 === 0) {
+          westInsectAnchors.push({x: rx, y: gy + rs * 0.72, z: rz, habitat: 'rock'});
+        }
+      });
+      ecoRockIM.instanceMatrix.needsUpdate = true;
+      ecoMossIM.instanceMatrix.needsUpdate = true;
+      ecoRockIM.computeBoundingSphere();
+      ecoMossIM.computeBoundingSphere();
+      eco.add(ecoRockIM, ecoMossIM);
+
+      // B. Static Instanced River Grasses & Reeds (Cỏ sông tĩnh — zero animation cost!)
+      const rBladeParts: THREE.BufferGeometry[] = [];
+      for (let b = 0; b < 7; b++) {
+        const ang = (b / 7) * Math.PI * 2;
+        const h = 0.62 + (b % 3) * 0.24;
+        const blade = new THREE.ConeGeometry(0.056, h, 4);
+        blade.translate(0, h / 2, 0);
+        blade.rotateZ(0.24 + (b % 2) * 0.1);
+        blade.rotateY(ang);
+        blade.translate(Math.cos(ang) * 0.08, 0, Math.sin(ang) * 0.08);
+        rBladeParts.push(blade);
+      }
+      const riverGrassGeo = mergeParts(rBladeParts);
+      const riverGrassMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.74});
+      const grassCoords: [number, number, number][] = [];
+      for (let i = 0; i < 86; i++) {
+        const z = THREE.MathUtils.lerp(-58, 55, i / 85);
+        const side = i % 2 === 0 ? 1 : -1;
+        if (Math.abs(z - WEST_BRIDGE_Z) < 2.4) continue;
+        if (side > 0 && z > -3.8 && z < 0.2) continue;
+        if (side < 0 && z > -12.8 && z < -5.2) continue;
+        const cx = getWestRiverCenterX(z);
+        const hw = getWestRiverHalfWidth(z);
+        const gx = cx + side * (hw * 0.86 + (i % 3) * 0.22);
+        grassCoords.push([gx, z, 0.9 + (i % 4) * 0.16]);
+      }
+      const riverGrassIM = new THREE.InstancedMesh(riverGrassGeo, riverGrassMat, grassCoords.length);
+      const rgPalette = ['#479E56', '#59B464', '#3D8C4D', '#67C070'];
+      grassCoords.forEach(([gx, gz, gs], i) => {
+        _instDummy.position.set(gx, RIVER_WATER_Y - 0.18, gz);
+        _instDummy.rotation.set(0, i * 1.13, 0);
+        _instDummy.scale.setScalar(gs);
+        _instDummy.updateMatrix();
+        riverGrassIM.setMatrixAt(i, _instDummy.matrix);
+        _instColor.set(rgPalette[i % rgPalette.length]);
+        riverGrassIM.setColorAt(i, _instColor);
+        if (i % 7 === 0) {
+          westInsectAnchors.push({x: gx, y: 0.25, z: gz, habitat: 'water_edge'});
+        }
+      });
+      riverGrassIM.instanceMatrix.needsUpdate = true;
+      if (riverGrassIM.instanceColor) riverGrassIM.instanceColor.needsUpdate = true;
+      riverGrassIM.computeBoundingSphere();
+      eco.add(riverGrassIM);
+
+      // C. Purple-Blooming Water Hyacinth Clusters (Lục bình hoa tím tĩnh ven sông)
+      const hyLeafParts: THREE.BufferGeometry[] = [];
+      for (let l = 0; l < 6; l++) {
+        const a = (l / 6) * Math.PI * 2 + 0.2;
+        const bulb = new THREE.SphereGeometry(0.095, 6, 5);
+        bulb.scale(0.85, 0.65, 1.35);
+        bulb.translate(Math.cos(a) * 0.12, 0.03, Math.sin(a) * 0.12);
+        const pad = new THREE.SphereGeometry(0.13, 6, 5);
+        pad.scale(1.15, 0.22, 1.3);
+        pad.rotateX(-0.35);
+        pad.rotateY(a);
+        pad.translate(Math.cos(a) * 0.22, 0.09, Math.sin(a) * 0.22);
+        hyLeafParts.push(bulb, pad);
+      }
+      const hyLeafGeo = mergeParts(hyLeafParts);
+      const hyLeafMat = glossyClayMat('#55AE5C', 0.48);
+
+      // Upright lavender-purple 6-floret hyacinth spike!
+      const hySpikeParts: THREE.BufferGeometry[] = [];
+      const hyGoldParts: THREE.BufferGeometry[] = [];
+      for (let f = 0; f < 6; f++) {
+        const fa = (f / 6) * Math.PI * 2;
+        const fy = 0.2 + (f % 3) * 0.065;
+        const fl = new THREE.SphereGeometry(0.068, 6, 5);
+        fl.scale(0.95, 1.2, 0.68);
+        fl.translate(Math.cos(fa) * 0.058, fy, Math.sin(fa) * 0.058);
+        hySpikeParts.push(fl);
+      }
+      const hyTop = new THREE.SphereGeometry(0.065, 6, 5);
+      hyTop.translate(0, 0.39, 0);
+      hySpikeParts.push(hyTop);
+      const hyGoldDot = new THREE.SphereGeometry(0.026, 5, 4);
+      hyGoldDot.translate(0.055, 0.29, 0);
+      hyGoldParts.push(hyGoldDot);
+
+      const hyBloomGeo = mergeParts(hySpikeParts);
+      const hyGoldGeo = mergeParts(hyGoldParts);
+      const hyBloomMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.44});
+      const hyGoldMat = getMat('#FFD54F', 0.4);
+
+      const hyacinthSpots: [number, number, number][] = [];
+      for (let i = 0; i < 46; i++) {
+        const z = THREE.MathUtils.lerp(-54, 52, i / 45);
+        const side = i % 2 === 0 ? 1 : -1;
+        if (Math.abs(z - WEST_BRIDGE_Z) < 2.2) continue;
+        if (side > 0 && z > -4.6 && z < 0.8) continue;
+        if (side < 0 && z > -13.0 && z < -4.8) continue;
+        const cx = getWestRiverCenterX(z);
+        const hw = getWestRiverHalfWidth(z);
+        const hx = cx + side * (hw * 0.68 + ((i * 0.17) % 1.1));
+        hyacinthSpots.push([hx, z, 0.86 + (i % 4) * 0.14]);
+      }
+      const hyLeafIM = new THREE.InstancedMesh(hyLeafGeo, hyLeafMat, hyacinthSpots.length);
+      const hyBloomIM = new THREE.InstancedMesh(hyBloomGeo, hyBloomMat, hyacinthSpots.length);
+      const hyGoldIM = new THREE.InstancedMesh(hyGoldGeo, hyGoldMat, hyacinthSpots.length);
+      const hyPurpleTints = ['#9D74E8', '#B388F5', '#8C61DB', '#C298FF'];
+      hyacinthSpots.forEach(([hx, hz, hs], i) => {
+        _instDummy.position.set(hx, RIVER_WATER_Y + 0.012, hz);
+        _instDummy.rotation.set(0, i * 1.4, 0);
+        _instDummy.scale.setScalar(hs);
+        _instDummy.updateMatrix();
+        hyLeafIM.setMatrixAt(i, _instDummy.matrix);
+        hyBloomIM.setMatrixAt(i, _instDummy.matrix);
+        hyGoldIM.setMatrixAt(i, _instDummy.matrix);
+        _instColor.set(hyPurpleTints[i % hyPurpleTints.length]);
+        hyBloomIM.setColorAt(i, _instColor);
+      });
+      hyLeafIM.instanceMatrix.needsUpdate = true;
+      hyBloomIM.instanceMatrix.needsUpdate = true;
+      hyGoldIM.instanceMatrix.needsUpdate = true;
+      if (hyBloomIM.instanceColor) hyBloomIM.instanceColor.needsUpdate = true;
+      hyLeafIM.computeBoundingSphere();
+      hyBloomIM.computeBoundingSphere();
+      hyGoldIM.computeBoundingSphere();
+      hyLeafIM.renderOrder = 4;
+      hyBloomIM.renderOrder = 4;
+      hyGoldIM.renderOrder = 4;
+      eco.add(hyLeafIM, hyBloomIM, hyGoldIM);
+
+      // D. Mountain Overlook & Riverbank Fairy-Tale Wildflowers (Static InstancedMesh)
+      const wPetalParts: THREE.BufferGeometry[] = [];
+      const wCenterParts: THREE.BufferGeometry[] = [];
+      append5PetalFlower(wPetalParts, wCenterParts, 0, 0.18, 0, 1.35, 0.12, 0, 0.1);
+      append5PetalFlower(wPetalParts, wCenterParts, 0.12, 0.14, 0.08, 1.05, 0.2, -0.2, 0.9);
+      const wfTopGeo = mergeParts(wPetalParts);
+      const wfCenterGeo = mergeParts(wCenterParts);
+      const wfSpots: [number, number, string][] = [];
+      const wfColors = ['#FF9BB5', '#B998FF', '#8EE0FF', '#FFF8E8', '#FFBC80'];
+      for (let i = 0; i < 120; i++) {
+        const ang = i * 2.39996;
+        let wx = -82 + Math.cos(ang) * (12 + (i % 34));
+        let wz = -6 + Math.sin(ang) * (14 + (i % 38));
+        if (i % 3 === 0) {
+          wx = -118 + Math.cos(ang) * (5 + (i % 15));
+          wz = 6 + Math.sin(ang) * (4 + (i % 14));
+        }
+        if (Math.abs(wx - getWestRiverCenterX(wz)) < getWestRiverHalfWidth(wz) + 1.4) continue;
+        if (wx >= -72 && wx <= -62 && wz >= -15 && wz <= 6) continue;
+        wfSpots.push([wx, wz, wfColors[i % wfColors.length]]);
+      }
+      const wfTopIM = new THREE.InstancedMesh(
+        wfTopGeo,
+        new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.5}),
+        wfSpots.length,
+      );
+      const wfCenterIM = new THREE.InstancedMesh(
+        wfCenterGeo,
+        getMat('#FFD24C', 0.42),
+        wfSpots.length,
+      );
+      wfSpots.forEach(([fx, fz, col], i) => {
+        const fy = getTownGroundHeight(fx, fz) - 0.01;
+        _instDummy.position.set(fx, fy, fz);
+        _instDummy.rotation.set(0, i * 0.9, 0);
+        _instDummy.scale.setScalar(0.95 + (i % 3) * 0.18);
+        _instDummy.updateMatrix();
+        wfTopIM.setMatrixAt(i, _instDummy.matrix);
+        wfCenterIM.setMatrixAt(i, _instDummy.matrix);
+        _instColor.set(col);
+        wfTopIM.setColorAt(i, _instColor);
+        if (i % 8 === 0) {
+          westInsectAnchors.push({x: fx, y: fy + 0.28, z: fz, habitat: 'flower'});
+        }
+      });
+      wfTopIM.instanceMatrix.needsUpdate = true;
+      wfCenterIM.instanceMatrix.needsUpdate = true;
+      if (wfTopIM.instanceColor) wfTopIM.instanceColor.needsUpdate = true;
+      wfTopIM.computeBoundingSphere();
+      wfCenterIM.computeBoundingSphere();
+      eco.add(wfTopIM, wfCenterIM);
+
+      // E. Woodland Trees Framing West Meadow, Trailhead & Mountain Summit Overlook
+      const {trunkGeo: wtGeo, lowerCanopyGeo: wlGeo, upperCanopyGeo: wuGeo} = createTreeGeometries();
+      const westTreeSpots: [number, number, number][] = [
+        [-64.5, 4.5, 1.18],
+        [-65.0, -19.5, 1.24],
+        [-71.5, -24.5, 1.22],
+        [-70.5, 19.5, 1.2],
+        [-72.0, 32.5, 1.24],
+        [-95.8, 16.5, 1.18],
+        [-97.5, 25.5, 1.26],
+        [-99.5, -27.5, 1.28],
+        [-111.5, 20.5, 1.22],
+        [-123.5, 14.0, 1.24],
+        [-125.0, 2.5, 1.2],
+        [-123.5, -7.2, 1.18],
+        [-134.5, 5.0, 1.32],
+        [-135.5, -15.5, 1.3],
+      ];
+      const wtIM = new THREE.InstancedMesh(wtGeo, getMat('#734C32', 0.84), westTreeSpots.length);
+      const wlIM = new THREE.InstancedMesh(
+        wlGeo,
+        new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.74}),
+        westTreeSpots.length,
+      );
+      const wuIM = new THREE.InstancedMesh(
+        wuGeo,
+        new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.7}),
+        westTreeSpots.length,
+      );
+      const wLowPal = ['#4E9756', '#56A25E', '#488E50'];
+      const wUpPal = ['#6BBC73', '#75C67D', '#64B46C'];
+      westTreeSpots.forEach(([tx, tz, ts], i) => {
+        const gy = getTownGroundHeight(tx, tz) - 0.05;
+        _instDummy.position.set(tx, gy, tz);
+        _instDummy.rotation.set(0, i * 1.4, 0);
+        _instDummy.scale.setScalar(ts);
+        _instDummy.updateMatrix();
+        wtIM.setMatrixAt(i, _instDummy.matrix);
+        wlIM.setMatrixAt(i, _instDummy.matrix);
+        wuIM.setMatrixAt(i, _instDummy.matrix);
+        _instColor.set(wLowPal[i % wLowPal.length]);
+        wlIM.setColorAt(i, _instColor);
+        _instColor.set(wUpPal[i % wUpPal.length]);
+        wuIM.setColorAt(i, _instColor);
+        colliders.push({type: 'circle', x: tx, z: tz, r: 0.46 * ts});
+        westInsectAnchors.push({x: tx + 0.4, y: gy + 0.85, z: tz + 0.2, habitat: 'tree'});
+      });
+      wtIM.instanceMatrix.needsUpdate = true;
+      wlIM.instanceMatrix.needsUpdate = true;
+      wuIM.instanceMatrix.needsUpdate = true;
+      if (wlIM.instanceColor) wlIM.instanceColor.needsUpdate = true;
+      if (wuIM.instanceColor) wuIM.instanceColor.needsUpdate = true;
+      wtIM.computeBoundingSphere();
+      wlIM.computeBoundingSphere();
+      wuIM.computeBoundingSphere();
+      eco.add(wtIM, wlIM, wuIM);
+    }
+
+    group.add(eco);
+  }
+
   // ========== SPARSE FARM-STYLE PALE STEPPING STONES (STOPPING SHORT BEFORE BUILDINGS) ==========
   {
     const stoneTrailSpots: [number, number, number, number][] = [];
@@ -4882,6 +6777,12 @@ export function buildTownScene(): TownWorld {
     addSteppingTrail(-35.5, 0, -8.8, 0);
     addSteppingTrail(-43.2, -2.5, -36.0, -0.3);
     addSteppingTrail(8.8, 0, 35.5, 0);
+
+    // West Eco-Zone Trails (connecting May Mall promenade -> Ship's Stall -> Boat Dock -> Bridge -> Mountain Trailhead)
+    addSteppingTrail(-62.4, -2.5, -67.8, -8.4);
+    addSteppingTrail(-62.4, -1.8, -73.0, -1.8);
+    addSteppingTrail(-62.4, 3.2, -74.0, 8.5);
+    addSteppingTrail(-94.4, 8.5, -100.2, 18.8);
 
     // Center North-South Spine (stops well short of Hill in North, flows south into meadow)
     addSteppingTrail(0, -8.8, 0, -19.2);
@@ -5223,7 +7124,7 @@ export function buildTownScene(): TownWorld {
   const upperLeafMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.7});
 
   // [x, z, scale, hasLantern, lanternAngleRad]
-  const oakTrees: [number, number, number, boolean?, number?][] = [
+  const oakTreesRaw: [number, number, number, boolean?, number?][] = [
     [-13.5, -5.8, 1.14, true, 0.78],
     [13.8, -5.8, 1.16, true, 2.36],
     [-13.8, 6.2, 1.15, true, -0.78],
@@ -5253,6 +7154,7 @@ export function buildTownScene(): TownWorld {
     [-22.0, 62.5, 1.26, true, 1.1],
     [22.5, 61.5, 1.28, true, 2.0],
   ];
+  const oakTrees = oakTreesRaw.filter(([tx, tz]) => !isInWestRiverOrCliffZone(tx, tz));
 
   const oakTrunkIM = new THREE.InstancedMesh(trunkGeo, trunkMat, oakTrees.length);
   const oakLowerIM = new THREE.InstancedMesh(lowerCanopyGeo, lowerLeafMat, oakTrees.length);
@@ -5367,7 +7269,7 @@ export function buildTownScene(): TownWorld {
   const branchLeafLowMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.72});
   const branchLeafUpMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.68});
 
-  const branchedTrees: [number, number, number, boolean?, number?][] = [
+  const branchedTreesRaw: [number, number, number, boolean?, number?][] = [
     [-8.2, -9.2, 1.1, true, -0.4],
     [8.4, -9.2, 1.12, true, -Math.PI + 0.4],
     [-8.2, 31.5, 1.14, true, 0.3],
@@ -5392,6 +7294,7 @@ export function buildTownScene(): TownWorld {
     [-18.5, -48.5, 1.22, true, -0.7],
     [18.5, -48.5, 1.22, true, -2.4],
   ];
+  const branchedTrees = branchedTreesRaw.filter(([tx, tz]) => !isInWestRiverOrCliffZone(tx, tz));
 
   const branchTrunkIM = new THREE.InstancedMesh(branchTrunkGeo, branchTrunkMat, branchedTrees.length);
   const branchLowIM = new THREE.InstancedMesh(branchLowerGeo, branchLeafLowMat, branchedTrees.length);
@@ -5595,7 +7498,7 @@ export function buildTownScene(): TownWorld {
   const pineLowerMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.8});
   const pineUpperMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.74});
 
-  const pineCoords: [number, number, number][] = [
+  const pineCoordsRaw: [number, number, number][] = [
     // Explorable Outer Meadows (showing players the world extends far!)
     [-8.5, 44.5, 1.32],
     [6.2, 44.5, 1.34],
@@ -5640,14 +7543,18 @@ export function buildTownScene(): TownWorld {
     [-70.0, -84.0, 1.56],
     [70.5, -83.5, 1.56],
   ];
+  const pineCoords = pineCoordsRaw.filter(([px, pz]) => !isInWestRiverOrCliffZone(px, pz, 3.0));
 
   // Outer Scenic Evergreen Ring far outside walkable zone
   for (let i = 0; i < 46; i++) {
     const a = (i / 46) * Math.PI * 2;
-    const rx = Math.cos(a) * 92 + Math.sin(a * 3) * 6;
+    let rx = Math.cos(a) * 92 + Math.sin(a * 3) * 6;
+    if (Math.cos(a) < -0.35) rx -= 48;
     const rz = -10 + Math.sin(a) * 98 + Math.cos(a * 2) * 6;
     const s = 1.42 + (i % 5) * 0.1;
-    pineCoords.push([rx, rz, s]);
+    if (!isInWestRiverOrCliffZone(rx, rz, 3.0)) {
+      pineCoords.push([rx, rz, s]);
+    }
   }
 
   const pineTrunkIM = new THREE.InstancedMesh(pineTrunkGeo, pineTrunkMat, pineCoords.length);
@@ -5670,7 +7577,7 @@ export function buildTownScene(): TownWorld {
     _instColor.set(pineUpPalette[i % pineUpPalette.length]);
     pineUpperIM.setColorAt(i, _instColor);
 
-    if (px >= -82 && px <= 82 && pz >= -98 && pz <= 78) {
+    if (px >= -146 && px <= 82 && pz >= -98 && pz <= 78) {
       colliders.push({type: 'circle', x: px, z: pz, r: 0.44 * ps});
     }
   });
@@ -6257,7 +8164,7 @@ export function buildTownScene(): TownWorld {
   }
 
   // B. Small & Medium Flowering Bushes (Bụi hoa nhỏ & vừa phủ khắp khu trung tâm & vùng ngoài)
-  const bushCoords: [number, number, string, number?][] = [
+  const bushCoordsRaw: [number, number, string, number?][] = [
     [-9.2, -7.8, '#F28482', 0.86],
     [9.2, -7.8, '#8ECAE6', 0.88],
     [-9.2, 7.8, '#F7A8B8', 0.84],
@@ -6308,6 +8215,7 @@ export function buildTownScene(): TownWorld {
     [-68.0, -10.5, '#8ECAE6', 0.98],
     [60.5, 2.5, '#FF9EBB', 0.98],
   ];
+  const bushCoords = bushCoordsRaw.filter(([bx, bz]) => !isInWestRiverOrCliffZone(bx, bz));
   const bushBodyParts: THREE.BufferGeometry[] = [];
   const bbMain = new THREE.SphereGeometry(0.42, 9, 7);
   bbMain.scale(1.25, 0.76, 1.15);
@@ -6370,7 +8278,7 @@ export function buildTownScene(): TownWorld {
   bigBushParts.push(mb1, mb2, mb3);
   const bigBushGeo = mergeParts(bigBushParts);
   const bigBushMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.78});
-  const bigBushCoords: [number, number, number, string][] = [
+  const bigBushCoordsRaw: [number, number, number, string][] = [
     [-16.8, -16.8, 1.15, '#4CA456'],
     [17.2, -16.6, 1.18, '#55AF5E'],
     [-18.0, 20.5, 1.16, '#489C52'],
@@ -6405,6 +8313,7 @@ export function buildTownScene(): TownWorld {
     [-56.0, -44.0, 1.4, '#4A9D54'],
     [56.5, -43.5, 1.4, '#54AC5D'],
   ];
+  const bigBushCoords = bigBushCoordsRaw.filter(([bx, bz]) => !isInWestRiverOrCliffZone(bx, bz));
   const bigBushIM = new THREE.InstancedMesh(bigBushGeo, bigBushMat, bigBushCoords.length);
   bigBushCoords.forEach(([bx, bz, bs, col], i) => {
     const by = getTownGroundHeight(bx, bz) - 0.04;
@@ -6477,6 +8386,9 @@ export function buildTownScene(): TownWorld {
     if (Math.hypot(px - 11.8, pz - 38.6) < 4.4) return true;
     if (Math.hypot(px + 16.8, pz - 37.2) < 3.4) return true;
     if (px >= -64.5 && px <= -36.5 && pz >= -13.0 && pz <= 8.5) return true;
+    if (isInWestRiverOrCliffZone(px, pz, 1.5)) return true;
+    if (Math.hypot(px - SHIP_STALL_POS.x, pz - SHIP_STALL_POS.z) < 5.2) return true;
+    if (Math.hypot(px - RIVER_DOCK_POS.x, pz - RIVER_DOCK_POS.z) < 3.2) return true;
     return false;
   };
 
@@ -6600,7 +8512,7 @@ export function buildTownScene(): TownWorld {
   group.add(tallGrassIM);
 
   // Small Pebbles & Large Mossy Boulder Clusters (Tảng đá lớn bé khắp đường mòn, đồi & vùng rìa)
-  const smallRockCoords: [number, number, number][] = [
+  const smallRockCoordsRaw: [number, number, number][] = [
     [-9.5, -16.5, 0.44],
     [10.8, -18.5, 0.48],
     [-21.5, -4.5, 0.45],
@@ -6633,6 +8545,7 @@ export function buildTownScene(): TownWorld {
     [-26.0, -45.0, 0.54],
     [26.5, -44.5, 0.54],
   ];
+  const smallRockCoords = smallRockCoordsRaw.filter(([rx, rz]) => !isInWestRiverOrCliffZone(rx, rz));
   const p1 = new THREE.DodecahedronGeometry(0.55, 0);
   p1.scale(1.22, 0.68, 1.0);
   const p2 = new THREE.DodecahedronGeometry(0.35, 0);
@@ -6668,7 +8581,7 @@ export function buildTownScene(): TownWorld {
   mossCapGeo.translate(0.05, 0.95, 0);
   const mossCapMat = getMat('#5BA65E', 0.82);
 
-  const largeRockCoords: [number, number, number][] = [
+  const largeRockCoordsRaw: [number, number, number][] = [
     [HILL_CENTER.x - 22.5, HILL_CENTER.z + 18.2, 1.15],
     [HILL_CENTER.x + 22.8, HILL_CENTER.z + 17.8, 1.12],
     [HILL_CENTER.x - 18.2, HILL_CENTER.z - 22.8, 1.25],
@@ -6693,6 +8606,7 @@ export function buildTownScene(): TownWorld {
     [-46.0, -49.5, 1.22],
     [46.5, -49.0, 1.2],
   ];
+  const largeRockCoords = largeRockCoordsRaw.filter(([rx, rz]) => !isInWestRiverOrCliffZone(rx, rz));
   const heroBoulderIM = new THREE.InstancedMesh(heroBoulderGeo, heroBoulderMat, largeRockCoords.length);
   const heroMossIM = new THREE.InstancedMesh(mossCapGeo, mossCapMat, largeRockCoords.length);
   largeRockCoords.forEach(([rx, rz, rs], i) => {
@@ -6822,7 +8736,7 @@ export function buildTownScene(): TownWorld {
   group.add(mushStemIM, mushCapIM);
 
   // 2. Mossy Fallen Logs (Khúc gỗ mục phủ rêu ngoài đồng cỏ & bìa rừng — điểm đậu côn trùng)
-  const fallenLogCoords: [number, number, number][] = [
+  const fallenLogCoordsRaw: [number, number, number][] = [
     [-46.5, 16.5, 0.4],
     [47.0, 16.0, -0.5],
     [-42.0, -28.0, 1.1],
@@ -6836,6 +8750,7 @@ export function buildTownScene(): TownWorld {
     [-49.5, 40.5, 0.6],
     [50.0, 40.0, -0.6],
   ];
+  const fallenLogCoords = fallenLogCoordsRaw.filter(([lx, lz]) => !isInWestRiverOrCliffZone(lx, lz));
   const logTrunk = new THREE.CylinderGeometry(0.24, 0.27, 2.05, 8);
   logTrunk.rotateZ(Math.PI / 2);
   logTrunk.translate(0, 0.22, 0);
@@ -6986,6 +8901,7 @@ export function buildTownScene(): TownWorld {
     const wz = LAKE_CENTER.z + Math.sin(a) * sr;
     insectAnchors.push({x: wx, y: 0.25, z: wz, habitat: 'water_edge'});
   }
+  insectAnchors.push(...westInsectAnchors);
   const insectManager = new TownInsectManager(group, insectAnchors);
 
   // Track last applied timeOfDay so emissive updates only run when changed
@@ -7003,6 +8919,8 @@ export function buildTownScene(): TownWorld {
   const _fireflySphere = new THREE.Sphere(new THREE.Vector3(LAKE_CENTER.x, 1.0, LAKE_CENTER.z), 12.0);
   const _campfireSphere = new THREE.Sphere(new THREE.Vector3(16.6, 0.6, -22.2), 2.8);
   const _koiSphere = new THREE.Sphere(new THREE.Vector3(-16.8, 1.2, 37.2), 3.2);
+  const _shipSphere = new THREE.Sphere(new THREE.Vector3(SHIP_STALL_POS.x, 1.4, SHIP_STALL_POS.z), 3.4);
+  const _waterfallSphere = new THREE.Sphere(new THREE.Vector3(-96.0, 4.2, -9.0), 14.0);
 
   let useExternalFishingFrame = false;
   let prevTownElapsed = 0;
@@ -7012,6 +8930,8 @@ export function buildTownScene(): TownWorld {
   let reedAccum = 0;
   let fireflyAccum = 0;
   let koiAccum = 0;
+  let shipAccum = 0;
+  let waterfallAccum = 0;
 
   const setFishingState = (state: 'idle' | 'waiting' | 'bite') => {
     useExternalFishingFrame = false;
@@ -7037,6 +8957,37 @@ export function buildTownScene(): TownWorld {
       z: -21.6 - L * Math.sin(a),
       pitch: a,
     };
+  };
+
+  const setRiverBoatPose = (
+    active: boolean,
+    x = RIVER_BOAT_SPAWN.x,
+    z = RIVER_BOAT_SPAWN.z,
+    rotY = RIVER_BOAT_SPAWN.rotY,
+    moving = false,
+    elapsed = 0,
+  ) => {
+    if (mooredRiverBoat) {
+      mooredRiverBoat.visible = !active;
+    }
+    if (activeRiverBoat) {
+      activeRiverBoat.visible = active;
+      if (active) {
+        const bob = Math.sin(elapsed * 2.2) * 0.028;
+        activeRiverBoat.position.set(x, RIVER_WATER_Y + 0.05 + bob, z);
+        activeRiverBoat.rotation.set(
+          moving ? Math.sin(elapsed * 4.4) * 0.02 : Math.sin(elapsed * 1.7) * 0.01,
+          rotY,
+          Math.cos(elapsed * 2.1) * 0.018,
+        );
+        if (activeBoatOarL && activeBoatOarR) {
+          const stroke = moving ? Math.sin(elapsed * 5.6) * 0.42 : 0;
+          const dip = moving ? Math.cos(elapsed * 5.6) * 0.14 : 0;
+          activeBoatOarL.rotation.set(dip, stroke, 0);
+          activeBoatOarR.rotation.set(dip, -stroke, 0);
+        }
+      }
+    }
   };
 
   const update = (
@@ -7078,7 +9029,10 @@ export function buildTownScene(): TownWorld {
         stringBulbMat.emissiveIntensity = isNight ? 2.9 : 0.16;
       }
       if (lakeWaterMat) {
-        lakeWaterMat.color.set(isNight ? '#1B4B6E' : '#3BB0D8');
+        lakeWaterMat.color.set(isNight ? '#17405C' : '#3496B5');
+      }
+      if (riverWaterMat) {
+        riverWaterMat.color.set(isNight ? '#446A84' : '#FFFFFF');
       }
       if (fireflyCoreIM && fireflyHaloIM) {
         fireflyCoreIM.visible = isNight;
@@ -7284,6 +9238,50 @@ export function buildTownScene(): TownWorld {
     ) {
       updateAvatarRigAnimation(koiRig, 'idle', elapsed, false);
     }
+
+    // 10. Khu Sinh Thái: Stationary Stream/Waterfall & Distance/Frustum-Gated Splash Bubbling (Sủi Bọt)
+    if (
+      (!frustum || frustum.intersectsSphere(_waterfallSphere)) &&
+      shouldAnimateAtDist(
+        _waterfallSphere.center,
+        waterfallAccum,
+        (v) => {
+          waterfallAccum = v;
+        },
+        42,
+        18,
+      )
+    ) {
+      if (waterfallSplashIM && waterfallSplashSeeds.length > 0) {
+        for (let i = 0; i < waterfallSplashSeeds.length; i++) {
+          const s = waterfallSplashSeeds[i];
+          const b = 0.5 + 0.5 * Math.sin(elapsed * s.speed + s.phase);
+          _instDummy.position.set(s.x, s.y + b * s.hop, s.z);
+          _instDummy.rotation.set(0, i * 0.8 + elapsed * 0.6, 0);
+          _instDummy.scale.setScalar(s.r * (0.82 + b * 0.38));
+          _instDummy.updateMatrix();
+          waterfallSplashIM.setMatrixAt(i, _instDummy.matrix);
+        }
+        waterfallSplashIM.instanceMatrix.needsUpdate = true;
+      }
+      if (midLedgeMistRing) {
+        const mp = 0.94 + Math.sin(elapsed * 4.8 + 0.8) * 0.08;
+        midLedgeMistRing.scale.set(mp, mp, 1);
+      }
+      if (waterfallFoamRing) {
+        const pulse = 0.94 + Math.sin(elapsed * 4.2) * 0.09;
+        waterfallFoamRing.scale.set(pulse, pulse, 1);
+      }
+    }
+    if (
+      shipRig &&
+      (!frustum || frustum.intersectsSphere(_shipSphere)) &&
+      shouldAnimateAtDist(_shipSphere.center, shipAccum, (v) => {
+        shipAccum = v;
+      }, 52, 24)
+    ) {
+      updateAvatarRigAnimation(shipRig, 'idle', elapsed, false);
+    }
   };
 
   const dispose = () => {
@@ -7351,6 +9349,7 @@ export function buildTownScene(): TownWorld {
     setOutdoorSwingSeated,
     getOutdoorSwingSeatPose,
     setMallElevatorY,
+    setRiverBoatPose,
     updateInsects,
     tryCatchInsect,
     update,

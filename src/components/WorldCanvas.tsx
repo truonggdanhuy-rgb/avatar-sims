@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  Anchor,
   Armchair,
   Bug,
   Building2,
@@ -29,6 +30,7 @@ import {
   FISH_RARITY_CONFIG,
   getRodRepairCost,
   rollRandomRiverFish,
+  WOODEN_BOAT_PRICE,
 } from '../data/fishingCatalog';
 import {getNetRepairCost} from '../data/insectCatalog';
 import {MAX_PET_INTIMACY, PET_CATALOG} from '../data/petCatalog';
@@ -49,15 +51,27 @@ import {
 import {
   buildTownScene,
   clampPointToMallDeck,
+  getLakeShoreRadius,
   getTownGroundHeight,
+  getWestRiverCenterX,
+  getWestRiverHalfWidth,
+  getWestRiverNavBounds,
   isPointOnPlazaFlowerBed,
+  LAKE_CENTER,
   MALL_DECK_Y,
   MALL_ELEVATOR_BOARD_POS,
   MALL_ELEVATOR_CAB_POS,
+  RIVER_BOAT_SPAWN,
+  RIVER_BOARD_INTERACT,
+  RIVER_WATER_Y,
   TOWN_LAKE_WATER_Y,
   TOWN_ZONE_ENTRANCES,
   TownAnchor,
   TownWorld,
+  WEST_BRIDGE_HALF_SPAN,
+  WEST_BRIDGE_Z,
+  WEST_RIVER_NAV_MAX_Z,
+  WEST_RIVER_NAV_MIN_Z,
   WorldCollider,
 } from '../three/townBuilder';
 import {
@@ -84,6 +98,7 @@ import {
   TimeOfDay,
   ToolId,
   WellWaterState,
+  WoodenBoatState,
   ZoneId,
 } from '../types/game';
 import {soundFX} from '../utils/sound';
@@ -103,6 +118,7 @@ interface WorldCanvasProps {
   pondFeedPulse: number;
   farmPondFishPulse: number;
   fishingRod: FishingRodState;
+  woodenBoat: WoodenBoatState;
   bugNet: BugNetState;
   seeds: Partial<Record<CropType, number>>;
   bugSprayCount: number;
@@ -114,11 +130,13 @@ interface WorldCanvasProps {
   homeSpotRef: React.MutableRefObject<{x: number; z: number}>;
   showJoystick: boolean;
   showJumpButton: boolean;
+  onEnableJoystick: () => void;
   teleportToPlazaPulse: number;
   onChangeZone: (next: ZoneId) => void;
   onOpenWardrobe: () => void;
   onOpenShop: () => void;
   onOpenKoiShop: () => void;
+  onOpenShipShop: () => void;
   onOpenFurnitureShop: () => void;
   onOpenSettings: () => void;
   onOpenDailyQuests: () => void;
@@ -350,7 +368,7 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
 
 function getZoneWalkBounds(zone: ZoneId) {
   if (zone === 'town') {
-    return {minX: -82, maxX: 82, minZ: -98, maxZ: 78};
+    return {minX: -146, maxX: 82, minZ: -98, maxZ: 78};
   }
   if (zone === 'home') {
     return {minX: -12.85, maxX: 9.85, minZ: -8.95, maxZ: 6.95};
@@ -936,6 +954,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   pondFeedPulse,
   farmPondFishPulse,
   fishingRod,
+  woodenBoat,
   bugNet,
   seeds,
   bugSprayCount,
@@ -947,11 +966,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   homeSpotRef,
   showJoystick,
   showJumpButton,
+  onEnableJoystick,
   teleportToPlazaPulse,
   onChangeZone,
   onOpenWardrobe,
   onOpenShop,
   onOpenKoiShop,
+  onOpenShipShop,
   onOpenFurnitureShop,
   onOpenSettings,
   onOpenDailyQuests,
@@ -1016,6 +1037,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const catchActionRef = useRef<(() => void) | null>(null);
   const teleportPlazaActionRef = useRef<(() => void) | null>(null);
   const mallRideActionRef = useRef<(() => void) | null>(null);
+  const disembarkBoatActionRef = useRef<(() => void) | null>(null);
   const playerNameDomRef = useRef<HTMLDivElement | null>(null);
   const petNameDomRef = useRef<HTMLDivElement | null>(null);
   const mallElevatorHudRef = useRef<'none' | 'near_ground' | 'deck' | 'riding'>('none');
@@ -1026,6 +1048,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [arcMenuPos, setArcMenuPos] = useState<{plotId: number; x: number; y: number} | null>(null);
   const [petArcMenuPos, setPetArcMenuPos] = useState<{petId: string; x: number; y: number} | null>(null);
   const [mallElevatorHud, setMallElevatorHud] = useState<'none' | 'near_ground' | 'deck' | 'riding'>('none');
+  const [isBoatingHud, setIsBoatingHud] = useState(false);
   const [fishingState, setFishingState] = useState<FishingPhase>('idle');
   const [biteAlertPos, setBiteAlertPos] = useState<{x: number; y: number} | null>(null);
   const [brokenRodPrompt, setBrokenRodPrompt] = useState<{
@@ -1062,6 +1085,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     wellWater,
     fishingState,
     fishingRod,
+    woodenBoat,
     bugNet,
     showJoystick,
     placedFurniture,
@@ -1082,6 +1106,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     wellWater,
     fishingState,
     fishingRod,
+    woodenBoat,
     bugNet,
     showJoystick,
     placedFurniture,
@@ -1093,9 +1118,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
   const callbacksRef = useRef({
     onChangeZone,
+    onEnableJoystick,
     onOpenWardrobe,
     onOpenShop,
     onOpenKoiShop,
+    onOpenShipShop,
     onOpenFurnitureShop,
     onOpenSettings,
     onOpenDailyQuests,
@@ -1132,9 +1159,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   });
   callbacksRef.current = {
     onChangeZone,
+    onEnableJoystick,
     onOpenWardrobe,
     onOpenShop,
     onOpenKoiShop,
+    onOpenShipShop,
     onOpenFurnitureShop,
     onOpenSettings,
     onOpenDailyQuests,
@@ -1223,6 +1252,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     if (zone !== 'town') {
       mallElevatorHudRef.current = 'none';
       setMallElevatorHud('none');
+      setIsBoatingHud(false);
     }
     if (zone !== 'town' && zone !== 'fishing' && zone !== 'garden') {
       if (fishTimerRef.current) {
@@ -1501,6 +1531,26 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       progress: 0,
       duration: 4.4,
       y: 0.04,
+    };
+    const boatState = {
+      active: false,
+      x: RIVER_BOAT_SPAWN.x,
+      z: RIVER_BOAT_SPAWN.z,
+      rotY: RIVER_BOAT_SPAWN.rotY,
+      targetX: null as number | null,
+      targetZ: null as number | null,
+      moving: false,
+    };
+    const clampRiverBoatPoint = (x: number, z: number) => {
+      const cz = THREE.MathUtils.clamp(z, WEST_RIVER_NAV_MIN_Z, WEST_RIVER_NAV_MAX_Z);
+      const bounds = getWestRiverNavBounds(cz);
+      let cx = THREE.MathUtils.clamp(x, bounds.minX, bounds.maxX);
+      const dxW = cx - -94.8;
+      const dzW = cz - -9.0;
+      if (Math.hypot(dxW, dzW) < 3.4) {
+        cx = Math.min(bounds.maxX, -94.8 + 3.5);
+      }
+      return {x: cx, z: cz};
     };
 
     const playerProxy = new THREE.Mesh(
@@ -1782,6 +1832,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           mallElev.progress = 0;
           mallElev.y = 0.04;
           activeTown.setMallElevatorY?.(0.04);
+          boatState.active = false;
+          boatState.targetX = null;
+          boatState.targetZ = null;
+          boatState.moving = false;
+          activeTown.setRiverBoatPose?.(false);
+          setIsBoatingHud(false);
           playPetTimer = 0;
           activeTarget = null;
           activeSeat = null;
@@ -1815,11 +1871,19 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
         } else {
           activeTown.setMallElevatorY?.(mallElev.y);
+          if (boatState.active) {
+            activeTown.setRiverBoatPose?.(true, boatState.x, boatState.z, boatState.rotY, false, 0);
+          }
         }
       } else {
         mallElev.state = 'ground';
         mallElev.progress = 0;
         mallElev.y = 0.04;
+        boatState.active = false;
+        boatState.targetX = null;
+        boatState.targetZ = null;
+        boatState.moving = false;
+        setIsBoatingHud(false);
         if (zoneChanged) playPetTimer = 0;
         controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : 4.5;
         controls.maxDistance = z === 'garden' || z === 'home' ? 26 : z === 'petshop' ? 22 : 18;
@@ -2022,7 +2086,119 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       resetFishing(false);
     };
 
-    const handleSpotFishing = (spotX: number, spotZ: number, facingRotY: number) => {
+    const _shadowRay = new THREE.Raycaster();
+    const _shadowUpDir = new THREE.Vector3(0, 1, 0);
+    const _shadowOrigin = new THREE.Vector3();
+    const _shadowTarget = new THREE.Vector3();
+    const _shadowCamDir = new THREE.Vector3();
+
+    const isObjTreeVisible = (obj: THREE.Object3D): boolean => {
+      let cur: THREE.Object3D | null = obj;
+      while (cur) {
+        if (!cur.visible) return false;
+        cur = cur.parent;
+      }
+      return true;
+    };
+
+    const isShadowBlockerHit = (
+      hit: THREE.Intersection,
+      waterY: number,
+      allowShoreGrass = false,
+    ): boolean => {
+      const mesh = hit.object as THREE.Mesh;
+      if (!mesh.isMesh) return false;
+      if (!isObjTreeVisible(mesh)) return false;
+      const mat = mesh.material;
+      if (Array.isArray(mat)) {
+        if (mat.every((m) => m.visible === false)) return false;
+      } else if (mat) {
+        if (mat.visible === false) return false;
+        if ('opacity' in mat && mat.transparent && mat.opacity < 0.15) return false;
+      }
+      const ud = mesh.userData || {};
+      if (ud.isWaterMesh || ud.isWaterSurface || ud.isFishingVisual) return false;
+      if (ud.kind === 'ground') {
+        return allowShoreGrass ? hit.point.y > 0.38 : hit.point.y > waterY + 0.14;
+      }
+      return true;
+    };
+
+    const isWaterTargetOpenForShadow = (
+      targetX: number,
+      targetZ: number,
+      waterY: number,
+      waterKind: 'river' | 'lake',
+    ): boolean => {
+      if (waterKind === 'river') {
+        if (targetZ < WEST_RIVER_NAV_MIN_Z + 1.0 || targetZ > WEST_RIVER_NAV_MAX_Z - 1.0) {
+          return false;
+        }
+        const cx = getWestRiverCenterX(targetZ);
+        const hw = getWestRiverHalfWidth(targetZ);
+        if (Math.abs(targetX - cx) > hw - 1.05) return false;
+        // Arched bridge deck shadow
+        if (
+          Math.abs(targetZ - WEST_BRIDGE_Z) < 1.95 &&
+          Math.abs(targetX - getWestRiverCenterX(WEST_BRIDGE_Z)) < WEST_BRIDGE_HALF_SPAN + 0.35
+        ) {
+          return false;
+        }
+        // Boat dock overhang shadow
+        if (targetX > -78.1 && targetZ > -3.35 && targetZ < -0.25) return false;
+        // Waterfall plunge pool foam & cliff base pocket
+        if (Math.hypot(targetX - -94.7, targetZ - -9.0) < 3.45) return false;
+        if (targetX < -93.4 && targetZ > -14.2 && targetZ < -3.8) return false;
+      } else {
+        const dx = targetX - LAKE_CENTER.x;
+        const dz = targetZ - LAKE_CENTER.z;
+        const dist = Math.hypot(dx, dz);
+        const theta = Math.atan2(dz, dx);
+        if (dist > getLakeShoreRadius(theta) - 1.25) return false;
+        // Wooden lake pier shadow
+        if (Math.abs(targetX - -22.5) < 1.55 && targetZ < 45.05) return false;
+      }
+
+      if (!activeTown) return true;
+
+      // Overhead shade ray (trees, bridge, pier, dock, cliff rocks, lanterns)
+      _shadowOrigin.set(targetX, waterY + 0.12, targetZ);
+      _shadowRay.set(_shadowOrigin, _shadowUpDir);
+      _shadowRay.near = 0.04;
+      _shadowRay.far = 28;
+      const upHits = _shadowRay.intersectObject(activeTown.group, true);
+      for (let i = 0; i < upHits.length; i++) {
+        if (isShadowBlockerHit(upHits[i], waterY, false)) {
+          return false;
+        }
+      }
+
+      // Camera line-of-sight occlusion ray (ensures fish shadow is visible from camera)
+      _shadowTarget.set(targetX, waterY + 0.06, targetZ);
+      _shadowCamDir.subVectors(_shadowTarget, camera.position);
+      const camDist = _shadowCamDir.length();
+      if (camDist > 0.6) {
+        _shadowCamDir.divideScalar(camDist);
+        _shadowRay.set(camera.position, _shadowCamDir);
+        _shadowRay.near = 0.25;
+        _shadowRay.far = camDist - 0.32;
+        const camHits = _shadowRay.intersectObject(activeTown.group, true);
+        for (let i = 0; i < camHits.length; i++) {
+          if (isShadowBlockerHit(camHits[i], waterY, true)) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    };
+
+    const handleSpotFishing = (
+      spotX: number,
+      spotZ: number,
+      facingRotY: number,
+      customWater?: {targetX: number; targetZ: number; waterY: number; castOriginY?: number},
+    ) => {
       const rod = stateRef.current.fishingRod;
       if (!rod.owned) {
         soundFX.tap();
@@ -2057,7 +2233,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       if (fishCtrl.phase === 'idle') {
         const zNow = stateRef.current.zone;
-        const target = getZoneFishingWaterTarget(zNow);
+        const target = customWater ?? getZoneFishingWaterTarget(zNow);
         const rolled = rollRandomRiverFish();
         const cfg = FISH_RARITY_CONFIG[rolled.species.rarity];
 
@@ -2068,12 +2244,32 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               ? 0.36
               : 0;
 
-        // Random angle behind/beside the bobber in open water so shadow glides in naturally
+        // Pick an unoccluded open-water approach angle so the fish shadow spawns clearly in view
         const forwardX = Math.sin(facingRotY);
         const forwardZ = Math.cos(facingRotY);
-        const spread = (Math.random() - 0.5) * 1.45;
-        const appDirX = Math.sin(facingRotY + spread);
-        const appDirZ = Math.cos(facingRotY + spread);
+        const waterKindTown: 'river' | 'lake' | null =
+          zNow === 'town' ? (target.targetX < -55 ? 'river' : 'lake') : null;
+        const baseJitter = (Math.random() - 0.5) * 0.32;
+        const spreadCandidates = [0, 0.55, -0.55, 1.05, -1.05, 1.55, -1.55, 2.05, -2.05];
+        let chosenAngle = facingRotY + baseJitter;
+        if (waterKindTown) {
+          for (let si = 0; si < spreadCandidates.length; si++) {
+            const candAngle = facingRotY + spreadCandidates[si] + (si === 0 ? baseJitter : 0);
+            const sx = target.targetX + Math.sin(candAngle) * 2.15;
+            const sz = target.targetZ + Math.cos(candAngle) * 2.15;
+            const mx = target.targetX + Math.sin(candAngle) * 1.1;
+            const mz = target.targetZ + Math.cos(candAngle) * 1.1;
+            if (
+              isWaterTargetOpenForShadow(sx, sz, target.waterY, waterKindTown) &&
+              isWaterTargetOpenForShadow(mx, mz, target.waterY, waterKindTown)
+            ) {
+              chosenAngle = candAngle;
+              break;
+            }
+          }
+        }
+        const appDirX = Math.sin(chosenAngle);
+        const appDirZ = Math.cos(chosenAngle);
 
         fishCtrl.phase = 'casting';
         fishCtrl.phaseElapsed = 0;
@@ -2084,7 +2280,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         fishCtrl.targetZ = target.targetZ;
         fishCtrl.waterY = target.waterY;
         fishCtrl.startX = spotX + forwardX * 0.72;
-        fishCtrl.startY = gy + 1.55;
+        fishCtrl.startY = customWater?.castOriginY ?? gy + 1.55;
         fishCtrl.startZ = spotZ + forwardZ * 0.72;
         fishCtrl.spawnX = target.targetX + appDirX * 2.15;
         fishCtrl.spawnZ = target.targetZ + appDirZ * 2.15;
@@ -2203,7 +2399,33 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       };
     };
 
+    const disembarkBoat = (showNote = true) => {
+      if (!boatState.active) return;
+      if (fishCtrl.phase !== 'idle') {
+        resetFishing(false);
+      }
+      boatState.active = false;
+      boatState.targetX = null;
+      boatState.targetZ = null;
+      boatState.moving = false;
+      activeTown?.setRiverBoatPose?.(false);
+      setIsBoatingHud(false);
+      playerPos.x = -75.0;
+      playerPos.z = -1.8;
+      playerPos.rotY = Math.PI / 2;
+      playerPos.pose = 'idle';
+      prevGroundY = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+      jumpY = 0;
+      jumpVel = 0;
+      if (showNote) {
+        soundFX.tap();
+        showBubble('Đã lên bến gỗ Khu Sinh Thái!');
+      }
+    };
+    disembarkBoatActionRef.current = () => disembarkBoat(true);
+
     jumpActionRef.current = () => {
+      if (boatState.active) return;
       if (
         stateRef.current.zone === 'town' &&
         (mallElev.state === 'riding_up' || mallElev.state === 'riding_down')
@@ -2221,7 +2443,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
 
     catchActionRef.current = () => {
-      if (stateRef.current.zone !== 'town') return;
+      if (stateRef.current.zone !== 'town' || boatState.active) return;
       const net = stateRef.current.bugNet;
       if (!net.owned || !net.equipped) return;
       if (!stateRef.current.showJoystick) {
@@ -2261,6 +2483,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       activeTown?.setMallElevatorY?.(0.04);
       mallElevatorHudRef.current = 'none';
       setMallElevatorHud('none');
+      boatState.active = false;
+      boatState.targetX = null;
+      boatState.targetZ = null;
+      boatState.moving = false;
+      activeTown?.setRiverBoatPose?.(false);
+      setIsBoatingHud(false);
       playPetTimer = 0;
       activeTarget = null;
       activeSeat = null;
@@ -2878,14 +3106,88 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
 
           if (kind === 'town_lake_fish') {
+            if (boatState.active) return;
             soundFX.tap();
-            const spotX = data.tx as number;
-            const spotZ = data.tz as number;
             if (fishCtrl.phase !== 'idle') {
-              handleSpotFishing(spotX, spotZ, 0);
+              handleSpotFishing(
+                fishCtrl.spotX || playerPos.x,
+                fishCtrl.spotZ || playerPos.z,
+                fishCtrl.facingRotY,
+              );
               return;
             }
+            if (data.isWaterMesh) {
+              const hitPt = hits[0].point;
+              const tryLakeShoreCast = (spotX: number, spotZ: number) => {
+                const rodNow = stateRef.current.fishingRod;
+                if (!rodNow.owned || !rodNow.equipped || rodNow.durability <= 0) {
+                  handleSpotFishing(spotX, spotZ, Math.atan2(hitPt.x - spotX, hitPt.z - spotZ));
+                  return;
+                }
+                const dxW = hitPt.x - spotX;
+                const dzW = hitPt.z - spotZ;
+                const rawD = Math.hypot(dxW, dzW);
+                const dirX =
+                  rawD > 0.05
+                    ? dxW / rawD
+                    : (LAKE_CENTER.x - spotX) / (Math.hypot(LAKE_CENTER.x - spotX, LAKE_CENTER.z - spotZ) || 1);
+                const dirZ =
+                  rawD > 0.05
+                    ? dzW / rawD
+                    : (LAKE_CENTER.z - spotZ) / (Math.hypot(LAKE_CENTER.x - spotX, LAKE_CENTER.z - spotZ) || 1);
+                const castDist = THREE.MathUtils.clamp(rawD, 2.5, 4.6);
+                const tx = spotX + dirX * castDist;
+                const tz = spotZ + dirZ * castDist;
+                if (!isWaterTargetOpenForShadow(tx, tz, TOWN_LAKE_WATER_Y, 'lake')) {
+                  soundFX.tap();
+                  showBubble(
+                    'Chỗ này bị che bóng, không thấy bóng cá! Hãy di chuyển đến nơi thoáng hơn.',
+                    spotX,
+                    2.25,
+                    spotZ,
+                  );
+                  return;
+                }
+                const castRotY = Math.atan2(tx - spotX, tz - spotZ);
+                handleSpotFishing(spotX, spotZ, castRotY, {
+                  targetX: tx,
+                  targetZ: tz,
+                  waterY: TOWN_LAKE_WATER_Y,
+                });
+              };
+
+              const distToHit = Math.hypot(playerPos.x - hitPt.x, playerPos.z - hitPt.z);
+              const playerGy = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+              if (distToHit <= 5.6 && playerGy < 1.35) {
+                tryLakeShoreCast(playerPos.x, playerPos.z);
+              } else {
+                const lx = hitPt.x - LAKE_CENTER.x;
+                const lz = hitPt.z - LAKE_CENTER.z;
+                const standTheta =
+                  Math.hypot(lx, lz) > 2.2
+                    ? Math.atan2(lz, lx)
+                    : Math.atan2(playerPos.z - LAKE_CENTER.z, playerPos.x - LAKE_CENTER.x);
+                const sr = getLakeShoreRadius(standTheta) + 1.08;
+                const standX = LAKE_CENTER.x + Math.cos(standTheta) * sr;
+                const standZ = LAKE_CENTER.z + Math.sin(standTheta) * sr;
+                startWalkTo(standX, standZ, 'idle', undefined, () =>
+                  tryLakeShoreCast(standX, standZ),
+                );
+              }
+              return;
+            }
+            const spotX = data.tx as number;
+            const spotZ = data.tz as number;
             startWalkTo(spotX, spotZ, 'idle', undefined, () => {
+              if (!isWaterTargetOpenForShadow(-22.5, 46.6, TOWN_LAKE_WATER_Y, 'lake')) {
+                showBubble(
+                  'Chỗ này bị che bóng, không thấy bóng cá! Hãy di chuyển đến nơi thoáng hơn.',
+                  spotX,
+                  2.25,
+                  spotZ,
+                );
+                return;
+              }
               handleSpotFishing(spotX, spotZ, 0);
             });
             return;
@@ -3039,6 +3341,224 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
+          if (kind === 'ship_shop') {
+            soundFX.tap();
+            if (boatState.active) {
+              showBubble('Hãy bấm "Lên bờ" trước khi ghé Sạp Thuyền của Ship!');
+              return;
+            }
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenShipShop();
+            });
+            return;
+          }
+
+          if (kind === 'river_boat_board') {
+            soundFX.tap();
+            if (boatState.active) {
+              disembarkBoat(true);
+              return;
+            }
+            const embarkNow = () => {
+              if (!stateRef.current.woodenBoat.owned) {
+                soundFX.tap();
+                showBubble(
+                  `Bạn chưa có Thuyền Gỗ (${WOODEN_BOAT_PRICE} Xu)! Ghé Sạp Thuyền của Ship ngay bên cạnh để mua nhé.`,
+                );
+                return;
+              }
+              releaseSeatIfNeeded();
+              activeTarget = null;
+              jumpY = 0;
+              jumpVel = 0;
+              playPetTimer = 0;
+              if (fishCtrl.phase !== 'idle') {
+                resetFishing(false);
+              }
+              const sp = clampRiverBoatPoint(RIVER_BOAT_SPAWN.x, RIVER_BOAT_SPAWN.z);
+              boatState.active = true;
+              boatState.x = sp.x;
+              boatState.z = sp.z;
+              boatState.rotY = RIVER_BOAT_SPAWN.rotY;
+              boatState.targetX = null;
+              boatState.targetZ = null;
+              boatState.moving = false;
+              activeTown?.setRiverBoatPose?.(true, boatState.x, boatState.z, boatState.rotY, false, 0);
+              setIsBoatingHud(true);
+              callbacksRef.current.onEnableJoystick();
+              soundFX.splash();
+              showBubble(
+                'Đã xuống Thuyền Gỗ! Kéo Joystick (đã tự bật) hoặc chạm mặt nước để chèo, cầm Cần Câu chạm nước để câu cá sông!',
+              );
+            };
+            const distBoard = Math.hypot(
+              playerPos.x - RIVER_BOARD_INTERACT.tx,
+              playerPos.z - RIVER_BOARD_INTERACT.tz,
+            );
+            if (distBoard < 2.2) {
+              embarkNow();
+            } else {
+              startWalkTo(
+                RIVER_BOARD_INTERACT.tx,
+                RIVER_BOARD_INTERACT.tz,
+                'idle',
+                undefined,
+                embarkNow,
+              );
+            }
+            return;
+          }
+
+          if (kind === 'river_water') {
+            if (fishCtrl.phase === 'waiting' || fishCtrl.phase === 'nibbling') {
+              handleSpotFishing(
+                boatState.active ? boatState.x : playerPos.x,
+                boatState.active ? boatState.z : playerPos.z,
+                fishCtrl.facingRotY,
+              );
+              return;
+            }
+            if (!boatState.active) {
+              soundFX.tap();
+              if (fishCtrl.phase !== 'idle') return;
+              if (stateRef.current.fishingRod.equipped) {
+                const hitPt = hits[0].point;
+                const tryRiverShoreCast = (spotX: number, spotZ: number) => {
+                  const rodNow = stateRef.current.fishingRod;
+                  if (rodNow.durability <= 0) {
+                    setBrokenRodPrompt({
+                      repairCost: getRodRepairCost(rodNow.durability, rodNow.maxDurability),
+                      maxDurability: rodNow.maxDurability,
+                    });
+                    return;
+                  }
+                  const cxSpot = getWestRiverCenterX(spotZ);
+                  const dxW = hitPt.x - spotX;
+                  const dzW = hitPt.z - spotZ;
+                  const rawD = Math.hypot(dxW, dzW);
+                  const dirX = rawD > 0.05 ? dxW / rawD : spotX >= cxSpot ? -1 : 1;
+                  const dirZ = rawD > 0.05 ? dzW / rawD : 0;
+                  const castDist = THREE.MathUtils.clamp(rawD, 2.8, 4.8);
+                  const tz = THREE.MathUtils.clamp(
+                    spotZ + dirZ * castDist,
+                    WEST_RIVER_NAV_MIN_Z + 1.2,
+                    WEST_RIVER_NAV_MAX_Z - 1.2,
+                  );
+                  const tx = spotX + dirX * castDist;
+                  if (!isWaterTargetOpenForShadow(tx, tz, RIVER_WATER_Y, 'river')) {
+                    soundFX.tap();
+                    showBubble(
+                      'Chỗ này bị che bóng, không thấy bóng cá! Hãy di chuyển đến nơi thoáng hơn.',
+                      spotX,
+                      2.25,
+                      spotZ,
+                    );
+                    return;
+                  }
+                  const castRotY = Math.atan2(tx - spotX, tz - spotZ);
+                  handleSpotFishing(spotX, spotZ, castRotY, {
+                    targetX: tx,
+                    targetZ: tz,
+                    waterY: RIVER_WATER_Y,
+                  });
+                };
+
+                const distToHit = Math.hypot(playerPos.x - hitPt.x, playerPos.z - hitPt.z);
+                const playerGy = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+                if (distToHit <= 5.6 && playerGy < 2.6) {
+                  tryRiverShoreCast(playerPos.x, playerPos.z);
+                } else {
+                  const standZ = THREE.MathUtils.clamp(
+                    hitPt.z,
+                    WEST_RIVER_NAV_MIN_Z + 2.0,
+                    WEST_RIVER_NAV_MAX_Z - 2.0,
+                  );
+                  const cxStand = getWestRiverCenterX(standZ);
+                  const hwStand = getWestRiverHalfWidth(standZ);
+                  const useWestBank = playerPos.x < cxStand - 0.5 && standZ >= 12.5;
+                  const standX = useWestBank
+                    ? cxStand - hwStand - 1.65
+                    : cxStand + hwStand + 1.65;
+                  startWalkTo(standX, standZ, 'idle', undefined, () =>
+                    tryRiverShoreCast(standX, standZ),
+                  );
+                }
+                return;
+              }
+              showBubble(
+                stateRef.current.woodenBoat.owned
+                  ? 'Chạm Biển hiệu Xuống Thuyền hoặc chiếc thuyền neo để xuống sông! (Hoặc cầm Cần Câu để câu từ bờ)'
+                  : stateRef.current.fishingRod.owned
+                    ? 'Mở Túi Đồ cầm Cần Câu để câu từ bờ, hoặc ghé Sạp Ship (350 Xu) mua Thuyền Gỗ!'
+                    : `Ghé Sạp Ship (${WOODEN_BOAT_PRICE} Xu) mua Thuyền Gỗ, hoặc mua Cần Câu ở Sạp Koi để câu từ bờ!`,
+              );
+              return;
+            }
+            if (fishCtrl.phase !== 'idle') return;
+            if (stateRef.current.fishingRod.equipped) {
+              const rodNow = stateRef.current.fishingRod;
+              if (rodNow.durability <= 0) {
+                soundFX.tap();
+                setBrokenRodPrompt({
+                  repairCost: getRodRepairCost(rodNow.durability, rodNow.maxDurability),
+                  maxDurability: rodNow.maxDurability,
+                });
+                return;
+              }
+              const hitPt = hits[0].point;
+              const dxW = hitPt.x - boatState.x;
+              const dzW = hitPt.z - boatState.z;
+              const rawDist = Math.hypot(dxW, dzW);
+              const castDist = THREE.MathUtils.clamp(rawDist, 2.8, 4.8);
+              const dirX = rawDist > 0.05 ? dxW / rawDist : Math.sin(boatState.rotY);
+              const dirZ = rawDist > 0.05 ? dzW / rawDist : Math.cos(boatState.rotY);
+              const tz = THREE.MathUtils.clamp(
+                boatState.z + dirZ * castDist,
+                WEST_RIVER_NAV_MIN_Z + 1.2,
+                WEST_RIVER_NAV_MAX_Z - 1.2,
+              );
+              const bRiver = getWestRiverNavBounds(tz);
+              const tx = THREE.MathUtils.clamp(
+                boatState.x + dirX * castDist,
+                bRiver.minX - 0.6,
+                bRiver.maxX + 0.6,
+              );
+              boatState.targetX = null;
+              boatState.targetZ = null;
+              boatState.moving = false;
+              if (!isWaterTargetOpenForShadow(tx, tz, RIVER_WATER_Y, 'river')) {
+                soundFX.tap();
+                showBubble(
+                  'Chỗ này bị che bóng, không thấy bóng cá! Hãy chèo thuyền đến nơi thoáng hơn.',
+                  boatState.x,
+                  2.25,
+                  boatState.z,
+                );
+                return;
+              }
+              const castRotY = Math.atan2(tx - boatState.x, tz - boatState.z);
+              handleSpotFishing(boatState.x, boatState.z, castRotY, {
+                targetX: tx,
+                targetZ: tz,
+                waterY: RIVER_WATER_Y,
+                castOriginY: RIVER_WATER_Y + 1.78,
+              });
+              return;
+            }
+            const dest = clampRiverBoatPoint(hits[0].point.x, hits[0].point.z);
+            boatState.targetX = dest.x;
+            boatState.targetZ = dest.z;
+            soundFX.tap();
+            return;
+          }
+
+          if (boatState.active) {
+            soundFX.tap();
+            showBubble('Đang trên Thuyền Gỗ! Chạm mặt nước để chèo/câu hoặc bấm "Lên bờ".');
+            return;
+          }
+
           if (kind === 'mall_entrance') {
             soundFX.tap();
             if (stateRef.current.zone === 'town' && mallElev.state === 'deck') {
@@ -3064,6 +3584,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
         }
+      }
+
+      if (boatState.active) {
+        soundFX.tap();
+        showBubble('Đang chèo Thuyền Gỗ! Chạm mặt nước để di chuyển/câu hoặc bấm "Lên bờ".');
+        return;
       }
 
       // 2. Tap on walkable ground or hill -> smart A* route around obstacles cleanly
@@ -3423,280 +3949,391 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       const onFlowerBedLevel = z === 'town' && !isOnMallDeck && prevGroundY + jumpY >= 0.86;
 
-      // Dynamic Virtual Joystick steering OR Smart Waypoint Walk Kinematics
+      let groundOffset = 0.02;
       const joy = joystickInputRef.current;
       const joyMag = !isRidingMallElevator && joy.active ? Math.hypot(joy.x, joy.y) : 0;
       let moveHorizSpeed = 0;
       let isCreepingNow = false;
 
-      if (isRidingMallElevator) {
+      if (z === 'town' && boatState.active) {
         activeTarget = null;
-      } else if (netSwingCtrl.active) {
-        activeTarget = null;
-        playPetTimer = 0;
-      } else if (joyMag > 0.08) {
-        playPetTimer = 0;
-        if (activeTarget) activeTarget = null;
-        releaseSeatIfNeeded();
-        if (fishCtrl.phase !== 'idle') {
-          resetFishing(true);
-        }
-        if (selectedPlotRef.current) {
-          selectedPlotRef.current = null;
-          setArcMenuPos(null);
-        }
-        if (selectedPetRef.current) {
-          selectedPetRef.current = null;
-          setPetArcMenuPos(null);
-        }
-
-        let fwdX = controls.target.x - camera.position.x;
-        let fwdZ = controls.target.z - camera.position.z;
-        const fwdLen = Math.hypot(fwdX, fwdZ);
-        if (fwdLen > 0.001) {
-          fwdX /= fwdLen;
-          fwdZ /= fwdLen;
-        } else {
-          fwdX = 0;
-          fwdZ = -1;
-        }
-        const rightX = -fwdZ;
-        const rightZ = fwdX;
-        const moveDirX = rightX * joy.x + fwdX * -joy.y;
-        const moveDirZ = rightZ * joy.x + fwdZ * -joy.y;
-        const moveLen = Math.hypot(moveDirX, moveDirZ) || 1;
-        isCreepingNow =
-          z === 'town' &&
-          !isOnMallDeck &&
-          stateRef.current.bugNet.equipped &&
-          joyMag <= 0.58 &&
-          !isAirborne;
-        const speed = isCreepingNow
-          ? 0.68
-          : (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : 3.6) * Math.min(1, joyMag);
-        const stepLen = speed * delta;
-        const rawX = playerPos.x + (moveDirX / moveLen) * stepLen;
-        const rawZ = playerPos.z + (moveDirZ / moveLen) * stepLen;
-
-        let nextX: number;
-        let nextZ: number;
-        if (isOnMallDeck) {
-          const deckClamped = clampPointToMallDeck(rawX, rawZ);
-          nextX = deckClamped.x;
-          nextZ = deckClamped.z;
-        } else {
-          const resolved = resolvePointAgainstColliders(
-            rawX,
-            rawZ,
-            currentColliders,
-            PLAYER_RADIUS,
-            onFlowerBedLevel,
-          );
-          const b = getZoneWalkBounds(z);
-          nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
-          nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
-        }
-        const dmx = nextX - playerPos.x;
-        const dmz = nextZ - playerPos.z;
-        playerPos.x = nextX;
-        playerPos.z = nextZ;
-        moveHorizSpeed = Math.hypot(dmx, dmz) / Math.max(0.001, delta);
-
-        const targetRot =
-          Math.hypot(dmx, dmz) > 0.002
-            ? Math.atan2(dmx, dmz)
-            : Math.atan2(moveDirX, moveDirZ);
-        let diff = targetRot - playerPos.rotY;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        playerPos.rotY += diff * Math.min(1, delta * (isCreepingNow ? 10 : 14));
-        playerPos.pose = isAirborne ? 'jump' : isCreepingNow ? 'creep' : 'walk';
-      } else {
-        if (!activeTarget && (playerPos.pose === 'walk' || playerPos.pose === 'creep')) {
-          playerPos.pose = isAirborne ? 'jump' : 'idle';
-        }
-        // Smart waypoint walk kinematics with collision sliding & exact seat alignment
-        if (activeTarget) {
-          playPetTimer = 0;
-          while (
-            activeTarget.waypointIdx < activeTarget.waypoints.length - 1 &&
-            Math.hypot(
-              activeTarget.waypoints[activeTarget.waypointIdx].x - playerPos.x,
-              activeTarget.waypoints[activeTarget.waypointIdx].z - playerPos.z,
-            ) < 0.34
-          ) {
-            activeTarget.waypointIdx++;
-            prevDistToTarget = Infinity;
-            stallTimer = 0;
-          }
-
-          const isFinalWp = activeTarget.waypointIdx >= activeTarget.waypoints.length - 1;
-          const wp = activeTarget.waypoints[activeTarget.waypointIdx] ?? activeTarget;
-          const dx = wp.x - playerPos.x;
-          const dz = wp.z - playerPos.z;
-          const dist = Math.hypot(dx, dz);
-          const speed = z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : 3.6;
-
-          if (isFinalWp && dist < 0.16) {
-            if (activeTarget.seat && !isAirborne) {
-              activeSeat = activeTarget.seat;
-              playerPos.x = activeTarget.seat.seatX;
-              playerPos.z = activeTarget.seat.seatZ;
-              playerPos.rotY = activeTarget.seat.rotY;
-            } else {
-              playerPos.x = activeTarget.x;
-              playerPos.z = activeTarget.z;
-            }
-            playerPos.pose = isAirborne ? 'jump' : activeTarget.arrivePose;
-            const cb = activeTarget.onArrive;
-            activeTarget = null;
-            stallTimer = 0;
-            cb?.();
-          } else {
-            playerPos.pose = isAirborne ? 'jump' : 'walk';
-            const dirX = dist > 0.0001 ? dx / dist : 0;
-            const dirZ = dist > 0.0001 ? dz / dist : 0;
-            const stepLen = Math.min(dist, speed * delta);
-            const rawX = playerPos.x + dirX * stepLen;
-            const rawZ = playerPos.z + dirZ * stepLen;
-
-            let nextX: number;
-            let nextZ: number;
-            if (isOnMallDeck) {
-              const deckClamped = clampPointToMallDeck(rawX, rawZ);
-              nextX = deckClamped.x;
-              nextZ = deckClamped.z;
-            } else {
-              let resolved = resolvePointAgainstColliders(
-                rawX,
-                rawZ,
-                currentColliders,
-                PLAYER_RADIUS,
-                onFlowerBedLevel,
-              );
-              // Secondary tangential slide around obstacle corners
-              const progress = (resolved.x - playerPos.x) * dirX + (resolved.z - playerPos.z) * dirZ;
-              if (resolved.collided && progress < stepLen * 0.35) {
-                const perpX = -dirZ;
-                const perpZ = dirX;
-                const optA = resolvePointAgainstColliders(
-                  playerPos.x + perpX * stepLen * 0.9,
-                  playerPos.z + perpZ * stepLen * 0.9,
-                  currentColliders,
-                  PLAYER_RADIUS,
-                  onFlowerBedLevel,
-                );
-                const optB = resolvePointAgainstColliders(
-                  playerPos.x - perpX * stepLen * 0.9,
-                  playerPos.z - perpZ * stepLen * 0.9,
-                  currentColliders,
-                  PLAYER_RADIUS,
-                  onFlowerBedLevel,
-                );
-                const distA = Math.hypot(wp.x - optA.x, wp.z - optA.z);
-                const distB = Math.hypot(wp.x - optB.x, wp.z - optB.z);
-                resolved = distA <= distB ? optA : optB;
-              }
-
-              const b = getZoneWalkBounds(z);
-              nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
-              nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
-            }
-
-            const moveX = nextX - playerPos.x;
-            const moveZ = nextZ - playerPos.z;
-            playerPos.x = nextX;
-            playerPos.z = nextZ;
-            moveHorizSpeed = Math.hypot(moveX, moveZ) / Math.max(0.001, delta);
-
-            if (Math.hypot(moveX, moveZ) > 0.002) {
-              const targetRot = Math.atan2(moveX, moveZ);
-              let diff = targetRot - playerPos.rotY;
-              while (diff > Math.PI) diff -= Math.PI * 2;
-              while (diff < -Math.PI) diff += Math.PI * 2;
-              playerPos.rotY += diff * Math.min(1, delta * 12);
-            }
-
-            const newDist = Math.hypot(wp.x - playerPos.x, wp.z - playerPos.z);
-            if (prevDistToTarget - newDist < stepLen * 0.15) {
-              stallTimer += delta;
-              if (stallTimer > 0.5) {
-                activeTarget = null;
-                playerPos.pose = isAirborne ? 'jump' : 'idle';
-                stallTimer = 0;
-              }
-            } else {
-              stallTimer = 0;
-              prevDistToTarget = newDist;
-            }
-          }
-        }
-      }
-
-      if (playPetTimer > 0) {
-        if (isAirborne || isRidingMallElevator || activeTarget || activeSeat || joyMag > 0.08) {
-          playPetTimer = 0;
-          if (!isAirborne && !activeTarget && !activeSeat && playerPos.pose === 'play_pet') {
-            playerPos.pose = 'idle';
-          }
-        } else {
-          playPetTimer = Math.max(0, playPetTimer - delta);
-          if (petCompanion.rig) {
-            const pDx = petCompanion.x - playerPos.x;
-            const pDz = petCompanion.z - playerPos.z;
-            if (Math.hypot(pDx, pDz) > 0.05) {
-              const facePetRot = Math.atan2(pDx, pDz);
-              let diff = facePetRot - playerPos.rotY;
-              while (diff > Math.PI) diff -= Math.PI * 2;
-              while (diff < -Math.PI) diff += Math.PI * 2;
-              playerPos.rotY += diff * Math.min(1, delta * 11);
-            }
-          }
-          playerPos.pose = playPetTimer > 0 ? 'play_pet' : 'idle';
-        }
-      } else if (playerPos.pose === 'play_pet' && !isAirborne && !activeTarget) {
-        playerPos.pose = 'idle';
-      }
-
-      if (isAirborne) {
-        playerPos.pose = 'jump';
-        moveHorizSpeed = Math.max(moveHorizSpeed, 2.5);
-      }
-
-      if (z === 'town') {
-        activeTown?.setOutdoorSwingSeated?.(Boolean(playerPos.pose === 'sit' && activeSeat?.isSwing));
-      }
-
-      let groundOffset = 0.02;
-      if (isRidingMallElevator) {
-        groundOffset = mallElev.y + 0.06;
-      } else if ((playerPos.pose === 'sit' || playerPos.pose === 'bath') && activeSeat) {
-        groundOffset = activeSeat.seatY - 0.245;
-      } else if (playerPos.pose === 'sleep' && activeSeat?.isBed) {
-        groundOffset = activeSeat.seatY - 0.65;
-      } else if (isOnMallDeck) {
-        groundOffset = MALL_DECK_Y;
-      } else if (z === 'town') {
-        if (isPointOnPlazaFlowerBed(playerPos.x, playerPos.z) && prevGroundY + jumpY >= 0.82) {
-          groundOffset = 0.98;
-        } else {
-          groundOffset = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
-        }
-      } else if (z === 'garden' && playerPos.x > 9.35 && playerPos.x < 15.9 && Math.abs(playerPos.z - 3.0) < 0.98) {
-        groundOffset = 0.36;
-      }
-
-      // Preserve world elevation smoothly when landing onto or stepping off elevated flower beds
-      if (isRidingMallElevator) {
-        prevGroundY = groundOffset;
+        activeSeat = null;
         jumpY = 0;
-      } else {
-        if (groundOffset < prevGroundY - 0.05) {
-          jumpY += prevGroundY - groundOffset;
-        } else if (groundOffset > prevGroundY + 0.05) {
-          jumpY = Math.max(0, prevGroundY + jumpY - groundOffset);
+        jumpVel = 0;
+        playPetTimer = 0;
+
+        if (joyMag > 0.08) {
+          if (fishCtrl.phase !== 'idle') {
+            resetFishing(true);
+          }
+          boatState.targetX = null;
+          boatState.targetZ = null;
+          let fwdX = controls.target.x - camera.position.x;
+          let fwdZ = controls.target.z - camera.position.z;
+          const fwdLen = Math.hypot(fwdX, fwdZ);
+          if (fwdLen > 0.001) {
+            fwdX /= fwdLen;
+            fwdZ /= fwdLen;
+          } else {
+            fwdX = 0;
+            fwdZ = -1;
+          }
+          const rightX = -fwdZ;
+          const rightZ = fwdX;
+          const moveDirX = rightX * joy.x + fwdX * -joy.y;
+          const moveDirZ = rightZ * joy.x + fwdZ * -joy.y;
+          const moveLen = Math.hypot(moveDirX, moveDirZ) || 1;
+          const stepLen = 5.4 * Math.min(1, joyMag) * delta;
+          const next = clampRiverBoatPoint(
+            boatState.x + (moveDirX / moveLen) * stepLen,
+            boatState.z + (moveDirZ / moveLen) * stepLen,
+          );
+          const dmx = next.x - boatState.x;
+          const dmz = next.z - boatState.z;
+          boatState.x = next.x;
+          boatState.z = next.z;
+          boatState.moving = Math.hypot(dmx, dmz) > 0.002;
+          moveHorizSpeed = Math.hypot(dmx, dmz) / Math.max(0.001, delta);
+          const targetRot =
+            boatState.moving ? Math.atan2(dmx, dmz) : Math.atan2(moveDirX, moveDirZ);
+          let diff = targetRot - boatState.rotY;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          boatState.rotY += diff * Math.min(1, delta * 9);
+        } else if (boatState.targetX !== null && boatState.targetZ !== null) {
+          if (fishCtrl.phase !== 'idle') {
+            boatState.targetX = null;
+            boatState.targetZ = null;
+            boatState.moving = false;
+          } else {
+            const dx = boatState.targetX - boatState.x;
+            const dz = boatState.targetZ - boatState.z;
+            const dist = Math.hypot(dx, dz);
+            if (dist < 0.25) {
+              boatState.targetX = null;
+              boatState.targetZ = null;
+              boatState.moving = false;
+            } else {
+              const stepLen = Math.min(dist, 5.4 * delta);
+              const next = clampRiverBoatPoint(
+                boatState.x + (dx / dist) * stepLen,
+                boatState.z + (dz / dist) * stepLen,
+              );
+              const dmx = next.x - boatState.x;
+              const dmz = next.z - boatState.z;
+              boatState.x = next.x;
+              boatState.z = next.z;
+              boatState.moving = Math.hypot(dmx, dmz) > 0.002;
+              moveHorizSpeed = Math.hypot(dmx, dmz) / Math.max(0.001, delta);
+              if (boatState.moving) {
+                const targetRot = Math.atan2(dmx, dmz);
+                let diff = targetRot - boatState.rotY;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                boatState.rotY += diff * Math.min(1, delta * 9);
+              } else {
+                boatState.targetX = null;
+                boatState.targetZ = null;
+              }
+            }
+          }
+        } else {
+          boatState.moving = false;
+        }
+
+        activeTown?.setRiverBoatPose?.(
+          true,
+          boatState.x,
+          boatState.z,
+          boatState.rotY,
+          boatState.moving,
+          elapsed,
+        );
+
+        const boatBob = Math.sin(elapsed * 2.2) * 0.028;
+        const isBoatFishing = fishCtrl.phase !== 'idle' || fishCtrl.pullPoseTimer > 0;
+        if (isBoatFishing) {
+          playerPos.x = boatState.x;
+          playerPos.z = boatState.z;
+          groundOffset = RIVER_WATER_Y + 0.16 + boatBob;
+        } else {
+          const aftOff = -0.56;
+          playerPos.x = boatState.x + Math.sin(boatState.rotY) * aftOff;
+          playerPos.z = boatState.z + Math.cos(boatState.rotY) * aftOff;
+          playerPos.rotY = boatState.rotY;
+          playerPos.pose = 'sit';
+          groundOffset = RIVER_WATER_Y + 0.18 + boatBob;
         }
         prevGroundY = groundOffset;
+      } else {
+        if (isRidingMallElevator) {
+          activeTarget = null;
+        } else if (netSwingCtrl.active) {
+          activeTarget = null;
+          playPetTimer = 0;
+        } else if (joyMag > 0.08) {
+          playPetTimer = 0;
+          if (activeTarget) activeTarget = null;
+          releaseSeatIfNeeded();
+          if (fishCtrl.phase !== 'idle') {
+            resetFishing(true);
+          }
+          if (selectedPlotRef.current) {
+            selectedPlotRef.current = null;
+            setArcMenuPos(null);
+          }
+          if (selectedPetRef.current) {
+            selectedPetRef.current = null;
+            setPetArcMenuPos(null);
+          }
+
+          let fwdX = controls.target.x - camera.position.x;
+          let fwdZ = controls.target.z - camera.position.z;
+          const fwdLen = Math.hypot(fwdX, fwdZ);
+          if (fwdLen > 0.001) {
+            fwdX /= fwdLen;
+            fwdZ /= fwdLen;
+          } else {
+            fwdX = 0;
+            fwdZ = -1;
+          }
+          const rightX = -fwdZ;
+          const rightZ = fwdX;
+          const moveDirX = rightX * joy.x + fwdX * -joy.y;
+          const moveDirZ = rightZ * joy.x + fwdZ * -joy.y;
+          const moveLen = Math.hypot(moveDirX, moveDirZ) || 1;
+          isCreepingNow =
+            z === 'town' &&
+            !isOnMallDeck &&
+            stateRef.current.bugNet.equipped &&
+            joyMag <= 0.58 &&
+            !isAirborne;
+          const speed = isCreepingNow
+            ? 0.68
+            : (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : 3.6) * Math.min(1, joyMag);
+          const stepLen = speed * delta;
+          const rawX = playerPos.x + (moveDirX / moveLen) * stepLen;
+          const rawZ = playerPos.z + (moveDirZ / moveLen) * stepLen;
+
+          let nextX: number;
+          let nextZ: number;
+          if (isOnMallDeck) {
+            const deckClamped = clampPointToMallDeck(rawX, rawZ);
+            nextX = deckClamped.x;
+            nextZ = deckClamped.z;
+          } else {
+            const resolved = resolvePointAgainstColliders(
+              rawX,
+              rawZ,
+              currentColliders,
+              PLAYER_RADIUS,
+              onFlowerBedLevel,
+            );
+            const b = getZoneWalkBounds(z);
+            nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
+            nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
+          }
+          const dmx = nextX - playerPos.x;
+          const dmz = nextZ - playerPos.z;
+          playerPos.x = nextX;
+          playerPos.z = nextZ;
+          moveHorizSpeed = Math.hypot(dmx, dmz) / Math.max(0.001, delta);
+
+          const targetRot =
+            Math.hypot(dmx, dmz) > 0.002
+              ? Math.atan2(dmx, dmz)
+              : Math.atan2(moveDirX, moveDirZ);
+          let diff = targetRot - playerPos.rotY;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          playerPos.rotY += diff * Math.min(1, delta * (isCreepingNow ? 10 : 14));
+          playerPos.pose = isAirborne ? 'jump' : isCreepingNow ? 'creep' : 'walk';
+        } else {
+          if (!activeTarget && (playerPos.pose === 'walk' || playerPos.pose === 'creep')) {
+            playerPos.pose = isAirborne ? 'jump' : 'idle';
+          }
+          // Smart waypoint walk kinematics with collision sliding & exact seat alignment
+          if (activeTarget) {
+            playPetTimer = 0;
+            while (
+              activeTarget.waypointIdx < activeTarget.waypoints.length - 1 &&
+              Math.hypot(
+                activeTarget.waypoints[activeTarget.waypointIdx].x - playerPos.x,
+                activeTarget.waypoints[activeTarget.waypointIdx].z - playerPos.z,
+              ) < 0.34
+            ) {
+              activeTarget.waypointIdx++;
+              prevDistToTarget = Infinity;
+              stallTimer = 0;
+            }
+
+            const isFinalWp = activeTarget.waypointIdx >= activeTarget.waypoints.length - 1;
+            const wp = activeTarget.waypoints[activeTarget.waypointIdx] ?? activeTarget;
+            const dx = wp.x - playerPos.x;
+            const dz = wp.z - playerPos.z;
+            const dist = Math.hypot(dx, dz);
+            const speed = z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : 3.6;
+
+            if (isFinalWp && dist < 0.16) {
+              if (activeTarget.seat && !isAirborne) {
+                activeSeat = activeTarget.seat;
+                playerPos.x = activeTarget.seat.seatX;
+                playerPos.z = activeTarget.seat.seatZ;
+                playerPos.rotY = activeTarget.seat.rotY;
+              } else {
+                playerPos.x = activeTarget.x;
+                playerPos.z = activeTarget.z;
+              }
+              playerPos.pose = isAirborne ? 'jump' : activeTarget.arrivePose;
+              const cb = activeTarget.onArrive;
+              activeTarget = null;
+              stallTimer = 0;
+              cb?.();
+            } else {
+              playerPos.pose = isAirborne ? 'jump' : 'walk';
+              const dirX = dist > 0.0001 ? dx / dist : 0;
+              const dirZ = dist > 0.0001 ? dz / dist : 0;
+              const stepLen = Math.min(dist, speed * delta);
+              const rawX = playerPos.x + dirX * stepLen;
+              const rawZ = playerPos.z + dirZ * stepLen;
+
+              let nextX: number;
+              let nextZ: number;
+              if (isOnMallDeck) {
+                const deckClamped = clampPointToMallDeck(rawX, rawZ);
+                nextX = deckClamped.x;
+                nextZ = deckClamped.z;
+              } else {
+                let resolved = resolvePointAgainstColliders(
+                  rawX,
+                  rawZ,
+                  currentColliders,
+                  PLAYER_RADIUS,
+                  onFlowerBedLevel,
+                );
+                // Secondary tangential slide around obstacle corners
+                const progress = (resolved.x - playerPos.x) * dirX + (resolved.z - playerPos.z) * dirZ;
+                if (resolved.collided && progress < stepLen * 0.35) {
+                  const perpX = -dirZ;
+                  const perpZ = dirX;
+                  const optA = resolvePointAgainstColliders(
+                    playerPos.x + perpX * stepLen * 0.9,
+                    playerPos.z + perpZ * stepLen * 0.9,
+                    currentColliders,
+                    PLAYER_RADIUS,
+                    onFlowerBedLevel,
+                  );
+                  const optB = resolvePointAgainstColliders(
+                    playerPos.x - perpX * stepLen * 0.9,
+                    playerPos.z - perpZ * stepLen * 0.9,
+                    currentColliders,
+                    PLAYER_RADIUS,
+                    onFlowerBedLevel,
+                  );
+                  const distA = Math.hypot(wp.x - optA.x, wp.z - optA.z);
+                  const distB = Math.hypot(wp.x - optB.x, wp.z - optB.z);
+                  resolved = distA <= distB ? optA : optB;
+                }
+
+                const b = getZoneWalkBounds(z);
+                nextX = THREE.MathUtils.clamp(resolved.x, b.minX, b.maxX);
+                nextZ = THREE.MathUtils.clamp(resolved.z, b.minZ, b.maxZ);
+              }
+
+              const moveX = nextX - playerPos.x;
+              const moveZ = nextZ - playerPos.z;
+              playerPos.x = nextX;
+              playerPos.z = nextZ;
+              moveHorizSpeed = Math.hypot(moveX, moveZ) / Math.max(0.001, delta);
+
+              if (Math.hypot(moveX, moveZ) > 0.002) {
+                const targetRot = Math.atan2(moveX, moveZ);
+                let diff = targetRot - playerPos.rotY;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                playerPos.rotY += diff * Math.min(1, delta * 12);
+              }
+
+              const newDist = Math.hypot(wp.x - playerPos.x, wp.z - playerPos.z);
+              if (prevDistToTarget - newDist < stepLen * 0.15) {
+                stallTimer += delta;
+                if (stallTimer > 0.5) {
+                  activeTarget = null;
+                  playerPos.pose = isAirborne ? 'jump' : 'idle';
+                  stallTimer = 0;
+                }
+              } else {
+                stallTimer = 0;
+                prevDistToTarget = newDist;
+              }
+            }
+          }
+        }
+
+        if (playPetTimer > 0) {
+          if (isAirborne || isRidingMallElevator || activeTarget || activeSeat || joyMag > 0.08) {
+            playPetTimer = 0;
+            if (!isAirborne && !activeTarget && !activeSeat && playerPos.pose === 'play_pet') {
+              playerPos.pose = 'idle';
+            }
+          } else {
+            playPetTimer = Math.max(0, playPetTimer - delta);
+            if (petCompanion.rig) {
+              const pDx = petCompanion.x - playerPos.x;
+              const pDz = petCompanion.z - playerPos.z;
+              if (Math.hypot(pDx, pDz) > 0.05) {
+                const facePetRot = Math.atan2(pDx, pDz);
+                let diff = facePetRot - playerPos.rotY;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                playerPos.rotY += diff * Math.min(1, delta * 11);
+              }
+            }
+            playerPos.pose = playPetTimer > 0 ? 'play_pet' : 'idle';
+          }
+        } else if (playerPos.pose === 'play_pet' && !isAirborne && !activeTarget) {
+          playerPos.pose = 'idle';
+        }
+
+        if (isAirborne) {
+          playerPos.pose = 'jump';
+          moveHorizSpeed = Math.max(moveHorizSpeed, 2.5);
+        }
+
+        if (z === 'town') {
+          activeTown?.setOutdoorSwingSeated?.(Boolean(playerPos.pose === 'sit' && activeSeat?.isSwing));
+        }
+
+        if (isRidingMallElevator) {
+          groundOffset = mallElev.y + 0.06;
+        } else if ((playerPos.pose === 'sit' || playerPos.pose === 'bath') && activeSeat) {
+          groundOffset = activeSeat.seatY - 0.245;
+        } else if (playerPos.pose === 'sleep' && activeSeat?.isBed) {
+          groundOffset = activeSeat.seatY - 0.65;
+        } else if (isOnMallDeck) {
+          groundOffset = MALL_DECK_Y;
+        } else if (z === 'town') {
+          if (isPointOnPlazaFlowerBed(playerPos.x, playerPos.z) && prevGroundY + jumpY >= 0.82) {
+            groundOffset = 0.98;
+          } else {
+            groundOffset = getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius);
+          }
+        } else if (z === 'garden' && playerPos.x > 9.35 && playerPos.x < 15.9 && Math.abs(playerPos.z - 3.0) < 0.98) {
+          groundOffset = 0.36;
+        }
+
+        // Preserve world elevation smoothly when landing onto or stepping off elevated flower beds
+        if (isRidingMallElevator) {
+          prevGroundY = groundOffset;
+          jumpY = 0;
+        } else {
+          if (groundOffset < prevGroundY - 0.05) {
+            jumpY += prevGroundY - groundOffset;
+          } else if (groundOffset > prevGroundY + 0.05) {
+            jumpY = Math.max(0, prevGroundY + jumpY - groundOffset);
+          }
+          prevGroundY = groundOffset;
+        }
       }
 
       const isSwingingNow = Boolean(z === 'town' && playerPos.pose === 'sit' && activeSeat?.isSwing);
@@ -4093,7 +4730,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       // Keep walking orbit pet cleanly grounded on hills, plaza, Skydeck, or elevator floor
       if (playerRig.heldPetRig?.speciesId === 'brown_puppy') {
         let petGy = 0.02;
-        if (isRidingMallElevator) {
+        if (boatState.active && z === 'town') {
+          petGy = groundOffset;
+        } else if (isRidingMallElevator) {
           petGy = mallElev.y + 0.06;
         } else if (isOnMallDeck) {
           petGy = MALL_DECK_Y;
@@ -4123,7 +4762,28 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const minSafeDist = isFly ? 1.32 : 1.22;
         let petMovedSpeed = 0;
 
-        if (isRidingMallElevator) {
+        if (boatState.active && z === 'town') {
+          const boatBobPet = Math.sin(elapsed * 2.2) * 0.028;
+          petCompanion.playTimer = 0;
+          petCompanion.playKind = 'none';
+          if (isFly) {
+            petCompanion.x = boatState.x - Math.cos(boatState.rotY) * 1.25;
+            petCompanion.z = boatState.z + Math.sin(boatState.rotY) * 1.25;
+            petCompanion.y = RIVER_WATER_Y + 1.55;
+            petCompanion.rotY = boatState.rotY;
+          } else {
+            petCompanion.x = boatState.x + Math.sin(boatState.rotY) * 0.92;
+            petCompanion.z = boatState.z + Math.cos(boatState.rotY) * 0.92;
+            petCompanion.y = RIVER_WATER_Y + 0.34 + boatBobPet;
+            petCompanion.rotY = boatState.rotY;
+          }
+          petCompanion.rig.root.position.set(petCompanion.x, petCompanion.y, petCompanion.z);
+          petCompanion.rig.root.rotation.y = petCompanion.rotY;
+          updatePetAnimation(petCompanion.rig, isFly ? 'fly' : 'idle', elapsed, {
+            baseScale: companionScale,
+            hoverHeight: 0,
+          });
+        } else if (isRidingMallElevator) {
           petCompanion.playTimer = 0;
           petCompanion.playKind = 'none';
           petCompanion.x = MALL_ELEVATOR_CAB_POS.x + 0.26;
@@ -4824,6 +5484,22 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                   ? 'Xuống Tầng Trệt May Mall'
                   : 'Lên Sân Thượng May Mall (25m)'}
             </span>
+          </button>
+        </div>
+      )}
+
+      {/* Wooden Rowboat Disembark HUD while rowing on the West River */}
+      {zone === 'town' && isBoatingHud && !miniActive && (
+        <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              disembarkBoatActionRef.current?.();
+            }}
+            className="anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 border-[#78421B] bg-[#FFF5E2]/95 px-4 py-2 text-xs font-extrabold text-[#4E2D12] shadow-lg transition-transform hover:scale-105 active:scale-95"
+          >
+            <Anchor className="h-4 w-4 text-[#2E82A8]" />
+            <span>Lên bờ</span>
           </button>
         </div>
       )}

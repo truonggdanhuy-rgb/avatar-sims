@@ -124,14 +124,14 @@ export function createFishingSpotVisuals(options: {
   shadowGroup.visible = false;
 
   const shadowMat = new THREE.MeshBasicMaterial({
-    color: '#072230',
+    color: '#041822',
     transparent: true,
-    opacity: 0.4,
+    opacity: 0.48,
     side: THREE.DoubleSide,
     depthWrite: false,
     polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -1,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
   });
 
   // Streamlined top-down fish silhouette oriented along +Y in 2D -> rotateX(+PI/2) maps +Y to +Z forward!
@@ -153,7 +153,7 @@ export function createFishingSpotVisuals(options: {
   const shadowBodyGeo = new THREE.ShapeGeometry(bodyShape, 12);
   shadowBodyGeo.rotateX(Math.PI / 2);
   const shadowBody = new THREE.Mesh(shadowBodyGeo, shadowMat);
-  shadowBody.renderOrder = 2;
+  shadowBody.renderOrder = 4;
 
   // Flat forked caudal tail fin on pivot behind body (-Z)
   const tailPivot = new THREE.Group();
@@ -169,11 +169,14 @@ export function createFishingSpotVisuals(options: {
   const tailGeo = new THREE.ShapeGeometry(tailShape, 8);
   tailGeo.rotateX(Math.PI / 2);
   const tailMesh = new THREE.Mesh(tailGeo, shadowMat);
-  tailMesh.renderOrder = 2;
+  tailMesh.renderOrder = 4;
   tailPivot.add(tailMesh);
 
   shadowGroup.add(shadowBody, tailPivot);
   group.add(shadowGroup);
+  group.traverse((o) => {
+    o.userData = {...o.userData, isFishingVisual: true};
+  });
 
   let legacyState: 'idle' | 'waiting' | 'bite' = 'idle';
 
@@ -200,10 +203,10 @@ export function createFishingSpotVisuals(options: {
 
     shadowGroup.visible = frame.shadowVisible;
     if (frame.shadowVisible) {
-      shadowGroup.position.set(frame.shadowX, waterY + 0.008, frame.shadowZ);
+      shadowGroup.position.set(frame.shadowX, waterY + 0.012, frame.shadowZ);
       shadowGroup.rotation.y = frame.shadowRotY;
       shadowGroup.scale.set(frame.shadowScale, 1, frame.shadowScale);
-      shadowMat.opacity = frame.shadowOpacity;
+      shadowMat.opacity = Math.min(0.68, frame.shadowOpacity * 1.18);
       tailPivot.rotation.y = Math.sin(elapsed * frame.shadowTailSpeed) * 0.34;
     }
   };

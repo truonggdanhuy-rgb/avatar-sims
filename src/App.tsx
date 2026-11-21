@@ -13,6 +13,7 @@ import {PondModal} from './components/modals/PondModal';
 import {PetAdoptModal} from './components/modals/PetAdoptModal';
 import {PetSupplyShopModal} from './components/modals/PetSupplyShopModal';
 import {SettingsModal} from './components/modals/SettingsModal';
+import {ShipShopModal} from './components/modals/ShipShopModal';
 import {WardrobeModal} from './components/modals/WardrobeModal';
 import {KoiShopModal} from './components/modals/KoiShopModal';
 import {WorldCanvas} from './components/WorldCanvas';
@@ -33,10 +34,12 @@ import {
   computeFishSellPrice,
   createInitialFishDex,
   createInitialFishingRod,
+  createInitialWoodenBoat,
   getRodRepairCost,
   RIVER_FISH_CATALOG,
   rollRandomRiverFish,
   rollRodDurabilityLoss,
+  WOODEN_BOAT_PRICE,
   WOODEN_ROD_MAX_DURABILITY,
   WOODEN_ROD_PRICE,
 } from './data/fishingCatalog';
@@ -133,6 +136,7 @@ import {
   ShopItem,
   TimeOfDay,
   WellWaterState,
+  WoodenBoatState,
   ZoneId,
 } from './types/game';
 import {finalizePlayerName, sanitizePlayerNameInput} from './utils/playerName';
@@ -322,10 +326,11 @@ export default function App() {
   const [pondOpen, setPondOpen] = useState(false);
   const [farmShopOpen, setFarmShopOpen] = useState(false);
   const [koiShopOpen, setKoiShopOpen] = useState(false);
+  const [shipShopOpen, setShipShopOpen] = useState(false);
   const [petSupplyShopOpen, setPetSupplyShopOpen] = useState(false);
   const [petAdoptOpen, setPetAdoptOpen] = useState(false);
   const [phoneInitialTab, setPhoneInitialTab] = useState<'menu' | 'guide' | 'bag' | 'fishdex'>('menu');
-  const [phoneBagSubTab, setPhoneBagSubTab] = useState<'list' | 'tools' | 'pets' | 'mounts'>('list');
+  const [phoneBagSubTab, setPhoneBagSubTab] = useState<'list' | 'tools' | 'pets' | 'boats' | 'mounts'>('list');
   const [nearPond, setNearPond] = useState(false);
   const [pondFeedPulse, setPondFeedPulse] = useState(0);
   const [farmPondFishPulse, setFarmPondFishPulse] = useState(0);
@@ -815,6 +820,27 @@ export default function App() {
   });
   const fishingRodRef = useRef(fishingRod);
   fishingRodRef.current = fishingRod;
+
+  const [woodenBoat, setWoodenBoat] = useState<WoodenBoatState>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.woodenBoat && typeof parsed.woodenBoat === 'object') {
+          return {
+            owned: Boolean(parsed.woodenBoat.owned),
+            purchasedAt:
+              typeof parsed.woodenBoat.purchasedAt === 'number'
+                ? parsed.woodenBoat.purchasedAt
+                : null,
+          };
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return createInitialWoodenBoat();
+  });
 
   const [fishBasket, setFishBasket] = useState<CaughtFishItem[]>(() => {
     try {
@@ -1425,6 +1451,7 @@ export default function App() {
           placedFurniture,
           furnitureInventory,
           fishingRod,
+          woodenBoat,
           fishBasket,
           fishDex,
           bugNet,
@@ -1464,6 +1491,7 @@ export default function App() {
     placedFurniture,
     furnitureInventory,
     fishingRod,
+    woodenBoat,
     fishBasket,
     fishDex,
     bugNet,
@@ -1494,6 +1522,9 @@ export default function App() {
       setPastureCoop(null);
       setPondOpen(false);
       setFarmShopOpen(false);
+    }
+    if (next !== 'town') {
+      setShipShopOpen(false);
     }
     if (next !== 'petshop') {
       setPetSupplyShopOpen(false);
@@ -2199,6 +2230,20 @@ export default function App() {
       equipped: false,
       durability: WOODEN_ROD_MAX_DURABILITY,
       maxDurability: WOODEN_ROD_MAX_DURABILITY,
+    });
+  };
+
+  const handleBuyWoodenBoat = () => {
+    if (woodenBoat.owned || stats.coins < WOODEN_BOAT_PRICE) return;
+    soundFX.sparkle();
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - WOODEN_BOAT_PRICE,
+      mood: Math.min(100, prev.mood + 8),
+    }));
+    setWoodenBoat({
+      owned: true,
+      purchasedAt: Date.now(),
     });
   };
 
@@ -2958,6 +3003,7 @@ export default function App() {
         pondFeedPulse={pondFeedPulse}
         farmPondFishPulse={farmPondFishPulse}
         fishingRod={fishingRod}
+        woodenBoat={woodenBoat}
         bugNet={bugNet}
         seeds={farmInventory.seeds}
         bugSprayCount={farmInventory.supplies.bugSpray}
@@ -2969,6 +3015,7 @@ export default function App() {
         homeSpotRef={homeSpotRef}
         showJoystick={showJoystick}
         showJumpButton={showJumpButton}
+        onEnableJoystick={() => setShowJoystick(true)}
         teleportToPlazaPulse={teleportToPlazaPulse}
         activePet={activePet}
         carriedPetId={effectiveCarriedPetId}
@@ -2977,6 +3024,7 @@ export default function App() {
         onOpenWardrobe={() => setWardrobeOpen(true)}
         onOpenShop={() => setBoutiqueOpen(true)}
         onOpenKoiShop={() => setKoiShopOpen(true)}
+        onOpenShipShop={() => setShipShopOpen(true)}
         onOpenFurnitureShop={() => setFurnitureShopOpen(true)}
         onOpenPetSupplyShop={() => setPetSupplyShopOpen(true)}
         onOpenPetAdopt={() => setPetAdoptOpen(true)}
@@ -3167,6 +3215,21 @@ export default function App() {
         />
       )}
 
+      {zone === 'town' && shipShopOpen && (
+        <ShipShopModal
+          coins={stats.coins}
+          woodenBoat={woodenBoat}
+          onBuyBoat={handleBuyWoodenBoat}
+          onOpenBagBoats={() => {
+            setShipShopOpen(false);
+            setPhoneInitialTab('bag');
+            setPhoneBagSubTab('boats');
+            setPhoneOpen(true);
+          }}
+          onClose={() => setShipShopOpen(false)}
+        />
+      )}
+
       {boutiqueOpen && (
         <BoutiqueModal
           avatar={avatar}
@@ -3208,6 +3271,7 @@ export default function App() {
           storageCapacity={storageCapacity}
           fishingRod={fishingRod}
           bugNet={bugNet}
+          woodenBoat={woodenBoat}
           fishDex={fishDex}
           insectDex={insectDex}
           ownedPets={ownedPets}
