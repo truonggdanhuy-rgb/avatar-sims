@@ -1760,11 +1760,27 @@ export function buildTownScene(): TownWorld {
     const wmFinial = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), goldAccentMat);
     wmFinial.position.y = 5.5;
 
-    // Rotating 4-blade Wooden & Cream Canvas Sail Hub
+    // Projecting Wooden Nacelle Housing so spinning sails stay completely clear of roof & tower
+    const wmNacelle = new THREE.Mesh(
+      new RoundedBoxGeometry(0.58, 0.52, 0.88, 2, 0.08),
+      getMat('#8A5A36', 0.74),
+    );
+    wmNacelle.position.set(0, 3.76, 1.28);
+    const wmNacelleCap = new THREE.Mesh(
+      new RoundedBoxGeometry(0.66, 0.14, 0.96, 2, 0.04),
+      getMat('#C8664D', 0.62),
+    );
+    wmNacelleCap.position.set(0, 4.04, 1.28);
+
+    // Rotating 4-blade Wooden & Cream Canvas Sail Hub positioned cleanly in front of nacelle
     const sailHub = new THREE.Group();
-    sailHub.position.set(0, 3.72, 1.18);
-    const hubCap = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.36, 10), getMat('#6E4427', 0.7));
+    sailHub.position.set(0, 3.76, 1.82);
+    const hubCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.21, 0.25, 0.36, 12),
+      getMat('#6E4427', 0.7),
+    );
     hubCap.rotation.x = Math.PI / 2;
+    hubCap.position.z = -0.02;
     sailHub.add(hubCap);
 
     const sparMat = getMat('#8A5A36', 0.74);
@@ -1772,24 +1788,36 @@ export function buildTownScene(): TownWorld {
     for (let b = 0; b < 4; b++) {
       const arm = new THREE.Group();
       arm.rotation.z = (b * Math.PI) / 2 + 0.35;
-      const spar = new THREE.Mesh(new RoundedBoxGeometry(0.11, 2.35, 0.08, 2, 0.02), sparMat);
-      spar.position.y = 1.18;
+      const spar = new THREE.Mesh(new RoundedBoxGeometry(0.11, 2.24, 0.08, 2, 0.02), sparMat);
+      spar.position.set(0, 1.14, 0.06);
       const canvasBlade = new THREE.Mesh(
-        new RoundedBoxGeometry(0.54, 1.72, 0.03, 2, 0.02),
+        new RoundedBoxGeometry(0.52, 1.66, 0.03, 2, 0.02),
         sailMat,
       );
-      canvasBlade.position.set(0.29, 1.4, 0.02);
-      canvasBlade.rotation.y = 0.16;
-      const crossRung = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.05, 0.05), sparMat);
-      crossRung.position.set(0.29, 0.85, 0.03);
+      canvasBlade.position.set(0.28, 1.36, 0.08);
+      canvasBlade.rotation.y = 0.14;
+      const crossRung = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.05, 0.05), sparMat);
+      crossRung.position.set(0.28, 0.84, 0.09);
       const crossRung2 = crossRung.clone();
-      crossRung2.position.y = 1.75;
+      crossRung2.position.y = 1.72;
       arm.add(spar, canvasBlade, crossRung, crossRung2);
       sailHub.add(arm);
     }
     windmillSailHub = sailHub;
 
-    windmill.add(wmPlinth, wmTower, wmBand1, wmBand2, wmDoor, wmWin, wmRoof, wmFinial, sailHub);
+    windmill.add(
+      wmPlinth,
+      wmTower,
+      wmBand1,
+      wmBand2,
+      wmDoor,
+      wmWin,
+      wmRoof,
+      wmFinial,
+      wmNacelle,
+      wmNacelleCap,
+      sailHub,
+    );
     addInteractionProxy(
       windmill,
       [3.0, 5.4, 3.0],
@@ -1989,77 +2017,109 @@ export function buildTownScene(): TownWorld {
 
     // Upper Crown Cornice (y = 5.08)
     const upperCornice = new THREE.Mesh(
-      new RoundedBoxGeometry(4.46, 0.22, 3.42, 2, 0.05),
+      new RoundedBoxGeometry(4.46, 0.22, 3.42, 3, 0.08),
       pilasterMat,
     );
     upperCornice.position.y = 5.08;
 
-    // 4. True Tapered Sloped Parisian Mansard Roof + Gable Clock Pediment + Golden Cupola Crown (up to ~11.5m world!)
-    const mansardSlope = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.62, 2.65, 1.18, 4),
+    // 4. Smooth Beveled Château / Castle Boutique Crown + Twin Cylindrical Corner Turrets
+    const castleRoofTier1 = new THREE.Mesh(
+      new RoundedBoxGeometry(4.28, 0.56, 3.24, 5, 0.24),
       mansardMat,
     );
-    mansardSlope.rotation.y = Math.PI / 4;
-    mansardSlope.scale.set(1.16, 1, 0.89);
-    mansardSlope.position.y = 5.76;
+    castleRoofTier1.position.y = 5.42;
 
-    const mansardDeck = new THREE.Mesh(
-      new RoundedBoxGeometry(2.68, 0.16, 2.04, 2, 0.04),
+    const castleRoofTier2 = new THREE.Mesh(
+      new RoundedBoxGeometry(3.64, 0.56, 2.66, 5, 0.25),
+      mansardMat,
+    );
+    castleRoofTier2.position.y = 5.84;
+
+    const castleRoofCap = new THREE.Mesh(
+      new RoundedBoxGeometry(2.76, 0.34, 1.92, 4, 0.15),
       roofTrimMat,
     );
-    mansardDeck.position.y = 6.38;
+    castleRoofCap.position.y = 6.2;
 
-    // Central Ornate Gable Pediment + Sculpted 3D Gold Ribbon Bow Crest
-    const gableBack = new THREE.Mesh(
-      new RoundedBoxGeometry(1.24, 1.02, 0.56, 2, 0.08),
-      pilasterMat,
+    const castleCrestTrim = new THREE.Mesh(
+      new RoundedBoxGeometry(2.34, 0.12, 1.54, 3, 0.05),
+      goldMat,
     );
-    gableBack.position.set(0, 5.66, 1.44);
-    const gableCap = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.68, 0.68, 0.62, 16, 1, false, 0, Math.PI),
-      roofTrimMat,
-    );
-    gableCap.rotation.x = Math.PI / 2;
-    gableCap.rotation.z = Math.PI / 2;
-    gableCap.position.set(0, 6.14, 1.46);
+    castleCrestTrim.position.y = 6.38;
 
-    const bowCenter = new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 10), goldMat);
-    bowCenter.position.set(0, 5.72, 1.78);
-    [-0.35, 0.35].forEach((bx, idx) => {
-      const wing = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.56, 10), goldMat);
-      wing.rotation.z = idx === 0 ? -Math.PI / 2 : Math.PI / 2;
-      wing.position.set(bx, 5.72, 1.78);
-      shop.add(wing);
-    });
-
-    // Flanking Cute Mansard Dormer Windows
-    [-1.12, 1.12].forEach((dx) => {
-      const dormerBox = new THREE.Mesh(
-        new RoundedBoxGeometry(0.56, 0.62, 0.44, 2, 0.05),
+    // Twin Smooth Cylindrical Corner Castle Turrets framing the facade
+    [-1.84, 1.84].forEach((tx) => {
+      const turretDrum = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.41, 0.44, 0.98, 24),
         pilasterMat,
       );
-      dormerBox.position.set(dx, 5.62, 1.38);
-      const dormerWin = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.4, 0.08), makeWinMat());
-      dormerWin.position.set(dx, 5.6, 1.6);
-      const dormerCap = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.34, 4), roofTrimMat);
-      dormerCap.rotation.y = Math.PI / 4;
-      dormerCap.position.set(dx, 6.06, 1.38);
-      shop.add(dormerBox, dormerWin, dormerCap);
+      turretDrum.position.set(tx, 5.62, 1.32);
+
+      const turretCollar = new THREE.Mesh(
+        new THREE.TorusGeometry(0.44, 0.05, 10, 24),
+        pilasterMat,
+      );
+      turretCollar.rotation.x = Math.PI / 2;
+      turretCollar.position.set(tx, 6.1, 1.32);
+
+      const turretWin = new THREE.Mesh(
+        new RoundedBoxGeometry(0.22, 0.34, 0.1, 2, 0.04),
+        makeWinMat(),
+      );
+      turretWin.position.set(tx, 5.62, 1.72);
+
+      const turretSpire = new THREE.Mesh(
+        new THREE.ConeGeometry(0.53, 0.96, 24),
+        mansardMat,
+      );
+      turretSpire.position.set(tx, 6.58, 1.32);
+
+      const turretFinial = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 10), goldMat);
+      turretFinial.position.set(tx, 7.1, 1.32);
+
+      shop.add(turretDrum, turretCollar, turretWin, turretSpire, turretFinial);
     });
 
-    // Sculpted Gold Cupola Spire Crown on Mansard Peak
-    const cupolaBase = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.46, 0.58, 0.24, 12),
+    // Clean Central Château Arched Dormer + Boutique Crest Medallion
+    const castleGable = new THREE.Mesh(
+      new RoundedBoxGeometry(1.18, 0.88, 0.62, 4, 0.14),
       pilasterMat,
     );
-    cupolaBase.position.y = 6.54;
-    const cupolaDome = new THREE.Mesh(
-      new THREE.SphereGeometry(0.42, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.6),
+    castleGable.position.set(0, 5.56, 1.44);
+    const castleGableArch = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.56, 0.56, 0.66, 24, 1, false, 0, Math.PI),
       roofTrimMat,
     );
-    cupolaDome.position.y = 6.62;
-    const cupolaFinial = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 10), goldMat);
-    cupolaFinial.position.y = 7.08;
+    castleGableArch.rotation.x = Math.PI / 2;
+    castleGableArch.rotation.z = Math.PI / 2;
+    castleGableArch.position.set(0, 5.92, 1.44);
+    const castleGableWin = new THREE.Mesh(
+      new RoundedBoxGeometry(0.66, 0.58, 0.08, 3, 0.06),
+      makeWinMat(),
+    );
+    castleGableWin.position.set(0, 5.54, 1.74);
+    const castleMedallion = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.18, 0.07, 18),
+      goldMat,
+    );
+    castleMedallion.rotation.x = Math.PI / 2;
+    castleMedallion.position.set(0, 6.06, 1.78);
+
+    // Central Rounded Château Lantern Dome
+    const cupolaBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5, 0.56, 0.42, 24),
+      pilasterMat,
+    );
+    cupolaBase.position.set(0, 6.56, -0.05);
+    const cupolaDome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.52, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.58),
+      mansardMat,
+    );
+    cupolaDome.position.set(0, 6.72, -0.05);
+    const cupolaSpire = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.3, 16), goldMat);
+    cupolaSpire.position.set(0, 7.34, -0.05);
+    const cupolaFinial = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 10), goldMat);
+    cupolaFinial.position.set(0, 7.5, -0.05);
 
     // Partial dainty picket fence wings beside the boutique porch
     const shopFenceMat = getMat('#FFFDF7', 0.72);
@@ -2080,10 +2140,14 @@ export function buildTownScene(): TownWorld {
       cornice,
       upperBody,
       upperCornice,
-      mansardSlope,
-      mansardDeck,
-      gableBack,
-      gableCap,
+      castleRoofTier1,
+      castleRoofTier2,
+      castleRoofCap,
+      castleCrestTrim,
+      castleGable,
+      castleGableArch,
+      castleGableWin,
+      castleMedallion,
       showWinFrame,
       showWin,
       dress1,
@@ -2091,9 +2155,9 @@ export function buildTownScene(): TownWorld {
       doorFrame,
       door,
       doorArch,
-      bowCenter,
       cupolaBase,
       cupolaDome,
+      cupolaSpire,
       cupolaFinial,
       sFenceL,
       sFenceLSide,
@@ -2568,15 +2632,16 @@ export function buildTownScene(): TownWorld {
     );
     signPlinthBeam.position.set(0, 5.9, 1.15);
     const signBackArch = new THREE.Mesh(
-      new RoundedBoxGeometry(4.62, 1.48, 0.18, 3, 0.08),
+      new RoundedBoxGeometry(4.62, 1.48, 0.22, 3, 0.08),
       trimIndigoMat,
     );
-    signBackArch.position.set(0, 6.68, 0.96);
+    signBackArch.position.set(0, 6.68, 1.0);
     const signArchNeon = new THREE.Mesh(
-      new RoundedBoxGeometry(4.74, 1.56, 0.1, 3, 0.08),
+      new RoundedBoxGeometry(4.78, 1.62, 0.09, 3, 0.04),
       tealNeonMat,
     );
-    signArchNeon.position.set(0, 6.68, 0.92);
+    // Offset cleanly inside signBackArch Z-thickness [0.89..1.11] so no coplanar faces cause rear Z-fighting
+    signArchNeon.position.set(0, 6.68, 0.97);
     arcade.add(signPlinthBeam, signBackArch, signArchNeon);
 
     [-1.95, -0.65, 0.65, 1.95].forEach((sx) => {
@@ -4045,14 +4110,23 @@ export function buildTownScene(): TownWorld {
       mallStatic.add(slat, slatR);
     }
 
-    // Polished Main East Mall Entrance Door & Glowing Lobby Portal (at z = -6.5)
+    // Polished Main East Mall Entrance Door & Glowing Lobby Portal (at z = -6.5, clean non-overlapping layers)
     const lobbyGlowMat = new THREE.MeshStandardMaterial({
-      color: '#FFF1D4',
-      emissive: '#FFD088',
-      emissiveIntensity: 0.48,
-      roughness: 0.4,
+      color: '#F5DFB8',
+      emissive: '#F2B863',
+      emissiveIntensity: 0.26,
+      roughness: 0.85,
+      metalness: 0,
     });
     lampBulbs.push(lobbyGlowMat);
+    const doorTintGlassMat = new THREE.MeshStandardMaterial({
+      color: '#7BB6D4',
+      roughness: 0.55,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.36,
+    });
+
     const canopy = new THREE.Mesh(
       new RoundedBoxGeometry(2.55, 0.28, 4.4, 2, 0.05),
       silverSteelMat,
@@ -4063,31 +4137,61 @@ export function buildTownScene(): TownWorld {
       goldAccentMat,
     );
     canopyGoldTrim.position.set(-47.82, 3.53, -6.5);
-    const doorPortalFrame = new THREE.Mesh(
-      new RoundedBoxGeometry(0.32, 3.05, 3.16, 2, 0.05),
+
+    // Outer Champagne Portal Jambs + Lintel (open center so nothing overlaps door glass!)
+    const portalJambL = new THREE.Mesh(
+      new RoundedBoxGeometry(0.28, 3.04, 0.32, 2, 0.04),
       champagneMat,
     );
-    doorPortalFrame.position.set(-48.92, 1.72, -6.5);
-    const doorFrame = new THREE.Mesh(
-      new RoundedBoxGeometry(0.26, 2.86, 2.82, 2, 0.04),
+    portalJambL.position.set(-48.88, 1.72, -7.96);
+    const portalJambR = portalJambL.clone();
+    portalJambR.position.z = -5.04;
+    const portalLintel = new THREE.Mesh(
+      new RoundedBoxGeometry(0.32, 0.34, 3.24, 2, 0.04),
+      champagneMat,
+    );
+    portalLintel.position.set(-48.88, 3.16, -6.5);
+
+    // Inner Dark-Steel Door Frame Jambs + Header + Threshold Sill
+    const doorJambL = new THREE.Mesh(
+      new RoundedBoxGeometry(0.22, 2.74, 0.16, 2, 0.03),
       darkSteelMat,
     );
-    doorFrame.position.set(-48.88, 1.66, -6.5);
+    doorJambL.position.set(-48.86, 1.58, -7.72);
+    const doorJambR = doorJambL.clone();
+    doorJambR.position.z = -5.28;
+    const doorHeader = new THREE.Mesh(
+      new RoundedBoxGeometry(0.24, 0.22, 2.66, 2, 0.03),
+      darkSteelMat,
+    );
+    doorHeader.position.set(-48.86, 2.9, -6.5);
+    const doorSill = new THREE.Mesh(
+      new RoundedBoxGeometry(0.38, 0.08, 2.86, 2, 0.02),
+      champagneMat,
+    );
+    doorSill.position.set(-48.82, 0.24, -6.5);
+
+    // Matte Warm Interior Lobby Backdrop cleanly in front of podium wall (x = -49.00)
     const doorWarmLobby = new THREE.Mesh(
-      new THREE.BoxGeometry(0.14, 2.56, 2.48),
+      new THREE.BoxGeometry(0.06, 2.54, 2.34),
       lobbyGlowMat,
     );
-    doorWarmLobby.position.set(-48.93, 1.6, -6.5);
-    const doorGlass = new THREE.Mesh(
-      new THREE.BoxGeometry(0.16, 2.58, 2.48),
-      skyGlassMat,
-    );
-    doorGlass.position.set(-48.83, 1.6, -6.5);
-    const doorMullion = new THREE.Mesh(new THREE.BoxGeometry(0.24, 2.6, 0.08), silverSteelMat);
-    doorMullion.position.set(-48.82, 1.6, -6.5);
-    [-6.26, -6.74].forEach((hz) => {
-      const dHandle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.48, 0.06), goldAccentMat);
-      dHandle.position.set(-48.7, 1.42, hz);
+    doorWarmLobby.position.set(-48.94, 1.54, -6.5);
+
+    // Two Distinct Semi-Transparent Tinted Glass Door Leaves cleanly forward of backdrop
+    [-7.08, -5.92].forEach((leafZ) => {
+      const glassLeaf = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 2.5, 1.1),
+        doorTintGlassMat,
+      );
+      glassLeaf.position.set(-48.8, 1.53, leafZ);
+      mallStatic.add(glassLeaf);
+    });
+    const doorMullion = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.56, 0.08), silverSteelMat);
+    doorMullion.position.set(-48.79, 1.54, -6.5);
+    [-6.3, -6.7].forEach((hz) => {
+      const dHandle = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.52, 0.055), goldAccentMat);
+      dHandle.position.set(-48.72, 1.42, hz);
       mallStatic.add(dHandle);
     });
     // Flanking Mall Entrance Topiary Planters
@@ -4107,10 +4211,14 @@ export function buildTownScene(): TownWorld {
     mallStatic.add(
       canopy,
       canopyGoldTrim,
-      doorPortalFrame,
-      doorFrame,
+      portalJambL,
+      portalJambR,
+      portalLintel,
+      doorJambL,
+      doorJambR,
+      doorHeader,
+      doorSill,
       doorWarmLobby,
-      doorGlass,
       doorMullion,
     );
 
@@ -4457,27 +4565,27 @@ export function buildTownScene(): TownWorld {
       tblRim.position.y = 0.74;
       cafeGroup.add(tblBase, tblStem, tblTop, tblRim);
 
-      // Tall Striped Sun Umbrella (Dù che) rising cleanly above seated head height
+      // Tall Striped Sun Umbrella (Dù che) raised spaciously above standing head height
       const poleMat = champagneMat;
       const umbrellaPole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.032, 0.038, 1.72, 10),
+        new THREE.CylinderGeometry(0.032, 0.038, 2.28, 10),
         poleMat,
       );
-      umbrellaPole.position.y = 1.62;
+      umbrellaPole.position.y = 1.9;
       cafeGroup.add(umbrellaPole);
 
-      const UMB_Y = 2.42;
+      const UMB_Y = 2.98;
       const canopyAquaMat = getMat('#4BA8C8', 0.52);
       const canopyCreamMat = getMat('#FFFDF7', 0.56);
       const umbBaseCanopy = new THREE.Mesh(
-        new THREE.ConeGeometry(1.42, 0.44, 8),
+        new THREE.ConeGeometry(1.48, 0.44, 8),
         canopyCreamMat,
       );
       umbBaseCanopy.position.y = UMB_Y;
       cafeGroup.add(umbBaseCanopy);
       for (let w = 0; w < 4; w++) {
         const wedge = new THREE.Mesh(
-          new THREE.ConeGeometry(1.435, 0.442, 2, 1, false, 0, Math.PI / 4),
+          new THREE.ConeGeometry(1.495, 0.442, 2, 1, false, 0, Math.PI / 4),
           canopyAquaMat,
         );
         wedge.rotation.y = (w / 4) * Math.PI * 2;
@@ -4485,7 +4593,7 @@ export function buildTownScene(): TownWorld {
         cafeGroup.add(wedge);
       }
       const umbTrimRing = new THREE.Mesh(
-        new THREE.TorusGeometry(1.42, 0.032, 6, 16),
+        new THREE.TorusGeometry(1.48, 0.032, 6, 16),
         goldAccentMat,
       );
       umbTrimRing.rotation.x = Math.PI / 2;
