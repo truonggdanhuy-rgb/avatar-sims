@@ -1,5 +1,5 @@
 import React from 'react';
-import {RiverFishSpeciesId} from '../types/game';
+import {FishSpeciesId} from '../types/game';
 
 /**
  * Combined icon showing 1 wooden fishing rod + 1 bug net together (Cần & Vợt)
@@ -364,13 +364,13 @@ export function WoodenBoatIcon({className = 'w-11 h-11'}: {className?: string}) 
 }
 
 /**
- * Custom recognizable illustration for each of the 8 River Fish species
+ * Custom recognizable illustration for all River Fish & Sea Creatures
  */
 export function FishIllustration({
   speciesId,
   className = 'w-11 h-11',
 }: {
-  speciesId: RiverFishSpeciesId;
+  speciesId: FishSpeciesId;
   className?: string;
 }) {
   switch (speciesId) {
@@ -612,6 +612,239 @@ export function FishIllustration({
           <path d="M10 36L8 41M13 36.5L12 41" stroke="#475A66" strokeWidth="1.6" strokeLinecap="round" />
           <circle cx="17" cy="31.5" r="2.1" fill="#FFFDF5" />
           <circle cx="16.6" cy="31.5" r="1.1" fill="#1E293B" />
+        </svg>
+      );
+
+    case 'ca_he':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Clownfish vibrant orange body & white bands */}
+          <path d="M24 22 C29 14 39 15 41 24 Z" fill="#FF7B33" stroke="#8C3308" strokeWidth="2" strokeLinejoin="round" />
+          <ellipse cx="32" cy="34" rx="16.5" ry="11.5" fill="#FF7B33" stroke="#8C3308" strokeWidth="2.3" />
+          <path d="M47 34 L57 25 V43 Z" fill="#FF8C47" stroke="#8C3308" strokeWidth="2" strokeLinejoin="round" />
+          <path d="M25 23.5 C27 30 27 38 25 44.5" stroke="#FFFFFF" strokeWidth="4.6" strokeLinecap="round" />
+          <path d="M36 22.8 C38 30 38 38 36 45.2" stroke="#FFFFFF" strokeWidth="4.2" strokeLinecap="round" />
+          <path d="M25 23.5 C27 30 27 38 25 44.5 M36 22.8 C38 30 38 38 36 45.2" stroke="#2D1B10" strokeWidth="1.1" strokeLinecap="round" strokeDasharray="1 0" opacity="0.4" />
+          <ellipse cx="31" cy="38" rx="4.2" ry="2.8" fill="#FFA45B" stroke="#8C3308" strokeWidth="1.4" />
+          <circle cx="19.5" cy="31.5" r="2.6" fill="#FFFFFF" stroke="#8C3308" strokeWidth="1.2" />
+          <circle cx="19" cy="31.5" r="1.4" fill="#1E293B" />
+        </svg>
+      );
+
+    case 'sua_bien':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Trailing translucent tentacles */}
+          <path d="M22 33 Q19 43 23 53" stroke="#FF8EC7" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M29 34 Q27 45 30 56" stroke="#D58CFF" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M36 34 Q38 45 34 55" stroke="#FF8EC7" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M42 33 Q45 43 41 52" stroke="#D58CFF" strokeWidth="2.4" strokeLinecap="round" />
+          {/* Glowing pastel dome */}
+          <path
+            d="M15 32 C15 16 49 16 49 32 C44 35 38 32 32 34 C26 32 20 35 15 32 Z"
+            fill="#FFB5E0"
+            stroke="#A83C7D"
+            strokeWidth="2.3"
+            strokeLinejoin="round"
+          />
+          <path d="M22 25 C25 19 36 18 41 24" stroke="#FFF2FA" strokeWidth="2.8" strokeLinecap="round" />
+          <circle cx="26" cy="28" r="1.6" fill="#FFF2FA" />
+          <circle cx="38" cy="27" r="1.4" fill="#FFF2FA" />
+        </svg>
+      );
+
+    case 'sao_bien':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Plump coral sea star */}
+          <path
+            d="M32 10 L38.6 24.4 L54.5 26.2 L42.6 36.8 L46.2 52.5 L32 44.2 L17.8 52.5 L21.4 36.8 L9.5 26.2 L25.4 24.4 Z"
+            fill="#FF8663"
+            stroke="#9E3C20"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+          />
+          <circle cx="32" cy="33" r="4" fill="#FFBE9D" />
+          <circle cx="32" cy="20" r="1.7" fill="#FFE0CF" />
+          <circle cx="21" cy="29" r="1.7" fill="#FFE0CF" />
+          <circle cx="43" cy="29" r="1.7" fill="#FFE0CF" />
+          <circle cx="24" cy="43" r="1.7" fill="#FFE0CF" />
+          <circle cx="40" cy="43" r="1.7" fill="#FFE0CF" />
+        </svg>
+      );
+
+    case 'ca_noc_gai':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Outer spikes */}
+          <path d="M32 12 L34 18 M45 16 L41 21 M52 29 L46 31 M48 44 L42 41 M32 52 L32 46 M18 46 L22 41 M12 31 L18 32 M18 18 L22 22" stroke="#8C6726" strokeWidth="2.4" strokeLinecap="round" />
+          {/* Chubby puffer body */}
+          <circle cx="32" cy="32" r="14.5" fill="#FBE18D" stroke="#8C6726" strokeWidth="2.4" />
+          <path d="M46 32 L56 26 V38 Z" fill="#E8C25B" stroke="#8C6726" strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M21 39 C26 45 38 45 43 39" fill="#FFFDF2" />
+          <circle cx="24" cy="29" r="2.7" fill="#FFFFFF" stroke="#8C6726" strokeWidth="1.2" />
+          <circle cx="23.5" cy="29" r="1.5" fill="#1E293B" />
+          <circle cx="21" cy="35" r="1.6" fill="#F4978E" />
+          <circle cx="37" cy="25" r="1.6" fill="#C49A45" />
+          <circle cx="40" cy="32" r="1.8" fill="#C49A45" />
+        </svg>
+      );
+
+    case 'bach_tuoc':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Wavy tentacles */}
+          <path d="M22 36 Q14 44 16 52" stroke="#E96B5E" strokeWidth="4" strokeLinecap="round" />
+          <path d="M27 38 Q23 48 26 55" stroke="#E96B5E" strokeWidth="4" strokeLinecap="round" />
+          <path d="M37 38 Q41 48 38 55" stroke="#E96B5E" strokeWidth="4" strokeLinecap="round" />
+          <path d="M42 36 Q50 44 48 52" stroke="#E96B5E" strokeWidth="4" strokeLinecap="round" />
+          {/* Octopus dome head */}
+          <ellipse cx="32" cy="26" rx="14.5" ry="13.5" fill="#F27669" stroke="#8C2F27" strokeWidth="2.4" />
+          <ellipse cx="26" cy="19" rx="4" ry="2.2" transform="rotate(-25 26 19)" fill="#FFB3AA" />
+          <circle cx="26.5" cy="29" r="2.7" fill="#FFFFFF" stroke="#8C2F27" strokeWidth="1.2" />
+          <circle cx="26.5" cy="29" r="1.5" fill="#1E293B" />
+          <circle cx="37.5" cy="29" r="2.7" fill="#FFFFFF" stroke="#8C2F27" strokeWidth="1.2" />
+          <circle cx="37.5" cy="29" r="1.5" fill="#1E293B" />
+          <path d="M30 33 Q32 35 34 33" stroke="#8C2F27" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'ca_thu_xanh':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Fast mackerel streamlined body */}
+          <path d="M27 21 L35 16 L37 22 Z" fill="#3E759D" stroke="#1E4563" strokeWidth="1.8" />
+          <path d="M8 33 C17 23 39 22 50 31 L58 23 L54 33 L58 43 L50 35 C39 43 17 42 8 33 Z" fill="#529AC7" stroke="#1E4563" strokeWidth="2.3" strokeLinejoin="round" />
+          <path d="M14 35 C23 40 38 40 48 34" fill="#E6F4FA" />
+          <path d="M22 27 L25 32 M28 26 L31 32 M34 26 L37 32 M40 27 L42 32" stroke="#1E4563" strokeWidth="1.9" strokeLinecap="round" />
+          <circle cx="15" cy="31" r="2.3" fill="#FFFFFF" stroke="#1E4563" strokeWidth="1.2" />
+          <circle cx="14.5" cy="31" r="1.2" fill="#0F172A" />
+        </svg>
+      );
+
+    case 'ca_ngua':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Cute golden seahorse */}
+          <path
+            d="M27 16 C28 11 37 11 39 17 C41 21 37 25 39 30 C42 35 40 42 35 45 C31 48 33 53 38 52 C41 51 41 47 38 47"
+            fill="#F9C74F"
+            stroke="#946511"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d="M27 17 L18 19 L25 22 Z" fill="#F9C74F" stroke="#946511" strokeWidth="2.1" strokeLinejoin="round" />
+          <path d="M39 24 L46 21 L45 29 Z" fill="#FFE18A" stroke="#946511" strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M30 28 H37 M29 33 H37 M30 38 H36" stroke="#D99B26" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="30.5" cy="17.5" r="2.2" fill="#FFFFFF" stroke="#946511" strokeWidth="1.1" />
+          <circle cx="30" cy="17.5" r="1.1" fill="#1E293B" />
+        </svg>
+      );
+
+    case 'tom_hum_do':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Giant lobster claws */}
+          <path d="M22 25 C12 18 8 22 14 28 C16 29 19 28 22 27" fill="#EA4C3B" stroke="#851E15" strokeWidth="2.2" strokeLinejoin="round" />
+          <path d="M22 39 C12 46 8 42 14 36 C16 35 19 36 22 37" fill="#EA4C3B" stroke="#851E15" strokeWidth="2.2" strokeLinejoin="round" />
+          <path d="M23 23 Q10 11 5 14 M23 41 Q10 53 5 50" stroke="#EA4C3B" strokeWidth="1.6" strokeLinecap="round" />
+          {/* Segmented red tail & body */}
+          <ellipse cx="32" cy="32" rx="12" ry="8" fill="#E63928" stroke="#851E15" strokeWidth="2.3" />
+          <path d="M41 26 L53 27 L58 23 L55 32 L58 41 L53 37 L41 38 Z" fill="#D12D1D" stroke="#851E15" strokeWidth="2.1" strokeLinejoin="round" />
+          <path d="M38 26 V38 M44 26.5 V37.5 M49 27 V37" stroke="#851E15" strokeWidth="1.8" />
+          <circle cx="24" cy="29.5" r="1.9" fill="#1E293B" />
+          <circle cx="24" cy="34.5" r="1.9" fill="#1E293B" />
+        </svg>
+      );
+
+    case 'ca_duoi_dom':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Blue-spotted stingray */}
+          <path d="M44 36 Q52 46 57 53" stroke="#2D6D8C" strokeWidth="2.8" strokeLinecap="round" />
+          <path
+            d="M15 28 C21 15 39 14 48 25 C53 31 50 41 39 42 C29 44 12 40 15 28 Z"
+            fill="#6EB8D9"
+            stroke="#225570"
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+          />
+          <circle cx="25" cy="26" r="2.2" fill="#2494C7" />
+          <circle cx="34" cy="24" r="2.4" fill="#2494C7" />
+          <circle cx="41" cy="30" r="2.1" fill="#2494C7" />
+          <circle cx="29" cy="34" r="2.2" fill="#2494C7" />
+          <circle cx="37" cy="36" r="1.8" fill="#2494C7" />
+          <circle cx="22" cy="30" r="2.1" fill="#FFFFFF" stroke="#225570" strokeWidth="1.1" />
+          <circle cx="21.5" cy="30" r="1.1" fill="#0F172A" />
+        </svg>
+      );
+
+    case 'rua_bien':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Front & rear flippers */}
+          <path d="M23 22 C17 12 24 10 29 20 Z" fill="#70C27E" stroke="#2A6B39" strokeWidth="2.1" strokeLinejoin="round" />
+          <path d="M23 42 C17 52 24 54 29 44 Z" fill="#70C27E" stroke="#2A6B39" strokeWidth="2.1" strokeLinejoin="round" />
+          <path d="M43 24 L50 18 L48 28 Z" fill="#70C27E" stroke="#2A6B39" strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M43 40 L50 46 L48 36 Z" fill="#70C27E" stroke="#2A6B39" strokeWidth="1.8" strokeLinejoin="round" />
+          {/* Head */}
+          <ellipse cx="16" cy="32" rx="7" ry="5.5" fill="#7CD18A" stroke="#2A6B39" strokeWidth="2.2" />
+          <circle cx="14.5" cy="30.5" r="1.6" fill="#1E293B" />
+          {/* Emerald patterned shell */}
+          <ellipse cx="34" cy="32" rx="14.5" ry="12" fill="#3D9C5D" stroke="#205432" strokeWidth="2.4" />
+          <polygon points="34,25 40,29 38,36 30,36 28,29" fill="#63BD7D" stroke="#205432" strokeWidth="1.6" />
+          <path d="M34 25 V20 M40 29 L47 28 M38 36 L44 41 M30 36 L24 41 M28 29 L21 28" stroke="#205432" strokeWidth="1.5" />
+        </svg>
+      );
+
+    case 'so_tai_tuong':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Giant clam scalloped shell with vibrant teal mantle & pearl */}
+          <path
+            d="M11 32 C11 19 20 14 32 14 C44 14 53 19 53 32 C49 36 44 33 40 36 C36 33 32 36 28 36 C24 33 19 36 11 32 Z"
+            fill="#F4EBD7"
+            stroke="#8A704E"
+            strokeWidth="2.3"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M14 34 C16 46 23 50 32 50 C41 50 48 46 50 34 Z"
+            fill="#E3D2B6"
+            stroke="#8A704E"
+            strokeWidth="2.3"
+            strokeLinejoin="round"
+          />
+          {/* Vivid sapphire-turquoise inner mantle */}
+          <path d="M14 33 C20 29 26 35 32 31 C38 35 44 29 50 33 C45 38 39 39 32 39 C25 39 19 38 14 33 Z" fill="#2CA3C9" stroke="#185C75" strokeWidth="1.8" />
+          {/* Radiant pearl */}
+          <circle cx="32" cy="31.5" r="4.2" fill="#FFFDF9" stroke="#C5B293" strokeWidth="1.4" />
+          <circle cx="30.8" cy="30.2" r="1.2" fill="#FFFFFF" />
+          {/* Shell ribs */}
+          <path d="M23 16 L25 27 M32 14 V26 M41 16 L39 27" stroke="#BA9F7B" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'ca_voi_xanh':
+      return (
+        <svg viewBox="0 0 64 64" fill="none" className={className}>
+          {/* Little water spout */}
+          <path d="M23 18 Q21 11 16 12 M25 18 Q27 11 32 12" stroke="#7AD3F0" strokeWidth="2.2" strokeLinecap="round" />
+          {/* Iconic gentle blue whale */}
+          <path
+            d="M8 33 C8 21 25 19 39 24 C47 27 51 31 53 33 L60 25 L57 34 L61 42 L52 37 C46 43 32 46 18 44 C11 43 8 39 8 33 Z"
+            fill="#3B89C4"
+            stroke="#1B4B75"
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+          />
+          {/* Cream pleated belly */}
+          <path d="M12 37 C19 42 32 43 42 38 C36 42 20 44 12 37 Z" fill="#DFF2FA" />
+          <path d="M17 39 H32 M21 42 H34" stroke="#82BED9" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M27 36 L22 45 L31 41 Z" fill="#3278AD" stroke="#1B4B75" strokeWidth="1.8" strokeLinejoin="round" />
+          <circle cx="15.5" cy="31.5" r="2.2" fill="#FFFFFF" stroke="#1B4B75" strokeWidth="1.2" />
+          <circle cx="15" cy="31.5" r="1.1" fill="#0F172A" />
         </svg>
       );
   }

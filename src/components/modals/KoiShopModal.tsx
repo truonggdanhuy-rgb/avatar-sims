@@ -20,6 +20,7 @@ import {
   BugNetState,
   CaughtFishItem,
   CaughtInsectItem,
+  FishWaterType,
   FishingRodState,
 } from '../../types/game';
 import {BugBasketPanel} from '../BugBasketPanel';
@@ -37,7 +38,7 @@ interface KoiShopModalProps {
   onBuyNet: () => void;
   onToggleFishLock: (fishId: string) => void;
   onSellFish: (fishId: string) => void;
-  onSellAllUnlocked: () => void;
+  onSellAllUnlocked: (waterType?: FishWaterType) => void;
   onToggleInsectLock: (insectId: string) => void;
   onSellInsect: (insectId: string) => void;
   onSellAllUnlockedInsects: () => void;

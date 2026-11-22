@@ -137,6 +137,180 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
           );
         }
 
+        if (style === 'varsity_jacket') {
+          return (
+            <g>
+              {/* Contrast Sleeves */}
+              <path d="M24 22 L11 39 L19 45 L26 35 V63 H54 V35 L61 45 L69 39 L56 22 Z" fill="#FAF4E8" stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              {/* Jacket Body */}
+              <path d="M25 22 H55 V63 H25 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              {/* Striped Collar & Hem & Cuffs */}
+              <path d="M32 22 Q40 27 48 22" stroke="#FAF4E8" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+              <path d="M26 60 H54" stroke={dark} strokeWidth="3.2" strokeLinecap="round" />
+              <path d="M26 60 H54" stroke="#FAF4E8" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M13 38 L19 43 M67 38 L61 43" stroke={col} strokeWidth="3" strokeLinecap="round" />
+              {/* Snap Placket & Snaps */}
+              <line x1="40" y1="25" x2="40" y2="61" stroke={dark} strokeWidth="2.4" />
+              {[31, 39, 47, 55].map((sy) => (
+                <circle key={sy} cx="40" cy={sy} r="1.4" fill="#FFFFFF" />
+              ))}
+              {/* Pocket Welts + Varsity B Patch */}
+              <path d="M29 48 L33 55 M51 48 L47 55" stroke="#FAF4E8" strokeWidth="2" strokeLinecap="round" />
+              <text x="48" y="39" textAnchor="middle" fill="#FFFFFF" fontSize="11" fontWeight="900" fontFamily="Georgia, serif">B</text>
+            </g>
+          );
+        }
+
+        if (style === 'raglan_clover') {
+          return (
+            <g>
+              <path d="M25 22 L11 35 L18 42 L26 34 V63 H54 V34 L62 42 L69 35 L55 22 Z" fill="#FAF4E8" stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              {/* Raglan Sleeves & Neck */}
+              <path d="M25 22 L11 35 L18 42 L26 34 L33 22 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <path d="M55 22 L69 35 L62 42 L54 34 L47 22 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <path d="M33 22 Q40 27 47 22" stroke={col} strokeWidth="3" fill="none" strokeLinecap="round" />
+              {/* 4-Leaf Clover */}
+              <circle cx="37.5" cy="40.5" r="3" fill={col} />
+              <circle cx="42.5" cy="40.5" r="3" fill={col} />
+              <circle cx="37.5" cy="45.2" r="3" fill={col} />
+              <circle cx="42.5" cy="45.2" r="3" fill={col} />
+              <path d="M40 46 Q41 50 42 52" stroke={col} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+            </g>
+          );
+        }
+
+        if (style === 'star_sweater') {
+          return (
+            <g>
+              <path d="M25 22 L12 40 L20 46 L26 35 V64 H54 V35 L60 46 L68 40 L55 22 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M32 22 Q40 28 48 22" stroke={dark} strokeWidth="3" fill="none" strokeLinecap="round" />
+              <path d="M27 60 H53" stroke={dark} strokeWidth="2.8" strokeLinecap="round" />
+              {/* Golden Star Emblem */}
+              <polygon
+                points="46,34 47.9,38 52.2,38.4 48.9,41.2 49.9,45.5 46,43.2 42.1,45.5 43.1,41.2 39.8,38.4 44.1,38"
+                fill="#E8B954"
+                stroke={outline}
+                strokeWidth="1.1"
+                strokeLinejoin="round"
+              />
+            </g>
+          );
+        }
+
+        if (style === 'ribbon_blouse') {
+          return (
+            <g>
+              <path d="M25 22 L13 36 L20 42 L27 33 V63 H53 V33 L60 42 L67 36 L55 22 Z" fill="#FFFFFF" stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M32 22 L38 29 L33 32 L28 24 Z" fill="#F1F5F9" stroke={outline} strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M48 22 L42 29 L47 32 L52 24 Z" fill="#F1F5F9" stroke={outline} strokeWidth="1.5" strokeLinejoin="round" />
+              <circle cx="40" cy="43" r="1.3" fill="#CBD5E1" />
+              <circle cx="40" cy="51" r="1.3" fill="#CBD5E1" />
+              <circle cx="40" cy="58" r="1.3" fill="#CBD5E1" />
+              {/* Red Bow */}
+              <path d="M40 31 L31 26 L32 35 Z" fill={col} stroke={outline} strokeWidth="1.4" strokeLinejoin="round" />
+              <path d="M40 31 L49 26 L48 35 Z" fill={col} stroke={outline} strokeWidth="1.4" strokeLinejoin="round" />
+              <path d="M38 33 L35 42 M42 33 L45 42" stroke={col} strokeWidth="2.8" strokeLinecap="round" />
+              <circle cx="40" cy="31" r="2.6" fill={dark} stroke={outline} strokeWidth="1.3" />
+            </g>
+          );
+        }
+
+        if (style === 'pinafore_dress') {
+          return (
+            <g>
+              {/* White Tee Base */}
+              <path d="M25 22 L13 36 L20 42 L27 33 V60 H53 V33 L60 42 L67 36 L55 22 Z" fill="#FFFFFF" stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              {/* Yellow Overall Pinafore + Flared Skirt */}
+              <rect x="29" y="21" width="4.5" height="12" rx="1.8" fill={col} stroke={outline} strokeWidth="1.6" />
+              <rect x="46.5" y="21" width="4.5" height="12" rx="1.8" fill={col} stroke={outline} strokeWidth="1.6" />
+              <path d="M27 30 H53 L55 44 L61 65 H19 L25 44 Z" fill={col} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <rect x="33" y="36" width="14" height="9" rx="2" fill={light} stroke={outline} strokeWidth="1.4" />
+              <circle cx="31.2" cy="32" r="1.5" fill="#E3B04B" stroke={outline} strokeWidth="0.9" />
+              <circle cx="48.8" cy="32" r="1.5" fill="#E3B04B" stroke={outline} strokeWidth="0.9" />
+            </g>
+          );
+        }
+
+        if (style === 'bunny_hoodie') {
+          return (
+            <g>
+              <path d="M23 24 C22 10, 58 10, 57 24 L52 30 H28 Z" fill={dark} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <path d="M22 23 L8 39 L16 46 L23 36 V65 H57 V36 L64 46 L72 39 L58 23 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M24 61 H56" stroke={dark} strokeWidth="3" strokeLinecap="round" />
+              <path d="M30 49 H50 L53 58 H27 Z" fill={light} stroke={outline} strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M35 25 V34 M45 25 V34" stroke="#FFFFFF" strokeWidth="1.9" strokeLinecap="round" />
+              {/* Bunny Emblem */}
+              <ellipse cx="37.5" cy="35" rx="1.8" ry="4.5" fill="#FFFFFF" stroke={outline} strokeWidth="1.2" />
+              <ellipse cx="42.5" cy="35" rx="1.8" ry="4.5" fill="#FFFFFF" stroke={outline} strokeWidth="1.2" />
+              <ellipse cx="40" cy="41.5" rx="5.8" ry="4.6" fill="#FFFFFF" stroke={outline} strokeWidth="1.3" />
+              <circle cx="38.2" cy="41" r="0.8" fill={outline} />
+              <circle cx="41.8" cy="41" r="0.8" fill={outline} />
+              <circle cx="40" cy="42.6" r="0.9" fill="#F5A2B8" />
+            </g>
+          );
+        }
+
+        if (style === 'zip_parka') {
+          return (
+            <g>
+              <path d="M23 24 C22 10, 58 10, 57 24 L52 30 H28 Z" fill={dark} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <path d="M22 23 L9 39 L17 45 L24 35 V64 H56 V35 L63 45 L71 39 L58 23 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M25 61 H55" stroke="#FFFFFF" strokeWidth="3.2" strokeLinecap="round" />
+              <path d="M11 38 L17 43 M69 38 L63 43" stroke="#FFFFFF" strokeWidth="2.8" strokeLinecap="round" />
+              <line x1="40" y1="24" x2="40" y2="62" stroke="#E2E8F0" strokeWidth="2.1" />
+              <rect x="27" y="48" width="8" height="8" rx="2" fill={light} stroke="#FFFFFF" strokeWidth="1.5" />
+              <rect x="45" y="48" width="8" height="8" rx="2" fill={light} stroke="#FFFFFF" strokeWidth="1.5" />
+            </g>
+          );
+        }
+
+        if (style === 'safari_shirt') {
+          return (
+            <g>
+              <path d="M25 22 L12 36 L19 42 L26 33 V63 H54 V33 L61 42 L68 36 L55 22 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M32 22 L38 29 L33 32 L28 24 Z" fill={light} stroke={outline} strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M48 22 L42 29 L47 32 L52 24 Z" fill={light} stroke={outline} strokeWidth="1.5" strokeLinejoin="round" />
+              <line x1="40" y1="27" x2="40" y2="62" stroke={dark} strokeWidth="1.6" />
+              <rect x="29" y="38" width="8" height="8" rx="1.5" fill={light} stroke={outline} strokeWidth="1.4" />
+              <rect x="43" y="38" width="8" height="8" rx="1.5" fill={light} stroke={outline} strokeWidth="1.4" />
+              <path d="M29 40 H37 M43 40 H51" stroke={dark} strokeWidth="2" />
+            </g>
+          );
+        }
+
+        if (style === 'sport_raglan') {
+          return (
+            <g>
+              <path d="M25 22 L11 35 L18 42 L26 34 V63 H54 V34 L62 42 L69 35 L55 22 Z" fill="#FFFFFF" stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M25 22 L11 35 L18 42 L26 34 L33 22 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <path d="M55 22 L69 35 L62 42 L54 34 L47 22 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <path d="M33 22 Q40 27 47 22" stroke={col} strokeWidth="3" fill="none" strokeLinecap="round" />
+              <polygon
+                points="40,34 42.3,38.9 47.6,39.5 43.6,43 44.8,48.2 40,45.5 35.2,48.2 36.4,43 32.4,39.5 37.7,38.9"
+                fill={col}
+                stroke={outline}
+                strokeWidth="1.1"
+                strokeLinejoin="round"
+              />
+            </g>
+          );
+        }
+
+        if (style === 'casual_shirt') {
+          return (
+            <g>
+              <path d="M25 22 L12 36 L19 42 L26 33 V63 H54 V33 L61 42 L68 36 L55 22 Z" fill="#FFFFFF" stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M32 22 L38 29 L33 32 L28 24 Z" fill="#F1F5F9" stroke={outline} strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M48 22 L42 29 L47 32 L52 24 Z" fill="#F1F5F9" stroke={outline} strokeWidth="1.5" strokeLinejoin="round" />
+              <line x1="40" y1="27" x2="40" y2="62" stroke="#CBD5E1" strokeWidth="1.6" />
+              <circle cx="40" cy="36" r="1.2" fill="#94A3B8" />
+              <circle cx="40" cy="45" r="1.2" fill="#94A3B8" />
+              <circle cx="40" cy="54" r="1.2" fill="#94A3B8" />
+              <rect x="44" y="38" width="6.5" height="7" rx="1.2" fill="#F8FAFC" stroke="#CBD5E1" strokeWidth="1.3" />
+            </g>
+          );
+        }
+
         // cardigan_vest
         return (
           <g>
@@ -217,6 +391,39 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <path d="M26.5 24.5 H53.5" stroke="#1E1815" strokeWidth="3.2" />
               <rect x="37.2" y="22.2" width="5.6" height="4.2" rx="1" fill="#E8C36A" stroke={outline} strokeWidth="1.1" />
               <path d="M40 28 V61" stroke={dark} strokeWidth="1.6" strokeLinecap="round" />
+            </g>
+          );
+        }
+
+        if (style === 'cargo_shorts') {
+          return (
+            <g>
+              <path d="M23 23 H57 L60 55 H43 L40 41 L37 55 H20 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M23 28 H57" stroke={dark} strokeWidth="2" />
+              <rect x="17" y="34" width="7" height="12" rx="1.6" fill={shade(col, 14)} stroke={outline} strokeWidth="1.6" />
+              <rect x="56" y="34" width="7" height="12" rx="1.6" fill={shade(col, 14)} stroke={outline} strokeWidth="1.6" />
+              <path d="M17 37 H24 M56 37 H63" stroke={dark} strokeWidth="1.8" />
+            </g>
+          );
+        }
+
+        if (style === 'sport_shorts') {
+          return (
+            <g>
+              <path d="M23 23 H57 L61 54 H43 L40 41 L37 54 H19 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M23 26 H57" stroke="#FFFFFF" strokeWidth="3.2" />
+              <path d="M22 30 L19 52 M58 30 L61 52" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" />
+              <path d="M20 53 H36 M44 53 H60" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" />
+            </g>
+          );
+        }
+
+        if (style === 'a_line_skirt') {
+          return (
+            <g>
+              <path d="M26 22 H54 L63 59 C48 63, 32 63, 17 59 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M26 27 H54" stroke={dark} strokeWidth="2" />
+              <path d="M19 57 Q40 61 61 57" stroke={shade(col, 18)} strokeWidth="1.8" fill="none" />
             </g>
           );
         }
@@ -554,6 +761,16 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             </g>
           );
         }
+        if (style === 'bucket_hat') {
+          return (
+            <g>
+              {/* Downward-sloped Bucket Brim & Tapered Flat Crown */}
+              <path d="M12 52 C14 43, 66 43, 68 52 C56 58, 24 58, 12 52 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M22 44 L25 25 C31 22, 49 22, 55 25 L58 44 Z" fill={shade(col, 10)} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M22 42 Q40 45 58 42" stroke={shade(col, -26)} strokeWidth="4" fill="none" />
+            </g>
+          );
+        }
         if (style === 'hair_clip') {
           return (
             <g>
@@ -621,9 +838,20 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
         if (style === 'scarf') {
           return (
             <g>
-              <rect x="20" y="24" width="40" height="16" rx="8" fill={col} stroke={outline} strokeWidth="2.2" />
-              <path d="M40 36 H53 L56 61 H42 Z" fill={shade(col, -16)} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
-              <path d="M44 61 V65 M49 61 V65 M54 61 V65" stroke={outline} strokeWidth="1.8" strokeLinecap="round" />
+              {/* Layered Soft Under-Tail */}
+              <path d="M35 36 H46 L48 59 H34 Z" fill={shade(col, -18)} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <path d="M34.5 54 H47.5" stroke="#FFF8EE" strokeWidth="2.2" />
+              <path d="M37 59 V63 M41 59 V63 M45 59 V63" stroke={outline} strokeWidth="1.6" strokeLinecap="round" />
+              {/* Primary Draped Tail */}
+              <path d="M44 35 H56 L59 63 H44 Z" fill={col} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <path d="M44.5 58 H58.5" stroke="#FFF8EE" strokeWidth="2.4" />
+              <path d="M46 63 V67 M51 63 V67 M56 63 V67" stroke={outline} strokeWidth="1.7" strokeLinecap="round" />
+              {/* Double-Tiered Plush Collar & Rib Bands */}
+              <rect x="16" y="21" width="48" height="17" rx="8.5" fill={col} stroke={outline} strokeWidth="2.2" />
+              <rect x="20" y="18" width="40" height="11" rx="5.5" fill={shade(col, 16)} stroke={outline} strokeWidth="1.9" />
+              <path d="M27 21 L24 38 M53 21 L56 38" stroke="#FFF8EE" strokeWidth="2.4" strokeLinecap="round" />
+              {/* Plump Cross-Knot */}
+              <rect x="41" y="29" width="15" height="11" rx="5" fill={shade(col, 14)} stroke={outline} strokeWidth="2" />
             </g>
           );
         }

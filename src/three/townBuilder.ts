@@ -25,7 +25,7 @@ import {
   mergeStaticGroupByMaterial,
 } from './materials';
 
-export const TOWN_PLAZA_RADIUS = 7.2;
+export const TOWN_PLAZA_RADIUS = 11.2;
 export const HILL_CENTER = {x: 0, z: -64};
 export const HILL_RADIUS = 40.0;
 export const HILL_PEAK_Y = 13.2;
@@ -41,6 +41,7 @@ export const TOWN_ZONE_ENTRANCES: Record<
   fishing: {tx: -19.6, tz: 38.6, exitRotY: 0},
   petshop: {tx: 16.2, tz: 44.2, exitRotY: 0},
   mall: {tx: -45.6, tz: -6.5, exitRotY: Math.PI / 2},
+  island: {tx: 0.95, tz: -62.5, exitRotY: 0},
 };
 
 export const LAKE_CENTER = {x: -23.0, z: 46.8};
@@ -257,17 +258,19 @@ export function getTownGroundHeight(
   return 0.02;
 }
 
-const PLAZA_BED_ARC_MID_R = 8.02;
-const PLAZA_BED_ARC_SPAN = THREE.MathUtils.degToRad(46);
+const PLAZA_BED_ARC_MID_R = 12.25;
+const PLAZA_BED_ARC_MIN = THREE.MathUtils.degToRad(15);
+const PLAZA_BED_ARC_MAX = THREE.MathUtils.degToRad(40);
 
 export function isPointOnPlazaFlowerBed(x: number, z: number): boolean {
   const ax = Math.abs(x);
-  if (ax < 3.6 || ax > 9.3 || Math.abs(z) > 6.6) return false;
-  const ang = Math.atan2(z, ax);
-  const clampedAng = Math.max(-PLAZA_BED_ARC_SPAN, Math.min(PLAZA_BED_ARC_SPAN, ang));
+  const az = Math.abs(z);
+  if (ax < 8.4 || ax > 13.3 || az < 2.2 || az > 8.9) return false;
+  const ang = Math.atan2(az, ax);
+  const clampedAng = Math.max(PLAZA_BED_ARC_MIN, Math.min(PLAZA_BED_ARC_MAX, ang));
   const cx = Math.cos(clampedAng) * PLAZA_BED_ARC_MID_R;
   const cz = Math.sin(clampedAng) * PLAZA_BED_ARC_MID_R;
-  return Math.hypot(ax - cx, z - cz) <= 0.50;
+  return Math.hypot(ax - cx, az - cz) <= 0.52;
 }
 
 export interface TownAnchor {
@@ -776,6 +779,218 @@ function buildFramedWindow(
   return g;
 }
 
+export function buildWoodenRowboat(
+  withOarPivots = false,
+  lampBulbsOut?: THREE.MeshStandardMaterial[],
+): {
+  boat: THREE.Group;
+  oarLPivot: THREE.Group | null;
+  oarRPivot: THREE.Group | null;
+} {
+  const getMat = createMatPool();
+  const boat = new THREE.Group();
+  const oakHull = getMat('#A46233', 0.68);
+  const oakInner = getMat('#C88E56', 0.72);
+  const oakTrim = getMat('#DDA86F', 0.62);
+  const oakDark = getMat('#5D351A', 0.78);
+  const brassMat = getMat('#D8A94B', 0.34, 0.72);
+  const ropeHempMat = getMat('#DCC194', 0.86);
+  const cushionRed = getMat('#C65943', 0.74);
+  const sailBlue = getMat('#3D8EB8', 0.58);
+
+  const STATIONS = 11;
+  const PROW_Z = 1.52;
+  const STERN_Z = -1.18;
+  const hullHalfW = (t: number) => {
+    if (t > 0.58) {
+      const u = (1 - t) / 0.42;
+      return 0.64 * Math.pow(Math.max(0.02, u), 0.62);
+    }
+    if (t < 0.22) {
+      return THREE.MathUtils.lerp(0.46, 0.62, t / 0.22);
+    }
+    return 0.62 + 0.03 * Math.sin(((t - 0.22) / 0.36) * Math.PI);
+  };
+  const sheerLift = (t: number) =>
+    Math.pow(Math.max(0, (t - 0.55) / 0.45), 1.7) * 0.2 + (t < 0.2 ? 0.04 : 0);
+
+  const makeHullShellGeo = (wallOffset: number, yOffset: number) => {
+    const verts: number[] = [];
+    const indices: number[] = [];
+    const RING = 7;
+    for (let i = 0; i <= STATIONS; i++) {
+      const t = i / STATIONS;
+      const z = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t);
+      const hw = Math.max(0.03, hullHalfW(t) + wallOffset);
+      const sheerY = 0.38 + sheerLift(t) + yOffset;
+      const chineY = 0.11 + sheerLift(t) * 0.35 + yOffset;
+      const keelY = 0.02 + sheerLift(t) * 0.28 + yOffset;
+      const pts: [number, number][] = [
+        [-hw, sheerY],
+        [-hw * 0.84, chineY],
+        [-hw * 0.42, keelY + 0.02],
+        [0, keelY],
+        [hw * 0.42, keelY + 0.02],
+        [hw * 0.84, chineY],
+        [hw, sheerY],
+      ];
+      for (const [px, py] of pts) {
+        verts.push(px, py, z);
+      }
+    }
+    for (let i = 0; i < STATIONS; i++) {
+      const rA = i * RING;
+      const rB = (i + 1) * RING;
+      for (let j = 0; j < RING - 1; j++) {
+        const a = rA + j;
+        const b = rA + j + 1;
+        const c = rB + j;
+        const d = rB + j + 1;
+        indices.push(a, c, b, b, c, d);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
+  };
+
+  const oakHullDouble = new THREE.MeshStandardMaterial({
+    color: '#A46233',
+    roughness: 0.68,
+    side: THREE.DoubleSide,
+  });
+  const oakInnerDouble = new THREE.MeshStandardMaterial({
+    color: '#C88E56',
+    roughness: 0.72,
+    side: THREE.DoubleSide,
+  });
+  const outerShell = new THREE.Mesh(makeHullShellGeo(0, 0), oakHullDouble);
+  const innerShell = new THREE.Mesh(makeHullShellGeo(-0.055, 0.045), oakInnerDouble);
+  boat.add(outerShell, innerShell);
+
+  const transom = new THREE.Mesh(new RoundedBoxGeometry(0.94, 0.36, 0.1, 2, 0.03), oakDark);
+  transom.position.set(0, 0.22, STERN_Z + 0.03);
+  transom.rotation.x = -0.14;
+  const keelSpine = new THREE.Mesh(new RoundedBoxGeometry(0.11, 0.08, 2.38, 2, 0.02), oakDark);
+  keelSpine.position.set(0, 0.01, 0.06);
+  const stemPost = new THREE.Mesh(new RoundedBoxGeometry(0.11, 0.48, 0.18, 2, 0.03), oakDark);
+  stemPost.rotation.x = 0.56;
+  stemPost.position.set(0, 0.34, PROW_Z - 0.08);
+  boat.add(transom, keelSpine, stemPost);
+
+  [-1, 1].forEach((side) => {
+    for (let i = 0; i < STATIONS; i++) {
+      const t0 = i / STATIONS;
+      const t1 = (i + 1) / STATIONS;
+      const z0 = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t0);
+      const z1 = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t1);
+      const x0 = side * hullHalfW(t0);
+      const x1 = side * hullHalfW(t1);
+      const y0 = 0.4 + sheerLift(t0);
+      const y1 = 0.4 + sheerLift(t1);
+      const segLen = Math.hypot(x1 - x0, y1 - y0, z1 - z0);
+      const rail = new THREE.Mesh(
+        new RoundedBoxGeometry(0.085, 0.075, segLen + 0.04, 1, 0.02),
+        oakTrim,
+      );
+      rail.position.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5);
+      rail.lookAt(x1, y1, z1);
+      boat.add(rail);
+    }
+  });
+
+  for (let s = -2; s <= 2; s++) {
+    const plank = new THREE.Mesh(
+      new RoundedBoxGeometry(0.11, 0.035, 1.82 - Math.abs(s) * 0.14, 1, 0.01),
+      s % 2 === 0 ? oakTrim : oakInner,
+    );
+    plank.position.set(s * 0.145, 0.1, -0.05);
+    boat.add(plank);
+  }
+  [-0.78, -0.22, 0.32, 0.82].forEach((rz) => {
+    const rib = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.04, 0.06, 1, 0.015), oakDark);
+    rib.position.set(0, 0.085, rz);
+    boat.add(rib);
+  });
+
+  const foreDeck = new THREE.Mesh(new THREE.ConeGeometry(0.54, 0.68, 4), oakTrim);
+  foreDeck.rotation.x = Math.PI / 2;
+  foreDeck.rotation.y = Math.PI / 4;
+  foreDeck.scale.set(0.95, 1, 0.14);
+  foreDeck.position.set(0, 0.38, 1.18);
+  const ropeCoil = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.028, 6, 12), ropeHempMat);
+  ropeCoil.rotation.x = Math.PI / 2;
+  ropeCoil.position.set(-0.1, 0.43, 1.06);
+  const cleat = new THREE.Mesh(new RoundedBoxGeometry(0.14, 0.035, 0.04, 1, 0.01), brassMat);
+  cleat.position.set(0.12, 0.43, 1.14);
+  boat.add(foreDeck, ropeCoil, cleat);
+
+  const aftBench = new THREE.Mesh(new RoundedBoxGeometry(1.06, 0.075, 0.4, 2, 0.02), oakTrim);
+  aftBench.position.set(0, 0.28, -0.58);
+  const cushion = new THREE.Mesh(new RoundedBoxGeometry(0.74, 0.06, 0.32, 2, 0.025), cushionRed);
+  cushion.position.set(0, 0.33, -0.58);
+  const midThwart = new THREE.Mesh(new RoundedBoxGeometry(1.14, 0.07, 0.3, 2, 0.02), oakTrim);
+  midThwart.position.set(0, 0.27, 0.26);
+  boat.add(aftBench, cushion, midThwart);
+
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.034, 0.72, 7), oakDark);
+  mast.position.set(0, 0.72, 1.32);
+  const bowArm = new THREE.Mesh(new RoundedBoxGeometry(0.05, 0.05, 0.24, 1, 0.01), oakDark);
+  bowArm.position.set(0, 1.02, 1.42);
+  const bowCap = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.07, 6), oakDark);
+  bowCap.position.set(0, 0.94, 1.5);
+  const bowBulbMat = new THREE.MeshStandardMaterial({
+    color: '#FFF4C2',
+    emissive: '#FFCC66',
+    emissiveIntensity: 0.45,
+    roughness: 0.25,
+  });
+  lampBulbsOut?.push(bowBulbMat);
+  const bowBulb = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), bowBulbMat);
+  bowBulb.position.set(0, 0.85, 1.5);
+  const flag = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.3, 3), sailBlue);
+  flag.rotation.z = -Math.PI / 2;
+  flag.position.set(0.14, 0.96, 1.32);
+  boat.add(mast, bowArm, bowCap, bowBulb, flag);
+
+  let oarLPivot: THREE.Group | null = null;
+  let oarRPivot: THREE.Group | null = null;
+  [-1, 1].forEach((side) => {
+    const oarlock = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.09, 6), brassMat);
+    oarlock.position.set(side * 0.62, 0.44, 0.14);
+    boat.add(oarlock);
+
+    const pivot = new THREE.Group();
+    pivot.position.set(side * 0.62, 0.47, 0.14);
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.24, 6), oakDark);
+    grip.rotation.z = side * 1.16;
+    grip.position.set(-side * 0.14, 0.06, 0);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.026, 1.28, 7), oakTrim);
+    shaft.rotation.z = side * 1.16;
+    shaft.position.set(side * 0.44, -0.17, 0);
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.12, 7), oakDark);
+    collar.rotation.z = side * 1.16;
+    collar.position.set(side * 0.02, -0.01, 0);
+    const blade = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.028, 0.48, 2, 0.01), oakHull);
+    blade.rotation.z = side * 1.16;
+    blade.position.set(side * 0.98, -0.41, 0);
+    pivot.add(grip, collar, shaft, blade);
+    boat.add(pivot);
+    if (side < 0) oarLPivot = pivot;
+    else oarRPivot = pivot;
+  });
+
+  const skipSet = new Set<THREE.Object3D>();
+  if (withOarPivots) {
+    if (oarLPivot) skipSet.add(oarLPivot);
+    if (oarRPivot) skipSet.add(oarRPivot);
+  }
+  mergeStaticGroupByMaterial(boat, skipSet);
+  return {boat, oarLPivot, oarRPivot};
+}
+
 export function buildTownScene(): TownWorld {
   const group = new THREE.Group();
   const clickTargets: THREE.Object3D[] = [];
@@ -788,7 +1003,7 @@ export function buildTownScene(): TownWorld {
   // ShapeGeometry UVs are in world meters (110/600m ≈ 0.185 repeats/m)
   const grassTex = createGrassTexture(0.185, 0.185);
   const hillTex = createGrassTexture(18, 18);
-  const plazaStoneTex = createStoneWalkwayTexture(4, 4);
+  const plazaStoneTex = createStoneWalkwayTexture(6, 6);
   const signAtlasMat = getSharedSignAtlasMaterial();
   const warmGlowTex = getWarmGlowTexture();
   let koiRig: AvatarRig | null = null;
@@ -1055,6 +1270,19 @@ export function buildTownScene(): TownWorld {
 
     mergeStaticGroupByMaterial(balloonStation);
     group.add(balloonStation);
+
+    const balloonProxy = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 3.4, 2.4),
+      new THREE.MeshBasicMaterial({visible: false}),
+    );
+    balloonProxy.position.set(HILL_CENTER.x + bx, HILL_PEAK_Y + 1.8, stationZ + bz);
+    balloonProxy.userData = {
+      kind: 'balloon_to_island',
+      tx: HILL_CENTER.x + bx,
+      tz: stationZ + 1.2,
+    };
+    group.add(balloonProxy);
+    clickTargets.push(balloonProxy);
   }
 
   // Static sculpted sky clouds spread high above the gentle mountain & broad town
@@ -1273,22 +1501,22 @@ export function buildTownScene(): TownWorld {
   [
     {
       id: 'bench_left',
-      bx: -4.45,
+      bx: -6.6,
       bz: 0,
       rot: Math.PI / 2,
-      tx: -3.55,
+      tx: -5.65,
       tz: 0,
-      seatX: -4.38,
+      seatX: -6.52,
       seatZ: 0,
     },
     {
       id: 'bench_right',
-      bx: 4.45,
+      bx: 6.6,
       bz: 0,
       rot: -Math.PI / 2,
-      tx: 3.55,
+      tx: 5.65,
       tz: 0,
-      seatX: 4.38,
+      seatX: 6.52,
       seatZ: 0,
     },
   ].forEach(({id, bx, bz, rot, tx, tz, seatX, seatZ}) => {
@@ -1338,10 +1566,10 @@ export function buildTownScene(): TownWorld {
   // 4 Plaza Lamps
   const lampPostMat = getMat('#3D4752', 0.4, 0.6);
   [
-    [-5.1, -4.8],
-    [5.1, -4.8],
-    [-5.1, 4.8],
-    [5.1, 4.8],
+    [-7.2, -6.4],
+    [7.2, -6.4],
+    [-7.2, 6.4],
+    [7.2, 6.4],
   ].forEach(([lx, lz]) => {
     const lamp = new THREE.Group();
     lamp.position.set(lx, 0.1, lz);
@@ -1382,13 +1610,13 @@ export function buildTownScene(): TownWorld {
 
     // 1. Flush Decorative Compass Ring & Border Mosaic Inlays (y = 0.146, zero walk impediment / zero Z-fighting)
     const compassRingInner = new THREE.Mesh(
-      new THREE.RingGeometry(2.38, 2.54, 40),
+      new THREE.RingGeometry(2.55, 2.75, 40),
       mosaicTerracottaMat,
     );
     compassRingInner.rotation.x = -Math.PI / 2;
     compassRingInner.position.y = 0.146;
     const compassRingOuter = new THREE.Mesh(
-      new THREE.RingGeometry(6.55, 6.82, 48),
+      new THREE.RingGeometry(10.35, 10.65, 56),
       mosaicTealMat,
     );
     compassRingOuter.rotation.x = -Math.PI / 2;
@@ -1398,31 +1626,31 @@ export function buildTownScene(): TownWorld {
     for (let d = 0; d < 8; d++) {
       const a = (d / 8) * Math.PI * 2;
       const diamond = new THREE.Mesh(
-        new THREE.CircleGeometry(0.28, 4),
+        new THREE.CircleGeometry(0.32, 4),
         d % 2 === 0 ? mosaicTerracottaMat : mosaicTealMat,
       );
       diamond.rotation.x = -Math.PI / 2;
       diamond.rotation.z = -a;
-      diamond.position.set(Math.cos(a) * 2.86, 0.147, Math.sin(a) * 2.86);
+      diamond.position.set(Math.cos(a) * 3.45, 0.147, Math.sin(a) * 3.45);
 
       const outerTile = new THREE.Mesh(
-        new THREE.CircleGeometry(0.22, 6),
+        new THREE.CircleGeometry(0.26, 6),
         d % 2 === 0 ? mosaicCreamMat : mosaicTerracottaMat,
       );
       outerTile.rotation.x = -Math.PI / 2;
-      outerTile.position.set(Math.cos(a) * 6.32, 0.147, Math.sin(a) * 6.32);
+      outerTile.position.set(Math.cos(a) * 9.85, 0.147, Math.sin(a) * 9.85);
       plazaDecor.add(diamond, outerTile);
     }
 
     // 2. Single South Floral Entrance Archway with Climbing Vines, Flowers & Centered Hanging String Bulb (North hill-side arch removed!)
     {
-      const az = 7.02;
+      const az = 10.95;
       const archGrp = new THREE.Group();
       archGrp.position.set(0, 0.1, az);
       const archBloomCols = ['#FF85A1', '#FFD166', '#9BE080', '#FF9F68', '#C69EFF'];
       const vineGreenMat = getMat('#3D8B4C', 0.78);
 
-      [-2.45, 2.45].forEach((px, pIdx) => {
+      [-2.85, 2.85].forEach((px, pIdx) => {
         const plinth = new THREE.Mesh(new RoundedBoxGeometry(0.56, 0.62, 0.56, 2, 0.05), urnStoneMat);
         plinth.position.set(px, 0.31, 0);
         const col = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.115, 2.9, 10), archIronMat);
@@ -1465,22 +1693,22 @@ export function buildTownScene(): TownWorld {
       });
 
       const archSpan = new THREE.Mesh(
-        new THREE.TorusGeometry(2.45, 0.085, 8, 28, Math.PI),
+        new THREE.TorusGeometry(2.85, 0.085, 8, 30, Math.PI),
         archIronMat,
       );
       archSpan.position.set(0, 3.35, 0);
       const innerScroll = new THREE.Mesh(
-        new THREE.TorusGeometry(2.26, 0.045, 6, 24, Math.PI),
+        new THREE.TorusGeometry(2.65, 0.045, 6, 26, Math.PI),
         archGoldMat,
       );
       innerScroll.position.set(0, 3.35, 0);
       archGrp.add(archSpan, innerScroll);
 
       // Rich blossom & trailing vine garland along upper arch crest
-      for (let b = 0; b <= 10; b++) {
-        const phi = 0.14 + (b / 10) * (Math.PI - 0.28);
-        const bx = Math.cos(phi) * 2.44;
-        const by = 3.35 + Math.sin(phi) * 2.44;
+      for (let b = 0; b <= 12; b++) {
+        const phi = 0.14 + (b / 12) * (Math.PI - 0.28);
+        const bx = Math.cos(phi) * 2.84;
+        const by = 3.35 + Math.sin(phi) * 2.84;
         const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.19, 7, 6), foliageLushMat);
         leaf.position.set(bx, by, 0);
         const sideLeaf = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), vineGreenMat);
@@ -1500,12 +1728,12 @@ export function buildTownScene(): TownWorld {
         new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6),
         archIronMat,
       );
-      archWire.position.set(0, 5.46, 0);
+      archWire.position.set(0, 5.84, 0);
       const archSocket = new THREE.Mesh(
         new THREE.CylinderGeometry(0.045, 0.055, 0.09, 8),
         archGoldMat,
       );
-      archSocket.position.set(0, 5.24, 0);
+      archSocket.position.set(0, 5.62, 0);
       const archLampMat = new THREE.MeshStandardMaterial({
         color: '#FFF5CC',
         emissive: '#FFC95C',
@@ -1514,28 +1742,28 @@ export function buildTownScene(): TownWorld {
       });
       lampBulbs.push(archLampMat);
       const archLampBulb = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), archLampMat);
-      archLampBulb.position.set(0, 5.12, 0);
+      archLampBulb.position.set(0, 5.5, 0);
       archGrp.add(archWire, archSocket, archLampBulb);
 
       const crestFinial = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), archGoldMat);
-      crestFinial.position.set(0, 5.98, 0);
+      crestFinial.position.set(0, 6.38, 0);
       archGrp.add(crestFinial);
       plazaDecor.add(archGrp);
     }
 
-    // 3. Symmetrical NW & NE Plaza Café Tables + Identical Striped Umbrellas + Interactive Stools (x = ±3.35, z = -3.35)
+    // 3. Symmetrical NW & NE Plaza Café Tables + Identical Striped Umbrellas + Interactive Stools
     [
       {
         id: 'nw_cafe',
-        cx: -3.35,
-        cz: -3.35,
-        stoolOff: {ox: 0.72, oz: 0.35},
+        cx: -4.9,
+        cz: -4.9,
+        stoolOff: {ox: 0.92, oz: 0.42},
       },
       {
         id: 'ne_cafe',
-        cx: 3.35,
-        cz: -3.35,
-        stoolOff: {ox: -0.72, oz: 0.35},
+        cx: 4.9,
+        cz: -4.9,
+        stoolOff: {ox: -0.92, oz: 0.42},
       },
     ].forEach(({id, cx, cz, stoolOff}) => {
       const tbl = new THREE.Group();
@@ -1609,10 +1837,10 @@ export function buildTownScene(): TownWorld {
 
     // 4. Four Symmetrical Festive Balloon Flower Pedestals ("Bồn Cây Bong Bóng") Framing the South & Side Plaza
     const urnSpots: [number, number][] = [
-      [-3.35, 3.35],
-      [3.35, 3.35],
-      [-5.25, -1.85],
-      [5.25, -1.85],
+      [-4.9, 5.2],
+      [4.9, 5.2],
+      [-8.7, -2.7],
+      [8.7, -2.7],
     ];
     const balloonPalettes = [
       ['#FF7597', '#67C6E3', '#FFD166'],
@@ -1691,10 +1919,10 @@ export function buildTownScene(): TownWorld {
     [16.2, 0.05, 42.4, 1.8],
     [-32, 0.05, 22.0, 1.8],
     [32, 0.05, 22.0, 1.8],
-    [-5.1, 0.16, -4.8, 1.05],
-    [5.1, 0.16, -4.8, 1.05],
-    [-5.1, 0.16, 4.8, 1.05],
-    [5.1, 0.16, 4.8, 1.05],
+    [-7.2, 0.16, -6.4, 1.15],
+    [7.2, 0.16, -6.4, 1.15],
+    [-7.2, 0.16, 6.4, 1.15],
+    [7.2, 0.16, 6.4, 1.15],
     [-21.18, TOWN_LAKE_WATER_Y + 0.02, 44.3, 1.45],
     [32.0, 0.05, 42.8, 2.3],
     [-73.0, 0.05, -3.55, 1.35],
@@ -1975,6 +2203,7 @@ export function buildTownScene(): TownWorld {
       clickTargets,
     );
     colliders.push({type: 'box', id: 'home', x: -32, z: -22.5, hw: 5.55, hd: 4.55, rotY: 0});
+    home.updateMatrixWorld(true);
     const mailWorld = new THREE.Vector3(1.55, 0, 3.08).applyMatrix4(home.matrixWorld);
     colliders.push({type: 'circle', id: 'home_mailbox', x: mailWorld.x, z: mailWorld.z, r: 0.58});
     mergeStaticGroupByMaterial(home);
@@ -6752,214 +6981,7 @@ export function buildTownScene(): TownWorld {
     }
 
     // 5. East Bank Boat Dock, 2 Hanging Wooden Lanterns, Boat Signboard & Crafted Clinker Wooden Rowboats
-    const buildWoodenRowboat = (withOarPivots = false) => {
-      const boat = new THREE.Group();
-      const oakHull = getMat('#A46233', 0.68);
-      const oakInner = getMat('#C88E56', 0.72);
-      const oakTrim = getMat('#DDA86F', 0.62);
-      const oakDark = getMat('#5D351A', 0.78);
-      const brassMat = getMat('#D8A94B', 0.34, 0.72);
-      const ropeHempMat = getMat('#DCC194', 0.86);
-      const cushionRed = getMat('#C65943', 0.74);
-      const sailBlue = getMat('#3D8EB8', 0.58);
-
-      // Curved lofted boat shell (hollow U-profile from curved transom stern z=-1.18 to pointed prow z=+1.52)
-      const STATIONS = 11;
-      const PROW_Z = 1.52;
-      const STERN_Z = -1.18;
-      const hullHalfW = (t: number) => {
-        if (t > 0.58) {
-          const u = (1 - t) / 0.42;
-          return 0.64 * Math.pow(Math.max(0.02, u), 0.62);
-        }
-        if (t < 0.22) {
-          return THREE.MathUtils.lerp(0.46, 0.62, t / 0.22);
-        }
-        return 0.62 + 0.03 * Math.sin(((t - 0.22) / 0.36) * Math.PI);
-      };
-      const sheerLift = (t: number) => Math.pow(Math.max(0, (t - 0.55) / 0.45), 1.7) * 0.2 + (t < 0.2 ? 0.04 : 0);
-
-      // Build curved outer hull & inner cockpit lining with 7 cross-section ring points per station
-      const makeHullShellGeo = (wallOffset: number, yOffset: number) => {
-        const verts: number[] = [];
-        const indices: number[] = [];
-        const RING = 7;
-        for (let i = 0; i <= STATIONS; i++) {
-          const t = i / STATIONS;
-          const z = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t);
-          const hw = Math.max(0.03, hullHalfW(t) + wallOffset);
-          const sheerY = 0.38 + sheerLift(t) + yOffset;
-          const chineY = 0.11 + sheerLift(t) * 0.35 + yOffset;
-          const keelY = 0.02 + sheerLift(t) * 0.28 + yOffset;
-          const pts: [number, number][] = [
-            [-hw, sheerY],
-            [-hw * 0.84, chineY],
-            [-hw * 0.42, keelY + 0.02],
-            [0, keelY],
-            [hw * 0.42, keelY + 0.02],
-            [hw * 0.84, chineY],
-            [hw, sheerY],
-          ];
-          for (const [px, py] of pts) {
-            verts.push(px, py, z);
-          }
-        }
-        for (let i = 0; i < STATIONS; i++) {
-          const rA = i * RING;
-          const rB = (i + 1) * RING;
-          for (let j = 0; j < RING - 1; j++) {
-            const a = rA + j;
-            const b = rA + j + 1;
-            const c = rB + j;
-            const d = rB + j + 1;
-            indices.push(a, c, b, b, c, d);
-          }
-        }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-        geo.setIndex(indices);
-        geo.computeVertexNormals();
-        return geo;
-      };
-
-      const oakHullDouble = new THREE.MeshStandardMaterial({
-        color: '#A46233',
-        roughness: 0.68,
-        side: THREE.DoubleSide,
-      });
-      const oakInnerDouble = new THREE.MeshStandardMaterial({
-        color: '#C88E56',
-        roughness: 0.72,
-        side: THREE.DoubleSide,
-      });
-      const outerShell = new THREE.Mesh(makeHullShellGeo(0, 0), oakHullDouble);
-      const innerShell = new THREE.Mesh(makeHullShellGeo(-0.055, 0.045), oakInnerDouble);
-      boat.add(outerShell, innerShell);
-
-      // Curved stern transom board + dark oak keel spine + bow stempost
-      const transom = new THREE.Mesh(new RoundedBoxGeometry(0.94, 0.36, 0.1, 2, 0.03), oakDark);
-      transom.position.set(0, 0.22, STERN_Z + 0.03);
-      transom.rotation.x = -0.14;
-      const keelSpine = new THREE.Mesh(new RoundedBoxGeometry(0.11, 0.08, 2.38, 2, 0.02), oakDark);
-      keelSpine.position.set(0, 0.01, 0.06);
-      const stemPost = new THREE.Mesh(new RoundedBoxGeometry(0.11, 0.48, 0.18, 2, 0.03), oakDark);
-      stemPost.rotation.x = 0.56;
-      stemPost.position.set(0, 0.34, PROW_Z - 0.08);
-      boat.add(transom, keelSpine, stemPost);
-
-      // Left & Right Curved Gunwale Rub Rails
-      [-1, 1].forEach((side) => {
-        for (let i = 0; i < STATIONS; i++) {
-          const t0 = i / STATIONS;
-          const t1 = (i + 1) / STATIONS;
-          const z0 = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t0);
-          const z1 = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t1);
-          const x0 = side * hullHalfW(t0);
-          const x1 = side * hullHalfW(t1);
-          const y0 = 0.4 + sheerLift(t0);
-          const y1 = 0.4 + sheerLift(t1);
-          const segLen = Math.hypot(x1 - x0, y1 - y0, z1 - z0);
-          const rail = new THREE.Mesh(new RoundedBoxGeometry(0.085, 0.075, segLen + 0.04, 1, 0.02), oakTrim);
-          rail.position.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5);
-          rail.lookAt(x1, y1, z1);
-          boat.add(rail);
-        }
-      });
-
-      // Slatted Floorboards (5 lengthwise planks) + 4 Curved Interior Timber Ribs
-      for (let s = -2; s <= 2; s++) {
-        const plank = new THREE.Mesh(
-          new RoundedBoxGeometry(0.11, 0.035, 1.82 - Math.abs(s) * 0.14, 1, 0.01),
-          s % 2 === 0 ? oakTrim : oakInner,
-        );
-        plank.position.set(s * 0.145, 0.1, -0.05);
-        boat.add(plank);
-      }
-      [-0.78, -0.22, 0.32, 0.82].forEach((rz) => {
-        const rib = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.04, 0.06, 1, 0.015), oakDark);
-        rib.position.set(0, 0.085, rz);
-        boat.add(rib);
-      });
-
-      // Triangular Carved Foredeck (Boong Mũi) + Mooring Rope Coil & Brass Cleat
-      const foreDeck = new THREE.Mesh(new THREE.ConeGeometry(0.54, 0.68, 4), oakTrim);
-      foreDeck.rotation.x = Math.PI / 2;
-      foreDeck.rotation.y = Math.PI / 4;
-      foreDeck.scale.set(0.95, 1, 0.14);
-      foreDeck.position.set(0, 0.38, 1.18);
-      const ropeCoil = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.028, 6, 12), ropeHempMat);
-      ropeCoil.rotation.x = Math.PI / 2;
-      ropeCoil.position.set(-0.1, 0.43, 1.06);
-      const cleat = new THREE.Mesh(new RoundedBoxGeometry(0.14, 0.035, 0.04, 1, 0.01), brassMat);
-      cleat.position.set(0.12, 0.43, 1.14);
-      boat.add(foreDeck, ropeCoil, cleat);
-
-      // Aft Captain Bench with Cozy Quilted Cushion + Mid Rowing Thwart
-      const aftBench = new THREE.Mesh(new RoundedBoxGeometry(1.06, 0.075, 0.4, 2, 0.02), oakTrim);
-      aftBench.position.set(0, 0.28, -0.58);
-      const cushion = new THREE.Mesh(new RoundedBoxGeometry(0.74, 0.06, 0.32, 2, 0.025), cushionRed);
-      cushion.position.set(0, 0.33, -0.58);
-      const midThwart = new THREE.Mesh(new RoundedBoxGeometry(1.14, 0.07, 0.3, 2, 0.02), oakTrim);
-      midThwart.position.set(0, 0.27, 0.26);
-      boat.add(aftBench, cushion, midThwart);
-
-      // Crooked Bow Lantern Post + Warm Glowing Harbor Lantern + Pennant Flag
-      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.034, 0.72, 7), oakDark);
-      mast.position.set(0, 0.72, 1.32);
-      const bowArm = new THREE.Mesh(new RoundedBoxGeometry(0.05, 0.05, 0.24, 1, 0.01), oakDark);
-      bowArm.position.set(0, 1.02, 1.42);
-      const bowCap = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.07, 6), oakDark);
-      bowCap.position.set(0, 0.94, 1.5);
-      const bowBulbMat = new THREE.MeshStandardMaterial({
-        color: '#FFF4C2',
-        emissive: '#FFCC66',
-        emissiveIntensity: 0.45,
-        roughness: 0.25,
-      });
-      lampBulbs.push(bowBulbMat);
-      const bowBulb = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), bowBulbMat);
-      bowBulb.position.set(0, 0.85, 1.5);
-      const flag = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.3, 3), sailBlue);
-      flag.rotation.z = -Math.PI / 2;
-      flag.position.set(0.14, 0.96, 1.32);
-      boat.add(mast, bowArm, bowCap, bowBulb, flag);
-
-      // Brass Oarlocks + Sculpted Tapered Wooden Oars
-      let oarLPivot: THREE.Group | null = null;
-      let oarRPivot: THREE.Group | null = null;
-      [-1, 1].forEach((side) => {
-        const oarlock = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.09, 6), brassMat);
-        oarlock.position.set(side * 0.62, 0.44, 0.14);
-        boat.add(oarlock);
-
-        const pivot = new THREE.Group();
-        pivot.position.set(side * 0.62, 0.47, 0.14);
-        const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.24, 6), oakDark);
-        grip.rotation.z = side * 1.16;
-        grip.position.set(-side * 0.14, 0.06, 0);
-        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.026, 1.28, 7), oakTrim);
-        shaft.rotation.z = side * 1.16;
-        shaft.position.set(side * 0.44, -0.17, 0);
-        const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.12, 7), oakDark);
-        collar.rotation.z = side * 1.16;
-        collar.position.set(side * 0.02, -0.01, 0);
-        const blade = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.028, 0.48, 2, 0.01), oakHull);
-        blade.rotation.z = side * 1.16;
-        blade.position.set(side * 0.98, -0.41, 0);
-        pivot.add(grip, collar, shaft, blade);
-        boat.add(pivot);
-        if (side < 0) oarLPivot = pivot;
-        else oarRPivot = pivot;
-      });
-
-      const skipSet = new Set<THREE.Object3D>();
-      if (withOarPivots) {
-        if (oarLPivot) skipSet.add(oarLPivot);
-        if (oarRPivot) skipSet.add(oarRPivot);
-      }
-      mergeStaticGroupByMaterial(boat, skipSet);
-      return {boat, oarLPivot, oarRPivot};
-    };
+    // (Uses exported module-scope buildWoodenRowboat helper so Island Ocean Boat matches 1:1)
 
     {
       const dockGroup = new THREE.Group();
@@ -7074,7 +7096,7 @@ export function buildTownScene(): TownWorld {
       eco.add(dockGroup);
 
       // Moored Wooden Boat floating right beside the dock
-      const mooredBuilt = buildWoodenRowboat(false);
+      const mooredBuilt = buildWoodenRowboat(false, lampBulbs);
       mooredRiverBoat = mooredBuilt.boat;
       mooredRiverBoat.position.set(-78.8, RIVER_WATER_Y + 0.05, -2.25);
       mooredRiverBoat.rotation.y = 0.22;
@@ -7092,7 +7114,7 @@ export function buildTownScene(): TownWorld {
       eco.add(mooredRiverBoat);
 
       // Active Steerable Boat (shown when player embarks onto the river)
-      const activeBuilt = buildWoodenRowboat(true);
+      const activeBuilt = buildWoodenRowboat(true, lampBulbs);
       activeRiverBoat = activeBuilt.boat;
       activeBoatOarL = activeBuilt.oarLPivot;
       activeBoatOarR = activeBuilt.oarRPivot;
@@ -8449,9 +8471,9 @@ export function buildTownScene(): TownWorld {
     };
 
     // East-West Main Trail (z = 0) + Scenic Mall Spur stopping cleanly at May Mall Forecourt Steps
-    addSteppingTrail(-35.5, 0, -8.8, 0);
+    addSteppingTrail(-35.5, 0, -12.6, 0);
     addSteppingTrail(-43.2, -2.5, -36.0, -0.3);
-    addSteppingTrail(8.8, 0, 35.5, 0);
+    addSteppingTrail(12.6, 0, 35.5, 0);
 
     // West Eco-Zone Trails (connecting May Mall promenade -> Ship's Stall -> Boat Dock -> Bridge -> Mountain Trailhead)
     addSteppingTrail(-62.4, -2.5, -67.8, -8.4);
@@ -8460,8 +8482,8 @@ export function buildTownScene(): TownWorld {
     addSteppingTrail(-94.4, 8.5, -100.2, 18.8);
 
     // Center North-South Spine (stops well short of Hill in North, flows south into meadow)
-    addSteppingTrail(0, -8.8, 0, -19.2);
-    addSteppingTrail(0, 8.8, 0, 51.0);
+    addSteppingTrail(0, -12.4, 0, -19.2);
+    addSteppingTrail(0, 12.4, 0, 51.0);
 
     // North Street (z = -12.5) + short approach spurs that STOP before reaching Home / Patio / Garden
     addSteppingTrail(-32.0, -12.5, -1.6, -12.5);
@@ -8808,10 +8830,10 @@ export function buildTownScene(): TownWorld {
 
   // [x, z, scale, hasLantern, lanternAngleRad]
   const oakTreesRaw: [number, number, number, boolean?, number?][] = [
-    [-13.5, -5.8, 1.44, true, 0.78],
-    [13.8, -5.8, 1.24, true, 2.36],
-    [-13.8, 6.2, 1.22, true, -0.78],
-    [13.8, 6.2, 1.48, true, -2.36],
+    [-15.2, -6.6, 1.44, true, 0.78],
+    [15.2, -6.6, 1.24, true, 2.36],
+    [-15.2, 6.6, 1.22, true, -0.78],
+    [15.2, 6.6, 1.48, true, -2.36],
     [-10.2, 17.5, 1.18, true, 0.2],
     [10.5, 17.5, 1.46, true, Math.PI - 0.2],
     [9.6, -24.4, 1.16, true, -0.55],
@@ -8837,12 +8859,12 @@ export function buildTownScene(): TownWorld {
     [-22.0, 62.5, 1.7, true, 1.1],
     [22.5, 61.5, 1.54, true, 2.0],
     // South Main Avenue Trees (x = ±3.85 flanking the untouched central path; lamps point outward onto x = 0 walkway)
-    [-3.85, 11.5, 1.1, true, 0],
-    [3.85, 11.5, 1.1, true, Math.PI],
-    [-3.85, 17.2, 1.1, true, 0],
-    [3.85, 17.2, 1.1, true, Math.PI],
-    [-3.85, 22.9, 1.1, true, 0],
-    [3.85, 22.9, 1.1, true, Math.PI],
+    [-3.85, 13.6, 1.1, true, 0],
+    [3.85, 13.6, 1.1, true, Math.PI],
+    [-3.85, 18.4, 1.1, true, 0],
+    [3.85, 18.4, 1.1, true, Math.PI],
+    [-3.85, 23.2, 1.1, true, 0],
+    [3.85, 23.2, 1.1, true, Math.PI],
     [-3.85, 30.8, 1.1, true, 0],
     [3.85, 30.8, 1.1, true, Math.PI],
     [-3.85, 37.6, 1.1, true, 0],
@@ -8857,8 +8879,8 @@ export function buildTownScene(): TownWorld {
   // South Main Avenue Thin Cords + Colorful Hanging Pennant Flags (merged + 1 InstancedMesh = ~2 draw calls!)
   {
     const avenueBlocks: [number, number[]][] = [
-      [-3.85, [11.5, 17.2, 22.9]],
-      [3.85, [11.5, 17.2, 22.9]],
+      [-3.85, [13.6, 18.4, 23.2]],
+      [3.85, [13.6, 18.4, 23.2]],
       [-3.85, [30.8, 37.6, 43.4, 49.2]],
       [3.85, [30.8, 37.6, 43.4, 49.2]],
     ];
@@ -9072,8 +9094,8 @@ export function buildTownScene(): TownWorld {
   const branchLeafUpMat = new THREE.MeshStandardMaterial({color: '#FFFFFF', roughness: 0.68});
 
   const branchedTreesRaw: [number, number, number, boolean?, number?][] = [
-    [-8.2, -9.2, 1.16, true, -0.4],
-    [8.4, -9.2, 1.38, true, -Math.PI + 0.4],
+    [-13.6, -15.8, 1.16, true, -0.4],
+    [13.8, -15.8, 1.38, true, -Math.PI + 0.4],
     [-8.2, 31.5, 1.42, true, 0.3],
     [8.4, 31.5, 1.18, true, Math.PI - 0.3],
     [19.4, -18.8, 1.36, true, 2.55],
@@ -9955,10 +9977,11 @@ export function buildTownScene(): TownWorld {
   }
 
   // ========== 5C. STATIC INSTANCED GROUND FLORA (BỒN HOA CONG QUẢNG TRƯỜNG, BỤI HOA, CỎ LỚN BÉ & HOA DẠI) ==========
-  // A. Two Smooth Curved Neck-High Plaza Flower Beds (Bồn hoa bo cong hai bên quảng trường theo 2 cây đèn mỗi bên, cao ngang cổ nhân vật)
+  // A. Four Symmetrical Curved Neck-High Plaza Flower Beds (Bồn hoa bo cong 4 góc quảng trường, mở thoáng lối đi Đông-Tây-Bắc-Nam)
   {
-    const ARC_MID_R = 8.02;
-    const ARC_SPAN = THREE.MathUtils.degToRad(46); // -46°..+46° each side -> leaves wide 11.1m N & S entrances open!
+    const ARC_MID_R = PLAZA_BED_ARC_MID_R;
+    const ARC_MIN = PLAZA_BED_ARC_MIN;
+    const ARC_MAX = PLAZA_BED_ARC_MAX;
 
     const buildCurvedPlanterShape = (
       innerR: number,
@@ -9969,15 +9992,11 @@ export function buildTownScene(): TownWorld {
       const midR = (innerR + outerR) * 0.5;
       const capR = (outerR - innerR) * 0.5;
       const shape = new THREE.Shape();
-      // Start on outer arc at startAngle -> trace outer arc to endAngle
       shape.absarc(0, 0, outerR, startAngle, endAngle, false);
-      // Smooth semicircle rounded end-cap at endAngle
       const endCx = Math.cos(endAngle) * midR;
       const endCy = Math.sin(endAngle) * midR;
       shape.absarc(endCx, endCy, capR, endAngle, endAngle + Math.PI, false);
-      // Trace inner arc back from endAngle to startAngle
       shape.absarc(0, 0, innerR, endAngle, startAngle, true);
-      // Smooth semicircle rounded end-cap at startAngle
       const startCx = Math.cos(startAngle) * midR;
       const startCy = Math.sin(startAngle) * midR;
       shape.absarc(startCx, startCy, capR, startAngle + Math.PI, startAngle + Math.PI * 2, false);
@@ -9995,8 +10014,8 @@ export function buildTownScene(): TownWorld {
       const shape = buildCurvedPlanterShape(
         innerR,
         outerR,
-        -ARC_SPAN - anglePad,
-        ARC_SPAN + anglePad,
+        ARC_MIN - anglePad,
+        ARC_MAX + anglePad,
       );
       const geo = new THREE.ExtrudeGeometry(shape, {
         depth: Math.max(0.02, height - bevel * 2),
@@ -10004,7 +10023,7 @@ export function buildTownScene(): TownWorld {
         bevelThickness: bevel,
         bevelSize: bevel,
         bevelSegments: 1,
-        curveSegments: 18,
+        curveSegments: 14,
       });
       geo.rotateX(-Math.PI / 2);
       geo.translate(0, bevel, 0);
@@ -10012,20 +10031,27 @@ export function buildTownScene(): TownWorld {
     };
 
     // Neck-high profile (~0.98m rim = character neck height HEAD_PIVOT_Y = 0.968)
-    const plinthGeo = makeExtrudedArcGeo(7.52, 8.52, 0.18, 0.025, 0.008);
-    const wallGeo = makeExtrudedArcGeo(7.58, 8.46, 0.72, 0.02, 0);
-    const capRimGeo = makeExtrudedArcGeo(7.53, 8.51, 0.12, 0.028, 0.006);
-    const soilGeo = makeExtrudedArcGeo(7.68, 8.36, 0.08, 0.01, -0.012);
+    const plinthGeo = makeExtrudedArcGeo(11.75, 12.75, 0.18, 0.025, 0.008);
+    const wallGeo = makeExtrudedArcGeo(11.81, 12.69, 0.72, 0.02, 0);
+    const capRimGeo = makeExtrudedArcGeo(11.76, 12.74, 0.12, 0.028, 0.006);
+    const soilGeo = makeExtrudedArcGeo(11.91, 12.59, 0.08, 0.01, -0.012);
 
     const plinthMat = getMat('#D6CCBC', 0.8);
     const wallMat = getMat('#F4E8D6', 0.72);
     const capRimMat = getMat('#E5D5BE', 0.68);
     const soilMat = getMat('#5D412C', 0.92);
 
-    // Build Right (+X) and Left (-X, rotated Math.PI) curved beds sharing exact geometries
-    [0, Math.PI].forEach((sideRotY, sideIdx) => {
+    // 4 quadrant orientations around world center (open E/W corridor z ∈ [-3.1, 3.1] and wide N/S avenues!)
+    const bedAngles: {rotY: number; sign: 1 | -1}[] = [
+      {rotY: 0, sign: 1},
+      {rotY: Math.PI, sign: 1},
+      {rotY: 0, sign: -1},
+      {rotY: Math.PI, sign: -1},
+    ];
+    bedAngles.forEach(({rotY, sign}, bedIdx) => {
       const sideBed = new THREE.Group();
-      sideBed.rotation.y = sideRotY;
+      sideBed.rotation.y = rotY;
+      if (sign < 0) sideBed.scale.z = -1;
 
       const plinthMesh = new THREE.Mesh(plinthGeo, plinthMat);
       const wallMesh = new THREE.Mesh(wallGeo, wallMat);
@@ -10038,23 +10064,23 @@ export function buildTownScene(): TownWorld {
       sideBed.add(plinthMesh, wallMesh, capRimMesh, soilMesh);
       group.add(sideBed);
 
-      // Smooth overlapping circle colliders tracing the curved planter arc
-      const colSteps = 9;
+      const colSteps = 5;
       for (let c = 0; c <= colSteps; c++) {
-        const a = THREE.MathUtils.lerp(-ARC_SPAN, ARC_SPAN, c / colSteps) + sideRotY;
+        const localA = THREE.MathUtils.lerp(ARC_MIN, ARC_MAX, c / colSteps) * sign;
+        const worldA = localA + rotY;
         colliders.push({
           type: 'circle',
-          id: `plaza_curved_bed_${sideIdx}_${c}`,
-          x: Math.cos(a) * ARC_MID_R,
-          z: Math.sin(a) * ARC_MID_R,
+          id: `plaza_curved_bed_${bedIdx}_${c}`,
+          x: Math.cos(worldA) * ARC_MID_R,
+          z: Math.sin(worldA) * ARC_MID_R,
           r: 0.56,
         });
       }
     });
 
-    // Static repeatable InstancedMesh foliage cushions & crisp 5-petal flowers along both curved beds
-    const tuftPerSide = 24;
-    const totalBedTufts = tuftPerSide * 2;
+    // Static repeatable InstancedMesh foliage cushions & crisp 5-petal flowers along all 4 curved beds
+    const tuftPerBed = 12;
+    const totalBedTufts = tuftPerBed * bedAngles.length;
     const bedFoliageParts: THREE.BufferGeometry[] = [];
     const bfMound = new THREE.SphereGeometry(0.32, 8, 6);
     bfMound.scale(1.16, 0.56, 1.16);
@@ -10086,10 +10112,11 @@ export function buildTownScene(): TownWorld {
     const bedBloomPalette = ['#FF8DA8', '#FFAD70', '#8CD5FF', '#D1A6FF', '#FF7676', '#FFFFFF'];
 
     let bIdx = 0;
-    [0, Math.PI].forEach((sideRotY) => {
-      for (let t = 0; t < tuftPerSide; t++) {
-        const u = t / (tuftPerSide - 1);
-        const ang = THREE.MathUtils.lerp(-ARC_SPAN * 0.96, ARC_SPAN * 0.96, u) + sideRotY;
+    bedAngles.forEach(({rotY, sign}) => {
+      for (let t = 0; t < tuftPerBed; t++) {
+        const u = t / (tuftPerBed - 1);
+        const localA = THREE.MathUtils.lerp(ARC_MIN + 0.02, ARC_MAX - 0.02, u) * sign;
+        const ang = localA + rotY;
         const rOff = t % 2 === 0 ? -0.11 : 0.11;
         const r = ARC_MID_R + rOff;
         _instDummy.position.set(Math.cos(ang) * r, 0.96, Math.sin(ang) * r);
@@ -10119,10 +10146,10 @@ export function buildTownScene(): TownWorld {
 
   // B. Small & Medium Flowering Bushes (Bụi hoa nhỏ & vừa phủ khắp khu trung tâm & vùng ngoài)
   const bushCoordsRaw: [number, number, string, number?][] = [
-    [-9.2, -7.8, '#F28482', 0.86],
-    [9.2, -7.8, '#8ECAE6', 0.88],
-    [-9.2, 7.8, '#F7A8B8', 0.84],
-    [9.2, 7.8, '#A8D8EA', 0.86],
+    [-12.8, -9.8, '#F28482', 0.86],
+    [12.8, -9.8, '#8ECAE6', 0.88],
+    [-12.8, 9.8, '#F7A8B8', 0.84],
+    [12.8, 9.8, '#A8D8EA', 0.86],
     [-38.2, -25.2, '#FF9EBB', 0.95],
     [-25.8, -25.8, '#F28482', 0.92],
     [25.6, -25.8, '#F7A8B8', 0.94],
@@ -10335,7 +10362,7 @@ export function buildTownScene(): TownWorld {
   const flowerCenterMat = getMat('#FFD24C', 0.42);
 
   const isOnRoadOrPlaza = (px: number, pz: number) => {
-    if (Math.hypot(px, pz) < TOWN_PLAZA_RADIUS + 1.2) return true;
+    if (Math.hypot(px, pz) < TOWN_PLAZA_RADIUS + 2.0) return true;
     if (Math.abs(pz) < 1.8 && px > -37 && px < 37) return true;
     if (Math.abs(pz + 12.5) < 1.8 && px > -34 && px < 34) return true;
     if (Math.abs(pz - 26.8) < 1.8 && px > -34 && px < 34) return true;

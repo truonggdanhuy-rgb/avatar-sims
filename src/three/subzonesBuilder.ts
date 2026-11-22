@@ -35,6 +35,8 @@ import {
   mergeStaticGroupByMaterial,
 } from './materials';
 import {buildMallInteriorScene} from './mallBuilder';
+import {buildIslandScene} from './islandBuilder';
+import type {InsectCatchEvaluation} from './insects3d';
 import {createTreeGeometries, TownAnchor, WorldCollider} from './townBuilder';
 
 export interface HouseDoorHandle {
@@ -89,6 +91,40 @@ export interface SubzoneWorld {
   triggerPondFeed?: () => void;
   setFishingState?: (state: 'idle' | 'waiting' | 'bite') => void;
   updateFishingVisuals?: (frame: FishingVisualFrame, elapsed: number) => void;
+  setSwimRingPose?: (
+    active: boolean,
+    x?: number,
+    z?: number,
+    moving?: boolean,
+    elapsed?: number,
+  ) => void;
+  setIslandBoatPose?: (
+    active: boolean,
+    x?: number,
+    z?: number,
+    rotY?: number,
+    moving?: boolean,
+    elapsed?: number,
+  ) => void;
+  setTreehouseFocus?: (active: boolean) => void;
+  updateInsects?: (
+    playerX: number,
+    playerY: number,
+    playerZ: number,
+    playerSpeed: number,
+    isCreeping: boolean,
+    elapsed: number,
+    delta: number,
+    frustum?: THREE.Frustum,
+    cameraX?: number,
+    cameraZ?: number,
+  ) => {escapedByRun: number; startledByRun: number};
+  tryCatchInsect?: (
+    playerX: number,
+    playerY: number,
+    playerZ: number,
+    playerRotY: number,
+  ) => InsectCatchEvaluation;
   update: (elapsed: number, timeOfDay: TimeOfDay, context?: SubzoneUpdateContext) => void;
   dispose: () => void;
 }
@@ -203,6 +239,9 @@ export function buildSubzoneScene(
 ): SubzoneWorld {
   if (zone === 'mall') {
     return buildMallInteriorScene();
+  }
+  if (zone === 'island') {
+    return buildIslandScene({fishingState: options.fishingState});
   }
   const group = new THREE.Group();
   const clickTargets: THREE.Object3D[] = [];

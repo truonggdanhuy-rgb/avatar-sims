@@ -6,7 +6,8 @@ export type ZoneId =
   | 'arcade'
   | 'boutique'
   | 'petshop'
-  | 'mall';
+  | 'mall'
+  | 'island';
 
 export type TimeOfDay = 'morning' | 'night';
 
@@ -50,7 +51,17 @@ export type TopStyle =
   | 'sundress'
   | 'cardigan_vest'
   | 'office_male'
-  | 'office_female';
+  | 'office_female'
+  | 'varsity_jacket'
+  | 'raglan_clover'
+  | 'star_sweater'
+  | 'ribbon_blouse'
+  | 'pinafore_dress'
+  | 'bunny_hoodie'
+  | 'zip_parka'
+  | 'safari_shirt'
+  | 'sport_raglan'
+  | 'casual_shirt';
 
 export type BottomStyle =
   | 'pleated_skirt'
@@ -58,7 +69,10 @@ export type BottomStyle =
   | 'wide_trousers'
   | 'midi_skirt'
   | 'office_trousers'
-  | 'office_skirt';
+  | 'office_skirt'
+  | 'cargo_shorts'
+  | 'sport_shorts'
+  | 'a_line_skirt';
 
 export type ShoeStyle = 'sneakers' | 'mary_janes' | 'boots' | 'loafers';
 
@@ -68,6 +82,7 @@ export type HeadItemStyle =
   | 'sunhat'
   | 'cap'
   | 'beanie'
+  | 'bucket_hat'
   | 'cat_ears'
   | 'flower_crown'
   | 'ribbon_bow'
@@ -107,7 +122,9 @@ export type AvatarPose =
   | 'skate_ride'
   | 'skate_push'
   | 'bike_idle'
-  | 'bike_ride';
+  | 'bike_ride'
+  | 'swim'
+  | 'climb';
 
 export interface AvatarConfig {
   name: string;
@@ -508,8 +525,24 @@ export type RiverFishSpeciesId =
   | 'ca_rong_bac'
   | 'ca_tam_song';
 
+export type SeaFishSpeciesId =
+  | 'ca_he'
+  | 'sua_bien'
+  | 'sao_bien'
+  | 'ca_noc_gai'
+  | 'bach_tuoc'
+  | 'ca_thu_xanh'
+  | 'ca_ngua'
+  | 'tom_hum_do'
+  | 'ca_duoi_dom'
+  | 'rua_bien'
+  | 'so_tai_tuong'
+  | 'ca_voi_xanh';
+
+export type FishSpeciesId = RiverFishSpeciesId | SeaFishSpeciesId;
+
 export interface FishSpeciesDefinition {
-  id: RiverFishSpeciesId;
+  id: FishSpeciesId;
   name: string;
   waterType: FishWaterType;
   rarity: FishRarity;
@@ -523,7 +556,7 @@ export interface FishSpeciesDefinition {
 
 export interface CaughtFishItem {
   id: string;
-  speciesId: RiverFishSpeciesId;
+  speciesId: FishSpeciesId;
   waterType: FishWaterType;
   weightKg: number;
   sellPrice: number;

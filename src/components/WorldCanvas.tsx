@@ -20,6 +20,7 @@ import {
   Sparkles,
   Trophy,
   Utensils,
+  Waves,
   Wind,
   Wrench,
   X,
@@ -32,6 +33,7 @@ import {
   FISH_RARITY_CONFIG,
   getRodRepairCost,
   rollRandomRiverFish,
+  rollRandomSeaFish,
   WOODEN_BOAT_PRICE,
 } from '../data/fishingCatalog';
 import {getNetRepairCost} from '../data/insectCatalog';
@@ -92,6 +94,7 @@ import {
   RIVER_BOARD_INTERACT,
   RIVER_WATER_Y,
   TOWN_LAKE_WATER_Y,
+  TOWN_PLAZA_RADIUS,
   TOWN_ZONE_ENTRANCES,
   TownAnchor,
   TownWorld,
@@ -101,6 +104,23 @@ import {
   WEST_RIVER_NAV_MIN_Z,
   WorldCollider,
 } from '../three/townBuilder';
+import {
+  clampPointToIslandTreehouse,
+  getIslandBaseTerrainY,
+  getIslandGroundHeight,
+  ISLAND_BALLOON_POS,
+  ISLAND_LADDER_BOTTOM,
+  ISLAND_LADDER_CLIMB_END,
+  ISLAND_LADDER_CLIMB_START,
+  ISLAND_LADDER_TOP,
+  ISLAND_PIER_INTERACT,
+  ISLAND_SPAWN,
+  ISLAND_SWIM_MAX_R,
+  ISLAND_TREEHOUSE_DECK_Y,
+  ISLAND_TREEHOUSE_DOOR,
+  ISLAND_WATER_Y,
+  isPointOnIslandPier,
+} from '../three/islandBuilder';
 import {
   AvatarConfig,
   AvatarPose,
@@ -112,6 +132,8 @@ import {
   FishingPhase,
   FishingRodState,
   FishRarity,
+  FishSpeciesId,
+  FishWaterType,
   GameStats,
   GardenPlotState,
   InsectRarity,
@@ -124,7 +146,6 @@ import {
   PetSupplies,
   PlacedFurniture,
   PondFishState,
-  RiverFishSpeciesId,
   TimeOfDay,
   ToolId,
   WellWaterState,
@@ -180,11 +201,12 @@ interface WorldCanvasProps {
   onRotateFurniture: (id: string) => void;
   onStowFurniture: (id: string) => void;
   onCatchRiverFish: (preRolled?: {
-    speciesId: RiverFishSpeciesId;
+    speciesId: FishSpeciesId;
     weightKg: number;
     sellPrice: number;
+    waterType?: FishWaterType;
   }) => {
-    speciesId: RiverFishSpeciesId;
+    speciesId: FishSpeciesId;
     name: string;
     rarity: FishRarity;
     weightKg: number;
@@ -287,7 +309,7 @@ interface SeatTarget {
 type CatchCelebrationData =
   | {
       kind: 'fish';
-      speciesId: RiverFishSpeciesId;
+      speciesId: FishSpeciesId;
       name: string;
       rarity: FishRarity;
       weightKg: number;
@@ -408,6 +430,16 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
     return {fov: 43, pos: [0, 6.2, 7.2] as const, look: [0, 1.0, 0] as const};
   }
 
+  if (zone === 'island') {
+    if (isPortrait) {
+      return {fov, pos: [0, 17.6, 27.0] as const, look: [0, 0.9, 0] as const};
+    }
+    if (isSquare) {
+      return {fov, pos: [0, 16.5, 25.0] as const, look: [0, 0.9, 0] as const};
+    }
+    return {fov, pos: [0, 15.2, 23.2] as const, look: [0, 0.9, 0] as const};
+  }
+
   if (isPortrait) {
     return {fov, pos: [0, 6.8, 10.6] as const, look: [0, 0.75, -0.35] as const};
   }
@@ -417,6 +449,9 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
 function getZoneWalkBounds(zone: ZoneId) {
   if (zone === 'town') {
     return {minX: -146, maxX: 82, minZ: -98, maxZ: 78};
+  }
+  if (zone === 'island') {
+    return {minX: -74.0, maxX: 74.0, minZ: -74.0, maxZ: 74.0};
   }
   if (zone === 'home') {
     return {minX: -12.85, maxX: 9.85, minZ: -8.95, maxZ: 6.95};
@@ -1246,9 +1281,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const mallRideActionRef = useRef<(() => void) | null>(null);
   const disembarkBoatActionRef = useRef<(() => void) | null>(null);
   const launchParachuteRef = useRef<(() => void) | null>(null);
+  const goToIslandActionRef = useRef<(() => void) | null>(null);
+  const goToTownFromIslandActionRef = useRef<(() => void) | null>(null);
+  const toggleIslandSwimActionRef = useRef<(() => void) | null>(null);
   const playerNameDomRef = useRef<HTMLDivElement | null>(null);
   const petNameDomRef = useRef<HTMLDivElement | null>(null);
   const mallElevatorHudRef = useRef<'none' | 'near_ground' | 'deck' | 'riding'>('none');
+  const nearTownBalloonRef = useRef<boolean>(false);
+  const nearIslandBalloonRef = useRef<boolean>(false);
+  const nearIslandPierRef = useRef<boolean>(false);
   const pendingPlazaSpawnRef = useRef<boolean>(false);
 
   const [tags, setTags] = useState<ProjectedTag[]>([]);
@@ -1259,6 +1300,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [isBoatingHud, setIsBoatingHud] = useState(false);
   const [parachuteConfirmOpen, setParachuteConfirmOpen] = useState(false);
   const [isParachutingHud, setIsParachutingHud] = useState(false);
+  const [nearTownBalloon, setNearTownBalloon] = useState(false);
+  const [nearIslandBalloon, setNearIslandBalloon] = useState(false);
+  const [nearIslandPier, setNearIslandPier] = useState(false);
+  const [isSwimmingHud, setIsSwimmingHud] = useState(false);
   const [fishingState, setFishingState] = useState<FishingPhase>('idle');
   const [biteAlertPos, setBiteAlertPos] = useState<{x: number; y: number} | null>(null);
   const [brokenRodPrompt, setBrokenRodPrompt] = useState<{
@@ -1496,8 +1541,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       setIsBoatingHud(false);
       setIsParachutingHud(false);
       setParachuteConfirmOpen(false);
+      nearTownBalloonRef.current = false;
+      setNearTownBalloon(false);
     }
-    if (zone !== 'town' && zone !== 'fishing' && zone !== 'garden') {
+    if (zone !== 'island') {
+      setIsSwimmingHud(false);
+      nearIslandBalloonRef.current = false;
+      setNearIslandBalloon(false);
+      nearIslandPierRef.current = false;
+      setNearIslandPier(false);
+    }
+    if (zone !== 'town' && zone !== 'fishing' && zone !== 'garden' && zone !== 'island') {
       if (fishTimerRef.current) {
         clearTimeout(fishTimerRef.current);
         fishTimerRef.current = null;
@@ -1583,7 +1637,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       fishingState === 'idle' ? 'idle' : fishingState === 'bite' ? 'bite' : 'waiting';
     if (zone === 'town') {
       activeTownRef.current?.setFishingState?.(legacyState);
-    } else if (zone === 'garden' || zone === 'fishing') {
+    } else if (zone === 'garden' || zone === 'fishing' || zone === 'island') {
       activeSubzoneRef.current?.setFishingState?.(legacyState);
     }
   }, [zone, fishingState]);
@@ -1846,6 +1900,138 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       return {x: cx, z: cz};
     };
 
+    const swimState = {
+      active: false,
+      targetX: null as number | null,
+      targetZ: null as number | null,
+      moving: false,
+      limitNoticeCooldown: 0,
+    };
+
+    const treehouseState = {
+      onTreehouse: false,
+      climbing: false,
+      direction: 'up' as 'up' | 'down',
+      progress: 0,
+      duration: 2.05,
+      cooldown: 0,
+      baseGroundY: 0.72,
+      postClimbAction: null as (() => void) | null,
+    };
+
+    const clampSwimOceanPoint = (x: number, z: number): {x: number; z: number; hitLimit: boolean} => {
+      const r = Math.hypot(x, z);
+      const maxR = ISLAND_SWIM_MAX_R - 0.7;
+      let hitLimit = false;
+      let cx = x;
+      let cz = z;
+      if (r > maxR && r > 0.001) {
+        hitLimit = true;
+        cx = (x / r) * maxR;
+        cz = (z / r) * maxR;
+      }
+      return {x: cx, z: cz, hitLimit};
+    };
+
+    const enterIslandSwim = (startX?: number, startZ?: number) => {
+      if (stateRef.current.zone !== 'island') return;
+      if (fishCtrl.phase !== 'idle') {
+        resetFishing(false);
+      }
+      callbacksRef.current.onDismountMount();
+      activeTarget = null;
+      releaseSeatIfNeeded();
+      treehouseState.onTreehouse = false;
+      treehouseState.climbing = false;
+      treehouseState.postClimbAction = null;
+      activeSubzone?.setTreehouseFocus?.(false);
+      jumpY = 0;
+      jumpVel = 0;
+      swimState.active = true;
+      swimState.targetX = null;
+      swimState.targetZ = null;
+      swimState.moving = false;
+      if (typeof startX === 'number' && typeof startZ === 'number') {
+        playerPos.x = startX;
+        playerPos.z = startZ;
+      } else if (isPointOnIslandPier(playerPos.x, playerPos.z)) {
+        playerPos.x = 0;
+        playerPos.z = 35.4;
+        playerPos.rotY = 0;
+      } else {
+        const r = Math.hypot(playerPos.x, playerPos.z) || 1;
+        const pushR = Math.max(r + 2.4, 27.4);
+        playerPos.x = (playerPos.x / r) * pushR;
+        playerPos.z = (playerPos.z / r) * pushR;
+      }
+      playerPos.pose = 'swim';
+      prevGroundY = ISLAND_WATER_Y - 0.56;
+      setIsSwimmingHud(true);
+      soundFX.splash();
+      showBubble(
+        'Bơi tự do ngoài biển! Chạm nước để bơi hoặc bấm "Lên bờ".',
+        playerPos.x,
+        1.5,
+        playerPos.z,
+      );
+    };
+
+    const exitIslandSwim = (toPier = false) => {
+      if (!swimState.active) return;
+      swimState.active = false;
+      swimState.targetX = null;
+      swimState.targetZ = null;
+      swimState.moving = false;
+      activeSubzone?.setSwimRingPose?.(false);
+      setIsSwimmingHud(false);
+      if (toPier) {
+        playerPos.x = ISLAND_PIER_INTERACT.tx;
+        playerPos.z = ISLAND_PIER_INTERACT.tz;
+        playerPos.rotY = Math.PI;
+      } else {
+        const r = Math.hypot(playerPos.x, playerPos.z) || 1;
+        for (let rt = r; rt >= 17.5; rt -= 0.4) {
+          const sx = (playerPos.x / r) * rt;
+          const sz = (playerPos.z / r) * rt;
+          if (getIslandBaseTerrainY(sx, sz) >= ISLAND_WATER_Y + 0.14) {
+            playerPos.x = sx;
+            playerPos.z = sz;
+            break;
+          }
+        }
+      }
+      playerPos.pose = 'idle';
+      prevGroundY = getIslandGroundHeight(playerPos.x, playerPos.z);
+      jumpY = 0;
+      jumpVel = 0;
+      soundFX.tap();
+      showBubble(toPier ? 'Đã lên Bến Thuyền!' : 'Đã bơi lên bãi cát!');
+    };
+
+    toggleIslandSwimActionRef.current = () => {
+      if (stateRef.current.zone !== 'island') return;
+      if (swimState.active) {
+        const nearEndOfPier = Math.hypot(playerPos.x, playerPos.z - 34.4) < 5.6;
+        exitIslandSwim(nearEndOfPier);
+      } else {
+        enterIslandSwim();
+      }
+    };
+
+    goToIslandActionRef.current = () => {
+      if (stateRef.current.zone !== 'town') return;
+      callbacksRef.current.onDismountMount();
+      soundFX.enterDoor();
+      callbacksRef.current.onChangeZone('island');
+    };
+
+    goToTownFromIslandActionRef.current = () => {
+      if (stateRef.current.zone !== 'island') return;
+      callbacksRef.current.onDismountMount();
+      soundFX.enterDoor();
+      callbacksRef.current.onChangeZone('town');
+    };
+
     const playerProxy = new THREE.Mesh(
       new THREE.BoxGeometry(0.95, 1.85, 0.95),
       new THREE.MeshBasicMaterial({visible: false}),
@@ -1866,6 +2052,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           ? currentColliders.filter((c) => c.id?.startsWith('mall_f2_'))
           : currentColliders.filter((c) => !c.id?.startsWith('mall_f2_'));
       }
+      if (zNow === 'island') {
+        return treehouseState.onTreehouse
+          ? currentColliders.filter((c) => c.id?.startsWith('island_th_'))
+          : currentColliders.filter((c) => !c.id?.startsWith('island_th_'));
+      }
       return currentColliders;
     };
     let currentShadowBlockers: THREE.Mesh[] = [];
@@ -1874,7 +2065,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     const _shadowBoxHitVec = new THREE.Vector3();
     let currentNavGrid: NavGrid | null = null;
     let mallFloor2NavGrid: NavGrid | null = null;
-    let currentPlazaRadius = 6.8;
+    let currentPlazaRadius = TOWN_PLAZA_RADIUS;
     let currentGrounds: THREE.Object3D[] = [];
     let currentWallSurfaces: HouseWallSurface[] = [];
     let prevGroundY = 0.14;
@@ -1973,6 +2164,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (zNow === 'town' && mallElev.state === 'deck') {
         return clampPointToMallDeck(wx, wz);
       }
+      if (zNow === 'island' && treehouseState.onTreehouse) {
+        return clampPointToIslandTreehouse(wx, wz);
+      }
       const b = getZoneWalkBounds(zNow);
       return {
         x: THREE.MathUtils.clamp(wx, b.minX + 0.35, b.maxX - 0.35),
@@ -2002,6 +2196,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           );
         }
         return mallState.floor === 2 ? MALL_UPPER_Y : 0.02;
+      }
+      if (zNow === 'island') {
+        if (treehouseState.climbing) {
+          const eased =
+            treehouseState.progress * treehouseState.progress * (3 - 2 * treehouseState.progress);
+          return treehouseState.direction === 'up'
+            ? THREE.MathUtils.lerp(treehouseState.baseGroundY, ISLAND_TREEHOUSE_DECK_Y, eased)
+            : THREE.MathUtils.lerp(ISLAND_TREEHOUSE_DECK_Y, treehouseState.baseGroundY, eased);
+        }
+        if (treehouseState.onTreehouse) {
+          return ISLAND_TREEHOUSE_DECK_Y;
+        }
+        return swimState.active && Math.hypot(px, pz) > 25.0
+          ? ISLAND_WATER_Y + 0.04
+          : getIslandGroundHeight(px, pz);
       }
       return 0.02;
     };
@@ -2278,12 +2487,32 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         boatState.targetZ = null;
         boatState.moving = false;
         setIsBoatingHud(false);
+        swimState.active = false;
+        swimState.targetX = null;
+        swimState.targetZ = null;
+        swimState.moving = false;
+        setIsSwimmingHud(false);
+        treehouseState.onTreehouse = false;
+        treehouseState.climbing = false;
+        treehouseState.direction = 'up';
+        treehouseState.progress = 0;
+        treehouseState.cooldown = 0;
+        treehouseState.postClimbAction = null;
         if (zoneChanged) playPetTimer = 0;
         controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : z === 'mall' ? 3.6 : 4.5;
         controls.maxDistance =
-          z === 'garden' || z === 'home' ? 26 : z === 'mall' ? 16.5 : z === 'petshop' ? 22 : 18;
-        controls.minPolarAngle = Math.PI * 0.16;
-        controls.maxPolarAngle = z === 'mall' ? Math.PI * 0.48 : Math.PI * 0.45;
+          z === 'island'
+            ? 56
+            : z === 'garden' || z === 'home'
+              ? 26
+              : z === 'mall'
+                ? 16.5
+                : z === 'petshop'
+                  ? 22
+                  : 18;
+        controls.minPolarAngle = z === 'island' ? Math.PI * 0.12 : Math.PI * 0.16;
+        controls.maxPolarAngle =
+          z === 'island' ? Math.PI * 0.62 : z === 'mall' ? Math.PI * 0.48 : Math.PI * 0.45;
         activeSubzone = buildSubzoneScene(z, {
           plots: pl,
           fishingState: legacyFs,
@@ -2318,6 +2547,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             'mall',
             currentColliders.filter((c) => c.id?.startsWith('mall_f2_')),
           );
+        } else if (z === 'island') {
+          currentNavGrid = buildNavGrid(
+            'island',
+            currentColliders.filter((c) => !c.id?.startsWith('island_th_')),
+          );
+          mallFloor2NavGrid = null;
         } else {
           currentNavGrid = buildNavGrid(z, currentColliders);
           mallFloor2NavGrid = null;
@@ -2354,16 +2589,24 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             playerPos.x = 0;
             playerPos.z = 18.8;
             playerPos.rotY = Math.PI;
+          } else if (z === 'island') {
+            playerPos.x = ISLAND_SPAWN.x;
+            playerPos.z = ISLAND_SPAWN.z;
+            playerPos.rotY = ISLAND_SPAWN.rotY;
           } else {
             playerPos.x = 0;
             playerPos.z = 2.6;
             playerPos.rotY = 0;
           }
           playerPos.pose = 'idle';
-          prevGroundY = 0;
-          playerRig.root.position.set(playerPos.x, 0, playerPos.z);
+          const spawnSubY =
+            z === 'island' ? getIslandGroundHeight(playerPos.x, playerPos.z) : 0;
+          prevGroundY = spawnSubY;
+          playerRig.root.position.set(playerPos.x, spawnSubY, playerPos.z);
           playerRig.root.rotation.y = playerPos.rotY;
           cameraTransitionActive = true;
+        } else if (z === 'island') {
+          activeSubzone.setTreehouseFocus?.(treehouseState.onTreehouse || treehouseState.climbing);
         }
       }
       activeZoneLoaded = z;
@@ -2403,11 +2646,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             : mallElev.state === 'riding_up' || mallElev.state === 'riding_down'
               ? mallElev.y + 0.06
               : getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius)
-          : stateRef.current.zone === 'mall'
-            ? mallState.floor === 2
-              ? MALL_UPPER_Y
-              : 0.02
-            : 0;
+          : stateRef.current.zone === 'island'
+            ? swimState.active
+              ? ISLAND_WATER_Y - 0.56
+              : getIslandGroundHeight(playerPos.x, playerPos.z)
+            : stateRef.current.zone === 'mall'
+              ? mallState.floor === 2
+                ? MALL_UPPER_Y
+                : 0.02
+              : 0;
       playerRig.root.position.set(playerPos.x, curY, playerPos.z);
       playerRig.root.rotation.y = playerPos.rotY;
       playerRig.root.add(playerProxy);
@@ -2463,11 +2710,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       dirToBobberZ: -1,
       approachRotY: Math.PI,
       rolledCatch: null as {
-        speciesId: RiverFishSpeciesId;
+        speciesId: FishSpeciesId;
         name: string;
         rarity: FishRarity;
         weightKg: number;
         sellPrice: number;
+        waterType: FishWaterType;
       } | null,
       shadowScale: 0.72,
       biteWindowSec: 1.45,
@@ -2494,6 +2742,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
       if (z === 'fishing') {
         return {targetX: 0, targetZ: -3.25, waterY: -0.14};
+      }
+      if (z === 'island') {
+        return {targetX: 0, targetZ: 36.2, waterY: ISLAND_WATER_Y};
       }
       return {targetX: -22.5, targetZ: 46.6, waterY: TOWN_LAKE_WATER_Y};
     };
@@ -2593,8 +2844,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       targetX: number,
       targetZ: number,
       waterY: number,
-      waterKind: 'river' | 'lake',
+      waterKind: 'river' | 'lake' | 'sea',
     ): boolean => {
+      if (waterKind === 'sea') {
+        if (Math.hypot(targetX, targetZ) > ISLAND_SWIM_MAX_R - 1.5) return false;
+        if (getIslandBaseTerrainY(targetX, targetZ) >= ISLAND_WATER_Y - 0.14) return false;
+        if (isPointOnIslandPier(targetX, targetZ)) return false;
+        return true;
+      }
       if (waterKind === 'river') {
         if (targetZ < WEST_RIVER_NAV_MIN_Z + 1.0 || targetZ > WEST_RIVER_NAV_MAX_Z - 1.0) {
           return false;
@@ -2701,7 +2958,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (fishCtrl.phase === 'idle') {
         const zNow = stateRef.current.zone;
         const target = customWater ?? getZoneFishingWaterTarget(zNow);
-        const rolled = rollRandomRiverFish();
+        const rolled = zNow === 'island' ? rollRandomSeaFish() : rollRandomRiverFish();
         const cfg = FISH_RARITY_CONFIG[rolled.species.rarity];
 
         const gy =
@@ -2709,13 +2966,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             ? getTownGroundHeight(spotX, spotZ, currentPlazaRadius)
             : zNow === 'garden'
               ? 0.36
-              : 0;
+              : zNow === 'island'
+                ? getIslandGroundHeight(spotX, spotZ)
+                : 0;
 
         // Pick an unoccluded open-water approach angle so the fish shadow spawns clearly in view
         const forwardX = Math.sin(facingRotY);
         const forwardZ = Math.cos(facingRotY);
-        const waterKindTown: 'river' | 'lake' | null =
-          zNow === 'town' ? (target.targetX < -55 ? 'river' : 'lake') : null;
+        const waterKindTown: 'river' | 'lake' | 'sea' | null =
+          zNow === 'town'
+            ? target.targetX < -55
+              ? 'river'
+              : 'lake'
+            : zNow === 'island'
+              ? 'sea'
+              : null;
         const baseJitter = (Math.random() - 0.5) * 0.32;
         const spreadCandidates = [0, 0.7, -0.7, 1.35, -1.35];
         let chosenAngle = facingRotY + baseJitter;
@@ -2761,6 +3026,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           rarity: rolled.species.rarity,
           weightKg: rolled.weightKg,
           sellPrice: rolled.sellPrice,
+          waterType: rolled.species.waterType,
         };
         fishCtrl.shadowScale = cfg.shadowScale;
         fishCtrl.biteWindowSec = cfg.biteWindowMs / 1000;
@@ -2787,6 +3053,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               speciesId: fishCtrl.rolledCatch.speciesId,
               weightKg: fishCtrl.rolledCatch.weightKg,
               sellPrice: fishCtrl.rolledCatch.sellPrice,
+              waterType: fishCtrl.rolledCatch.waterType,
             }
           : undefined;
         resetFishing(false);
@@ -2895,8 +3162,137 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
     disembarkBoatActionRef.current = () => disembarkBoat(true);
 
+    const climbTreehouseLadder = (direction: 'up' | 'down', postAction?: () => void) => {
+      if (stateRef.current.zone !== 'island' || treehouseState.climbing) return;
+      if (fishCtrl.phase !== 'idle') {
+        resetFishing(false);
+      }
+      callbacksRef.current.onDismountMount();
+      releaseSeatIfNeeded();
+      activeTarget = null;
+      jumpY = 0;
+      jumpVel = 0;
+      playPetTimer = 0;
+      treehouseState.climbing = true;
+      treehouseState.direction = direction;
+      treehouseState.progress = 0;
+      treehouseState.baseGroundY = getIslandBaseTerrainY(
+        ISLAND_LADDER_BOTTOM.x,
+        ISLAND_LADDER_BOTTOM.z,
+      );
+      treehouseState.postClimbAction = postAction ?? null;
+      playerPos.x =
+        direction === 'up' ? ISLAND_LADDER_CLIMB_START.x : ISLAND_LADDER_CLIMB_END.x;
+      playerPos.z =
+        direction === 'up' ? ISLAND_LADDER_CLIMB_START.z : ISLAND_LADDER_CLIMB_END.z;
+      playerPos.rotY = Math.PI;
+      playerPos.pose = 'climb';
+      activeSubzone?.setTreehouseFocus?.(true);
+      soundFX.tap();
+      showBubble(
+        direction === 'up'
+          ? 'Đang leo cầu thang dây lên Vườn Trên Cây...'
+          : 'Đang leo cầu thang dây xuống bãi cỏ...',
+      );
+    };
+
+    const walkToIslandTreehousePoint = (
+      tx: number,
+      tz: number,
+      arrivePose: AvatarPose,
+      seat?: SeatTarget,
+      onArrive?: () => void,
+    ) => {
+      if (stateRef.current.zone !== 'island') return;
+      if (!treehouseState.onTreehouse) {
+        if (swimState.active) {
+          showBubble('Hãy lên bờ trước khi leo Cầu Thang Dây lên Nhà Trên Cây!');
+          return;
+        }
+        const distBot = Math.hypot(
+          playerPos.x - ISLAND_LADDER_BOTTOM.x,
+          playerPos.z - ISLAND_LADDER_BOTTOM.z,
+        );
+        const startUp = () =>
+          climbTreehouseLadder('up', () =>
+            walkToIslandTreehousePoint(tx, tz, arrivePose, seat, onArrive),
+          );
+        if (distBot < 0.72) {
+          startUp();
+        } else {
+          startWalkTo(
+            ISLAND_LADDER_BOTTOM.x,
+            ISLAND_LADDER_BOTTOM.z,
+            'idle',
+            undefined,
+            startUp,
+          );
+        }
+        return;
+      }
+
+      const thPt = clampPointToIslandTreehouse(tx, tz);
+      const finalPt = seat
+        ? thPt
+        : resolvePointAgainstColliders(
+            thPt.x,
+            thPt.z,
+            getActiveColliders('island'),
+            PLAYER_RADIUS,
+            false,
+          );
+      const clampedFinal = clampPointToIslandTreehouse(finalPt.x, finalPt.z);
+      const waypoints: {x: number; z: number}[] = [];
+      const doorZ = ISLAND_TREEHOUSE_DOOR.z;
+      const startInside = playerPos.z < doorZ;
+      const endInside = clampedFinal.z < doorZ;
+      if (startInside !== endInside) {
+        if (startInside) {
+          waypoints.push({x: ISLAND_TREEHOUSE_DOOR.x, z: doorZ - 0.52});
+          waypoints.push({x: ISLAND_TREEHOUSE_DOOR.x, z: doorZ + 0.52});
+        } else {
+          waypoints.push({x: ISLAND_TREEHOUSE_DOOR.x, z: doorZ + 0.52});
+          waypoints.push({x: ISLAND_TREEHOUSE_DOOR.x, z: doorZ - 0.52});
+        }
+      }
+      waypoints.push({x: clampedFinal.x, z: clampedFinal.z});
+      stallTimer = 0;
+      prevDistToTarget = Infinity;
+      playPetTimer = 0;
+      activeTarget = {
+        x: clampedFinal.x,
+        z: clampedFinal.z,
+        waypoints,
+        waypointIdx: 0,
+        arrivePose,
+        seat,
+        onArrive,
+      };
+    };
+
+    const ensureOnIslandGroundThen = (afterDown: () => void) => {
+      if (stateRef.current.zone === 'island' && treehouseState.onTreehouse) {
+        walkToIslandTreehousePoint(
+          ISLAND_LADDER_TOP.x,
+          ISLAND_LADDER_TOP.z,
+          'idle',
+          undefined,
+          () => climbTreehouseLadder('down', afterDown),
+        );
+        return;
+      }
+      afterDown();
+    };
+
     jumpActionRef.current = () => {
-      if (boatState.active || parachuteCtrl.active) return;
+      if (
+        boatState.active ||
+        parachuteCtrl.active ||
+        swimState.active ||
+        treehouseState.climbing
+      ) {
+        return;
+      }
       if (
         stateRef.current.zone === 'town' &&
         (mallElev.state === 'riding_up' || mallElev.state === 'riding_down')
@@ -2914,7 +3310,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
 
     catchActionRef.current = () => {
-      if (stateRef.current.zone !== 'town' || boatState.active || parachuteCtrl.active) return;
+      const zAct = stateRef.current.zone;
+      if (
+        (zAct !== 'town' && zAct !== 'island') ||
+        boatState.active ||
+        parachuteCtrl.active ||
+        swimState.active ||
+        treehouseState.climbing
+      ) {
+        return;
+      }
       const net = stateRef.current.bugNet;
       if (!net.owned || !net.equipped) return;
       if (net.durability <= 0) {
@@ -3095,7 +3500,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     const pointer = new THREE.Vector2();
 
     const handlePointerTap = (clientX: number, clientY: number) => {
-      if (parachuteCtrl.active) return;
+      if (parachuteCtrl.active || treehouseState.climbing) return;
       if (
         stateRef.current.zone === 'town' &&
         (mallElev.state === 'riding_up' || mallElev.state === 'riding_down')
@@ -3298,9 +3703,57 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               standX: chosen.tx,
               standZ: chosen.tz,
             };
-            startWalkTo(chosen.tx, chosen.tz, 'sit', seatInfo, () =>
-              soundFX.sparkle(),
-            );
+            if (stateRef.current.zone === 'island' && data.isTreehouseItem) {
+              walkToIslandTreehousePoint(chosen.tx, chosen.tz, 'sit', seatInfo, () => {
+                soundFX.sparkle();
+                callbacksRef.current.onBoostMood();
+                showBubble('Thưởng trà & bánh ngọt thơm lừng trên Nhà Trên Cây! (+Vui vẻ)');
+              });
+            } else if (stateRef.current.zone === 'island' && treehouseState.onTreehouse) {
+              ensureOnIslandGroundThen(() =>
+                startWalkTo(chosen.tx, chosen.tz, 'sit', seatInfo, () =>
+                  soundFX.sparkle(),
+                ),
+              );
+            } else {
+              startWalkTo(chosen.tx, chosen.tz, 'sit', seatInfo, () =>
+                soundFX.sparkle(),
+              );
+            }
+            return;
+          }
+
+          if (kind === 'island_rope_ladder') {
+            soundFX.tap();
+            if (swimState.active) {
+              showBubble('Hãy lên bờ trước khi leo Cầu Thang Dây!');
+              return;
+            }
+            if (treehouseState.onTreehouse) {
+              walkToIslandTreehousePoint(
+                ISLAND_LADDER_TOP.x,
+                ISLAND_LADDER_TOP.z,
+                'idle',
+                undefined,
+                () => climbTreehouseLadder('down'),
+              );
+            } else {
+              const distBot = Math.hypot(
+                playerPos.x - ISLAND_LADDER_BOTTOM.x,
+                playerPos.z - ISLAND_LADDER_BOTTOM.z,
+              );
+              if (distBot < 0.72) {
+                climbTreehouseLadder('up');
+              } else {
+                startWalkTo(
+                  ISLAND_LADDER_BOTTOM.x,
+                  ISLAND_LADDER_BOTTOM.z,
+                  'idle',
+                  undefined,
+                  () => climbTreehouseLadder('up'),
+                );
+              }
+            }
             return;
           }
 
@@ -3333,11 +3786,30 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               standX: data.tx as number,
               standZ: data.tz as number,
             };
-            startWalkTo(data.tx as number, data.tz as number, 'sit', seatInfo, () => {
-              soundFX.sparkle();
-              callbacksRef.current.onBoostMood();
-              showBubble('Ngồi sưởi ấm bên bếp lửa trại thật chill! (+Vui vẻ)');
-            });
+            ensureOnIslandGroundThen(() =>
+              startWalkTo(data.tx as number, data.tz as number, 'sit', seatInfo, () => {
+                soundFX.sparkle();
+                callbacksRef.current.onBoostMood();
+                showBubble('Ngồi sưởi ấm bên bếp lửa trại thật chill! (+Vui vẻ)');
+              }),
+            );
+            return;
+          }
+
+          if (kind === 'beach_grill') {
+            soundFX.tap();
+            ensureOnIslandGroundThen(() =>
+              startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+                soundFX.sparkle();
+                callbacksRef.current.onBoostMood();
+                showBubble(
+                  'Nướng cá biển vàng giòn thơm phức bên tiếng sóng rì rào! (+Vui vẻ)',
+                  (data.grillX as number) ?? (data.tx as number),
+                  2.1,
+                  (data.grillZ as number) ?? (data.tz as number),
+                );
+              }),
+            );
             return;
           }
 
@@ -3408,7 +3880,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'bed') {
             soundFX.tap();
-            const bedId = data.furnitureId as string;
+            const bedId = typeof data.furnitureId === 'string' ? data.furnitureId : null;
+            const sleepMsg =
+              (data.sleepMessage as string | undefined) || 'Ngủ thật ngon! (+Năng lượng)';
             const bedSeat: SeatTarget = {
               seatX: (data.seatX as number) ?? 2.35,
               seatZ: (data.seatZ as number) ?? -3.1,
@@ -3418,13 +3892,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               standZ: data.tz as number,
               isBed: true,
             };
-            startWalkTo(data.tx as number, data.tz as number, 'sleep', bedSeat, () => {
-              soundFX.nap();
-              activeBedIdRef.current = bedId;
-              activeSubzone?.setActiveBed?.(bedId);
-              callbacksRef.current.onRestoreEnergy();
-              showBubble('Ngủ thật ngon! (+Năng lượng)', bedSeat.seatX, 2.1, bedSeat.seatZ);
-            });
+            const walkToBed = () =>
+              startWalkTo(data.tx as number, data.tz as number, 'sleep', bedSeat, () => {
+                soundFX.nap();
+                if (bedId) {
+                  activeBedIdRef.current = bedId;
+                  activeSubzone?.setActiveBed?.(bedId);
+                }
+                callbacksRef.current.onRestoreEnergy();
+                showBubble(sleepMsg, bedSeat.seatX, bedSeat.seatY + 1.45, bedSeat.seatZ);
+              });
+            if (stateRef.current.zone === 'island') {
+              ensureOnIslandGroundThen(walkToBed);
+            } else {
+              walkToBed();
+            }
             return;
           }
 
@@ -3905,10 +4387,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'campsite_bbq') {
             soundFX.tap();
-            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              soundFX.sparkle();
-              callbacksRef.current.onOpenBbqGrill();
-            });
+            const walkToBbq = () =>
+              startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+                soundFX.sparkle();
+                callbacksRef.current.onOpenBbqGrill();
+              });
+            if (stateRef.current.zone === 'island') {
+              ensureOnIslandGroundThen(walkToBbq);
+            } else {
+              walkToBbq();
+            }
             return;
           }
 
@@ -4237,6 +4725,136 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
+          if (kind === 'balloon_to_island') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              goToIslandActionRef.current?.();
+            });
+            return;
+          }
+
+          if (kind === 'balloon_to_town') {
+            soundFX.tap();
+            if (swimState.active) {
+              showBubble('Hãy lên bờ trước khi lên Khinh Khí Cầu Về Mây!');
+              return;
+            }
+            ensureOnIslandGroundThen(() =>
+              startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+                goToTownFromIslandActionRef.current?.();
+              }),
+            );
+            return;
+          }
+
+          if (kind === 'island_pier_swim') {
+            soundFX.tap();
+            if (swimState.active) {
+              exitIslandSwim(true);
+            } else {
+              ensureOnIslandGroundThen(() =>
+                startWalkTo(
+                  (data.tx as number) ?? ISLAND_PIER_INTERACT.tx,
+                  (data.tz as number) ?? ISLAND_PIER_INTERACT.tz,
+                  'idle',
+                  undefined,
+                  () => {
+                    enterIslandSwim(0, 35.4);
+                  },
+                ),
+              );
+            }
+            return;
+          }
+
+          if (kind === 'island_sea_water') {
+            if (fishCtrl.phase === 'waiting' || fishCtrl.phase === 'nibbling') {
+              handleSpotFishing(playerPos.x, playerPos.z, fishCtrl.facingRotY);
+              return;
+            }
+            const hitPt = hits[0].point;
+            if (swimState.active) {
+              soundFX.tap();
+              const clamped = clampSwimOceanPoint(hitPt.x, hitPt.z);
+              if (clamped.hitLimit) {
+                showBubble('Đã tới giới hạn vùng bơi an toàn!');
+              }
+              swimState.targetX = clamped.x;
+              swimState.targetZ = clamped.z;
+              return;
+            }
+            soundFX.tap();
+            if (stateRef.current.fishingRod.equipped) {
+              const trySeaBeachCast = (spotX: number, spotZ: number) => {
+                const rodNow = stateRef.current.fishingRod;
+                if (rodNow.durability <= 0) {
+                  setBrokenRodPrompt({
+                    repairCost: getRodRepairCost(rodNow.durability, rodNow.maxDurability),
+                    maxDurability: rodNow.maxDurability,
+                  });
+                  return;
+                }
+                const dxW = hitPt.x - spotX;
+                const dzW = hitPt.z - spotZ;
+                const rawD = Math.hypot(dxW, dzW);
+                const dirX = rawD > 0.05 ? dxW / rawD : (spotX || 0) / (Math.hypot(spotX, spotZ) || 1);
+                const dirZ = rawD > 0.05 ? dzW / rawD : (spotZ || 1) / (Math.hypot(spotX, spotZ) || 1);
+                const castDist = THREE.MathUtils.clamp(rawD, 2.8, 5.2);
+                const tx = spotX + dirX * castDist;
+                const tz = spotZ + dirZ * castDist;
+                if (!isWaterTargetOpenForShadow(tx, tz, ISLAND_WATER_Y, 'sea')) {
+                  soundFX.tap();
+                  showBubble(
+                    'Hãy đứng sát mép bãi biển hoặc Bến Thuyền hướng ra biển thoáng để quăng phao!',
+                    spotX,
+                    2.2,
+                    spotZ,
+                  );
+                  return;
+                }
+                const castRotY = Math.atan2(tx - spotX, tz - spotZ);
+                handleSpotFishing(spotX, spotZ, castRotY, {
+                  targetX: tx,
+                  targetZ: tz,
+                  waterY: ISLAND_WATER_Y,
+                });
+              };
+
+              const distToHit = Math.hypot(playerPos.x - hitPt.x, playerPos.z - hitPt.z);
+              if (
+                distToHit <= 6.0 &&
+                (getIslandGroundHeight(playerPos.x, playerPos.z) <= 0.45 ||
+                  isPointOnIslandPier(playerPos.x, playerPos.z))
+              ) {
+                trySeaBeachCast(playerPos.x, playerPos.z);
+              } else {
+                // Walk cleanly to the sandy shoreline along the clicked direction
+                const ang = Math.atan2(hitPt.z, hitPt.x);
+                let standX = Math.cos(ang) * 23.0;
+                let standZ = Math.sin(ang) * 23.0;
+                for (let rt = 19.0; rt <= 29.0; rt += 0.35) {
+                  const tx = Math.cos(ang) * rt;
+                  const tz = Math.sin(ang) * rt;
+                  if (getIslandBaseTerrainY(tx, tz) <= ISLAND_WATER_Y + 0.12) {
+                    standX = Math.cos(ang) * Math.max(19.0, rt - 0.55);
+                    standZ = Math.sin(ang) * Math.max(19.0, rt - 0.55);
+                    break;
+                  }
+                }
+                ensureOnIslandGroundThen(() =>
+                  startWalkTo(standX, standZ, 'idle', undefined, () =>
+                    trySeaBeachCast(standX, standZ),
+                  ),
+                );
+              }
+              return;
+            }
+            showBubble(
+              'Lại Bến Thuyền để bơi tự do ngoài biển, hoặc cầm Cần Câu đứng bãi biển câu cá biển!',
+            );
+            return;
+          }
+
           if (stateRef.current.zone === 'town' && mallElev.state === 'deck') {
             return;
           }
@@ -4275,19 +4893,65 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
+          if (stateRef.current.zone === 'island' && !swimState.active) {
+            const firstHit = groundHits[0];
+            if (firstHit.object.userData?.isTreehouseFloor) {
+              walkToIslandTreehousePoint(firstHit.point.x, firstHit.point.z, 'idle');
+              return;
+            }
+          }
+
           const groundHit =
             stateRef.current.zone === 'mall'
               ? groundHits.find((h) => h.object.userData?.mallFloor === mallState.floor)
-              : groundHits.find((h) => !h.object.userData?.isMallDeck);
+              : stateRef.current.zone === 'island'
+                ? groundHits.find((h) => !h.object.userData?.isTreehouseFloor)
+                : groundHits.find((h) => !h.object.userData?.isMallDeck);
           if (!groundHit) return;
           const pt = groundHit.point;
+          if (stateRef.current.zone === 'island' && swimState.active) {
+            // If player is swimming and taps near shallow beach/pier, swim toward shore to climb up
+            const clampedSwim = clampSwimOceanPoint(pt.x, pt.z);
+            swimState.targetX = clampedSwim.x;
+            swimState.targetZ = clampedSwim.z;
+            soundFX.tap();
+            return;
+          }
           const b = getZoneWalkBounds(stateRef.current.zone);
-          const clampedX = THREE.MathUtils.clamp(pt.x, b.minX, b.maxX);
-          const clampedZ = THREE.MathUtils.clamp(pt.z, b.minZ, b.maxZ);
+          let clampedX = THREE.MathUtils.clamp(pt.x, b.minX, b.maxX);
+          let clampedZ = THREE.MathUtils.clamp(pt.z, b.minZ, b.maxZ);
+          if (stateRef.current.zone === 'island' && getIslandGroundHeight(clampedX, clampedZ) < ISLAND_WATER_Y - 0.08) {
+            // Pull underwater clicks gently back onto shallow beach edge
+            const rHit = Math.hypot(clampedX, clampedZ) || 1;
+            const nx = clampedX / rHit;
+            const nz = clampedZ / rHit;
+            for (let rt = Math.min(rHit, 32); rt >= 18; rt -= 0.35) {
+              const sx = nx * rt;
+              const sz = nz * rt;
+              if (getIslandGroundHeight(sx, sz) >= ISLAND_WATER_Y - 0.04) {
+                clampedX = sx;
+                clampedZ = sz;
+                break;
+              }
+            }
+          }
           const floorPoint =
             stateRef.current.zone === 'mall'
               ? clampMallFloorPoint(clampedX, clampedZ, mallState.floor)
               : {x: clampedX, z: clampedZ};
+          if (stateRef.current.zone === 'island' && treehouseState.onTreehouse) {
+            ensureOnIslandGroundThen(() => {
+              const safeDown = resolvePointAgainstColliders(
+                floorPoint.x,
+                floorPoint.z,
+                currentColliders.filter((c) => !c.id?.startsWith('island_th_')),
+                PLAYER_RADIUS,
+                false,
+              );
+              startWalkTo(safeDown.x, safeDown.z, 'idle');
+            });
+            return;
+          }
           const onBedNow = stateRef.current.zone === 'town' && prevGroundY + jumpY >= 0.86;
           const safeTarget = resolvePointAgainstColliders(
             floorPoint.x,
@@ -4569,9 +5233,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const spawnGroundY =
           z === 'town'
             ? getTownGroundHeight(playerPos.x, playerPos.z, currentPlazaRadius)
-            : z === 'mall' && mallState.floor === 2
-              ? MALL_UPPER_Y
-              : 0;
+            : z === 'island'
+              ? swimState.active
+                ? ISLAND_WATER_Y - 0.56
+                : getIslandGroundHeight(playerPos.x, playerPos.z)
+              : z === 'mall' && mallState.floor === 2
+                ? MALL_UPPER_Y
+                : 0;
         _camLookTarget.set(playerPos.x, spawnGroundY + 0.92, playerPos.z);
         _camPosTarget.set(
           playerPos.x + (camCfg.pos[0] - camCfg.look[0]),
@@ -4596,8 +5264,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         z === 'town' && (mallElev.state === 'riding_up' || mallElev.state === 'riding_down');
       const isOnMallDeck = z === 'town' && mallElev.state === 'deck';
       const isRidingEscalator = z === 'mall' && mallState.ridingLane !== null;
+      const isClimbingLadder = z === 'island' && treehouseState.climbing;
       if (z === 'mall' && !isRidingEscalator) {
         mallState.cooldown = Math.max(0, mallState.cooldown - delta);
+      }
+      if (z === 'island' && !isClimbingLadder) {
+        treehouseState.cooldown = Math.max(0, treehouseState.cooldown - delta);
       }
 
       if (isRidingMallElevator) {
@@ -4662,10 +5334,59 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
+      if (isClimbingLadder) {
+        treehouseState.progress = Math.min(
+          1,
+          treehouseState.progress + delta / treehouseState.duration,
+        );
+        const goingUp = treehouseState.direction === 'up';
+        const eased =
+          treehouseState.progress *
+          treehouseState.progress *
+          (3 - 2 * treehouseState.progress);
+        playerPos.x = goingUp
+          ? THREE.MathUtils.lerp(ISLAND_LADDER_CLIMB_START.x, ISLAND_LADDER_CLIMB_END.x, eased)
+          : THREE.MathUtils.lerp(ISLAND_LADDER_CLIMB_END.x, ISLAND_LADDER_CLIMB_START.x, eased);
+        playerPos.z = goingUp
+          ? THREE.MathUtils.lerp(ISLAND_LADDER_CLIMB_START.z, ISLAND_LADDER_CLIMB_END.z, eased)
+          : THREE.MathUtils.lerp(ISLAND_LADDER_CLIMB_END.z, ISLAND_LADDER_CLIMB_START.z, eased);
+        playerPos.rotY = Math.PI;
+        playerPos.pose = 'climb';
+        activeTarget = null;
+        activeSeat = null;
+        jumpY = 0;
+        jumpVel = 0;
+        playPetTimer = 0;
+        if (treehouseState.progress >= 1) {
+          treehouseState.climbing = false;
+          treehouseState.progress = 0;
+          treehouseState.onTreehouse = goingUp;
+          treehouseState.cooldown = 1.5;
+          activeSubzone?.setTreehouseFocus?.(goingUp);
+          if (goingUp) {
+            playerPos.x = ISLAND_LADDER_TOP.x;
+            playerPos.z = ISLAND_LADDER_TOP.z;
+            playerPos.rotY = Math.PI;
+            prevGroundY = ISLAND_TREEHOUSE_DECK_Y;
+          } else {
+            playerPos.x = ISLAND_LADDER_BOTTOM.x;
+            playerPos.z = ISLAND_LADDER_BOTTOM.z;
+            playerPos.rotY = 0;
+            prevGroundY = treehouseState.baseGroundY;
+          }
+          playerPos.pose = 'idle';
+          const cbClimb = treehouseState.postClimbAction;
+          treehouseState.postClimbAction = null;
+          soundFX.tap();
+          cbClimb?.();
+        }
+      }
+
       // Jump vertical physics
       if (
         !isRidingMallElevator &&
         !isRidingEscalator &&
+        !isClimbingLadder &&
         !parachuteCtrl.active &&
         (jumpY > 0 || jumpVel !== 0)
       ) {
@@ -4680,14 +5401,20 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
       const isAirborne =
-        !isRidingMallElevator && !isRidingEscalator && !parachuteCtrl.active && jumpY > 0.01;
+        !isRidingMallElevator &&
+        !isRidingEscalator &&
+        !isClimbingLadder &&
+        !parachuteCtrl.active &&
+        jumpY > 0.01;
 
       const onFlowerBedLevel = z === 'town' && !isOnMallDeck && prevGroundY + jumpY >= 0.86;
 
       let groundOffset = z === 'mall' && mallState.floor === 2 ? MALL_UPPER_Y : 0.02;
       const joy = joystickInputRef.current;
       const joyMag =
-        !isRidingMallElevator && !isRidingEscalator && joy.active ? Math.hypot(joy.x, joy.y) : 0;
+        !isRidingMallElevator && !isRidingEscalator && !isClimbingLadder && joy.active
+          ? Math.hypot(joy.x, joy.y)
+          : 0;
       let moveHorizSpeed = 0;
       let isCreepingNow = false;
 
@@ -4893,8 +5620,107 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           groundOffset = parachuteCtrl.worldY;
           prevGroundY = parachuteCtrl.worldY;
         }
+      } else if (z === 'island' && swimState.active) {
+        activeTarget = null;
+        activeSeat = null;
+        jumpY = 0;
+        jumpVel = 0;
+        playPetTimer = 0;
+        swimState.limitNoticeCooldown = Math.max(0, swimState.limitNoticeCooldown - delta);
+
+        const swimSpeed = 4.65;
+        let nextSwimX = playerPos.x;
+        let nextSwimZ = playerPos.z;
+        let hitBoundary = false;
+
+        if (joyMag > 0.08) {
+          swimState.targetX = null;
+          swimState.targetZ = null;
+          let fwdX = controls.target.x - camera.position.x;
+          let fwdZ = controls.target.z - camera.position.z;
+          const fwdLen = Math.hypot(fwdX, fwdZ);
+          if (fwdLen > 0.001) {
+            fwdX /= fwdLen;
+            fwdZ /= fwdLen;
+          } else {
+            fwdX = 0;
+            fwdZ = -1;
+          }
+          const rightX = -fwdZ;
+          const rightZ = fwdX;
+          const moveDirX = rightX * joy.x + fwdX * -joy.y;
+          const moveDirZ = rightZ * joy.x + fwdZ * -joy.y;
+          const moveLen = Math.hypot(moveDirX, moveDirZ) || 1;
+          const stepLen = swimSpeed * Math.min(1, joyMag) * delta;
+          const clamped = clampSwimOceanPoint(
+            playerPos.x + (moveDirX / moveLen) * stepLen,
+            playerPos.z + (moveDirZ / moveLen) * stepLen,
+          );
+          nextSwimX = clamped.x;
+          nextSwimZ = clamped.z;
+          hitBoundary = clamped.hitLimit;
+        } else if (swimState.targetX !== null && swimState.targetZ !== null) {
+          const dx = swimState.targetX - playerPos.x;
+          const dz = swimState.targetZ - playerPos.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist < 0.28) {
+            swimState.targetX = null;
+            swimState.targetZ = null;
+          } else {
+            const stepLen = Math.min(dist, swimSpeed * delta);
+            const clamped = clampSwimOceanPoint(
+              playerPos.x + (dx / dist) * stepLen,
+              playerPos.z + (dz / dist) * stepLen,
+            );
+            nextSwimX = clamped.x;
+            nextSwimZ = clamped.z;
+            hitBoundary = clamped.hitLimit;
+          }
+        }
+
+        if (hitBoundary && swimState.limitNoticeCooldown <= 0) {
+          swimState.limitNoticeCooldown = 2.6;
+          showBubble('Đã tới giới hạn vùng bơi an toàn!');
+        }
+
+        // Prevent swimming inside moored pier pilings
+        const resolvedSwim = resolvePointAgainstColliders(
+          nextSwimX,
+          nextSwimZ,
+          getActiveColliders('island'),
+          PLAYER_RADIUS,
+          false,
+        );
+        const dmx = resolvedSwim.x - playerPos.x;
+        const dmz = resolvedSwim.z - playerPos.z;
+        playerPos.x = resolvedSwim.x;
+        playerPos.z = resolvedSwim.z;
+        moveHorizSpeed = Math.hypot(dmx, dmz) / Math.max(0.001, delta);
+        swimState.moving = Math.hypot(dmx, dmz) > 0.002;
+        if (swimState.moving) {
+          const targetRot = Math.atan2(dmx, dmz);
+          let diff = targetRot - playerPos.rotY;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          playerPos.rotY += diff * Math.min(1, delta * 9);
+        }
+
+        // Swimming back up onto the shallow sandy beach cleanly exits swim mode
+        if (getIslandBaseTerrainY(playerPos.x, playerPos.z) >= ISLAND_WATER_Y + 0.08) {
+          exitIslandSwim(false);
+          groundOffset = getIslandGroundHeight(playerPos.x, playerPos.z);
+          prevGroundY = groundOffset;
+        } else {
+          playerPos.pose = 'swim';
+          groundOffset = ISLAND_WATER_Y - 0.56;
+          prevGroundY = groundOffset;
+          activeSubzone?.setSwimRingPose?.(true, playerPos.x, playerPos.z, swimState.moving, elapsed);
+        }
       } else {
-        if (isRidingMallElevator || isRidingEscalator) {
+        if (z === 'island') {
+          activeSubzone?.setSwimRingPose?.(false);
+        }
+        if (isRidingMallElevator || isRidingEscalator || isClimbingLadder) {
           activeTarget = null;
         } else if (netSwingCtrl.active) {
           activeTarget = null;
@@ -4931,8 +5757,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           const moveDirZ = rightZ * joy.x + fwdZ * -joy.y;
           const moveLen = Math.hypot(moveDirX, moveDirZ) || 1;
           isCreepingNow =
-            z === 'town' &&
+            (z === 'town' || z === 'island') &&
             !isOnMallDeck &&
+            !treehouseState.onTreehouse &&
             stateRef.current.bugNet.equipped &&
             joyMag <= 0.58 &&
             !isAirborne;
@@ -4945,8 +5772,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           const speed =
             (isCreepingNow
               ? 0.68
-              : (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : z === 'mall' ? 4.8 : 3.6) *
-                Math.min(1, joyMag)) *
+              : (z === 'town'
+                  ? isOnMallDeck
+                    ? 4.2
+                    : 5.6
+                  : z === 'island'
+                    ? treehouseState.onTreehouse
+                      ? 4.0
+                      : 5.2
+                    : z === 'mall'
+                      ? 4.8
+                      : 3.6) * Math.min(1, joyMag)) *
             hungerSpeedMult *
             mountSpeedMult;
           const stepLen = speed * delta;
@@ -4959,6 +5795,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const deckClamped = clampPointToMallDeck(rawX, rawZ);
             nextX = deckClamped.x;
             nextZ = deckClamped.z;
+          } else if (z === 'island' && treehouseState.onTreehouse) {
+            const resolved = resolvePointAgainstColliders(
+              rawX,
+              rawZ,
+              getActiveColliders('island'),
+              PLAYER_RADIUS,
+              false,
+            );
+            const thClamped = clampPointToIslandTreehouse(resolved.x, resolved.z);
+            nextX = thClamped.x;
+            nextZ = thClamped.z;
           } else {
             const resolved = resolvePointAgainstColliders(
               rawX,
@@ -4974,6 +5821,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               const mp = clampMallFloorPoint(nextX, nextZ, mallState.floor);
               nextX = mp.x;
               nextZ = mp.z;
+            } else if (z === 'island' && getIslandGroundHeight(nextX, nextZ) < ISLAND_WATER_Y - 0.1) {
+              // Keep non-swimming feet at ankle-deep sandy shoreline or on wooden pier
+              if (getIslandGroundHeight(playerPos.x, playerPos.z) >= ISLAND_WATER_Y - 0.1) {
+                nextX = playerPos.x;
+                nextZ = playerPos.z;
+              }
             }
           }
           const dmx = nextX - playerPos.x;
@@ -5020,7 +5873,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const mountDefWalk = getMountDefinition(stateRef.current.ownedMounts.activeMountId);
             const mountSpeedMult = mountDefWalk ? mountDefWalk.speedMultiplier : 1;
             const speed =
-              (z === 'town' ? (isOnMallDeck ? 4.2 : 5.6) : z === 'mall' ? 4.8 : 3.6) *
+              (z === 'town'
+                ? isOnMallDeck
+                  ? 4.2
+                  : 5.6
+                : z === 'island'
+                  ? 5.2
+                  : z === 'mall'
+                    ? 4.8
+                    : 3.6) *
               hungerSpeedMult *
               mountSpeedMult;
 
@@ -5094,6 +5955,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                   const mp = clampMallFloorPoint(nextX, nextZ, mallState.floor);
                   nextX = mp.x;
                   nextZ = mp.z;
+                } else if (z === 'island' && treehouseState.onTreehouse) {
+                  const thp = clampPointToIslandTreehouse(nextX, nextZ);
+                  nextX = thp.x;
+                  nextZ = thp.z;
                 }
               }
 
@@ -5179,6 +6044,27 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
         }
 
+        if (
+          z === 'island' &&
+          !isClimbingLadder &&
+          treehouseState.cooldown <= 0 &&
+          !activeTarget &&
+          joyMag > 0.08
+        ) {
+          if (
+            treehouseState.onTreehouse &&
+            Math.abs(playerPos.x - ISLAND_LADDER_TOP.x) < 0.56 &&
+            playerPos.z > -6.58
+          ) {
+            climbTreehouseLadder('down');
+          } else if (
+            !treehouseState.onTreehouse &&
+            Math.hypot(playerPos.x - ISLAND_LADDER_BOTTOM.x, playerPos.z - ISLAND_LADDER_BOTTOM.z) < 0.56
+          ) {
+            climbTreehouseLadder('up');
+          }
+        }
+
         if (isRidingMallElevator) {
           groundOffset = mallElev.y + 0.06;
         } else if (isRidingEscalator && mallState.ridingLane) {
@@ -5189,6 +6075,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             mallState.ridingLane.endY,
             eased,
           );
+        } else if (isClimbingLadder) {
+          const eased =
+            treehouseState.progress *
+            treehouseState.progress *
+            (3 - 2 * treehouseState.progress);
+          groundOffset =
+            treehouseState.direction === 'up'
+              ? THREE.MathUtils.lerp(treehouseState.baseGroundY, ISLAND_TREEHOUSE_DECK_Y, eased)
+              : THREE.MathUtils.lerp(ISLAND_TREEHOUSE_DECK_Y, treehouseState.baseGroundY, eased);
         } else if ((playerPos.pose === 'sit' || playerPos.pose === 'bath') && activeSeat) {
           groundOffset = activeSeat.seatY - 0.245;
         } else if (playerPos.pose === 'sleep' && activeSeat?.isBed) {
@@ -5203,12 +6098,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
         } else if (z === 'garden' && playerPos.x > 9.35 && playerPos.x < 15.9 && Math.abs(playerPos.z - 3.0) < 0.98) {
           groundOffset = 0.36;
+        } else if (z === 'island') {
+          groundOffset = treehouseState.onTreehouse
+            ? ISLAND_TREEHOUSE_DECK_Y
+            : getIslandGroundHeight(playerPos.x, playerPos.z);
         } else if (z === 'mall') {
           groundOffset = mallState.floor === 2 ? MALL_UPPER_Y : 0.02;
         }
 
         // Preserve world elevation smoothly when landing onto or stepping off elevated flower beds
-        if (isRidingMallElevator || isRidingEscalator) {
+        if (isRidingMallElevator || isRidingEscalator || isClimbingLadder) {
           prevGroundY = groundOffset;
           jumpY = 0;
         } else {
@@ -5243,11 +6142,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
 
       controls.update();
-      if (z === 'town' && !cameraTransitionActive) {
-        const camGround = Math.max(
-          TOWN_LAKE_WATER_Y + 0.35,
-          getTownGroundHeight(camera.position.x, camera.position.z, currentPlazaRadius),
-        );
+      if ((z === 'town' || z === 'island') && !cameraTransitionActive) {
+        const camGround =
+          z === 'town'
+            ? Math.max(
+                TOWN_LAKE_WATER_Y + 0.35,
+                getTownGroundHeight(camera.position.x, camera.position.z, currentPlazaRadius),
+              )
+            : Math.max(
+                ISLAND_WATER_Y + 0.35,
+                getIslandGroundHeight(camera.position.x, camera.position.z),
+              );
         const minCamY = camGround + 0.55;
         if (camera.position.y < minCamY) {
           camera.position.y = minCamY;
@@ -5607,12 +6512,20 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
         if (netSwingCtrl.elapsed >= 0.16 && !netSwingCtrl.catchEvaluated) {
           netSwingCtrl.catchEvaluated = true;
-          const evalRes = activeTown?.tryCatchInsect?.(
-            playerPos.x,
-            groundOffset + jumpY,
-            playerPos.z,
-            playerPos.rotY,
-          );
+          const evalRes =
+            z === 'town'
+              ? activeTown?.tryCatchInsect?.(
+                  playerPos.x,
+                  groundOffset + jumpY,
+                  playerPos.z,
+                  playerPos.rotY,
+                )
+              : activeSubzone?.tryCatchInsect?.(
+                  playerPos.x,
+                  groundOffset + jumpY,
+                  playerPos.z,
+                  playerPos.rotY,
+                );
           if (evalRes?.caught) {
             const catchRes = callbacksRef.current.onCatchInsect(evalRes.caught);
             if (catchRes) {
@@ -5667,9 +6580,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           mountRig &&
           mountRig.mountId === curMountDef.id &&
           !boatState.active &&
+          !swimState.active &&
           !parachuteCtrl.active &&
           !isRidingMallElevator &&
           !isRidingEscalator &&
+          !isClimbingLadder &&
           !activeSeat &&
           !netSwingCtrl.active &&
           fishCtrl.phase === 'idle' &&
@@ -5831,6 +6746,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           Math.abs(playerPos.z - 3.0) < 0.98
         ) {
           petGy = 0.36;
+        } else if (z === 'island') {
+          petGy = treehouseState.climbing
+            ? groundOffset
+            : treehouseState.onTreehouse
+              ? ISLAND_TREEHOUSE_DECK_Y
+              : swimState.active
+                ? ISLAND_WATER_Y + 0.04
+                : getIslandGroundHeight(playerPos.x, playerPos.z);
         } else if (z === 'mall') {
           petGy = isRidingEscalator
             ? groundOffset
@@ -6009,6 +6932,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             const dp = clampPointToMallDeck(petCompanion.x, petCompanion.z);
             petCompanion.x = dp.x;
             petCompanion.z = dp.z;
+          } else if (z === 'island' && treehouseState.onTreehouse) {
+            const thp = clampPointToIslandTreehouse(petCompanion.x, petCompanion.z);
+            petCompanion.x = thp.x;
+            petCompanion.z = thp.z;
           }
 
           const gy = getPetGroundY(petCompanion.x, petCompanion.z, z);
@@ -6080,8 +7007,36 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       } else {
         bbqLabelArmed = true;
         bbqLabelHideAtMs = 0;
-        if (z === 'garden' || z === 'fishing') {
+        if (z === 'garden' || z === 'fishing' || z === 'island') {
           activeSubzone?.updateFishingVisuals?.(fishVisualFrame, elapsed);
+        }
+        if (z === 'island') {
+          const islandInsects = activeSubzone?.updateInsects?.(
+            playerPos.x,
+            groundOffset + jumpY,
+            playerPos.z,
+            moveHorizSpeed,
+            isCreepingNow,
+            elapsed,
+            delta,
+            _frustum,
+            camera.position.x,
+            camera.position.z,
+          );
+          if (
+            islandInsects &&
+            (islandInsects.escapedByRun > 0 || islandInsects.startledByRun > 0) &&
+            stateRef.current.bugNet.equipped &&
+            !netSwingCtrl.active &&
+            insectAlertCooldown <= 0
+          ) {
+            insectAlertCooldown = 3.2;
+            showBubble(
+              islandInsects.escapedByRun > 0
+                ? 'Đi quá mạnh làm côn trùng bay mất! Kéo nhẹ Joystick để đi rón rén.'
+                : 'Côn trùng giật mình bay sang chỗ khác! Kéo nhẹ Joystick để đi chậm.',
+            );
+          }
         }
         activeSubzone?.update(elapsed, tod, {cameraPos: camera.position, playerPos});
       }
@@ -6202,12 +7157,49 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         const cw = container?.clientWidth || window.innerWidth || 800;
         const ch = container?.clientHeight || window.innerHeight || 600;
 
+        const nextNearTownBalloon =
+          z === 'town' &&
+          !parachuteCtrl.active &&
+          Math.hypot(playerPos.x - 0.95, playerPos.z - -64.8) <= 5.8;
+        if (nextNearTownBalloon !== nearTownBalloonRef.current) {
+          nearTownBalloonRef.current = nextNearTownBalloon;
+          setNearTownBalloon(nextNearTownBalloon);
+        }
+
+        const nextNearIslandBalloon =
+          z === 'island' &&
+          !swimState.active &&
+          Math.hypot(playerPos.x - ISLAND_BALLOON_POS.x, playerPos.z - ISLAND_BALLOON_POS.z) <= 5.8;
+        if (nextNearIslandBalloon !== nearIslandBalloonRef.current) {
+          nearIslandBalloonRef.current = nextNearIslandBalloon;
+          setNearIslandBalloon(nextNearIslandBalloon);
+        }
+
+        const nextNearIslandPier =
+          z === 'island' &&
+          !swimState.active &&
+          Math.hypot(playerPos.x - 0, playerPos.z - 31.8) <= 5.2;
+        if (nextNearIslandPier !== nearIslandPierRef.current) {
+          nearIslandPierRef.current = nextNearIslandPier;
+          setNearIslandPier(nextNearIslandPier);
+        }
+
         if (currentAnchors.length > 0) {
           const nextTags: ProjectedTag[] = [];
           const nowMs = performance.now();
           for (const a of currentAnchors) {
             if (a.id === 'campsite_bbq_tag' && (z !== 'town' || nowMs >= bbqLabelHideAtMs)) {
               continue;
+            }
+            if (a.id === 'balloon_station' && z === 'town') {
+              if (Math.hypot(playerPos.x - a.worldPos.x, playerPos.z - a.worldPos.z) > 6.5) {
+                continue;
+              }
+            }
+            if (a.id === 'island_balloon_station' && z === 'island') {
+              if (Math.hypot(playerPos.x - a.worldPos.x, playerPos.z - a.worldPos.z) > 6.8) {
+                continue;
+              }
             }
             if (z === 'mall') {
               // Strict close-proximity nameplate for NPC Tun ("lại thật gần mới hiện tên")
@@ -6650,6 +7642,62 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             <ArrowDown className="h-4 w-4 shrink-0 text-[#E86C5D]" />
             <span>Đang lướt dù đáp đất · Dùng Joystick chọn hướng</span>
           </div>
+        </div>
+      )}
+
+      {/* Hot Air Balloon Departure Button ("Qua Đảo") when close to Town Balloon Station */}
+      {zone === 'town' && nearTownBalloon && !isParachutingHud && !miniActive && (
+        <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              goToIslandActionRef.current?.();
+            }}
+            className="anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 border-[#2A7EA0] bg-[#E8F8FF]/95 px-5 py-2 text-xs font-extrabold text-[#124863] shadow-lg transition-transform hover:scale-105 active:scale-95"
+          >
+            <Wind className="h-4 w-4 text-[#2A7EA0]" />
+            <span>Qua Đảo</span>
+          </button>
+        </div>
+      )}
+
+      {/* Hot Air Balloon Return Button ("Về Mây") when close to Island Balloon Station */}
+      {zone === 'island' && nearIslandBalloon && !isSwimmingHud && !miniActive && (
+        <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              goToTownFromIslandActionRef.current?.();
+            }}
+            className="anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 border-[#D96B52] bg-[#FFF4EE]/95 px-5 py-2 text-xs font-extrabold text-[#6E2D1D] shadow-lg transition-transform hover:scale-105 active:scale-95"
+          >
+            <Wind className="h-4 w-4 text-[#D96B52]" />
+            <span>Về Mây</span>
+          </button>
+        </div>
+      )}
+
+      {/* Island Boat Pier Swim Toggle / Ocean Disembark HUD */}
+      {zone === 'island' && (isSwimmingHud || nearIslandPier) && !miniActive && (
+        <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              toggleIslandSwimActionRef.current?.();
+            }}
+            className={`anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 px-5 py-2 text-xs font-extrabold shadow-lg transition-transform hover:scale-105 active:scale-95 ${
+              isSwimmingHud
+                ? 'border-[#78421B] bg-[#FFF5E2]/95 text-[#4E2D12]'
+                : 'border-[#1E82A8] bg-[#E5F8FF]/95 text-[#124A63]'
+            }`}
+          >
+            {isSwimmingHud ? (
+              <Anchor className="h-4 w-4 text-[#2E82A8]" />
+            ) : (
+              <Waves className="h-4 w-4 text-[#1E82A8]" />
+            )}
+            <span>{isSwimmingHud ? 'Lên bờ' : 'Bơi Biển'}</span>
+          </button>
         </div>
       )}
 
@@ -7536,7 +8584,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* FPS-Style Catch Bug Button (Right Beside Jump Button when holding Bug Net) */}
-      {zone === 'town' && bugNet.equipped && !miniActive && (
+      {(zone === 'town' || zone === 'island') && bugNet.equipped && !isSwimmingHud && !miniActive && (
         <button
           type="button"
           onPointerDown={(e) => {

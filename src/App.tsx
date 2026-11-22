@@ -43,13 +43,14 @@ import {
   tickPetCareMeters,
 } from './data/petCatalog';
 import {
+  ALL_FISH_CATALOG,
   computeFishSellPrice,
   createInitialFishDex,
   createInitialFishingRod,
   createInitialWoodenBoat,
   getRodRepairCost,
-  RIVER_FISH_CATALOG,
   rollRandomRiverFish,
+  rollRandomSeaFish,
   rollRodDurabilityLoss,
   WOODEN_BOAT_PRICE,
   WOODEN_ROD_MAX_DURABILITY,
@@ -127,6 +128,8 @@ import {
   FarmSupplies,
   FishDexRecord,
   FishingRodState,
+  FishSpeciesId,
+  FishWaterType,
   FurnitureCatalogItem,
   GameStats,
   GardenPlotState,
@@ -147,7 +150,6 @@ import {
   PondFishState,
   ProcessedId,
   RecipeId,
-  RiverFishSpeciesId,
   ShopItem,
   TimeOfDay,
   WellWaterState,
@@ -896,7 +898,7 @@ export default function App() {
                 f &&
                   typeof f.id === 'string' &&
                   typeof f.speciesId === 'string' &&
-                  f.speciesId in RIVER_FISH_CATALOG &&
+                  f.speciesId in ALL_FISH_CATALOG &&
                   typeof f.weightKg === 'number' &&
                   f.weightKg > 0,
               ),
@@ -909,14 +911,14 @@ export default function App() {
     return [];
   });
 
-  const [fishDex, setFishDex] = useState<Partial<Record<RiverFishSpeciesId, FishDexRecord>>>(() => {
+  const [fishDex, setFishDex] = useState<Partial<Record<FishSpeciesId, FishDexRecord>>>(() => {
     const base = createInitialFishDex();
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.fishDex && typeof parsed.fishDex === 'object') {
-          for (const key of Object.keys(RIVER_FISH_CATALOG) as RiverFishSpeciesId[]) {
+          for (const key of Object.keys(ALL_FISH_CATALOG) as FishSpeciesId[]) {
             const rec = parsed.fishDex[key];
             if (rec && typeof rec === 'object') {
               base[key] = {
@@ -2445,20 +2447,24 @@ export default function App() {
   };
 
   const handleCatchRiverFish = (preRolled?: {
-    speciesId: RiverFishSpeciesId;
+    speciesId: FishSpeciesId;
     weightKg: number;
     sellPrice: number;
+    waterType?: FishWaterType;
   }) => {
     const rod = fishingRodRef.current;
     if (!rod.owned || !rod.equipped || rod.durability <= 0) return null;
 
+    const isSea = (preRolled?.waterType ?? (zone === 'island' ? 'sea' : 'river')) === 'sea';
     const caught = preRolled
       ? {
-          species: RIVER_FISH_CATALOG[preRolled.speciesId],
+          species: ALL_FISH_CATALOG[preRolled.speciesId],
           weightKg: preRolled.weightKg,
           sellPrice: preRolled.sellPrice,
         }
-      : rollRandomRiverFish();
+      : isSea
+        ? rollRandomSeaFish()
+        : rollRandomRiverFish();
     const spec = caught.species;
 
     const durLost = rollRodDurabilityLoss('catch', spec.rarity);
@@ -2473,7 +2479,7 @@ export default function App() {
     const newItem: CaughtFishItem = {
       id: `fish_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       speciesId: spec.id,
-      waterType: 'river',
+      waterType: spec.waterType,
       weightKg: caught.weightKg,
       sellPrice: caught.sellPrice,
       caughtAt: Date.now(),
@@ -2565,15 +2571,15 @@ export default function App() {
     }));
   };
 
-  const handleSellAllUnlockedFish = () => {
-    const unlocked = fishBasket.filter((f) => !f.locked && f.waterType === 'river');
+  const handleSellAllUnlockedFish = (waterType: FishWaterType = 'river') => {
+    const unlocked = fishBasket.filter((f) => !f.locked && f.waterType === waterType);
     if (unlocked.length === 0) return;
     const totalGain = unlocked.reduce(
       (sum, f) => sum + computeFishSellPrice(f.speciesId, f.weightKg),
       0,
     );
     soundFX.sparkle();
-    setFishBasket((prev) => prev.filter((f) => f.locked || f.waterType !== 'river'));
+    setFishBasket((prev) => prev.filter((f) => f.locked || f.waterType !== waterType));
     setStats((prev) => ({
       ...prev,
       coins: prev.coins + totalGain,

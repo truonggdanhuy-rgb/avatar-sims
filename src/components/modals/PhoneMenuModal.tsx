@@ -26,15 +26,15 @@ import {
   AvatarConfig,
   DailyQuestProgress,
   FishDexRecord,
+  FishSpeciesId,
   FishWaterType,
   GameStats,
   InsectDexRecord,
   InsectSpeciesId,
-  RiverFishSpeciesId,
   TimeOfDay,
   ZoneId,
 } from '../../types/game';
-import {RIVER_FISH_LIST} from '../../data/fishingCatalog';
+import {ALL_FISH_LIST, RIVER_FISH_LIST, SEA_FISH_LIST} from '../../data/fishingCatalog';
 import {INSECT_HABITAT_LABELS, INSECT_LIST} from '../../data/insectCatalog';
 import {HUNGER_HUNGRY_THRESHOLD} from '../../data/foodCatalog';
 import {soundFX} from '../../utils/sound';
@@ -51,7 +51,7 @@ interface PhoneMenuModalProps {
   dailyQuests: DailyQuestProgress;
   storageUsed: number;
   storageCapacity: number;
-  fishDex: Partial<Record<RiverFishSpeciesId, FishDexRecord>>;
+  fishDex: Partial<Record<FishSpeciesId, FishDexRecord>>;
   insectDex: Partial<Record<InsectSpeciesId, InsectDexRecord>>;
   accountCreatedAt: number;
   accountId: string;
@@ -79,6 +79,7 @@ const ZONE_LABELS: Record<ZoneId, string> = {
   fishing: 'Hồ Câu Cá',
   petshop: 'Cửa Hàng Pets',
   mall: 'May Mall',
+  island: 'Đảo Mây',
 };
 
 function formatDeviceTime(): string {
@@ -583,10 +584,14 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
           )}
 
           {tab === 'fishdex' && (() => {
-            const fishDiscovered = RIVER_FISH_LIST.filter(
+            const riverDiscovered = RIVER_FISH_LIST.filter(
               (s) => (fishDex[s.id]?.caughtCount ?? 0) > 0,
             ).length;
-            const totalFish = RIVER_FISH_LIST.length;
+            const seaDiscovered = SEA_FISH_LIST.filter(
+              (s) => (fishDex[s.id]?.caughtCount ?? 0) > 0,
+            ).length;
+            const fishDiscovered = riverDiscovered + seaDiscovered;
+            const totalFish = ALL_FISH_LIST.length;
             const fishPct = Math.round((fishDiscovered / Math.max(1, totalFish)) * 100);
 
             const bugDiscovered = INSECT_LIST.filter(
@@ -597,6 +602,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
 
             const isFishTab = dexCategory === 'fish';
             const activePct = isFishTab ? fishPct : bugPct;
+            const activeFishList = fishDexWater === 'sea' ? SEA_FISH_LIST : RIVER_FISH_LIST;
 
             return (
               <div className="flex h-full flex-col space-y-2.5">
@@ -632,7 +638,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                           : 'text-[#6A5138]'
                       }`}
                     >
-                      Cá ({fishDiscovered}/{totalFish})
+                      Cá &amp; Biển ({fishDiscovered}/{totalFish})
                     </button>
                     <button
                       type="button"
@@ -652,7 +658,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
 
                   <div>
                     <div className="flex items-center justify-between text-[11px] font-extrabold text-[#2A5970]">
-                      <span>{isFishTab ? 'Bộ Sưu Tập Cá' : 'Bộ Sưu Tập Côn Trùng'}</span>
+                      <span>{isFishTab ? 'Bộ Sưu Tập Thủy Sinh' : 'Bộ Sưu Tập Côn Trùng'}</span>
                       <span
                         className={`tabular-nums ${
                           isFishTab ? 'text-[#3C95AD]' : 'text-[#439A6C]'
@@ -690,7 +696,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                             : 'bg-[#F3ECE0] text-[#6A5138]'
                         }`}
                       >
-                        Cá Sông ({fishDiscovered}/{totalFish})
+                        Cá Sông ({riverDiscovered}/{RIVER_FISH_LIST.length})
                       </button>
                       <button
                         type="button"
@@ -700,11 +706,11 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                         }}
                         className={`rounded-xl py-1 text-[11px] font-extrabold transition ${
                           fishDexWater === 'sea'
-                            ? 'bg-[#466C9C] text-white shadow-xs'
+                            ? 'bg-[#2C72A6] text-white shadow-xs'
                             : 'bg-[#F3ECE0] text-[#6A5138]'
                         }`}
                       >
-                        Cá Biển (Sắp có)
+                        Cá Biển ({seaDiscovered}/{SEA_FISH_LIST.length})
                       </button>
                     </div>
                   )}
@@ -774,18 +780,9 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                       );
                     })}
                   </div>
-                ) : fishDexWater === 'sea' ? (
-                  <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#A8CBE0] bg-[#EDF5FA] p-5 text-center">
-                    <div className="text-sm font-black text-[#2E5573]">
-                      Bộ Sưu Tập Cá Biển · Sắp Ra Mắt
-                    </div>
-                    <p className="mt-1.5 text-xs font-semibold leading-relaxed text-[#567996]">
-                      Các loài cá biển sẽ được mở rộng trong bản cập nhật tới. Hiện tại hãy sưu tầm đủ {totalFish} loài Cá Sông nhé!
-                    </p>
-                  </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 pb-1">
-                    {RIVER_FISH_LIST.map((species) => {
+                    {activeFishList.map((species) => {
                       const dex = fishDex[species.id];
                       const totalCaught = dex?.caughtCount ?? 0;
                       const maxWeight = dex?.maxWeightKg ?? 0;

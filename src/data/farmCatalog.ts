@@ -36,7 +36,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Lúa Mì',
     seedPrice: 6,
     growSeconds: 180, // 3 phút (min)
-    rawSellPrice: 4, // 2 cây = 8 Xu (+2 Xu)
+    rawSellPrice: 6, // 2 cây = 12 Xu (+6 Xu)
     color: '#E7B94B',
     accentColor: '#76A64E',
     hint: '3 phút · Xay Bột Mì hoặc nấu Cháo & Bánh',
@@ -46,7 +46,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Hành Ngò',
     seedPrice: 6,
     growSeconds: 240, // 4 phút
-    rawSellPrice: 4, // 2 cây = 8 Xu (+2 Xu)
+    rawSellPrice: 7, // 2 cây = 14 Xu (+8 Xu)
     color: '#63B552',
     accentColor: '#F4F7EE',
     hint: '4 phút · Gia vị nấu Phở Thịt Lợn & món mặn',
@@ -56,7 +56,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Lúa Gạo',
     seedPrice: 7,
     growSeconds: 300, // 5 phút
-    rawSellPrice: 5, // 2 cây = 10 Xu (+3 Xu)
+    rawSellPrice: 8, // 2 cây = 16 Xu (+9 Xu)
     color: '#D9C262',
     accentColor: '#67A34F',
     hint: '5 phút · Xay làm Bánh Phở nấu Phở Thịt Lợn',
@@ -66,7 +66,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Cà Rốt',
     seedPrice: 8,
     growSeconds: 360, // 6 phút
-    rawSellPrice: 6, // 2 cây = 12 Xu (+4 Xu)
+    rawSellPrice: 9, // 2 cây = 18 Xu (+10 Xu)
     color: '#EF8432',
     accentColor: '#4E9A4E',
     hint: '6 phút · Nấu Súp Cà Rốt & Cà Rốt Sốt Mía',
@@ -76,7 +76,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Ngô Ngọt',
     seedPrice: 10,
     growSeconds: 720, // 12 phút
-    rawSellPrice: 8, // 2 cây = 16 Xu (+6 Xu)
+    rawSellPrice: 12, // 2 cây = 24 Xu (+14 Xu)
     color: '#F2C94C',
     accentColor: '#5BA355',
     hint: '12 phút · Nấu Sữa Bắp & Thịt Heo Áp Chảo',
@@ -86,7 +86,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Dâu Tây',
     seedPrice: 14,
     growSeconds: 1200, // 20 phút
-    rawSellPrice: 11, // 2 cây = 22 Xu (+8 Xu)
+    rawSellPrice: 16, // 2 cây = 32 Xu (+18 Xu)
     color: '#E54E63',
     accentColor: '#4E9A4E',
     hint: '20 phút · Cô Mứt Dâu, Trà Dâu & Panna Cotta',
@@ -96,7 +96,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Cà Chua',
     seedPrice: 18,
     growSeconds: 1800, // 30 phút
-    rawSellPrice: 14, // 2 cây = 28 Xu (+10 Xu)
+    rawSellPrice: 20, // 2 cây = 40 Xu (+22 Xu)
     color: '#DF483B',
     accentColor: '#4C924B',
     hint: '30 phút · Nấu Súp, Mì Ý & Trứng Chiên Phô Mai',
@@ -106,7 +106,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Quả Vani',
     seedPrice: 24,
     growSeconds: 2400, // 40 phút
-    rawSellPrice: 19, // 2 cây = 38 Xu (+14 Xu)
+    rawSellPrice: 26, // 2 cây = 52 Xu (+28 Xu)
     color: '#6C4936',
     accentColor: '#F5E4A4',
     hint: '40 phút · Hương liệu làm Panna Cotta Dâu thơm béo',
@@ -116,7 +116,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Chanh Vàng',
     seedPrice: 22,
     growSeconds: 2700, // 45 phút
-    rawSellPrice: 17, // 2 cây = 34 Xu (+12 Xu)
+    rawSellPrice: 24, // 2 cây = 48 Xu (+26 Xu)
     color: '#F7D44C',
     accentColor: '#569D4F',
     hint: '45 phút · Pha Trà Chanh & Bánh Tart Trứng',
@@ -126,7 +126,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Mía Ngọt',
     seedPrice: 26,
     growSeconds: 3600, // 1 giờ
-    rawSellPrice: 20, // 2 cây = 40 Xu (+14 Xu)
+    rawSellPrice: 29, // 2 cây = 58 Xu (+32 Xu)
     color: '#76B856',
     accentColor: '#D6CC74',
     hint: '1 giờ · Ép Đường Nâu, Siro Mía & Nước Mía',
@@ -136,7 +136,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Dưa Hấu',
     seedPrice: 34,
     growSeconds: 5400, // 1.5 giờ
-    rawSellPrice: 26, // 2 cây = 52 Xu (+18 Xu)
+    rawSellPrice: 38, // 2 cây = 76 Xu (+42 Xu)
     color: '#469C53',
     accentColor: '#EE5D6C',
     hint: '1.5 giờ · Ép Nước Dưa Hấu giá cao',
@@ -146,7 +146,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Bí Ngô',
     seedPrice: 42,
     growSeconds: 7200, // 2 giờ
-    rawSellPrice: 33, // 2 cây = 66 Xu (+24 Xu)
+    rawSellPrice: 48, // 2 cây = 96 Xu (+54 Xu)
     color: '#E57925',
     accentColor: '#4C8444',
     hint: '2 giờ · Làm Bánh Bí Ngô & Sinh Tố Bí Đỏ',
@@ -156,7 +156,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Ca Cao',
     seedPrice: 55,
     growSeconds: 14400, // 4 giờ
-    rawSellPrice: 46, // 2 cây = 92 Xu (+37 Xu)
+    rawSellPrice: 64, // 2 cây = 128 Xu (+73 Xu)
     color: '#A5633C',
     accentColor: '#66A34F',
     hint: '4 giờ · Xay Bột Ca Cao pha Ca Cao Nóng & Brownie',
@@ -166,7 +166,7 @@ export const CROPS: Record<CropType, CropDefinition> = {
     name: 'Cà Phê',
     seedPrice: 60,
     growSeconds: 21600, // 6 giờ (qua đêm)
-    rawSellPrice: 52, // 2 cây = 104 Xu (+44 Xu)
+    rawSellPrice: 72, // 2 cây = 144 Xu (+84 Xu)
     color: '#7C4D34',
     accentColor: '#C83E4D',
     hint: '6 giờ (qua đêm) · Rang Xay pha Cà Phê Sữa siêu lời',
@@ -252,25 +252,25 @@ export const ANIMAL_PRODUCTS: Record<AnimalProduceId, AnimalProduceDefinition> =
   chicken_egg: {
     id: 'chicken_egg',
     name: 'Trứng Gà',
-    sellPrice: 10,
+    sellPrice: 14,
     color: '#F5DFB0',
   },
   duck_egg: {
     id: 'duck_egg',
     name: 'Trứng Vịt',
-    sellPrice: 14,
+    sellPrice: 19,
     color: '#DDF2EB',
   },
   pork: {
     id: 'pork',
     name: 'Thịt Lợn',
-    sellPrice: 24,
+    sellPrice: 32,
     color: '#EB8F8F',
   },
   milk: {
     id: 'milk',
     name: 'Sữa Tươi',
-    sellPrice: 32,
+    sellPrice: 42,
     color: '#F7F9FC',
   },
 };
@@ -295,52 +295,52 @@ export const ANIMALS: Record<AnimalType, AnimalDefinition> = {
     coop: 'poultry',
     name: 'Gà',
     buyPrice: 40,
-    adultSellPrice: 55, // Lời +15 Xu khi bán lúc lớn
+    adultSellPrice: 65, // Lời +25 Xu khi bán lúc lớn
     growHours: 2,
     activeDays: 3,
-    produceSeconds: 1800, // 30 phút/lứa (2 Trứng Gà) — đủ nấu ăn, tránh dư thừa lạm phát
+    produceSeconds: 1800, // 30 phút/lứa (2 Trứng Gà)
     produceId: 'chicken_egg',
     color: '#FFF4DC',
-    description: '2h lớn · Đẻ 2 Trứng Gà/30p trong 3 ngày · Bán lúc lớn 55 Xu',
+    description: '2h lớn · Đẻ 2 Trứng Gà/30p trong 3 ngày · Bán lúc lớn 65 Xu',
   },
   duck: {
     type: 'duck',
     coop: 'poultry',
     name: 'Vịt',
     buyPrice: 55,
-    adultSellPrice: 75, // Lời +20 Xu khi bán lúc lớn
+    adultSellPrice: 88, // Lời +33 Xu khi bán lúc lớn
     growHours: 2,
     activeDays: 3,
     produceSeconds: 2400, // 40 phút/lứa (2 Trứng Vịt)
     produceId: 'duck_egg',
     color: '#EAEFEF',
-    description: '2h lớn · Đẻ 2 Trứng Vịt/40p trong 3 ngày · Bán lúc lớn 75 Xu',
+    description: '2h lớn · Đẻ 2 Trứng Vịt/40p trong 3 ngày · Bán lúc lớn 88 Xu',
   },
   pig: {
     type: 'pig',
     coop: 'cattle',
     name: 'Lợn',
     buyPrice: 90,
-    adultSellPrice: 125, // Lời +35 Xu khi bán lúc lớn
+    adultSellPrice: 145, // Lời +55 Xu khi bán lúc lớn
     growHours: 4,
     activeDays: 4,
-    produceSeconds: 2700, // 45 phút/lứa (2 Thịt Lợn) — vừa vặn cho Phở, Cháo & Áp chảo
+    produceSeconds: 2700, // 45 phút/lứa (2 Thịt Lợn)
     produceId: 'pork',
     color: '#F7A8B8',
-    description: '4h lớn · Thu 2 Thịt Lợn/45p trong 4 ngày · Bán lúc lớn 125 Xu',
+    description: '4h lớn · Thu 2 Thịt Lợn/45p trong 4 ngày · Bán lúc lớn 145 Xu',
   },
   cow: {
     type: 'cow',
     coop: 'cattle',
     name: 'Bò Sữa',
     buyPrice: 140,
-    adultSellPrice: 195, // Lời +55 Xu khi bán lúc lớn
+    adultSellPrice: 225, // Lời +85 Xu khi bán lúc lớn
     growHours: 4,
     activeDays: 4,
-    produceSeconds: 3600, // 60 phút/lứa (2 Sữa Tươi) — cân bằng Kem, Phô Mai & Panna Cotta
+    produceSeconds: 3600, // 60 phút/lứa (2 Sữa Tươi)
     produceId: 'milk',
     color: '#5B4639',
-    description: '4h lớn · Vắt 2 Sữa Tươi/60p trong 4 ngày · Bán lúc lớn 195 Xu',
+    description: '4h lớn · Vắt 2 Sữa Tươi/60p trong 4 ngày · Bán lúc lớn 225 Xu',
   },
 };
 
@@ -371,30 +371,30 @@ export const POND_FISH_SPECIES: Record<PondFishSpecies, FishSpeciesDefinition> =
     name: 'Cá Chép Vàng',
     durationHours: 12,
     fryPrice: 35,
-    matureSellPrice: 95,
+    matureSellPrice: 125,
     bodyColor: '#F39C3D',
     accentColor: '#FFE194',
-    description: 'Lớn sau 12 giờ · Bơi khỏe, bán thu 95 Xu (lời +60 Xu)',
+    description: 'Lớn sau 12 giờ · Bơi khỏe, bán thu 125 Xu (lời +90 Xu)',
   },
   duck_24h: {
     species: 'duck_24h',
     name: 'Vịt Vàng',
     durationHours: 24,
     fryPrice: 65,
-    matureSellPrice: 195,
+    matureSellPrice: 255,
     bodyColor: '#F7CF46',
     accentColor: '#F28B30',
-    description: 'Xuất bán sau 1 ngày (24h) · Thu 195 Xu (lời +130 Xu)',
+    description: 'Xuất bán sau 1 ngày (24h) · Thu 255 Xu (lời +190 Xu)',
   },
   turtle_48h: {
     species: 'turtle_48h',
     name: 'Rùa Xanh',
     durationHours: 48,
     fryPrice: 120,
-    matureSellPrice: 375,
+    matureSellPrice: 490,
     bodyColor: '#4E8C57',
     accentColor: '#85BD78',
-    description: 'Xuất bán sau 2 ngày (48h) · Lời cao nhất 375 Xu (+255 Xu)',
+    description: 'Xuất bán sau 2 ngày (48h) · Lời cao nhất 490 Xu (+370 Xu)',
   },
 };
 
@@ -438,7 +438,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     machineName: 'Cối Xay Bột',
     inputs: [{kind: 'crop', id: 'wheat', qty: 1}],
     processSeconds: 12,
-    sellPrice: 7, // > Lúa Mì (4)
+    sellPrice: 10, // > Lúa Mì (6)
     color: '#F5EAD5',
     description: 'Xay từ Lúa Mì để làm Bánh Mì, Bánh Tart & Mì Ý',
   },
@@ -448,7 +448,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     machineName: 'Cối Xay Bột',
     inputs: [{kind: 'crop', id: 'rice', qty: 2}],
     processSeconds: 15,
-    sellPrice: 15, // > 2 Lúa Gạo (10)
+    sellPrice: 22, // > 2 Lúa Gạo (16)
     color: '#FAF6EE',
     description: 'Xay từ Lúa Gạo làm sợi Phở Thịt Lợn dai mềm',
   },
@@ -458,7 +458,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     machineName: 'Máy Ép Mía',
     inputs: [{kind: 'crop', id: 'sugarcane', qty: 1}],
     processSeconds: 14,
-    sellPrice: 28, // > Mía (20)
+    sellPrice: 40, // > Mía (29)
     color: '#B67742',
     description: 'Vị ngọt thanh cho trà, cà phê, bánh & nước mía',
   },
@@ -468,7 +468,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     machineName: 'Máy Ép Mía',
     inputs: [{kind: 'crop', id: 'sugarcane', qty: 2}],
     processSeconds: 18,
-    sellPrice: 56, // > 2 Mía (40)
+    sellPrice: 78, // > 2 Mía (58)
     color: '#DF9B35',
     description: 'Siro cô đặc dùng pha Trà Dâu, Bánh Flan & Cà Rốt Mật',
   },
@@ -481,7 +481,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
     processSeconds: 22,
-    sellPrice: 68, // > 22 + 28 = 50
+    sellPrice: 98, // > 32 + 40 = 72
     color: '#CF465D',
     description: 'Mứt dâu thơm lừng cho Bánh Kem & Cheesecake',
   },
@@ -491,7 +491,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     machineName: 'Cối Xay Ca Cao',
     inputs: [{kind: 'crop', id: 'cacao', qty: 2}],
     processSeconds: 24,
-    sellPrice: 125, // > 2 Ca Cao (92)
+    sellPrice: 170, // > 2 Ca Cao (128)
     color: '#73442E',
     description: 'Nền cho Ca Cao Sữa Nóng & Bánh Brownie',
   },
@@ -501,7 +501,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     machineName: 'Cối Xay Rang',
     inputs: [{kind: 'crop', id: 'coffee', qty: 2}],
     processSeconds: 24,
-    sellPrice: 140, // > 2 Cà Phê (104)
+    sellPrice: 192, // > 2 Cà Phê (144)
     color: '#5C3522',
     description: 'Hương cà phê rang đậm pha Cà Phê Sữa Nông Trại',
   },
@@ -511,7 +511,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
     machineName: 'Máy Ủ Sữa',
     inputs: [{kind: 'animal_product', id: 'milk', qty: 1}],
     processSeconds: 18,
-    sellPrice: 46, // > Sữa Tươi (32)
+    sellPrice: 60, // > Sữa Tươi (42)
     color: '#FAD866',
     description: 'Ủ từ Sữa Tươi để làm Bánh Cheesecake & Trứng Chiên',
   },
@@ -524,7 +524,7 @@ export const PROCESSED_ITEMS: Record<ProcessedId, ProcessedDefinition> = {
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
     processSeconds: 20,
-    sellPrice: 74, // > 32 + 28 = 60
+    sellPrice: 108, // > 42 + 40 = 82
     color: '#FFFDF7',
     description: 'Kem sữa đánh bông mịn để làm Panna Cotta Dâu',
   },
@@ -603,7 +603,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
     cookSeconds: 1200, // 20 phút
-    sellPrice: 65, // Nguyên liệu: 20 + 28 = 48 -> lời +17 Xu
+    sellPrice: 96, // 29 + 40 = 69 -> lời +27 Xu
     color: '#93CE66',
     description: 'Ly nước mía thơm mát giải nhiệt thị trấn',
   },
@@ -617,7 +617,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
     cookSeconds: 1500, // 25 phút
-    sellPrice: 74, // 26 + 28 = 54
+    sellPrice: 108, // 38 + 40 = 78
     color: '#F26474',
     description: 'Nước ép dưa hấu đỏ mát lạnh giải khát ngày nắng',
   },
@@ -631,7 +631,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'cane_syrup', qty: 1},
     ],
     cookSeconds: 2100, // 35 phút
-    sellPrice: 105, // 22 + 56 = 78
+    sellPrice: 152, // 32 + 78 = 110
     color: '#EB6D83',
     description: 'Trà trái cây thanh ngọt kèm dâu tươi',
   },
@@ -645,7 +645,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'cane_syrup', qty: 1},
     ],
     cookSeconds: 2100, // 35 phút
-    sellPrice: 120, // 34 + 56 = 90
+    sellPrice: 174, // 48 + 78 = 126
     color: '#F6D55C',
     description: 'Vị chanh vàng tươi quyện siro mía thơm dịu',
   },
@@ -659,7 +659,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
     cookSeconds: 1800, // 30 phút
-    sellPrice: 84, // 33 + 28 = 61
+    sellPrice: 122, // 48 + 40 = 88
     color: '#F29A3E',
     description: 'Thức uống béo mịn giàu dinh dưỡng',
   },
@@ -673,7 +673,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'animal_product', id: 'milk', qty: 1},
     ],
     cookSeconds: 1680, // 28 phút
-    sellPrice: 72, // 16 + 36 = 52
+    sellPrice: 94, // 24 + 42 = 66
     color: '#F5D66B',
     description: 'Kết hợp Ngô Ngọt & Sữa Tươi cực hút khách',
   },
@@ -687,7 +687,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'animal_product', id: 'milk', qty: 1},
     ],
     cookSeconds: 3300, // 55 phút
-    sellPrice: 215, // 125 + 36 = 161
+    sellPrice: 290, // 170 + 42 = 212
     color: '#7F4D37',
     description: 'Tách ca cao sữa ấm áp thơm lừng buổi sáng',
   },
@@ -701,8 +701,8 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'animal_product', id: 'milk', qty: 1},
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
-    cookSeconds: 3600, // 1 giờ (món cầu kỳ giá cao)
-    sellPrice: 275, // 140 + 36 + 28 = 204
+    cookSeconds: 3600, // 1 giờ
+    sellPrice: 375, // 192 + 42 + 40 = 274
     color: '#8C583A',
     description: 'Đặc sản trứ danh từ Cà Phê Rang & Sữa Tươi',
   },
@@ -716,7 +716,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
     cookSeconds: 1320, // 22 phút
-    sellPrice: 58, // 14 + 28 = 42
+    sellPrice: 84, // 20 + 40 = 60
     color: '#DF9B56',
     description: 'Ổ bánh mì nướng giòn thơm mùi đường mía',
   },
@@ -731,7 +731,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'crop', id: 'lemon', qty: 1},
     ],
     cookSeconds: 1800, // 30 phút
-    sellPrice: 68, // 7 + 24 + 17 = 48
+    sellPrice: 88, // 10 + 28 + 24 = 62
     color: '#F7C95B',
     description: 'Tart trứng gà béo ngậy thoảng hương chanh vàng',
   },
@@ -746,7 +746,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'crop', id: 'pumpkin', qty: 1},
     ],
     cookSeconds: 2400, // 40 phút
-    sellPrice: 105, // 14 + 28 + 33 = 75
+    sellPrice: 150, // 20 + 40 + 48 = 108
     color: '#E68335',
     description: 'Bánh tart bí ngô vàng ươm thơm bùi',
   },
@@ -761,7 +761,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'crop', id: 'strawberry', qty: 1},
     ],
     cookSeconds: 2400, // 40 phút
-    sellPrice: 118, // 7 + 68 + 11 = 86
+    sellPrice: 172, // 10 + 98 + 16 = 124
     color: '#F59BB0',
     description: 'Bánh bông lan phủ kem và mứt dâu đỏ',
   },
@@ -776,7 +776,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
     cookSeconds: 2700, // 45 phút
-    sellPrice: 120, // 28 + 32 + 28 = 88 -> lời +32
+    sellPrice: 168, // 38 + 42 + 40 = 120
     color: '#F2C063',
     description: 'Bánh flan béo ngậy từ Trứng Vịt & caramel mía',
   },
@@ -791,7 +791,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'crop', id: 'vanilla', qty: 1},
     ],
     cookSeconds: 2400, // 40 phút
-    sellPrice: 158, // 74 + 22 + 19 = 115 -> lời +43
+    sellPrice: 230, // 108 + 32 + 26 = 166
     color: '#FCE7EA',
     description: 'Panna Cotta kem sữa vani phủ sốt dâu tây mịn mượt',
   },
@@ -806,7 +806,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'flour', qty: 1},
     ],
     cookSeconds: 3000, // 50 phút
-    sellPrice: 162, // 46 + 68 + 7 = 121
+    sellPrice: 232, // 60 + 98 + 10 = 168
     color: '#F29BB5',
     description: 'Cheesecake béo mịn kèm mứt dâu thơm lừng',
   },
@@ -820,8 +820,8 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'flour', qty: 2},
       {kind: 'animal_product', id: 'chicken_egg', qty: 2},
     ],
-    cookSeconds: 3600, // 1 giờ (món khó)
-    sellPrice: 210, // 125 + 14 + 20 = 159
+    cookSeconds: 3600, // 1 giờ
+    sellPrice: 300, // 170 + 20 + 28 = 218
     color: '#6E3F2C',
     description: 'Bánh sô-cô-la mềm ẩm đắt khách nhất tiệm bánh',
   },
@@ -835,7 +835,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'crop', id: 'tomato', qty: 1},
     ],
     cookSeconds: 1200, // 20 phút
-    sellPrice: 38, // 12 + 14 = 26
+    sellPrice: 54, // 18 + 20 = 38
     color: '#E86A38',
     description: 'Tô súp nóng hổi sánh mịn rau củ vườn',
   },
@@ -849,7 +849,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'crop', id: 'tomato', qty: 2},
     ],
     cookSeconds: 1500, // 25 phút
-    sellPrice: 60, // 14 + 28 = 42
+    sellPrice: 84, // 20 + 40 = 60
     color: '#D94F3B',
     description: 'Đĩa mì sợi tươi trộn sốt cà chua đậm đà',
   },
@@ -864,7 +864,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'crop', id: 'scallion', qty: 2},
     ],
     cookSeconds: 1680, // 28 phút
-    sellPrice: 68, // 15 + 24 + 8 = 47 -> lời +21
+    sellPrice: 96, // 22 + 32 + 14 = 68
     color: '#EBD3A5',
     description: 'Tô phở nóng hổi thịt lợn mềm kèm hành ngò thơm ngát',
   },
@@ -878,7 +878,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'cane_syrup', qty: 1},
     ],
     cookSeconds: 1800, // 30 phút
-    sellPrice: 92, // 12 + 56 = 68
+    sellPrice: 132, // 18 + 78 = 96
     color: '#E67A28',
     description: 'Món áp chảo bóng bẩy chuẩn thực đơn nông trại',
   },
@@ -893,7 +893,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'crop', id: 'wheat', qty: 2},
     ],
     cookSeconds: 2220, // 37 phút
-    sellPrice: 86, // 28 + 24 + 8 = 60
+    sellPrice: 115, // 38 + 32 + 12 = 82
     color: '#E7C88B',
     description: 'Cháo dinh dưỡng ấm bụng từ trứng vịt & thịt lợn',
   },
@@ -908,7 +908,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'crop', id: 'tomato', qty: 1},
     ],
     cookSeconds: 2700, // 45 phút
-    sellPrice: 108, // 48 + 16 + 14 = 78
+    sellPrice: 150, // 64 + 24 + 20 = 108
     color: '#C96352',
     description: 'Đĩa thịt lợn sạch nướng bắp ngọt thơm lừng',
   },
@@ -923,7 +923,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'crop', id: 'tomato', qty: 1},
     ],
     cookSeconds: 3000, // 50 phút
-    sellPrice: 112, // 20 + 46 + 14 = 80
+    sellPrice: 152, // 28 + 60 + 20 = 108
     color: '#F5C44F',
     description: 'Trứng gà ta ốp phô mai kéo sợi kèm cà chua',
   },
@@ -938,7 +938,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'cane_syrup', qty: 1},
     ],
     cookSeconds: 2100, // 35 phút
-    sellPrice: 188, // 52 + 32 + 56 = 140 -> lời +48 Xu
+    sellPrice: 270, // 76 + 42 + 78 = 196
     color: '#F7798A',
     description: 'Dưa hấu xay mịn quyện sữa tươi & siro mía ngọt mát',
   },
@@ -954,7 +954,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'brown_sugar', qty: 1},
     ],
     cookSeconds: 3300, // 55 phút
-    sellPrice: 295, // 140 + 32 + 19 + 28 = 219 -> lời +76 Xu
+    sellPrice: 415, // 192 + 42 + 26 + 40 = 300
     color: '#A16842',
     description: 'Cà phê sữa béo ngậy thoảng hương vani tươi quyến rũ',
   },
@@ -970,7 +970,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'processed', id: 'cane_syrup', qty: 1},
     ],
     cookSeconds: 2400, // 40 phút
-    sellPrice: 172, // 20 + 32 + 19 + 56 = 127 -> lời +45 Xu
+    sellPrice: 240, // 28 + 42 + 26 + 78 = 174
     color: '#F6CA65',
     description: 'Bánh flan trứng sữa mịn màng thơm lừng hương vani',
   },
@@ -986,7 +986,7 @@ export const KITCHEN_RECIPES: Record<RecipeId, RecipeDefinition> = {
       {kind: 'animal_product', id: 'chicken_egg', qty: 1},
     ],
     cookSeconds: 1500, // 25 phút
-    sellPrice: 66, // 10 + 16 + 8 + 10 = 44 -> lời +22 Xu
+    sellPrice: 96, // 16 + 24 + 14 + 14 = 68
     color: '#F4CD5C',
     description: 'Hạt cơm vàng ươm rang cùng bắp ngọt, trứng gà & hành lá',
   },
@@ -1302,7 +1302,8 @@ export function computeOrderExactReward(requirements: FarmOrderRequirement[]): n
   for (const req of requirements) {
     sum += getFarmItemDirectSellPrice(req.kind, req.id) * req.qty;
   }
-  return sum;
+  // +22% bonus thưởng khi giao qua Bảng Đơn Hàng để khuyến khích vòng lặp Trồng trọt -> Chế biến -> Giao đơn
+  return Math.round(sum * 1.22);
 }
 
 export function createSingleFarmOrder(seedOffset = 0): FarmOrder {

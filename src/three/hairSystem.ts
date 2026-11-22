@@ -110,7 +110,7 @@ export function createHairClayMaterial(color: string | number): THREE.MeshStanda
 }
 
 export function resolveHatFitMode(headItem?: HeadItemStyle): HatFitMode {
-  if (headItem === 'cap' || headItem === 'beanie') {
+  if (headItem === 'cap' || headItem === 'beanie' || headItem === 'bucket_hat') {
     return 'snug_cap';
   }
   if (headItem === 'beret' || headItem === 'sunhat') {

@@ -40,6 +40,9 @@ export const OrderBoardModal: React.FC<OrderBoardModalProps> = ({
             <h2 className="font-display text-sm font-bold text-[#4A3525]">
               Bảng Đơn Hàng ({orders.length})
             </h2>
+            <span className="rounded-md bg-[#E6F4EA] px-1.5 py-0.5 text-[10px] font-bold text-[#2E7D46]">
+              Thưởng +22%
+            </span>
           </div>
 
           <div className="flex items-center gap-1.5">
