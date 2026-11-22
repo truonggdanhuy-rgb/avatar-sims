@@ -28,6 +28,7 @@ export interface FishingVisualFrame {
   shadowScale: number;
   shadowOpacity: number;
   shadowTailSpeed: number;
+  thrashIntensity?: number;
 }
 
 export interface FishingSpotVisuals {
@@ -118,6 +119,30 @@ export function createFishingSpotVisuals(options: {
   burstMesh.visible = false;
   group.add(burstMesh);
 
+  // 3B. Arcing 3D Water Spray Droplets (văng bọt nước tung tóe khi cá vùng vẫy)
+  const sprayDrops: {mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; angle: number; speed: number; phase: number; radiusScale: number}[] = [];
+  const sprayGeo = new THREE.SphereGeometry(0.068, 8, 8);
+  for (let i = 0; i < 10; i++) {
+    const sMat = new THREE.MeshBasicMaterial({
+      color: i % 2 === 0 ? '#FFFFFF' : '#D9F6FF',
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+    });
+    const drop = new THREE.Mesh(sprayGeo, sMat);
+    drop.visible = false;
+    drop.renderOrder = 7;
+    group.add(drop);
+    sprayDrops.push({
+      mesh: drop,
+      mat: sMat,
+      angle: (i / 10) * Math.PI * 2 + (i % 3) * 0.25,
+      speed: 2.3 + (i % 4) * 0.48,
+      phase: i * 0.37,
+      radiusScale: 0.34 + (i % 3) * 0.14,
+    });
+  }
+
   // 4. Flat Underwater Fish Shadow Silhouette (Vệt bóng hình cá dẹt dưới mặt nước)
   const shadowGroup = new THREE.Group();
   shadowGroup.position.set(defaultPos[0], waterY + 0.008, defaultPos[2] - 1.4);
@@ -200,6 +225,27 @@ export function createFishingSpotVisuals(options: {
       burstMesh.scale.set(frame.burstScale, frame.burstScale, 1);
       burstMat.opacity = frame.burstOpacity;
     }
+
+    const thrash = Math.max(0, Math.min(1, frame.thrashIntensity ?? 0));
+    sprayDrops.forEach((d) => {
+      if (thrash <= 0.02 || !frame.bobberVisible) {
+        d.mesh.visible = false;
+        return;
+      }
+      d.mesh.visible = true;
+      const cycle = ((elapsed * d.speed + d.phase) % 1 + 1) % 1;
+      const arcH = Math.sin(cycle * Math.PI) * (0.28 + thrash * 0.42);
+      const radial = (0.14 + cycle * d.radiusScale * (0.65 + thrash * 0.75));
+      const ang = d.angle + Math.sin(elapsed * 2.5 + d.phase) * 0.35;
+      d.mesh.position.set(
+        frame.bobberX + Math.cos(ang) * radial,
+        waterY + 0.04 + arcH,
+        frame.bobberZ + Math.sin(ang) * radial,
+      );
+      const sc = (0.65 + (1 - cycle) * 0.75) * (0.65 + thrash * 0.55);
+      d.mesh.scale.set(sc, sc * (1.2 - cycle * 0.3), sc);
+      d.mat.opacity = Math.sin(cycle * Math.PI) * (0.62 + thrash * 0.32);
+    });
 
     shadowGroup.visible = frame.shadowVisible;
     if (frame.shadowVisible) {

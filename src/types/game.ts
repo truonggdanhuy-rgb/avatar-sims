@@ -148,6 +148,7 @@ export interface AvatarConfig {
   accessoryColor: string;
   handheld: HandheldStyle;
   handheldColor: string;
+  mascotCostume?: 'peppa_pig';
 }
 
 export interface AvatarPreset {
@@ -395,6 +396,8 @@ export interface DailyQuestProgress {
 }
 
 export type FurnitureCategory =
+  | 'tet'
+  | 'xmas'
   | 'living'
   | 'bedroom'
   | 'kitchen'
@@ -435,8 +438,30 @@ export type FurnitureKind =
   | 'window_curtain'
   | 'wall_clock'
   | 'wall_calendar'
+  | 'wall_calendar_tet'
+  | 'tet_couplets'
+  | 'tet_mai_pot'
+  | 'tet_peach_pot'
+  | 'tet_tea_table'
+  | 'tet_chair'
+  | 'tet_five_fruit_tray'
+  | 'tet_banh_chung'
+  | 'tet_lantern_lamp'
+  | 'tet_rug_red'
+  | 'tet_vase_blossom'
+  | 'tet_flower_wreath'
+  | 'tea_set_ceramic'
+  | 'xmas_tree'
+  | 'xmas_snowman'
+  | 'xmas_wreath'
+  | 'xmas_gift_boxes'
+  | 'moon_lamp'
+  | 'bonsai_zen'
+  | 'vinyl_corner'
   | 'succulent_shelf'
   | 'wall_tv'
+  | 'microwave'
+  | 'mini_oven'
   | 'floor_paint'
   | 'wall_paint';
 
@@ -471,7 +496,7 @@ export interface FurnitureCatalogItem {
   mountHeight?: number;
   surfaceHeight?: number;
   paintSpec?: PaintStyleSpec;
-  interactive?: 'wardrobe' | 'bed' | 'sofa' | 'bathtub' | 'lamp';
+  interactive?: 'wardrobe' | 'bed' | 'sofa' | 'bathtub' | 'lamp' | 'microwave' | 'mini_oven';
 }
 
 export interface PlacedFurniture {
@@ -508,7 +533,7 @@ export type FishWaterType = 'river' | 'sea';
 
 export type FishRarity = 'common' | 'rare';
 
-export type FishingPhase = 'idle' | 'casting' | 'waiting' | 'nibbling' | 'bite';
+export type FishingPhase = 'idle' | 'casting' | 'waiting' | 'nibbling' | 'bite' | 'pulling';
 
 export type RiverFishSpeciesId =
   | 'tom_cang_xanh'

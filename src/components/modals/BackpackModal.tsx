@@ -2,12 +2,15 @@ import React, {useState} from 'react';
 import {
   ArrowLeft,
   Check,
+  ChefHat,
+  Coins,
   Flame,
   Info,
   Package,
   Sparkles,
   Warehouse,
   X,
+  Zap,
 } from 'lucide-react';
 import {
   BbqFoodId,
@@ -44,6 +47,7 @@ import {
   WOODEN_NET_PRICE,
 } from '../../data/insectCatalog';
 import {KITCHEN_RECIPES} from '../../data/farmCatalog';
+import {PEPPA_RECIPES, PeppaRecipeId} from '../../data/peppaKitchenCatalog';
 import {BBQ_FOOD_LIST, VENDING_DRINK_LIST} from '../../data/foodCatalog';
 import {HandheldFoodIcon} from './VendingMachineModal';
 import {soundFX} from '../../utils/sound';
@@ -72,10 +76,13 @@ interface BackpackModalProps {
   bbqFoods: Partial<Record<BbqFoodId, number>>;
   equippedFoodId: BbqFoodId | null;
   farmDishes: Partial<Record<RecipeId, number>>;
+  peppaDishes: Partial<Record<PeppaRecipeId, number>>;
   initialSubTab?: BagSubTab;
   onToggleEquipRod: () => void;
   onToggleEquipNet: () => void;
   onToggleEquipFood: (foodId: BbqFoodId) => void;
+  onEatPeppaDish: (recipeId: PeppaRecipeId) => {ok: boolean; message: string};
+  onSellPeppaDish: (recipeId: PeppaRecipeId) => {ok: boolean; message: string};
   onToggleMount: (mountId: MountId) => void;
   onToggleSummonPet: (petId: string) => void;
   onRenamePet: (petId: string, newName: string) => void;
@@ -94,10 +101,13 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
   bbqFoods,
   equippedFoodId,
   farmDishes,
+  peppaDishes,
   initialSubTab = 'list',
   onToggleEquipRod,
   onToggleEquipNet,
   onToggleEquipFood,
+  onEatPeppaDish,
+  onSellPeppaDish,
   onToggleMount,
   onToggleSummonPet,
   onRenamePet,
@@ -109,6 +119,7 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
   const [selectedPetInfoId, setSelectedPetInfoId] = useState<string | null>(null);
   const [petRenameDraft, setPetRenameDraft] = useState('');
   const [petActionFeedback, setPetActionFeedback] = useState<string | null>(null);
+  const [foodActionFeedback, setFoodActionFeedback] = useState<string | null>(null);
 
   const subTitle =
     bagSubTab === 'list'
@@ -1109,7 +1120,95 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                   })}
                 </div>
 
-                {/* Section 2: Farm Dishes (Storage Only — NOT holdable in hand) */}
+                  {/* Section 2: Home Appliance Cooked Dishes (Lò Vi Sóng & Lò Nướng Mini) */}
+                <div className="space-y-2 border-t border-[#E6D6C1] pt-3">
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="flex items-center gap-1 text-[11px] font-black text-[#2674A3]">
+                      <ChefHat className="h-3.5 w-3.5" />
+                      Món Ăn Tự Nấu Tại Nhà
+                    </span>
+                    <span className="text-[10px] font-bold text-[#4D7C99]">
+                      Hồi Thể Lực &amp; Độ No
+                    </span>
+                  </div>
+
+                  {foodActionFeedback && (
+                    <div className="rounded-xl bg-[#EAF8EE] px-2.5 py-2 text-[11px] font-bold text-[#2A6E40]">
+                      {foodActionFeedback}
+                    </div>
+                  )}
+
+                  {(() => {
+                    const peppaEntries = (Object.keys(PEPPA_RECIPES) as PeppaRecipeId[]).filter(
+                      (rid) => (peppaDishes[rid] ?? 0) > 0,
+                    );
+                    if (peppaEntries.length === 0) {
+                      return (
+                        <div className="rounded-xl border border-[#DCEBF3] bg-[#F4FAFD] p-3 text-center text-[11px] font-semibold text-[#55778C]">
+                          Chưa có món nấu tại nhà nào. Ghé <b>Siêu Thị Mini của Peppa</b> (Mây Mall Tầng 1) mua nguyên liệu &amp; công thức, rồi bấm vào <b>Lò Vi Sóng / Lò Nướng Mini</b> ở nhà để nấu nhé!
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="space-y-2">
+                        {peppaEntries.map((rid) => {
+                          const r = PEPPA_RECIPES[rid];
+                          const qty = peppaDishes[rid] ?? 0;
+                          return (
+                            <div
+                              key={rid}
+                              className="space-y-2 rounded-2xl border-2 border-[#D2E6F2] bg-white p-3"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="truncate text-xs font-black text-[#1E3B4D]">
+                                    {r.name}
+                                  </div>
+                                  <div className="text-[10px] font-bold text-[#4C728A]">
+                                    +{r.energyRestore} Thể lực · +{r.hungerRestore} Độ no · Bán {r.sellPrice} Xu
+                                  </div>
+                                </div>
+                                <span className="shrink-0 rounded-lg bg-[#E4F2FA] px-2 py-0.5 text-[11px] font-black tabular-nums text-[#226285]">
+                                  x{qty}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const res = onEatPeppaDish(rid);
+                                    setFoodActionFeedback(res.message);
+                                    if (res.ok) soundFX.sparkle();
+                                    else soundFX.tap();
+                                  }}
+                                  className="flex min-h-[32px] flex-1 items-center justify-center gap-1 rounded-xl bg-[#278556] px-2.5 text-[11px] font-black text-white transition active:scale-95"
+                                >
+                                  <Zap className="h-3.5 w-3.5" />
+                                  <span>Ăn (+Thể lực)</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const res = onSellPeppaDish(rid);
+                                    setFoodActionFeedback(res.message);
+                                    if (res.ok) soundFX.sparkle();
+                                    else soundFX.tap();
+                                  }}
+                                  className="flex min-h-[32px] items-center justify-center gap-1 rounded-xl border border-[#ECC38C] bg-[#FFF4DC] px-2.5 text-[11px] font-black text-[#945D18] transition active:scale-95"
+                                >
+                                  <Coins className="h-3.5 w-3.5" />
+                                  <span>Bán {r.sellPrice}</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Section 3: Farm Dishes (Storage Only — NOT holdable in hand) */}
                 <div className="space-y-2 border-t border-[#E6D6C1] pt-3">
                   <div className="flex items-center justify-between px-0.5">
                     <span className="flex items-center gap-1 text-[11px] font-black text-[#4B6B46]">

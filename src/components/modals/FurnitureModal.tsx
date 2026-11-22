@@ -7,6 +7,8 @@ import {soundFX} from '../../utils/sound';
 interface FurnitureModalProps {
   inventory: Record<string, number>;
   placed: PlacedFurniture[];
+  tab?: 'all' | FurnitureCategory;
+  onTabChange?: (nextTab: 'all' | FurnitureCategory) => void;
   onPlaceItem: (catalogId: string) => void;
   onClose: () => void;
 }
@@ -244,6 +246,32 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
           <circle cx="46" cy="34.5" r="2.5" stroke="#7AD0F5" strokeWidth="1.2" fill="none" />
         </svg>
       );
+    case 'microwave':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="11" y="15" width="42" height="26" rx="4" fill={c} stroke="#D5C6B2" strokeWidth="1.4" />
+          <rect x="15" y="19" width="24" height="18" rx="2.5" fill="#27313D" stroke={a} strokeWidth="1.8" />
+          <ellipse cx="27" cy="33" rx="6.5" ry="1.8" fill="#FFF8EE" opacity="0.85" />
+          <rect x="42" y="19" width="8" height="5" rx="1" fill="#7CECD2" />
+          <circle cx="46" cy="29" r="2.8" fill={a} />
+          <rect x="42.5" y="34" width="7" height="3" rx="1" fill={a} />
+        </svg>
+      );
+    case 'mini_oven':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="11" y="14" width="42" height="27" rx="4" fill={c} stroke="#88B5A2" strokeWidth="1.4" />
+          <rect x="14" y="17" width="36" height="21" rx="2.5" fill="#FFF8EE" />
+          <rect x="17" y="20" width="22" height="15" rx="2" fill="#2D3642" />
+          <rect x="19" y="22" width="18" height="11" rx="1.2" fill="#4A3828" />
+          <line x1="20" y1="29" x2="36" y2="29" stroke="#CBD5E1" strokeWidth="1.2" />
+          <line x1="20" y1="24" x2="36" y2="24" stroke="#FF8F33" strokeWidth="1.4" />
+          <line x1="19" y1="19.5" x2="37" y2="19.5" stroke={a} strokeWidth="2.2" strokeLinecap="round" />
+          <circle cx="44" cy="22" r="2.2" fill={a} />
+          <circle cx="44" cy="28.5" r="2.2" fill={a} />
+          <circle cx="44" cy="34.5" r="1.8" fill="#FF8F33" />
+        </svg>
+      );
     case 'wooden_table':
       return (
         <svg width="64" height="54" viewBox="0 0 64 54">
@@ -339,6 +367,243 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
           <rect x="10" y="33" width="44" height="5" rx="2" fill={c} />
         </svg>
       );
+    case 'wall_calendar_tet':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="19" y="6" width="26" height="36" rx="3" fill="#B81D24" stroke="#F5C443" strokeWidth="1.5" />
+          <rect x="21" y="8" width="22" height="12" rx="1.5" fill="#D92B2B" />
+          <circle cx="26" cy="14" r="2.2" fill="#FFD43B" />
+          <rect x="21" y="21" width="22" height="19" rx="1.5" fill="#FFF7E8" />
+          <text x="32" y="34" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#C92424">1</text>
+          <polygon points="30,42 34,42 32,50" fill="#B81D24" />
+        </svg>
+      );
+    case 'tet_couplets':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="14" y="8" width="12" height="36" rx="1.5" fill="#C92424" stroke="#F6C945" strokeWidth="1.4" />
+          <rect x="38" y="8" width="12" height="36" rx="1.5" fill="#C92424" stroke="#F6C945" strokeWidth="1.4" />
+          <line x1="12" y1="8" x2="28" y2="8" stroke="#5E2814" strokeWidth="2.5" />
+          <line x1="36" y1="8" x2="52" y2="8" stroke="#5E2814" strokeWidth="2.5" />
+          <circle cx="20" cy="18" r="2" fill="#FFE47A" />
+          <circle cx="20" cy="26" r="2" fill="#FFE47A" />
+          <circle cx="20" cy="34" r="2" fill="#FFE47A" />
+          <circle cx="44" cy="18" r="2" fill="#FFE47A" />
+          <circle cx="44" cy="26" r="2" fill="#FFE47A" />
+          <circle cx="44" cy="34" r="2" fill="#FFE47A" />
+        </svg>
+      );
+    case 'tet_mai_pot':
+    case 'tet_peach_pot':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M32,33 L32,19 M32,26 L21,18 M32,23 L43,16" stroke="#6A4125" strokeWidth="3" strokeLinecap="round" />
+          <circle cx="21" cy="17" r="4.5" fill={c} />
+          <circle cx="32" cy="13" r="5" fill={c} />
+          <circle cx="43" cy="16" r="4.5" fill={c} />
+          <circle cx="26" cy="23" r="3.5" fill={c} />
+          <circle cx="38" cy="23" r="3.5" fill={c} />
+          <circle cx="32" cy="13" r="1.6" fill="#E87A14" />
+          <polygon points="22,33 42,33 38,47 26,47" fill={a} stroke="#F5C443" strokeWidth="1.3" />
+        </svg>
+      );
+    case 'tet_tea_table':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="8" y="20" width="48" height="7" rx="2.5" fill={c} stroke={a} strokeWidth="1.5" />
+          <rect x="13" y="27" width="38" height="4" fill={a} />
+          <rect x="14" y="38" width="36" height="3" rx="1" fill={c} />
+          <rect x="12" y="27" width="5" height="19" rx="1.5" fill={a} />
+          <rect x="47" y="27" width="5" height="19" rx="1.5" fill={a} />
+        </svg>
+      );
+    case 'tet_chair':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="20" y="9" width="24" height="19" rx="3" fill={c} />
+          <circle cx="32" cy="18" r="4" fill="#E8C366" />
+          <rect x="18" y="28" width="28" height="6" rx="2" fill={a} />
+          <rect x="20" y="34" width="4.5" height="13" fill={c} />
+          <rect x="39.5" y="34" width="4.5" height="13" fill={c} />
+        </svg>
+      );
+    case 'tet_five_fruit_tray':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M18,27 Q32,10 46,27" fill="none" stroke="#76B947" strokeWidth="5" strokeLinecap="round" />
+          <circle cx="32" cy="25" r="7" fill="#F2C12E" />
+          <circle cx="22" cy="27" r="4.5" fill="#E03E6E" />
+          <circle cx="42" cy="27" r="4.5" fill="#FFA928" />
+          <polygon points="16,30 48,30 41,37 23,37" fill={a} stroke="#F2C249" strokeWidth="1.2" />
+          <rect x="28" y="37" width="8" height="6" fill={a} />
+          <ellipse cx="32" cy="44" rx="10" ry="3" fill={a} />
+        </svg>
+      );
+    case 'tet_banh_chung':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <ellipse cx="32" cy="36" rx="22" ry="8" fill="#E7F0EA" stroke="#F2C249" strokeWidth="1.4" />
+          <rect x="17" y="20" width="18" height="15" rx="2.5" fill="#2E8540" />
+          <line x1="23" y1="20" x2="23" y2="35" stroke="#EAD293" strokeWidth="1.8" />
+          <line x1="29" y1="20" x2="29" y2="35" stroke="#EAD293" strokeWidth="1.8" />
+          <circle cx="42" cy="26" r="7" fill="#226F3D" />
+          <path d="M35,34 A7,7 0 0,0 49,34 Z" fill="#F0444D" />
+        </svg>
+      );
+    case 'tea_set_ceramic':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M16,29 C11,29 11,36 16,36" fill="none" stroke={c} strokeWidth="2.4" />
+          <ellipse cx="24" cy="32" rx="8.5" ry="7" fill={c} />
+          <path d="M31,29 L36,24" stroke={c} strokeWidth="2.8" strokeLinecap="round" />
+          <circle cx="24" cy="24" r="2.2" fill="#F2C249" />
+          <rect x="38" y="33" width="6" height="6.5" rx="1.5" fill={c} />
+          <rect x="46" y="34" width="5.5" height="5.5" rx="1.5" fill={c} />
+          <rect x="39" y="32" width="4" height="1.4" fill="#D48C38" />
+          <rect x="47" y="33" width="3.5" height="1.2" fill="#D48C38" />
+        </svg>
+      );
+    case 'tet_lantern_lamp':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M22,46 V12 H37" fill="none" stroke="#4E2414" strokeWidth="3.2" strokeLinecap="round" />
+          <ellipse cx="37" cy="26" rx="9" ry="11" fill={c} />
+          <rect x="33" y="14" width="8" height="2.5" fill={a} />
+          <rect x="33" y="36" width="8" height="2.5" fill={a} />
+          <polygon points="35,39 39,39 37,47" fill={c} />
+        </svg>
+      );
+    case 'tet_vase_blossom':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M31,25 Q23,16 19,9" fill="none" stroke="#6D4325" strokeWidth="2" strokeLinecap="round" />
+          <path d="M32,25 Q33,15 35,7" fill="none" stroke="#6D4325" strokeWidth="2" strokeLinecap="round" />
+          <path d="M33,25 Q41,17 45,11" fill="none" stroke="#6D4325" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="19" cy="11" r="3.6" fill="#FF9EB5" />
+          <circle cx="25" cy="16" r="2.8" fill="#FF9EB5" />
+          <circle cx="35" cy="9" r="3.8" fill="#FF9EB5" />
+          <circle cx="32" cy="15" r="2.6" fill="#FFB3C6" />
+          <circle cx="44" cy="12" r="3.4" fill="#FF9EB5" />
+          <circle cx="19" cy="11" r="1.2" fill="#F6C945" />
+          <circle cx="35" cy="9" r="1.3" fill="#F6C945" />
+          <circle cx="44" cy="12" r="1.1" fill="#F6C945" />
+          <ellipse cx="32" cy="37" rx="8.5" ry="10" fill={c} />
+          <rect x="28" y="24" width="8" height="6" rx="1.5" fill={c} />
+          <rect x="27" y="24" width="10" height="2.2" rx="1" fill="#F4EFE4" />
+        </svg>
+      );
+    case 'tet_rug_red':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="8" y="13" width="48" height="28" rx="4" fill={c} stroke={a} strokeWidth="2" />
+          <circle cx="32" cy="27" r="7.5" fill="none" stroke={a} strokeWidth="1.8" />
+          <circle cx="32" cy="27" r="3.5" fill="#FFD43B" />
+        </svg>
+      );
+    case 'tet_flower_wreath':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <circle cx="32" cy="27" r="15" fill="none" stroke="#8C5B32" strokeWidth="5.5" />
+          <circle cx="21" cy="20" r="4.2" fill="#FFD43B" />
+          <circle cx="19" cy="31" r="4" fill="#FF9EB5" />
+          <circle cx="26" cy="39" r="4.2" fill="#FFD43B" />
+          <circle cx="43" cy="20" r="3.8" fill="#FFD43B" />
+          <circle cx="45" cy="30" r="4" fill="#FF9EB5" />
+          <ellipse cx="26" cy="13" rx="5" ry="3" fill={a} />
+          <ellipse cx="38" cy="13" rx="5" ry="3" fill={a} />
+          <circle cx="32" cy="13" r="2.8" fill="#F5C443" />
+          <path d="M30,42 L28,50 M34,42 L36,50" stroke={a} strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+      );
+    case 'xmas_wreath':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <circle cx="32" cy="29" r="15" fill="none" stroke="#15472B" strokeWidth="8.5" strokeLinecap="round" strokeDasharray="3 1.5" />
+          <circle cx="32" cy="29" r="14.2" fill="none" stroke="#247345" strokeWidth="5.5" strokeDasharray="4 3" />
+          <circle cx="32" cy="29" r="13.5" fill="none" stroke="#539972" strokeWidth="3" strokeDasharray="2 5" />
+          <circle cx="29" cy="22" r="2.8" fill="#F2C249" />
+          <circle cx="35" cy="24" r="2.8" fill="#F2C249" />
+          <ellipse cx="25.5" cy="14" rx="5.5" ry="3.2" fill={a} />
+          <ellipse cx="38.5" cy="14" rx="5.5" ry="3.2" fill={a} />
+          <path d="M30,15 L25,25 M34,15 L39,25" stroke={a} strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="32" cy="14" r="3" fill="#841118" />
+          <circle cx="18.5" cy="25" r="2.8" fill="#F7A43B" stroke="#DF6F24" strokeWidth="1" />
+          <circle cx="45.5" cy="25" r="2.8" fill="#F7A43B" stroke="#DF6F24" strokeWidth="1" />
+          <circle cx="21" cy="39" r="2.5" fill="#8E5631" />
+          <circle cx="43" cy="39" r="2.5" fill="#8E5631" />
+          <circle cx="31" cy="44" r="2.1" fill="#E02430" />
+          <circle cx="34.5" cy="43" r="2.1" fill="#E02430" />
+        </svg>
+      );
+    case 'xmas_tree':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <polygon points="32,7 22,20 42,20" fill="#2E8B57" />
+          <polygon points="32,15 18,30 46,30" fill="#237447" />
+          <polygon points="32,24 14,41 50,41" fill="#1B5E3A" />
+          <rect x="29" y="41" width="6" height="6" fill="#6B4427" />
+          <circle cx="32" cy="6" r="3" fill="#FFE066" />
+          <circle cx="28" cy="24" r="2.2" fill="#E03131" />
+          <circle cx="37" cy="28" r="2.2" fill="#FFE066" />
+          <circle cx="24" cy="36" r="2.2" fill="#4DABF7" />
+          <circle cx="39" cy="37" r="2.2" fill="#E03131" />
+        </svg>
+      );
+    case 'xmas_snowman':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <circle cx="32" cy="37" r="10" fill={c} stroke="#CBD5E1" strokeWidth="1.2" />
+          <circle cx="32" cy="23" r="7.2" fill={c} stroke="#CBD5E1" strokeWidth="1.2" />
+          <rect x="26" y="28" width="12" height="3.2" rx="1.5" fill={a} />
+          <rect x="25" y="14" width="14" height="2.5" rx="1" fill="#2B303A" />
+          <rect x="27" y="7" width="10" height="7.5" rx="1.5" fill="#2B303A" />
+          <polygon points="32,22 39,23.5 32,25" fill="#FF7A1A" />
+        </svg>
+      );
+    case 'xmas_gift_boxes':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="13" y="25" width="18" height="19" rx="2" fill={c} />
+          <rect x="20" y="25" width="4" height="19" fill={a} />
+          <rect x="33" y="29" width="17" height="15" rx="2" fill="#237447" />
+          <rect x="39.5" y="29" width="4" height="15" fill="#F8F9FA" />
+          <rect x="21" y="13" width="14" height="12" rx="2" fill="#FFF5E1" stroke="#E2D5C1" strokeWidth="1" />
+          <rect x="26.5" y="13" width="3" height="12" fill={c} />
+        </svg>
+      );
+    case 'moon_lamp':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M26,10 A15,15 0 1,0 44,36" fill="none" stroke={a} strokeWidth="3" strokeLinecap="round" />
+          <circle cx="33" cy="24" r="11" fill={c} />
+          <circle cx="29" cy="21" r="2.2" fill="#E6C97A" />
+          <circle cx="36" cy="26" r="2.8" fill="#E6C97A" />
+          <ellipse cx="32" cy="45" rx="9" ry="3" fill="#5E3A22" />
+        </svg>
+      );
+    case 'bonsai_zen':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M25,35 Q20,26 32,20 Q41,16 44,12" fill="none" stroke="#6E472B" strokeWidth="4.2" strokeLinecap="round" />
+          <path d="M29,24 L19,21" fill="none" stroke="#6E472B" strokeWidth="2.4" strokeLinecap="round" />
+          <ellipse cx="18" cy="20" rx="8" ry="4" fill="#2E6F40" />
+          <ellipse cx="33" cy="13" rx="9" ry="4.5" fill={c} />
+          <ellipse cx="46" cy="16" rx="8" ry="4" fill="#68B572" />
+          <polygon points="15,35 49,35 45,44 19,44" fill={a} />
+          <rect x="20" y="44" width="4" height="3" fill={a} />
+          <rect x="40" y="44" width="4" height="3" fill={a} />
+        </svg>
+      );
+    case 'vinyl_corner':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="10" y="16" width="44" height="24" rx="4" fill={c} />
+          <rect x="13" y="19" width="38" height="18" rx="2" fill="#F2E9DC" />
+          <circle cx="27" cy="28" r="8" fill="#1E222A" />
+          <circle cx="27" cy="28" r="3" fill={a} />
+          <line x1="42" y1="21" x2="36" y2="30" stroke="#E8C366" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+      );
     case 'floor_paint':
     case 'wall_paint':
       return (
@@ -357,10 +622,17 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
 export const FurnitureModal: React.FC<FurnitureModalProps> = ({
   inventory,
   placed,
+  tab: controlledTab,
+  onTabChange,
   onPlaceItem,
   onClose,
 }) => {
-  const [tab, setTab] = useState<'all' | FurnitureCategory>('all');
+  const [internalTab, setInternalTab] = useState<'all' | FurnitureCategory>('all');
+  const tab = controlledTab ?? internalTab;
+  const setTab = (next: 'all' | FurnitureCategory) => {
+    setInternalTab(next);
+    onTabChange?.(next);
+  };
 
   const placedCounts: Record<string, number> = {};
   for (const p of placed) {

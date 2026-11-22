@@ -212,6 +212,19 @@ export function getLakeShoreRadius(theta: number): number {
   );
 }
 
+const TOWN_OCT_COS = Math.cos(Math.PI / 8);
+const TOWN_OCT_SIN = Math.sin(Math.PI / 8);
+
+function isInsideTownOctagon(dx: number, dz: number, vertexRadius: number): boolean {
+  const ax = Math.abs(dx);
+  const az = Math.abs(dz);
+  const limit = vertexRadius * TOWN_OCT_COS;
+  return (
+    ax * TOWN_OCT_COS + az * TOWN_OCT_SIN <= limit &&
+    ax * TOWN_OCT_SIN + az * TOWN_OCT_COS <= limit
+  );
+}
+
 export function getTownGroundHeight(
   x: number,
   z: number,
@@ -245,6 +258,23 @@ export function getTownGroundHeight(
   }
   if (x >= -61.85 && x <= -43.65 && z >= -10.95 && z <= 5.95) {
     return 0.12;
+  }
+  // Walkable Town Hot Air Balloon Station Platform & South Entry Steps
+  const bdx = x - HILL_CENTER.x;
+  const bdz = z - (HILL_CENTER.z - 0.8);
+  if (Math.abs(bdx) <= 5.1 && Math.abs(bdz) <= 5.2) {
+    if (isInsideTownOctagon(bdx, bdz, 4.44)) {
+      return HILL_PEAK_Y + 0.32;
+    }
+    if (Math.abs(bdx) <= 1.16 && bdz >= 3.96 && bdz <= 4.54) {
+      return HILL_PEAK_Y + 0.21;
+    }
+    if (Math.abs(bdx) <= 1.33 && bdz >= 4.30 && bdz <= 5.02) {
+      return HILL_PEAK_Y + 0.11;
+    }
+    if (isInsideTownOctagon(bdx, bdz, 4.86)) {
+      return HILL_PEAK_Y + 0.2;
+    }
   }
   const dh = Math.hypot(x - HILL_CENTER.x, z - HILL_CENTER.z);
   if (dh < HILL_RADIUS) {

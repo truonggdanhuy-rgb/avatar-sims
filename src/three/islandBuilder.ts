@@ -26,19 +26,19 @@ import {buildWoodenRowboat, TownAnchor, WorldCollider} from './townBuilder';
 export const ISLAND_WATER_Y = -0.35;
 export const ISLAND_SWIM_MAX_R = 72.0;
 export const ISLAND_TREEHOUSE_DECK_Y = 5.65;
-export const ISLAND_PIER_DECK_Y = 0.32;
+export const ISLAND_PIER_DECK_Y = 0.48;
 export const ISLAND_BALLOON_POS = {x: 13.5, z: -4.5};
 export const ISLAND_BALLOON_INTERACT = {tx: 11.4, tz: -2.2};
-export const ISLAND_PIER_INTERACT = {tx: 0, tz: 32.8};
-export const ISLAND_PIER_DUCK_INTERACT = {tx: -0.95, tz: 32.15};
-export const ISLAND_BOAT_INTERACT = {tx: 1.05, tz: 31.8};
-export const ISLAND_BOAT_SPAWN = {x: 3.15, z: 32.4, rotY: 0.24};
+export const ISLAND_PIER_INTERACT = {tx: 0, tz: 32.6};
+export const ISLAND_PIER_DUCK_INTERACT = {tx: -0.85, tz: 31.8};
+export const ISLAND_BOAT_INTERACT = {tx: 0.85, tz: 31.8};
+export const ISLAND_BOAT_SPAWN = {x: 3.05, z: 32.0, rotY: 0.14};
 export const ISLAND_SPAWN = {x: 10.6, z: -1.6, rotY: -Math.PI * 0.72};
 
 export const ISLAND_TREEHOUSE_CENTER = {x: -7.5, z: -9.5};
 export const ISLAND_LADDER_BOTTOM = {x: -7.5, z: -4.75};
-export const ISLAND_LADDER_CLIMB_START = {x: -7.5, z: -4.98};
-export const ISLAND_LADDER_CLIMB_END = {x: -7.5, z: -6.32};
+export const ISLAND_LADDER_CLIMB_START = {x: -7.5, z: -4.36};
+export const ISLAND_LADDER_CLIMB_END = {x: -7.5, z: -5.85};
 export const ISLAND_LADDER_TOP = {x: -7.5, z: -6.92};
 export const ISLAND_TREEHOUSE_DOOR = {x: -7.5, z: -8.15};
 
@@ -59,7 +59,7 @@ export function clampPointToIslandTreehouse(x: number, z: number): {x: number; z
 export const ISLAND_PIER_X_MIN = -1.58;
 export const ISLAND_PIER_X_MAX = 1.58;
 export const ISLAND_PIER_Z_MIN = 22.0;
-export const ISLAND_PIER_Z_MAX = 33.7;
+export const ISLAND_PIER_Z_MAX = 33.8;
 
 const STREAM_POINTS: [number, number][] = [
   [-0.8, -16.8],
@@ -515,15 +515,36 @@ export function isPointOnIslandPier(x: number, z: number): boolean {
   );
 }
 
+const OCT_COS = Math.cos(Math.PI / 8);
+const OCT_SIN = Math.sin(Math.PI / 8);
+
+function isInsideOctagon(dx: number, dz: number, vertexRadius: number): boolean {
+  const ax = Math.abs(dx);
+  const az = Math.abs(dz);
+  const limit = vertexRadius * OCT_COS;
+  return ax * OCT_COS + az * OCT_SIN <= limit && ax * OCT_SIN + az * OCT_COS <= limit;
+}
+
 /**
- * Ground-layer walkable height (terrain + boat pier). Upper Treehouse height is managed via climbing state.
+ * Ground-layer walkable height (terrain + boat pier + balloon platform). Upper Treehouse height is managed via climbing state.
  */
 export function getIslandGroundHeight(x: number, z: number): number {
-  const base = getIslandBaseTerrainY(x, z);
+  let y = getIslandBaseTerrainY(x, z);
   if (isPointOnIslandPier(x, z)) {
-    return Math.max(base, ISLAND_PIER_DECK_Y);
+    y = Math.max(y, ISLAND_PIER_DECK_Y);
   }
-  return base;
+  const bdx = x - ISLAND_BALLOON_POS.x;
+  const bdz = z - ISLAND_BALLOON_POS.z;
+  if (Math.abs(bdx) <= 3.9 && Math.abs(bdz) <= 3.9) {
+    // Island balloon pad base sits at terrain height 1.38
+    const padBaseY = 1.38;
+    if (isInsideOctagon(bdx, bdz, 3.43)) {
+      y = Math.max(y, padBaseY + 0.27);
+    } else if (isInsideOctagon(bdx, bdz, 3.74)) {
+      y = Math.max(y, padBaseY + 0.18);
+    }
+  }
+  return y;
 }
 
 function addBoxProxy(
@@ -798,169 +819,227 @@ export function buildIslandScene(options?: {
   group.add(buoysGroup);
 
   // =========================================================================
-  // 3. CLEAN NON-OVERLAPPING BOAT PIER + DUCK SWIM FLOAT + EQUIPPED SEA BOAT
+  // 3. CLEAN HARBOR WOODEN PIER + SWIM FLOAT + WOODEN ROWBOAT
   // =========================================================================
-  const pierWoodTex = createWoodPlankTexture('#C48A55', '#8D5B30', 2, 7);
+  const pierWoodTex = createWoodPlankTexture('#C68D57', '#946134', 2, 8);
   disposables.push(pierWoodTex);
   const pierDeckMat = new THREE.MeshStandardMaterial({map: pierWoodTex, roughness: 0.78});
-  const pierTimberMat = getMat('#734828', 0.8);
+  const pierPlankWarmMat = getMat('#CE9762', 0.72);
+  const pierPlankAltMat = getMat('#BC834F', 0.75);
+  const pierTimberMat = getMat('#6D4325', 0.8);
   const pierBrassMat = getMat('#DDA84F', 0.34, 0.65);
+  const ropeHempMat = getMat('#DCC194', 0.86);
 
   const pierGroup = new THREE.Group();
   const pierLen = ISLAND_PIER_Z_MAX - ISLAND_PIER_Z_MIN;
   const pierCenterZ = (ISLAND_PIER_Z_MIN + ISLAND_PIER_Z_MAX) * 0.5;
+
+  // Main walkable structural deck (top flush at ISLAND_PIER_DECK_Y = 0.48)
   const pierDeckMesh = new THREE.Mesh(
-    new RoundedBoxGeometry(3.16, 0.2, pierLen, 2, 0.04),
+    new RoundedBoxGeometry(3.16, 0.14, pierLen, 2, 0.03),
     pierDeckMat,
   );
-  pierDeckMesh.position.set(0, ISLAND_PIER_DECK_Y - 0.1, pierCenterZ);
+  pierDeckMesh.position.set(0, ISLAND_PIER_DECK_Y - 0.07, pierCenterZ);
   pierDeckMesh.userData = {kind: 'ground', noShadowBlock: true, isTreehouseFloor: false};
   pierGroup.add(pierDeckMesh);
 
-  // Under-deck structural pilings & cross-joists (strictly beneath deck underside — zero overlap!)
-  const pierZPosts = [22.5, 25.2, 27.9, 30.6, 33.3];
-  for (const pz of pierZPosts) {
-    for (const px of [-1.28, 1.28]) {
-      const piling = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.155, 2.32, 9), pierTimberMat);
-      piling.position.set(px, ISLAND_PIER_DECK_Y - 1.34, pz); // top at DECK_Y - 0.18 (cleanly below deck!)
-      pierGroup.add(piling);
-    }
-    const crossJoist = new THREE.Mesh(new RoundedBoxGeometry(2.88, 0.12, 0.16, 1, 0.02), pierTimberMat);
-    crossJoist.position.set(0, ISLAND_PIER_DECK_Y - 0.24, pz);
-    pierGroup.add(crossJoist);
+  // Shore approach ramp flush onto sandy beach (z: 21.25 .. 22.1)
+  const shoreRamp = new THREE.Mesh(
+    new RoundedBoxGeometry(3.04, 0.12, 0.95, 2, 0.03),
+    pierPlankWarmMat,
+  );
+  shoreRamp.position.set(0, ISLAND_PIER_DECK_Y - 0.05, ISLAND_PIER_Z_MIN - 0.32);
+  shoreRamp.rotation.x = -0.14;
+  pierGroup.add(shoreRamp);
+
+  // Sculpted beveled transverse deck planks & longitudinal under-deck stringers
+  let plankIdx = 0;
+  for (let pz = ISLAND_PIER_Z_MIN + 0.18; pz <= ISLAND_PIER_Z_MAX - 0.16; pz += 0.38) {
+    const plank = new THREE.Mesh(
+      new RoundedBoxGeometry(3.08, 0.032, 0.31, 1, 0.01),
+      plankIdx % 2 === 0 ? pierPlankWarmMat : pierPlankAltMat,
+    );
+    plank.position.set(0, ISLAND_PIER_DECK_Y - 0.006, pz);
+    pierGroup.add(plank);
+    plankIdx++;
+  }
+  for (const sx of [-1.42, 1.42]) {
+    const stringer = new THREE.Mesh(
+      new RoundedBoxGeometry(0.14, 0.15, pierLen + 0.1, 1, 0.02),
+      pierTimberMat,
+    );
+    stringer.position.set(sx, ISLAND_PIER_DECK_Y - 0.13, pierCenterZ);
+    pierGroup.add(stringer);
   }
 
-  // Distinct, spaced-cleanly deck bollards (no overlapping posts/pilings/rings)
+  // Aligned Pier Pilings (5 pairs at x = +/-1.38) rising smoothly into deck bollards — ZERO double posts!
+  const pierZPosts = [23.0, 25.7, 28.4, 31.1, 33.5];
   const lanternGlowMat = new THREE.MeshStandardMaterial({
     color: '#FFE79A',
     emissive: '#FFB347',
     emissiveIntensity: 0.9,
     roughness: 0.35,
   });
-  // Left-front Harbor Lantern Post
-  const endPostL = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.125, 1.12, 9), pierTimberMat);
-  endPostL.position.set(-1.38, ISLAND_PIER_DECK_Y + 0.56, ISLAND_PIER_Z_MAX - 0.28);
-  const lanternHead = new THREE.Mesh(new RoundedBoxGeometry(0.3, 0.36, 0.3, 2, 0.04), lanternGlowMat);
-  lanternHead.position.set(-1.38, ISLAND_PIER_DECK_Y + 1.28, ISLAND_PIER_Z_MAX - 0.28);
-  const lanternCap = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.18, 4), pierTimberMat);
-  lanternCap.rotation.y = Math.PI / 4;
-  lanternCap.position.set(-1.38, ISLAND_PIER_DECK_Y + 1.54, ISLAND_PIER_Z_MAX - 0.28);
 
-  // Right-front Clean Mooring Bollard (with brass cap, no clipping ring!)
-  const endPostR = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.48, 9), pierTimberMat);
-  endPostR.position.set(1.38, ISLAND_PIER_DECK_Y + 0.24, ISLAND_PIER_Z_MAX - 0.28);
-  const endCapR = new THREE.Mesh(new THREE.SphereGeometry(0.115, 8, 6), pierBrassMat);
-  endCapR.position.set(1.38, ISLAND_PIER_DECK_Y + 0.49, ISLAND_PIER_Z_MAX - 0.28);
+  pierZPosts.forEach((pz, idx) => {
+    const crossJoist = new THREE.Mesh(
+      new RoundedBoxGeometry(2.96, 0.13, 0.16, 1, 0.02),
+      pierTimberMat,
+    );
+    crossJoist.position.set(0, ISLAND_PIER_DECK_Y - 0.21, pz);
+    pierGroup.add(crossJoist);
 
-  // Mid-left Tie Bollard mooring the Yellow Duck Swim Float
-  const duckCleatL = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.1, 0.34, 8), pierTimberMat);
-  duckCleatL.position.set(-1.38, ISLAND_PIER_DECK_Y + 0.17, 31.2);
-  const duckCleatCap = new THREE.Mesh(new THREE.SphereGeometry(0.09, 7, 5), pierBrassMat);
-  duckCleatCap.position.set(-1.38, ISLAND_PIER_DECK_Y + 0.35, 31.2);
+    for (const px of [-1.38, 1.38]) {
+      const isLeft = px < 0;
+      const isTip = idx === pierZPosts.length - 1;
+      const isBerthCleat = idx === 3; // z = 31.1
+      const aboveH = isTip && isLeft ? 1.18 : isTip || isBerthCleat ? 0.38 : 0.62;
+      const botY = ISLAND_WATER_Y - 2.05;
+      const topY = ISLAND_PIER_DECK_Y + aboveH;
+      const totalH = topY - botY;
 
-  pierGroup.add(endPostL, lanternHead, lanternCap, endPostR, endCapR, duckCleatL, duckCleatCap);
+      const piling = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.105, 0.13, totalH, 9),
+        pierTimberMat,
+      );
+      piling.position.set(px, (botY + topY) * 0.5, pz);
+      pierGroup.add(piling);
+
+      if (isTip && isLeft) {
+        // Harbor Lantern crowning the seaward-left piling
+        const lanternArm = new THREE.Mesh(
+          new RoundedBoxGeometry(0.26, 0.07, 0.07, 1, 0.02),
+          pierTimberMat,
+        );
+        lanternArm.position.set(px + 0.08, topY - 0.02, pz);
+        const lanternHead = new THREE.Mesh(
+          new RoundedBoxGeometry(0.28, 0.34, 0.28, 2, 0.04),
+          lanternGlowMat,
+        );
+        lanternHead.position.set(px + 0.16, topY - 0.24, pz);
+        const lanternCap = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.16, 4), pierTimberMat);
+        lanternCap.rotation.y = Math.PI / 4;
+        lanternCap.position.set(px + 0.16, topY - 0.02, pz);
+        pierGroup.add(lanternArm, lanternHead, lanternCap);
+      } else {
+        const cap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.11, 8, 6),
+          isTip || isBerthCleat ? pierBrassMat : pierPlankWarmMat,
+        );
+        cap.position.set(px, topY + 0.02, pz);
+        pierGroup.add(cap);
+      }
+    }
+  });
+
+  // Clean taut hemp rope handrail on inner approach (z: 23.0 .. 28.4), leaving seaward berth area completely open!
+  for (const px of [-1.38, 1.38]) {
+    const railSpan = 28.4 - 23.0;
+    const ropeRail = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.026, 0.026, railSpan, 6),
+      ropeHempMat,
+    );
+    ropeRail.rotation.x = Math.PI / 2;
+    ropeRail.position.set(px, ISLAND_PIER_DECK_Y + 0.44, (23.0 + 28.4) * 0.5);
+    pierGroup.add(ropeRail);
+  }
+
+  // Colliders strictly aligned to the outer side bollards (central walkway x: -1.16..+1.16 wide open!)
   colliders.push(
-    {type: 'circle', id: 'island_pier_lantern_l', x: -1.38, z: ISLAND_PIER_Z_MAX - 0.28, r: 0.24},
-    {type: 'circle', id: 'island_pier_bollard_r', x: 1.38, z: ISLAND_PIER_Z_MAX - 0.28, r: 0.24},
-    {type: 'circle', id: 'island_pier_cleat_l', x: -1.38, z: 31.2, r: 0.2},
+    {type: 'circle', id: 'island_pier_post_l1', x: -1.38, z: 23.0, r: 0.22},
+    {type: 'circle', id: 'island_pier_post_r1', x: 1.38, z: 23.0, r: 0.22},
+    {type: 'circle', id: 'island_pier_post_l2', x: -1.38, z: 25.7, r: 0.22},
+    {type: 'circle', id: 'island_pier_post_r2', x: 1.38, z: 25.7, r: 0.22},
+    {type: 'circle', id: 'island_pier_post_l3', x: -1.38, z: 28.4, r: 0.22},
+    {type: 'circle', id: 'island_pier_post_r3', x: 1.38, z: 28.4, r: 0.22},
+    {type: 'circle', id: 'island_pier_cleat_l', x: -1.38, z: 31.1, r: 0.22},
+    {type: 'circle', id: 'island_pier_cleat_r', x: 1.38, z: 31.1, r: 0.22},
+    {type: 'circle', id: 'island_pier_lantern_l', x: -1.38, z: 33.5, r: 0.24},
+    {type: 'circle', id: 'island_pier_bollard_r', x: 1.38, z: 33.5, r: 0.24},
   );
 
-  // Mooring ropes connecting bollards gently to Duck Float (West) & Boat (East)
-  const ropeHempMat = getMat('#DCC194', 0.86);
-  const addMooringRope = (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number) => {
-    const p1 = new THREE.Vector3(x1, y1, z1);
-    const p2 = new THREE.Vector3(x2, y2, z2);
-    const dir = new THREE.Vector3().subVectors(p2, p1);
-    const rLen = dir.length();
-    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, rLen, 6), ropeHempMat);
-    rope.position.addVectors(p1, p2).multiplyScalar(0.5);
-    rope.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
-    pierGroup.add(rope);
+  // Wooden Swim Ladder on West edge next to Swim Float (x = -1.60, z = 31.8)
+  for (const lz of [31.52, 32.08]) {
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 1.32, 7), pierTimberMat);
+    rail.position.set(-1.62, ISLAND_PIER_DECK_Y - 0.34, lz);
+    rail.rotation.z = 0.08;
+    pierGroup.add(rail);
+  }
+  for (let r = 0; r < 4; r++) {
+    const rung = new THREE.Mesh(new RoundedBoxGeometry(0.06, 0.045, 0.56, 1, 0.015), pierPlankWarmMat);
+    rung.position.set(-1.62 - r * 0.02, ISLAND_PIER_DECK_Y - 0.14 - r * 0.25, 31.8);
+    pierGroup.add(rung);
+  }
+
+  // Slack catenary mooring lines (cleanly curving down from bollard to berth without intersecting deck!)
+  const addCatenaryRope = (
+    pStart: THREE.Vector3,
+    pMid: THREE.Vector3,
+    pEnd: THREE.Vector3,
+  ) => {
+    const curve = new THREE.CatmullRomCurve3([pStart, pMid, pEnd]);
+    const ropeGeo = new THREE.TubeGeometry(curve, 12, 0.022, 6, false);
+    pierGroup.add(new THREE.Mesh(ropeGeo, ropeHempMat));
   };
-  addMooringRope(-1.38, ISLAND_PIER_DECK_Y + 0.24, 31.2, -2.38, ISLAND_WATER_Y + 0.14, 31.8);
-  addMooringRope(1.38, ISLAND_PIER_DECK_Y + 0.32, ISLAND_PIER_Z_MAX - 0.28, 2.45, ISLAND_WATER_Y + 0.34, 32.35);
+  addCatenaryRope(
+    new THREE.Vector3(-1.38, ISLAND_PIER_DECK_Y + 0.26, 31.1),
+    new THREE.Vector3(-1.95, ISLAND_WATER_Y + 0.18, 31.45),
+    new THREE.Vector3(-2.36, ISLAND_WATER_Y + 0.14, 31.72),
+  );
+  addCatenaryRope(
+    new THREE.Vector3(1.38, ISLAND_PIER_DECK_Y + 0.28, 33.5),
+    new THREE.Vector3(2.08, ISLAND_WATER_Y + 0.32, 33.42),
+    new THREE.Vector3(2.8, ISLAND_WATER_Y + 0.42, 33.16),
+  );
 
   mergeStaticGroupByMaterial(pierGroup, new Set([pierDeckMesh]));
   group.add(pierGroup);
 
-  // Choice 1: Cute Clay Yellow Duck Swim Float moored on West side of Pier (prompts Swim Confirmation!)
-  const mooredDuckFloat = new THREE.Group();
-  mooredDuckFloat.position.set(-2.95, ISLAND_WATER_Y + 0.06, 32.15);
-  mooredDuckFloat.rotation.y = -0.32;
-  const duckYellowMat = glossyClayMat('#FFD638', 0.34);
-  const duckBellyMat = glossyClayMat('#FFF3A8', 0.38);
-  const duckBillMat = glossyClayMat('#FF7A2F', 0.36);
-  const duckCheekMat = getMat('#FF8FA3', 0.52);
-  const duckEyeMat = glossyClayMat('#241E1C', 0.18);
-  const duckWhiteMat = glossyClayMat('#FFFFFF', 0.2);
-
-  const duckRing = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.22, 12, 24), duckYellowMat);
-  duckRing.rotation.x = Math.PI / 2;
-  duckRing.position.y = 0.08;
-  const duckRingShine = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.08, 8, 20), duckBellyMat);
-  duckRingShine.rotation.x = Math.PI / 2;
-  duckRingShine.position.y = 0.24;
-
-  // Duck chest, arched neck & round head at +Z prow
-  const duckNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.19, 0.38, 10), duckYellowMat);
-  duckNeck.position.set(0, 0.34, 0.56);
-  duckNeck.rotation.x = 0.18;
-  const duckHead = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), duckYellowMat);
-  duckHead.scale.set(1.04, 0.96, 1.05);
-  duckHead.position.set(0, 0.58, 0.62);
-  const duckTuft = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.14, 7), duckYellowMat);
-  duckTuft.position.set(0, 0.82, 0.58);
-  duckTuft.rotation.x = -0.25;
-
-  const duckBeakTop = new THREE.Mesh(new THREE.SphereGeometry(0.125, 10, 8), duckBillMat);
-  duckBeakTop.scale.set(1.22, 0.52, 1.42);
-  duckBeakTop.position.set(0, 0.53, 0.86);
-  const duckBeakBot = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 7), duckBillMat);
-  duckBeakBot.scale.set(1.05, 0.4, 1.2);
-  duckBeakBot.position.set(0, 0.48, 0.83);
-
-  for (const side of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), duckEyeMat);
-    eye.position.set(side * 0.13, 0.62, 0.79);
-    const glint = new THREE.Mesh(new THREE.SphereGeometry(0.015, 6, 5), duckWhiteMat);
-    glint.position.set(side * 0.138, 0.635, 0.822);
-    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.05, 7, 5), duckCheekMat);
-    cheek.scale.set(1.1, 0.72, 0.6);
-    cheek.position.set(side * 0.175, 0.54, 0.76);
-    const wing = new THREE.Mesh(new THREE.SphereGeometry(0.22, 9, 7), duckYellowMat);
-    wing.scale.set(0.55, 0.78, 1.45);
-    wing.position.set(side * 0.72, 0.18, -0.04);
-    wing.rotation.z = side * -0.28;
-    mooredDuckFloat.add(eye, glint, cheek, wing);
+  // Choice 1: Classic Beach Swim Float ("Phao Bơi") moored cleanly at West berth (triggers normal swim!)
+  const mooredSwimFloat = new THREE.Group();
+  mooredSwimFloat.position.set(-2.85, ISLAND_WATER_Y + 0.05, 31.8);
+  const floatRedMat = glossyClayMat('#EE5A4F', 0.34);
+  const floatWhiteMat = glossyClayMat('#FFF8EE', 0.36);
+  const floatStripeCount = 8;
+  const floatSegArc = (Math.PI * 2) / floatStripeCount;
+  for (let s = 0; s < floatStripeCount; s++) {
+    const segMesh = new THREE.Mesh(
+      new THREE.TorusGeometry(0.54, 0.19, 12, 8, floatSegArc + 0.02),
+      s % 2 === 0 ? floatRedMat : floatWhiteMat,
+    );
+    segMesh.rotation.x = Math.PI / 2;
+    segMesh.rotation.z = s * floatSegArc;
+    segMesh.position.y = 0.08;
+    mooredSwimFloat.add(segMesh);
   }
-  const duckTail = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.34, 8), duckYellowMat);
-  duckTail.rotation.x = -1.05;
-  duckTail.position.set(0, 0.25, -0.74);
-  mooredDuckFloat.add(duckRing, duckRingShine, duckNeck, duckHead, duckTuft, duckBeakTop, duckBeakBot, duckTail);
-  mergeStaticGroupByMaterial(mooredDuckFloat);
-  group.add(mooredDuckFloat);
+  const floatTrim = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.022, 6, 24), ropeHempMat);
+  floatTrim.rotation.x = Math.PI / 2;
+  floatTrim.position.y = 0.11;
+  mooredSwimFloat.add(floatTrim);
+  mergeStaticGroupByMaterial(mooredSwimFloat);
+  group.add(mooredSwimFloat);
 
-  colliders.push({type: 'circle', id: 'island_duck_float', x: -2.95, z: 32.15, r: 0.92});
+  colliders.push({type: 'circle', id: 'island_swim_float', x: -2.85, z: 31.8, r: 0.88});
   addBoxProxy(
     group,
-    [1.85, 1.45, 1.95],
-    [-2.95, ISLAND_WATER_Y + 0.48, 32.15],
+    [1.75, 1.25, 1.75],
+    [-2.85, ISLAND_WATER_Y + 0.42, 31.8],
     {
-      kind: 'island_duck_float_swim',
+      kind: 'island_swim_float',
       tx: ISLAND_PIER_DUCK_INTERACT.tx,
       tz: ISLAND_PIER_DUCK_INTERACT.tz,
     },
     clickTargets,
   );
 
-  // Choice 2: Crafted Equipped Wooden Rowboat moored on East side + Active Steerable Sea Boat
+  // Choice 2: Crafted Regular Wooden Rowboat moored cleanly parallel at East berth + Active Steerable Sea Boat
   const mooredBoatBuilt = buildWoodenRowboat(false);
   const mooredIslandBoat = mooredBoatBuilt.boat;
-  mooredIslandBoat.position.set(2.95, ISLAND_WATER_Y + 0.05, 31.6);
-  mooredIslandBoat.rotation.y = 0.22;
+  mooredIslandBoat.position.set(2.8, ISLAND_WATER_Y + 0.05, 31.7);
+  mooredIslandBoat.rotation.y = 0;
   addBoxProxy(
     mooredIslandBoat,
-    [1.9, 1.5, 3.2],
+    [1.85, 1.5, 3.1],
     [0, 0.55, 0.1],
     {
       kind: 'island_boat_board',
@@ -1002,8 +1081,8 @@ export function buildIslandScene(options?: {
   const treehouseGroup = new THREE.Group();
   const basePadY = getIslandBaseTerrainY(ISLAND_LADDER_BOTTOM.x, ISLAND_LADDER_BOTTOM.z);
 
-  // 4A. Tall Ancient Banyan Tree cradling the high stilt garden deck (canopy stays elevated behind/beside deck — NEVER obstructs view!)
-  const treeBasePos = {x: -7.5, z: -13.35};
+  // 4A. Tall Ancient Banyan Tree cleanly cradling behind & beneath the high stilt garden deck
+  const treeBasePos = {x: -7.5, z: -14.35};
   const treeBaseGroundY = getIslandBaseTerrainY(treeBasePos.x, treeBasePos.z);
 
   // Flared stone-and-earth landing terrace at bottom of outward Rope Ladder (-7.5, -4.75)
@@ -1021,17 +1100,17 @@ export function buildIslandScene(options?: {
     treehouseGroup.add(pPost, pOrb);
   }
 
-  // Massive Gnarled Tall Trunk behind terrace + 6 thick buttress root flares
+  // Massive Gnarled Tall Trunk cleanly clear of deck back edge (-12.85) + 6 thick buttress root flares
   const trunkLower = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.92, 1.54, 6.6, 11),
+    new THREE.CylinderGeometry(0.86, 1.48, 6.6, 11),
     treeTrunkMat,
   );
   trunkLower.position.set(treeBasePos.x, treeBaseGroundY + 3.25, treeBasePos.z);
   const trunkUpper = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.68, 0.94, 5.8, 10),
+    new THREE.CylinderGeometry(0.64, 0.88, 5.8, 10),
     treeTrunkMat,
   );
-  trunkUpper.position.set(treeBasePos.x, treeBaseGroundY + 9.0, treeBasePos.z - 0.25);
+  trunkUpper.position.set(treeBasePos.x, treeBaseGroundY + 9.0, treeBasePos.z - 0.2);
   treehouseGroup.add(trunkLower, trunkUpper);
 
   for (let r = 0; r < 6; r++) {
@@ -1050,26 +1129,31 @@ export function buildIslandScene(options?: {
     treehouseGroup.add(rootFin);
   }
 
-  // 4 Sweeping Heavy Cradle Boughs strictly connecting trunk to underside of deck (ZERO protrusion through floor!)
+  // 4 Sweeping Heavy Cradle Boughs strictly terminating into saddle blocks BELOW deck joist (ZERO floor piercing!)
   const upAxis = new THREE.Vector3(0, 1, 0);
   const cradleTargets: [number, number][] = [
-    [-10.2, -9.8],
-    [-4.8, -9.8],
-    [-9.6, -7.4],
-    [-5.4, -7.4],
+    [-10.2, -9.9],
+    [-4.8, -9.9],
+    [-9.6, -7.5],
+    [-5.4, -7.5],
   ];
   cradleTargets.forEach(([tx, tz]) => {
     const startPt = new THREE.Vector3(treeBasePos.x, treeBaseGroundY + 3.05, treeBasePos.z);
-    const endPt = new THREE.Vector3(tx, ISLAND_TREEHOUSE_DECK_Y - 0.36, tz);
+    const endPt = new THREE.Vector3(tx, ISLAND_TREEHOUSE_DECK_Y - 0.54, tz);
     const dir = new THREE.Vector3().subVectors(endPt, startPt);
     const len = dir.length();
-    const bough = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, len, 8), treeTrunkMat);
+    const bough = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.34, len, 8), treeTrunkMat);
     bough.position.addVectors(startPt, endPt).multiplyScalar(0.5);
     bough.quaternion.setFromUnitVectors(upAxis, dir.normalize());
-    treehouseGroup.add(bough);
+    const saddle = new THREE.Mesh(
+      new RoundedBoxGeometry(0.46, 0.26, 0.46, 1, 0.03),
+      housePostMat,
+    );
+    saddle.position.set(tx, ISLAND_TREEHOUSE_DECK_Y - 0.41, tz);
+    treehouseGroup.add(bough, saddle);
   });
 
-  // Prominent Elevated Timber Stilts ("Chân Trụ") + angled knee-braces cleanly terminating under deck joist
+  // Prominent Elevated Timber Stilts ("Chân Trụ") + angled knee-braces cleanly terminating strictly below deck joist
   for (const [sx, sz] of [
     [-10.95, -6.55],
     [-4.05, -6.55],
@@ -1077,7 +1161,7 @@ export function buildIslandScene(options?: {
     [-4.2, -12.3],
   ]) {
     const stiltBotY = getIslandBaseTerrainY(sx, sz) - 0.25;
-    const stiltTopY = ISLAND_TREEHOUSE_DECK_Y - 0.22;
+    const stiltTopY = ISLAND_TREEHOUSE_DECK_Y - 0.29;
     const stiltH = stiltTopY - stiltBotY;
     const pillar = new THREE.Mesh(
       new THREE.CylinderGeometry(0.17, 0.23, stiltH, 9),
@@ -1085,8 +1169,8 @@ export function buildIslandScene(options?: {
     );
     pillar.position.set(sx, (stiltBotY + stiltTopY) * 0.5, sz);
 
-    const bStart = new THREE.Vector3(sx, ISLAND_TREEHOUSE_DECK_Y - 1.25, sz);
-    const bEnd = new THREE.Vector3(sx + (sx < -7.5 ? 0.95 : -0.95), ISLAND_TREEHOUSE_DECK_Y - 0.24, sz);
+    const bStart = new THREE.Vector3(sx, ISLAND_TREEHOUSE_DECK_Y - 1.32, sz);
+    const bEnd = new THREE.Vector3(sx + (sx < -7.5 ? 0.95 : -0.95), ISLAND_TREEHOUSE_DECK_Y - 0.36, sz);
     const bDir = new THREE.Vector3().subVectors(bEnd, bStart);
     const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, bDir.length(), 7), housePostMat);
     brace.position.addVectors(bStart, bEnd).multiplyScalar(0.5);
@@ -1105,14 +1189,14 @@ export function buildIslandScene(options?: {
   const treeCanopyGroup = new THREE.Group();
   const crownCenterY = ISLAND_TREEHOUSE_DECK_Y + 5.75;
   const canopyBlobs: [number, number, number, number, number, THREE.Material][] = [
-    [-7.5, crownCenterY + 0.75, -14.8, 3.4, 0.6, canopyMidMat],
-    [-11.4, crownCenterY + 0.1, -13.6, 2.65, 0.64, canopyDeepMat],
-    [-3.6, crownCenterY + 0.1, -13.6, 2.65, 0.64, canopyDeepMat],
-    [-10.4, crownCenterY + 1.05, -12.6, 2.25, 0.58, canopyTopMat],
-    [-4.6, crownCenterY + 1.05, -12.6, 2.25, 0.58, canopyTopMat],
-    [-7.5, crownCenterY + 1.65, -13.8, 2.55, 0.62, canopyTopMat],
-    [-12.6, crownCenterY - 0.15, -10.8, 2.0, 0.65, canopyMidMat],
-    [-2.4, crownCenterY - 0.15, -10.8, 2.0, 0.65, canopyMidMat],
+    [-7.5, crownCenterY + 0.75, -15.5, 3.4, 0.6, canopyMidMat],
+    [-11.4, crownCenterY + 0.1, -14.3, 2.65, 0.64, canopyDeepMat],
+    [-3.6, crownCenterY + 0.1, -14.3, 2.65, 0.64, canopyDeepMat],
+    [-10.4, crownCenterY + 1.05, -13.3, 2.25, 0.58, canopyTopMat],
+    [-4.6, crownCenterY + 1.05, -13.3, 2.25, 0.58, canopyTopMat],
+    [-7.5, crownCenterY + 1.65, -14.5, 2.55, 0.62, canopyTopMat],
+    [-12.6, crownCenterY - 0.15, -11.4, 2.0, 0.65, canopyMidMat],
+    [-2.4, crownCenterY - 0.15, -11.4, 2.0, 0.65, canopyMidMat],
   ];
   canopyBlobs.forEach(([cx, cy, cz, cr, sy, mat]) => {
     const puff = new THREE.Mesh(new THREE.SphereGeometry(cr, 11, 8), mat);
@@ -1123,10 +1207,10 @@ export function buildIslandScene(options?: {
 
   // Blossom puffs & hanging moss vines + warm fairy lanterns beneath outer side boughs
   [
-    [-12.4, crownCenterY - 0.95, -10.4],
-    [-2.6, crownCenterY - 0.95, -10.4],
-    [-11.2, crownCenterY - 0.95, -14.6],
-    [-3.8, crownCenterY - 0.95, -14.6],
+    [-12.4, crownCenterY - 0.95, -11.0],
+    [-2.6, crownCenterY - 0.95, -11.0],
+    [-11.2, crownCenterY - 0.95, -15.2],
+    [-3.8, crownCenterY - 0.95, -15.2],
   ].forEach(([vx, vy, vz]) => {
     const vine = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.015, 1.65, 5), canopyMidMat);
     vine.position.set(vx, vy - 0.75, vz);
@@ -1208,30 +1292,6 @@ export function buildIslandScene(options?: {
     treehouseGroup.add(poleExt, orb);
   }
 
-  // Overhanging Outer Balcony Flower Boxes (mounted forward on deck fascia — crisp air gap from railings!)
-  for (const fx of [-9.75, -5.25]) {
-    for (const bxOff of [-0.38, 0.38]) {
-      const bracketArm = new THREE.Mesh(new RoundedBoxGeometry(0.07, 0.08, 0.34, 1, 0.015), housePostMat);
-      bracketArm.position.set(fx + bxOff, ISLAND_TREEHOUSE_DECK_Y + 0.06, -5.98);
-      const bracketDrop = new THREE.Mesh(new RoundedBoxGeometry(0.07, 0.2, 0.08, 1, 0.015), housePostMat);
-      bracketDrop.position.set(fx + bxOff, ISLAND_TREEHOUSE_DECK_Y - 0.03, -6.1);
-      treehouseGroup.add(bracketArm, bracketDrop);
-    }
-    const fBox = new THREE.Mesh(new RoundedBoxGeometry(1.12, 0.22, 0.24, 2, 0.04), housePostMat);
-    fBox.position.set(fx, ISLAND_TREEHOUSE_DECK_Y + 0.2, -5.88);
-    const fSoil = new THREE.Mesh(new RoundedBoxGeometry(1.02, 0.06, 0.18, 1, 0.02), canopyDeepMat);
-    fSoil.position.set(fx, ISLAND_TREEHOUSE_DECK_Y + 0.32, -5.88);
-    treehouseGroup.add(fBox, fSoil);
-    for (let k = -1; k <= 1; k++) {
-      const bloom = new THREE.Mesh(
-        new THREE.SphereGeometry(0.105, 7, 6),
-        k === 0 ? blossomPinkMat : getMat('#FFD166', 0.5),
-      );
-      bloom.position.set(fx + k * 0.34, ISLAND_TREEHOUSE_DECK_Y + 0.41, -5.88);
-      treehouseGroup.add(bloom);
-    }
-  }
-
   const cabY = ISLAND_TREEHOUSE_DECK_Y;
   const cabCz = -10.05;
   const seaPotMatA = getMat('#56C2DF', 0.58);
@@ -1239,43 +1299,40 @@ export function buildIslandScene(options?: {
   const seaPotRimMat = getMat('#FFF5E1', 0.58);
   const seaShellMat = getMat('#FFF0DF', 0.5);
   const seaStarMat = getMat('#FF7D5C', 0.56);
+  // 4 Corner Ceramic Pots inset >= 0.95m from every railing bar/post (zero clipping!)
   const coastalPots: [number, number, string, number][] = [
-    [-10.45, -11.9, '#FF7B9B', 0],
-    [-4.55, -11.9, '#FFD166', 1],
-    [-10.45, -7.05, '#7DE2D1', 1],
-    [-4.55, -7.05, '#FF8FA3', 0],
-    [-9.15, -11.9, '#FFAC6A', 1],
-    [-5.85, -11.9, '#8CE0FF', 0],
+    [-10.1, -11.6, '#FF7B9B', 0],
+    [-4.9, -11.6, '#FFD166', 1],
+    [-10.1, -7.35, '#7DE2D1', 1],
+    [-4.9, -7.35, '#FF8FA3', 0],
   ];
   coastalPots.forEach(([px, pz, flowerCol, styleIdx], idx) => {
     const potBody = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.28, 0.21, 0.42, 10),
+      new THREE.CylinderGeometry(0.25, 0.19, 0.4, 10),
       styleIdx === 0 ? seaPotMatA : seaPotMatB,
     );
-    potBody.position.set(px, cabY + 0.21, pz);
-    const potRim = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.045, 7, 12), seaPotRimMat);
+    potBody.position.set(px, cabY + 0.2, pz);
+    const potRim = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.04, 7, 12), seaPotRimMat);
     potRim.rotation.x = Math.PI / 2;
-    potRim.position.set(px, cabY + 0.41, pz);
-    // Cute starfish or seashell badge on pot front
+    potRim.position.set(px, cabY + 0.39, pz);
     const badge = new THREE.Mesh(
       idx % 2 === 0
-        ? new THREE.CylinderGeometry(0.075, 0.085, 0.03, 5)
-        : new THREE.SphereGeometry(0.065, 7, 5),
+        ? new THREE.CylinderGeometry(0.07, 0.08, 0.028, 5)
+        : new THREE.SphereGeometry(0.06, 7, 5),
       idx % 2 === 0 ? seaStarMat : seaShellMat,
     );
     badge.rotation.x = Math.PI / 2;
-    badge.position.set(px, cabY + 0.24, pz + 0.25);
+    badge.position.set(px, cabY + 0.22, pz + 0.22);
 
-    // Tropical foliage dome + blooming coastal blossoms atop pot
-    const foliage = new THREE.Mesh(new THREE.SphereGeometry(0.27, 8, 6), canopyTopMat);
-    foliage.scale.set(1.1, 0.78, 1.1);
-    foliage.position.set(px, cabY + 0.56, pz);
+    const foliage = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 6), canopyTopMat);
+    foliage.scale.set(1.06, 0.78, 1.06);
+    foliage.position.set(px, cabY + 0.53, pz);
     treehouseGroup.add(potBody, potRim, badge, foliage);
 
     for (let f = 0; f < 3; f++) {
       const fa = (f / 3) * Math.PI * 2 + idx;
-      const fl = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 5), getMat(flowerCol, 0.5));
-      fl.position.set(px + Math.cos(fa) * 0.14, cabY + 0.7 + (f % 2) * 0.06, pz + Math.sin(fa) * 0.14);
+      const fl = new THREE.Mesh(new THREE.SphereGeometry(0.082, 6, 5), getMat(flowerCol, 0.5));
+      fl.position.set(px + Math.cos(fa) * 0.12, cabY + 0.67 + (f % 2) * 0.05, pz + Math.sin(fa) * 0.12);
       treehouseGroup.add(fl);
     }
 
@@ -1284,7 +1341,7 @@ export function buildIslandScene(options?: {
       id: `island_th_pot_${idx}`,
       x: px,
       z: pz,
-      r: 0.34,
+      r: 0.32,
     });
   });
 
@@ -1540,8 +1597,8 @@ export function buildIslandScene(options?: {
     [ISLAND_LADDER_BOTTOM.x, (basePadY + ISLAND_TREEHOUSE_DECK_Y) * 0.5, (ladderBotPos.z + ladderTopPos.z) * 0.5],
     {
       kind: 'island_rope_ladder',
-      bottomX: ISLAND_LADDER_BOTTOM.x,
-      bottomZ: ISLAND_LADDER_BOTTOM.z,
+      bottomX: ISLAND_LADDER_CLIMB_START.x,
+      bottomZ: ISLAND_LADDER_CLIMB_START.z,
       topX: ISLAND_LADDER_TOP.x,
       topZ: ISLAND_LADDER_TOP.z,
     },
@@ -2008,7 +2065,7 @@ export function buildIslandScene(options?: {
     if (Math.hypot(gx - -12.6, gz - 2.2) < 2.8) continue;
     if (Math.hypot(gx - ISLAND_BALLOON_POS.x, gz - ISLAND_BALLOON_POS.z) < 4.3) continue;
     if (Math.hypot(gx - -7.5, gz - -5.5) < 2.2) continue;
-    if (Math.hypot(gx - -7.5, gz - -12.8) < 2.1) continue;
+    if (Math.hypot(gx - -7.5, gz - -14.2) < 2.6) continue;
     if (gx > 0 && gx < 20 && gz < -11 && gz > -19 && getStreamChannelDistance(gx, gz) < 1.35) {
       continue;
     }
@@ -3127,14 +3184,14 @@ export function buildIslandScene(options?: {
     foamMat.opacity = 0.45 + Math.sin(elapsed * 1.8) * 0.14;
     foamMesh.scale.setScalar(1 + Math.sin(elapsed * 1.4) * 0.008);
 
-    mooredDuckFloat.position.y = ISLAND_WATER_Y + 0.06 + Math.sin(elapsed * 2.1 + 0.7) * 0.045;
-    mooredDuckFloat.rotation.z = Math.sin(elapsed * 1.65) * 0.055;
-    mooredDuckFloat.rotation.x = Math.cos(elapsed * 1.4) * 0.035;
+    mooredSwimFloat.position.y = ISLAND_WATER_Y + 0.05 + Math.sin(elapsed * 2.1 + 0.7) * 0.04;
+    mooredSwimFloat.rotation.z = Math.sin(elapsed * 1.65) * 0.05;
+    mooredSwimFloat.rotation.x = Math.cos(elapsed * 1.4) * 0.032;
 
     if (mooredIslandBoat.visible) {
-      mooredIslandBoat.position.y = ISLAND_WATER_Y + 0.05 + Math.sin(elapsed * 1.9) * 0.04;
-      mooredIslandBoat.rotation.z = Math.sin(elapsed * 1.5) * 0.035;
-      mooredIslandBoat.rotation.x = Math.cos(elapsed * 1.3) * 0.02;
+      mooredIslandBoat.position.y = ISLAND_WATER_Y + 0.05 + Math.sin(elapsed * 1.9) * 0.035;
+      mooredIslandBoat.rotation.z = Math.sin(elapsed * 1.5) * 0.03;
+      mooredIslandBoat.rotation.x = Math.cos(elapsed * 1.3) * 0.018;
     }
 
     const waveAmp = timeOfDay === 'night' ? 0.032 : 0.045;
@@ -3152,8 +3209,8 @@ export function buildIslandScene(options?: {
     cascadeFoamRing.scale.setScalar(0.94 + Math.sin(elapsed * 4.4) * 0.09);
     streamFoamMat.opacity = 0.6 + Math.sin(elapsed * 4.4) * 0.16;
 
-    // Gentle breeze sway on outward-sloping hanging rope ladder
-    ropeLadderGroup.rotation.z = Math.sin(elapsed * 1.65) * (treehouseFocused ? 0.004 : 0.015);
+    // Gentle breeze sway on outward-sloping hanging rope ladder (kept still while climbing/on treehouse)
+    ropeLadderGroup.rotation.z = treehouseFocused ? 0 : Math.sin(elapsed * 1.65) * 0.012;
 
     const fScale = 0.92 + Math.sin(elapsed * 9.2) * 0.12 + Math.cos(elapsed * 14.5) * 0.06;
     flameMesh.scale.set(1, fScale, 1);

@@ -68,6 +68,8 @@ export interface AvatarRig {
   toolType?: ToolId | null;
   rodBobber?: THREE.Object3D;
   rodLine?: THREE.Object3D;
+  rodMidPivot?: THREE.Group;
+  rodTipPivot?: THREE.Group;
   heldPetRig?: PetRig;
   headTopAbovePivot: number;
 }
@@ -1241,6 +1243,12 @@ export function buildAvatarRig(
   shadowDisc.position.y = 0.004;
   root.add(shadowDisc);
 
+  const isPeppaMascot = config.mascotCostume === 'peppa_pig';
+  const peppaPinkMat = clayMat('#F7A6C2', 0.62, 0.02);
+  const peppaDarkPinkMat = clayMat('#E4779F', 0.66, 0.02);
+  const peppaSnoutTipMat = clayMat('#F28FB3', 0.56, 0.02);
+  const peppaNostrilMat = clayMat('#C44978', 0.52, 0.02);
+
   // ========== ARTICULATED LEGS (HIP -> THIGH -> KNEE -> SHIN -> GROUNDED SHOES) ==========
   const KNEE_Y = -0.215;
   const sockMat = clayMat('#FFF8EE', 0.72, 0.01);
@@ -1249,7 +1257,7 @@ export function buildAvatarRig(
     legPivot.position.set(xOffset, 0.52, 0);
 
     const isTrousers = config.bottom === 'wide_trousers' || config.bottom === 'office_trousers';
-    const legMat = isTrousers ? bottomMat : skinMat;
+    const legMat = isPeppaMascot ? peppaPinkMat : isTrousers ? bottomMat : skinMat;
     const hipCap = new THREE.Mesh(new THREE.SphereGeometry(0.078, 14, 12), legMat);
     legPivot.add(hipCap);
 
@@ -1417,7 +1425,7 @@ export function buildAvatarRig(
     }
 
     // Knit ankle sock + rolled cuff bridging the lower shin smoothly into shoes
-    if (!isTrousers && config.shoes !== 'boots') {
+    if (!isTrousers && !isPeppaMascot && config.shoes !== 'boots') {
       const sockTube = new THREE.Mesh(
         new THREE.CylinderGeometry(0.062, 0.059, 0.105, 18),
         sockMat,
@@ -2550,6 +2558,54 @@ export function buildAvatarRig(
     }
   }
 
+  if (isPeppaMascot) {
+    const collarMat = clayMat('#FFF8F8', 0.66);
+    const badgeMat = glossyClayMat('#F8B4C8', 0.34);
+    const snoutBadgeMat = glossyClayMat('#E45C88', 0.32);
+    const collarRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.118, 0.018, 10, 22),
+      collarMat,
+    );
+    collarRing.rotation.x = Math.PI / 2;
+    collarRing.position.set(0, 0.188, 0.01);
+    torsoGroup.add(collarRing);
+
+    const chestBadge = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.056, 0.056, 0.014, 16),
+      badgeMat,
+    );
+    chestBadge.rotation.x = Math.PI / 2;
+    chestBadge.position.set(0, 0.068, 0.208);
+    const badgeSnout = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.022, 0.016, 12),
+      snoutBadgeMat,
+    );
+    badgeSnout.rotation.x = Math.PI / 2;
+    badgeSnout.position.set(0.012, 0.072, 0.215);
+    torsoGroup.add(chestBadge, badgeSnout);
+
+    // Cute curly pink pig tail at back of dress/hips
+    const pigTailMat = clayMat('#F99AC0', 0.58);
+    const tailPts: THREE.Vector3[] = [];
+    for (let i = 0; i <= 18; i++) {
+      const t = i / 18;
+      const a = t * Math.PI * 2.2;
+      tailPts.push(
+        new THREE.Vector3(
+          Math.sin(a) * (0.018 + t * 0.028),
+          -0.145 + t * 0.07 + Math.cos(a) * 0.02,
+          -0.21 - t * 0.085,
+        ),
+      );
+    }
+    const tailCurve = new THREE.CatmullRomCurve3(tailPts);
+    const pigTail = new THREE.Mesh(
+      new THREE.TubeGeometry(tailCurve, 22, 0.015, 8, false),
+      pigTailMat,
+    );
+    torsoGroup.add(pigTail);
+  }
+
   // Bottoms on Torso (clean radial hierarchy so all skirts drape smoothly over seated lap via paired geometries)
   let skirtPivot: THREE.Group | undefined;
   const skirtDeformMeshes: SkirtDeformPair[] = [];
@@ -2842,9 +2898,18 @@ export function buildAvatarRig(
             ? topLightMat
             : clayMat('#E6ECF2', 0.6);
 
-    const longSleeveMat =
-      config.top === 'varsity_jacket' ? topTrimMat : topMat;
-    const upperMat = isSleeveless ? skinMat : isShortSleeve ? shortSleeveMat : longSleeveMat;
+    const longSleeveMat = isPeppaMascot
+      ? peppaPinkMat
+      : config.top === 'varsity_jacket'
+        ? topTrimMat
+        : topMat;
+    const upperMat = isPeppaMascot
+      ? peppaPinkMat
+      : isSleeveless
+        ? skinMat
+        : isShortSleeve
+          ? shortSleeveMat
+          : longSleeveMat;
     const upperR = isOuterwear ? 0.062 : isShortSleeve ? 0.05 : 0.055;
     const midR = isOuterwear ? 0.055 : isShortSleeve ? 0.044 : 0.048;
     const wristR = isOuterwear ? 0.05 : isShortSleeve ? 0.041 : 0.043;
@@ -2892,7 +2957,11 @@ export function buildAvatarRig(
     elbowPivot.rotation.z = side * HAND_POSES.none.elbowZ;
     shoulderPivot.add(elbowPivot);
 
-    const forearmMat = isSleeveless || isShortSleeve ? skinMat : longSleeveMat;
+    const forearmMat = isPeppaMascot
+      ? peppaPinkMat
+      : isSleeveless || isShortSleeve
+        ? skinMat
+        : longSleeveMat;
     const elbowJoint = new THREE.Mesh(
       new THREE.SphereGeometry(midR, 14, 12),
       forearmMat,
@@ -2904,9 +2973,10 @@ export function buildAvatarRig(
     forearm.position.y = -0.066;
     elbowPivot.add(elbowJoint, forearm);
 
-    if (!isSleeveless && !isShortSleeve) {
-      const cuffMat =
-        config.top === 'cardigan_vest'
+    if (isPeppaMascot || (!isSleeveless && !isShortSleeve)) {
+      const cuffMat = isPeppaMascot
+        ? peppaDarkPinkMat
+        : config.top === 'cardigan_vest'
           ? topTrimMat
           : config.top === 'zip_parka'
             ? pureWhiteMat
@@ -2999,6 +3069,8 @@ export function buildAvatarRig(
 
   let rodBobberObj: THREE.Object3D | undefined;
   let rodLineObj: THREE.Object3D | undefined;
+  let rodMidPivot: THREE.Group | undefined;
+  let rodTipPivot: THREE.Group | undefined;
 
   if (handheld || equippedTool || equippedFood) {
     const hColor = config.handheldColor || '#E8B84B';
@@ -3060,35 +3132,54 @@ export function buildAvatarRig(
       );
       reelCrank.position.set(0.052, 0.095, 0.034);
 
-      const shaftLower = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.013, 0.018, 0.62, 10),
+      const shaftButt = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.016, 0.019, 0.24, 10),
         darkWoodMat,
       );
-      shaftLower.position.set(0, 0.44, 0);
+      shaftButt.position.set(0, 0.26, 0);
+
+      // Universal Flex Pivot 1 (Mid Shaft): rotates +X to flex rod cleanly downward under fish tension
+      rodMidPivot = new THREE.Group();
+      rodMidPivot.position.set(0, 0.38, 0);
+
+      const shaftMid = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.0125, 0.016, 0.42, 10),
+        darkWoodMat,
+      );
+      shaftMid.position.set(0, 0.21, 0);
+
+      const midGuide = new THREE.Mesh(
+        new THREE.TorusGeometry(0.017, 0.0038, 6, 12),
+        brassMat,
+      );
+      midGuide.position.set(0, 0.41, 0.012);
+
+      // Universal Flex Pivot 2 (Upper Whip Tip): bends even further downward under heavy struggle
+      rodTipPivot = new THREE.Group();
+      rodTipPivot.position.set(0, 0.42, 0);
 
       const shaftUpper = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.006, 0.013, 0.72, 10),
+        new THREE.CylinderGeometry(0.006, 0.0125, 0.66, 10),
         bambooMat,
       );
-      shaftUpper.position.set(0, 1.09, 0.025);
-      shaftUpper.rotation.x = 0.07;
+      shaftUpper.position.set(0, 0.33, 0);
 
       const tipRing = new THREE.Mesh(
         new THREE.TorusGeometry(0.015, 0.004, 6, 12),
         brassMat,
       );
-      tipRing.position.set(0, 1.445, 0.052);
+      tipRing.position.set(0, 0.665, 0);
 
       const lineDrop = new THREE.Mesh(
         new THREE.CylinderGeometry(0.002, 0.002, 0.34, 4),
         clayMat('#F5FAFF', 0.3),
       );
-      lineDrop.position.set(0, 1.28, 0.21);
+      lineDrop.position.set(0, 0.5, 0.16);
       lineDrop.rotation.x = -0.72;
       rodLineObj = lineDrop;
 
       const miniBobberGroup = new THREE.Group();
-      miniBobberGroup.position.set(0, 1.15, 0.33);
+      miniBobberGroup.position.set(0, 0.37, 0.28);
       const miniBobber = new THREE.Mesh(
         new THREE.SphereGeometry(0.025, 10, 10),
         glossyClayMat('#8B5228', 0.24),
@@ -3102,16 +3193,15 @@ export function buildAvatarRig(
       miniBobberGroup.add(miniBobber, miniBobberBand);
       rodBobberObj = miniBobberGroup;
 
+      rodTipPivot.add(shaftUpper, tipRing, lineDrop, miniBobberGroup);
+      rodMidPivot.add(shaftMid, midGuide, rodTipPivot);
       rodGroup.add(
         buttCap,
         handle,
         reelBody,
         reelCrank,
-        shaftLower,
-        shaftUpper,
-        tipRing,
-        lineDrop,
-        miniBobberGroup,
+        shaftButt,
+        rodMidPivot,
       );
       handAnchor.add(rodGroup);
     } else if (equippedTool === 'wooden_net') {
@@ -3638,21 +3728,23 @@ export function buildAvatarRig(
   const headMesh = new THREE.Mesh(createSculptedHeadGeometry(), skinMat);
   headPivot.add(headMesh);
 
-  // Detailed Ears nested cleanly beside Nendoroid cheek/jaw contour
-  const innerEarMat = clayMat(shadeHex(config.skinTone, -0.11).getHex(), 0.72);
-  [-1, 1].forEach((side) => {
-    const earGrp = new THREE.Group();
-    earGrp.position.set(side * 0.298, 0.252, -0.01);
-    earGrp.rotation.y = -side * 0.22;
+  // Detailed Ears nested cleanly beside Nendoroid cheek/jaw contour (hidden under mascot hood to avoid clipping!)
+  if (!isPeppaMascot) {
+    const innerEarMat = clayMat(shadeHex(config.skinTone, -0.11).getHex(), 0.72);
+    [-1, 1].forEach((side) => {
+      const earGrp = new THREE.Group();
+      earGrp.position.set(side * 0.298, 0.252, -0.01);
+      earGrp.rotation.y = -side * 0.22;
 
-    const earOuter = new THREE.Mesh(new THREE.SphereGeometry(0.056, 12, 12), skinMat);
-    earOuter.scale.set(0.6, 1.0, 0.72);
-    const earInner = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 10), innerEarMat);
-    earInner.scale.set(0.42, 0.72, 0.45);
-    earInner.position.set(side * 0.012, 0, 0.008);
-    earGrp.add(earOuter, earInner);
-    headPivot.add(earGrp);
-  });
+      const earOuter = new THREE.Mesh(new THREE.SphereGeometry(0.056, 12, 12), skinMat);
+      earOuter.scale.set(0.6, 1.0, 0.72);
+      const earInner = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 10), innerEarMat);
+      earInner.scale.set(0.42, 0.72, 0.45);
+      earInner.position.set(side * 0.012, 0, 0.008);
+      earGrp.add(earOuter, earInner);
+      headPivot.add(earGrp);
+    });
+  }
 
   // Optional Soft Rosy Cheeks positioned right beneath large chibi eye corners
   if (config.blush) {
@@ -3780,381 +3872,486 @@ export function buildAvatarRig(
   });
   headPivot.add(new THREE.Mesh(mouthPatchGeo, mouthMat));
 
-  // ========== MODULAR STYLIZED 3D CLAY HAIR SYSTEM ==========
-  const hairAssembly = buildCharacterHair(config, hairMat, topMat);
-  headPivot.add(hairAssembly.root);
+  // ========== MODULAR STYLIZED 3D CLAY HAIR / PEPPA MASCOT HOOD SYSTEM ==========
+  if (isPeppaMascot) {
+    // Girl wearing a Peppa Pig mascot costume: plush open-front pink pig hood wraps skull & neck cleanly with ZERO hair clipping
+    const hoodPinkMat = clayMat('#F99EC2', 0.62);
+    const hoodDeepPinkMat = clayMat('#E96C9B', 0.56);
+    const hoodRimMat = clayMat('#FFC7DE', 0.64);
+    const mascotEyeWhiteMat = glossyClayMat('#FFFFFF', 0.2);
+    const mascotEyeDarkMat = glossyClayMat('#1E1B24', 0.18);
+    const mascotCheekMat = clayMat('#F2638E', 0.66);
 
-  // ========== STANDARDIZED HEADWEAR & ACCESSORIES ON HAT ATTACHMENT POINTS ==========
-  const {crownTop, crownTilted, headbandArc, templeLeft, templeRight} =
-    hairAssembly.attachments;
-  const accGroup = hairAssembly.hairAccessories;
-  const headItemCol = config.headItemColor || config.topColor;
+    const hoodGroup = new THREE.Group();
 
-  if (config.headItem === 'beret') {
-    const beretMat = clayMat(headItemCol, 0.66);
-    const rimMat = clayMat(shadeHex(headItemCol, -0.14).getHex(), 0.72);
-    // Ordered bottom-up for crisp outward-facing Three.js LatheGeometry normals
-    const pts = [
-      new THREE.Vector2(0.245, -0.008),
-      new THREE.Vector2(0.268, 0.0),
-      new THREE.Vector2(0.32, 0.024),
-      new THREE.Vector2(0.332, 0.072),
-      new THREE.Vector2(0.248, 0.114),
-      new THREE.Vector2(0.1, 0.124),
-      new THREE.Vector2(0.0, 0.118),
-    ];
-    const beretGeo = new THREE.LatheGeometry(pts, 28);
-    beretGeo.scale(1.06, 0.96, 1.0);
-    const beretBody = new THREE.Mesh(beretGeo, beretMat);
-    beretBody.position.set(
-      crownTilted.position.x,
-      crownTilted.position.y - 0.078,
-      crownTilted.position.z,
+    // Open-front spherical mascot hood shell wrapping crown, sides & back cleanly outside the chibi face
+    const hoodShellGeo = new THREE.SphereGeometry(
+      0.348,
+      28,
+      20,
+      0,
+      Math.PI * 2,
+      0.88,
+      Math.PI - 0.88,
     );
-    beretBody.rotation.copy(crownTilted.rotation);
+    hoodShellGeo.rotateX(-Math.PI / 2);
+    const hoodShell = new THREE.Mesh(hoodShellGeo, hoodPinkMat);
+    hoodShell.position.set(0, 0.308, -0.012);
+    hoodGroup.add(hoodShell);
 
-    const band = new THREE.Mesh(new THREE.TorusGeometry(0.262, 0.02, 10, 28), rimMat);
-    band.rotation.x = Math.PI / 2;
-    band.scale.set(1.04, 0.98, 1.0);
-    const bandHolder = new THREE.Group();
-    bandHolder.position.set(
-      crownTilted.position.x,
-      crownTilted.position.y - 0.074,
-      crownTilted.position.z,
+    // Plush stitched trim framing the open face window (+Z)
+    const rimRadius = Math.sin(0.88) * 0.348;
+    const rimZ = Math.cos(0.88) * 0.348 - 0.012;
+    const faceRim = new THREE.Mesh(new THREE.TorusGeometry(rimRadius, 0.022, 12, 32), hoodRimMat);
+    faceRim.position.set(0, 0.308, rimZ);
+    hoodGroup.add(faceRim);
+
+    // Cozy neck gaiter / chin collar closing gap between mascot hood & red dress
+    const hoodCollar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.148, 0.172, 0.09, 18),
+      hoodPinkMat,
     );
-    bandHolder.rotation.copy(crownTilted.rotation);
-    bandHolder.add(band);
+    hoodCollar.position.set(0, 0.025, -0.02);
+    hoodGroup.add(hoodCollar);
 
-    const stem = new THREE.Mesh(new THREE.CapsuleGeometry(0.011, 0.026, 6, 8), rimMat);
-    stem.position.set(
-      crownTilted.position.x + 0.018,
-      crownTilted.position.y + 0.044,
-      crownTilted.position.z,
-    );
-    stem.rotation.copy(crownTilted.rotation);
-    accGroup.add(beretBody, bandHolder, stem);
-  } else if (config.headItem === 'sunhat') {
-    const hatMat = clayMat(headItemCol || '#EBD08E', 0.74);
-    const ribbonMat = clayMat('#E57A6B', 0.65);
-    // Ordered inner-underbrim -> outer-brim -> top-crown for outward normals
-    const pts = [
-      new THREE.Vector2(0.262, 0.006),
-      new THREE.Vector2(0.42, -0.022),
-      new THREE.Vector2(0.518, -0.042),
-      new THREE.Vector2(0.516, -0.028),
-      new THREE.Vector2(0.43, -0.008),
-      new THREE.Vector2(0.278, 0.018),
-      new THREE.Vector2(0.245, 0.118),
-      new THREE.Vector2(0.16, 0.14),
-      new THREE.Vector2(0.0, 0.146),
-    ];
-    const hatGeo = new THREE.LatheGeometry(pts, 32);
-    hatGeo.scale(1.06, 1.0, 0.98);
-    const pos = hatGeo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const y = pos.getY(i);
-      const z = pos.getZ(i);
-      const r = Math.hypot(x, z);
-      if (r > 0.28) {
-        pos.setY(i, y + Math.sin(Math.atan2(z, x) * 2) * 0.015 * ((r - 0.28) / 0.23));
-      }
-    }
-    hatGeo.computeVertexNormals();
-
-    const sunhat = new THREE.Mesh(hatGeo, hatMat);
-    sunhat.position.set(crownTop.position.x, crownTop.position.y - 0.068, crownTop.position.z);
-    sunhat.rotation.copy(crownTop.rotation);
-
-    const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(0.274, 0.282, 0.036, 24), ribbonMat);
-    ribbon.scale.set(1.06, 1, 0.98);
-    ribbon.position.set(crownTop.position.x, crownTop.position.y - 0.036, crownTop.position.z);
-    ribbon.rotation.copy(crownTop.rotation);
-    accGroup.add(sunhat, ribbon);
-  } else if (config.headItem === 'cap') {
-    const capCol = headItemCol || '#4B86B4';
-    const capMat = clayMat(capCol, 0.6);
-    const darkCapMat = clayMat(shadeHex(capCol, -0.14).getHex(), 0.64);
-    const trimMat = clayMat('#F7F3EA', 0.62);
-
-    const capGrp = new THREE.Group();
-    // Roomy sporty dome covering crown cleanly down to brow & temples while bangs peek out underneath
-    capGrp.position.set(crownTop.position.x, crownTop.position.y - 0.168, crownTop.position.z - 0.004);
-    capGrp.rotation.set(-0.08, 0, 0);
-
-    const domeGeo = new THREE.SphereGeometry(1, 32, 18, 0, Math.PI * 2, 0, Math.PI * 0.56);
-    domeGeo.scale(0.382, 0.252, 0.368);
-    const dome = new THREE.Mesh(domeGeo, capMat);
-
-    const rimGeo = new THREE.TorusGeometry(1, 0.018, 10, 32);
-    rimGeo.rotateX(Math.PI / 2);
-    rimGeo.scale(0.376, 1, 0.362);
-    const rim = new THREE.Mesh(rimGeo, darkCapMat);
-    rim.position.y = -0.004;
-
-    const visorShape = new THREE.Shape();
-    visorShape.moveTo(-0.255, 0);
-    visorShape.bezierCurveTo(-0.25, 0.225, -0.135, 0.335, 0, 0.345);
-    visorShape.bezierCurveTo(0.135, 0.335, 0.25, 0.225, 0.255, 0);
-    visorShape.quadraticCurveTo(0, 0.078, -0.255, 0);
-
-    const visorGeo = new THREE.ExtrudeGeometry(visorShape, {
-      depth: 0.018,
-      bevelEnabled: true,
-      bevelThickness: 0.008,
-      bevelSize: 0.008,
-      bevelSegments: 2,
-      curveSegments: 16,
-    });
-    visorGeo.rotateX(Math.PI / 2 + 0.1);
-    const vPos = visorGeo.attributes.position;
-    for (let i = 0; i < vPos.count; i++) {
-      const vx = vPos.getX(i);
-      const vz = vPos.getZ(i);
-      vPos.setY(i, vPos.getY(i) - vx * vx * 0.62 - vz * 0.04);
-    }
-    visorGeo.computeVertexNormals();
-    const visor = new THREE.Mesh(visorGeo, capMat);
-    visor.position.set(0, 0.014, 0.272);
-
-    const emblem = new THREE.Mesh(
-      new RoundedBoxGeometry(0.088, 0.048, 0.018, 2, 0.008),
-      trimMat,
-    );
-    emblem.position.set(0, 0.09, 0.352);
-    emblem.rotation.x = -0.34;
-
-    const btn = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), darkCapMat);
-    btn.scale.set(1, 0.52, 1);
-    btn.position.set(0, 0.252, 0);
-
-    capGrp.add(dome, rim, visor, emblem, btn);
-    accGroup.add(capGrp);
-  } else if (config.headItem === 'beanie') {
-    const knitCol = headItemCol || '#D89A48';
-    const knitMat = clayMat(knitCol, 0.78);
-    const cuffMat = clayMat(shadeHex(knitCol, -0.1).getHex(), 0.8);
-    const pomMat = clayMat('#F8F4EC', 0.82);
-
-    const beanieGrp = new THREE.Group();
-    beanieGrp.position.set(crownTop.position.x, crownTop.position.y - 0.112, crownTop.position.z - 0.006);
-    beanieGrp.rotation.set(-0.1, 0, 0);
-
-    // Oversized plush knit beanie sitting snugly over hair without poke-through
-    const pts = [
-      new THREE.Vector2(0.352, -0.076),
-      new THREE.Vector2(0.388, -0.068),
-      new THREE.Vector2(0.384, 0.018),
-      new THREE.Vector2(0.326, 0.112),
-      new THREE.Vector2(0.195, 0.168),
-      new THREE.Vector2(0.0, 0.178),
-    ];
-    const domeGeo = new THREE.LatheGeometry(pts, 32);
-    domeGeo.scale(1.06, 1.0, 1.0);
-    const dome = new THREE.Mesh(domeGeo, knitMat);
-
-    const cuffGeo = new THREE.TorusGeometry(0.368, 0.048, 12, 32);
-    cuffGeo.rotateX(Math.PI / 2);
-    cuffGeo.scale(1.06, 1.0, 1.0);
-    const cuff = new THREE.Mesh(cuffGeo, cuffMat);
-    cuff.position.y = -0.064;
-
-    const pom = new THREE.Mesh(new THREE.SphereGeometry(0.064, 16, 12), pomMat);
-    pom.position.set(0, 0.2, -0.01);
-
-    beanieGrp.add(dome, cuff, pom);
-    accGroup.add(beanieGrp);
-  } else if (config.headItem === 'bucket_hat') {
-    const hatCol = headItemCol || '#DFBA87';
-    const hatMat = clayMat(hatCol, 0.72);
-    const bandMat = clayMat(shadeHex(hatCol, -0.14).getHex(), 0.74);
-
-    const bucketGrp = new THREE.Group();
-    bucketGrp.position.set(crownTop.position.x, crownTop.position.y - 0.132, crownTop.position.z - 0.004);
-    bucketGrp.rotation.set(-0.08, 0, 0);
-
-    // Tapered flat-top bucket crown + downward bell brim (all in one smooth LatheGeometry)
-    const pts = [
-      new THREE.Vector2(0.354, -0.044),
-      new THREE.Vector2(0.45, -0.072),
-      new THREE.Vector2(0.506, -0.098),
-      new THREE.Vector2(0.498, -0.08),
-      new THREE.Vector2(0.435, -0.052),
-      new THREE.Vector2(0.376, -0.022),
-      new THREE.Vector2(0.362, 0.055),
-      new THREE.Vector2(0.324, 0.135),
-      new THREE.Vector2(0.278, 0.158),
-      new THREE.Vector2(0.14, 0.164),
-      new THREE.Vector2(0.0, 0.162),
-    ];
-    const bucketGeo = new THREE.LatheGeometry(pts, 32);
-    bucketGeo.scale(1.06, 1.0, 1.01);
-    const bucketMesh = new THREE.Mesh(bucketGeo, hatMat);
-
-    const band = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.372, 0.382, 0.036, 32),
-      bandMat,
-    );
-    band.scale.set(1.06, 1, 1.01);
-    band.position.y = 0.0;
-
-    bucketGrp.add(bucketMesh, band);
-    accGroup.add(bucketGrp);
-  } else if (config.headItem === 'cat_ears') {
-    const bandR = headbandArc.radius;
-    const band = new THREE.Mesh(
-      new THREE.TorusGeometry(bandR, 0.019, 10, 28, Math.PI),
-      clayMat('#3A2B28', 0.65),
-    );
-    band.scale.set(1.01, 0.99, 1.0);
-    band.position.copy(headbandArc.center);
-    band.rotation.x = headbandArc.tiltX;
-    accGroup.add(band);
-
-    const earTopY = headbandArc.center.y + bandR * 0.99 * Math.cos(headbandArc.tiltX) - 0.012;
-    const earZ = headbandArc.center.z - bandR * Math.sin(headbandArc.tiltX) * 0.52 + 0.022;
+    // Two sculpted upright rounded pig ears atop the mascot hood
     [-1, 1].forEach((side) => {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.084, 0.145, 14), clayMat('#FFF8F2'));
-      ear.scale.set(1.0, 1.0, 0.62);
-      ear.position.set(side * 0.21, earTopY, earZ);
-      ear.rotation.z = -side * 0.3;
-      ear.rotation.x = headbandArc.tiltX;
-      const inner = new THREE.Mesh(
-        new THREE.ConeGeometry(0.046, 0.095, 12),
-        clayMat(headItemCol || '#F497AC'),
+      const earOuter = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 12), hoodPinkMat);
+      earOuter.scale.set(0.74, 1.38, 0.44);
+      earOuter.position.set(side * 0.145, 0.675, 0.015);
+      earOuter.rotation.z = -side * 0.22;
+      earOuter.rotation.x = 0.08;
+
+      const earInner = new THREE.Mesh(new THREE.SphereGeometry(0.044, 12, 10), hoodDeepPinkMat);
+      earInner.scale.set(0.62, 1.16, 0.26);
+      earInner.position.set(side * 0.146, 0.672, 0.036);
+      earInner.rotation.z = -side * 0.22;
+      earInner.rotation.x = 0.08;
+      hoodGroup.add(earOuter, earInner);
+    });
+
+    // Iconic cute Peppa Pig snout perched on top of the hood forehead (+Z, slight tilt to left)
+    const snoutGroup = new THREE.Group();
+    snoutGroup.position.set(0.03, 0.562, 0.225);
+    snoutGroup.rotation.set(-0.22, 0.14, 0);
+
+    const snoutBridge = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.072, 0.084, 0.155, 16),
+      hoodPinkMat,
+    );
+    snoutBridge.rotation.x = Math.PI / 2;
+    snoutBridge.position.z = 0.055;
+
+    const snoutDisc = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.076, 0.076, 0.022, 18),
+      hoodRimMat,
+    );
+    snoutDisc.rotation.x = Math.PI / 2;
+    snoutDisc.position.z = 0.132;
+
+    [-0.024, 0.024].forEach((nx) => {
+      const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), hoodDeepPinkMat);
+      nostril.scale.set(0.95, 1.15, 0.55);
+      nostril.position.set(nx, 0.004, 0.144);
+      snoutGroup.add(nostril);
+    });
+    snoutGroup.add(snoutBridge, snoutDisc);
+    hoodGroup.add(snoutGroup);
+
+    // Mascot forehead button eyes & cheek patch so the costume reads immediately as Peppa Pig
+    [-1, 1].forEach((side) => {
+      const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.036, 12, 10), mascotEyeWhiteMat);
+      eyeWhite.scale.set(1, 1.08, 0.55);
+      eyeWhite.position.set(side * 0.078 - 0.02, 0.608, 0.204);
+
+      const eyePupil = new THREE.Mesh(new THREE.SphereGeometry(0.019, 10, 8), mascotEyeDarkMat);
+      eyePupil.scale.set(1, 1, 0.6);
+      eyePupil.position.set(side * 0.078 - 0.015, 0.608, 0.221);
+      hoodGroup.add(eyeWhite, eyePupil);
+    });
+
+    const hoodCheek = new THREE.Mesh(new THREE.SphereGeometry(0.044, 12, 10), mascotCheekMat);
+    hoodCheek.scale.set(1.1, 0.85, 0.38);
+    hoodCheek.position.set(-0.138, 0.515, 0.236);
+    hoodGroup.add(hoodCheek);
+
+    headPivot.add(hoodGroup);
+  } else {
+    const hairAssembly = buildCharacterHair(config, hairMat, topMat);
+    headPivot.add(hairAssembly.root);
+
+    // ========== STANDARDIZED HEADWEAR & ACCESSORIES ON HAT ATTACHMENT POINTS ==========
+    const {crownTop, crownTilted, headbandArc, templeLeft, templeRight} =
+      hairAssembly.attachments;
+    const accGroup = hairAssembly.hairAccessories;
+    const headItemCol = config.headItemColor || config.topColor;
+
+    if (config.headItem === 'beret') {
+      const beretMat = clayMat(headItemCol, 0.66);
+      const rimMat = clayMat(shadeHex(headItemCol, -0.14).getHex(), 0.72);
+      // Ordered bottom-up for crisp outward-facing Three.js LatheGeometry normals
+      const pts = [
+        new THREE.Vector2(0.245, -0.008),
+        new THREE.Vector2(0.268, 0.0),
+        new THREE.Vector2(0.32, 0.024),
+        new THREE.Vector2(0.332, 0.072),
+        new THREE.Vector2(0.248, 0.114),
+        new THREE.Vector2(0.1, 0.124),
+        new THREE.Vector2(0.0, 0.118),
+      ];
+      const beretGeo = new THREE.LatheGeometry(pts, 28);
+      beretGeo.scale(1.06, 0.96, 1.0);
+      const beretBody = new THREE.Mesh(beretGeo, beretMat);
+      beretBody.position.set(
+        crownTilted.position.x,
+        crownTilted.position.y - 0.078,
+        crownTilted.position.z,
       );
-      inner.scale.set(1.0, 1.0, 0.52);
-      inner.position.set(side * 0.21, earTopY - 0.012, earZ + 0.022);
-      inner.rotation.z = -side * 0.3;
-      inner.rotation.x = headbandArc.tiltX;
-      accGroup.add(ear, inner);
-    });
-  } else if (config.headItem === 'flower_crown') {
-    const bandR = headbandArc.radius;
-    const band = new THREE.Mesh(
-      new THREE.TorusGeometry(bandR, 0.017, 10, 28, Math.PI),
-      clayMat('#5E9E69', 0.72),
-    );
-    band.scale.set(1.01, 0.99, 1.0);
-    band.position.copy(headbandArc.center);
-    band.rotation.x = headbandArc.tiltX;
-    accGroup.add(band);
+      beretBody.rotation.copy(crownTilted.rotation);
 
-    const petalGeo = new THREE.SphereGeometry(0.019, 10, 8);
-    petalGeo.scale(0.85, 1.15, 0.45);
-    const coreMat = clayMat('#F7C844', 0.58);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.262, 0.02, 10, 28), rimMat);
+      band.rotation.x = Math.PI / 2;
+      band.scale.set(1.04, 0.98, 1.0);
+      const bandHolder = new THREE.Group();
+      bandHolder.position.set(
+        crownTilted.position.x,
+        crownTilted.position.y - 0.074,
+        crownTilted.position.z,
+      );
+      bandHolder.rotation.copy(crownTilted.rotation);
+      bandHolder.add(band);
 
-    for (let i = 0; i < 5; i++) {
-      const ang = -1.06 + i * 0.53;
-      const fx = Math.sin(ang) * (bandR * 1.01 + 0.014);
-      const fy = headbandArc.center.y + Math.cos(ang) * (bandR * 0.99 + 0.014) * Math.cos(headbandArc.tiltX);
-      const fz = headbandArc.center.z - Math.cos(ang) * (bandR + 0.014) * Math.sin(headbandArc.tiltX);
-
-      const flowerGrp = new THREE.Group();
-      flowerGrp.position.set(fx, fy, fz);
-      const radialN = new THREE.Vector3(
-        Math.sin(ang),
-        Math.cos(ang) * Math.cos(headbandArc.tiltX),
-        -Math.cos(ang) * Math.sin(headbandArc.tiltX) + 0.22,
-      ).normalize();
-      flowerGrp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), radialN);
-
-      const pMat = clayMat(i % 2 === 0 ? headItemCol || '#F7A8B8' : '#FFF3B8', 0.62);
-      for (let p = 0; p < 5; p++) {
-        const pa = (p / 5) * Math.PI * 2;
-        const petal = new THREE.Mesh(petalGeo, pMat);
-        petal.position.set(Math.cos(pa) * 0.022, Math.sin(pa) * 0.022, 0);
-        petal.rotation.z = pa - Math.PI / 2;
-        flowerGrp.add(petal);
+      const stem = new THREE.Mesh(new THREE.CapsuleGeometry(0.011, 0.026, 6, 8), rimMat);
+      stem.position.set(
+        crownTilted.position.x + 0.018,
+        crownTilted.position.y + 0.044,
+        crownTilted.position.z,
+      );
+      stem.rotation.copy(crownTilted.rotation);
+      accGroup.add(beretBody, bandHolder, stem);
+    } else if (config.headItem === 'sunhat') {
+      const hatMat = clayMat(headItemCol || '#EBD08E', 0.74);
+      const ribbonMat = clayMat('#E57A6B', 0.65);
+      // Ordered inner-underbrim -> outer-brim -> top-crown for outward normals
+      const pts = [
+        new THREE.Vector2(0.262, 0.006),
+        new THREE.Vector2(0.42, -0.022),
+        new THREE.Vector2(0.518, -0.042),
+        new THREE.Vector2(0.516, -0.028),
+        new THREE.Vector2(0.43, -0.008),
+        new THREE.Vector2(0.278, 0.018),
+        new THREE.Vector2(0.245, 0.118),
+        new THREE.Vector2(0.16, 0.14),
+        new THREE.Vector2(0.0, 0.146),
+      ];
+      const hatGeo = new THREE.LatheGeometry(pts, 32);
+      hatGeo.scale(1.06, 1.0, 0.98);
+      const pos = hatGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        const z = pos.getZ(i);
+        const r = Math.hypot(x, z);
+        if (r > 0.28) {
+          pos.setY(i, y + Math.sin(Math.atan2(z, x) * 2) * 0.015 * ((r - 0.28) / 0.23));
+        }
       }
-      const bud = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), coreMat);
-      bud.scale.set(1, 1, 0.65);
-      bud.position.z = 0.006;
-      flowerGrp.add(bud);
-      accGroup.add(flowerGrp);
+      hatGeo.computeVertexNormals();
+
+      const sunhat = new THREE.Mesh(hatGeo, hatMat);
+      sunhat.position.set(crownTop.position.x, crownTop.position.y - 0.068, crownTop.position.z);
+      sunhat.rotation.copy(crownTop.rotation);
+
+      const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(0.274, 0.282, 0.036, 24), ribbonMat);
+      ribbon.scale.set(1.06, 1, 0.98);
+      ribbon.position.set(crownTop.position.x, crownTop.position.y - 0.036, crownTop.position.z);
+      ribbon.rotation.copy(crownTop.rotation);
+      accGroup.add(sunhat, ribbon);
+    } else if (config.headItem === 'cap') {
+      const capCol = headItemCol || '#4B86B4';
+      const capMat = clayMat(capCol, 0.6);
+      const darkCapMat = clayMat(shadeHex(capCol, -0.14).getHex(), 0.64);
+      const trimMat = clayMat('#F7F3EA', 0.62);
+
+      const capGrp = new THREE.Group();
+      // Roomy sporty dome covering crown cleanly down to brow & temples while bangs peek out underneath
+      capGrp.position.set(crownTop.position.x, crownTop.position.y - 0.168, crownTop.position.z - 0.004);
+      capGrp.rotation.set(-0.08, 0, 0);
+
+      const domeGeo = new THREE.SphereGeometry(1, 32, 18, 0, Math.PI * 2, 0, Math.PI * 0.56);
+      domeGeo.scale(0.382, 0.252, 0.368);
+      const dome = new THREE.Mesh(domeGeo, capMat);
+
+      const rimGeo = new THREE.TorusGeometry(1, 0.018, 10, 32);
+      rimGeo.rotateX(Math.PI / 2);
+      rimGeo.scale(0.376, 1, 0.362);
+      const rim = new THREE.Mesh(rimGeo, darkCapMat);
+      rim.position.y = -0.004;
+
+      const visorShape = new THREE.Shape();
+      visorShape.moveTo(-0.255, 0);
+      visorShape.bezierCurveTo(-0.25, 0.225, -0.135, 0.335, 0, 0.345);
+      visorShape.bezierCurveTo(0.135, 0.335, 0.25, 0.225, 0.255, 0);
+      visorShape.quadraticCurveTo(0, 0.078, -0.255, 0);
+
+      const visorGeo = new THREE.ExtrudeGeometry(visorShape, {
+        depth: 0.018,
+        bevelEnabled: true,
+        bevelThickness: 0.008,
+        bevelSize: 0.008,
+        bevelSegments: 2,
+        curveSegments: 16,
+      });
+      visorGeo.rotateX(Math.PI / 2 + 0.1);
+      const vPos = visorGeo.attributes.position;
+      for (let i = 0; i < vPos.count; i++) {
+        const vx = vPos.getX(i);
+        const vz = vPos.getZ(i);
+        vPos.setY(i, vPos.getY(i) - vx * vx * 0.62 - vz * 0.04);
+      }
+      visorGeo.computeVertexNormals();
+      const visor = new THREE.Mesh(visorGeo, capMat);
+      visor.position.set(0, 0.014, 0.272);
+
+      const emblem = new THREE.Mesh(
+        new RoundedBoxGeometry(0.088, 0.048, 0.018, 2, 0.008),
+        trimMat,
+      );
+      emblem.position.set(0, 0.09, 0.352);
+      emblem.rotation.x = -0.34;
+
+      const btn = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), darkCapMat);
+      btn.scale.set(1, 0.52, 1);
+      btn.position.set(0, 0.252, 0);
+
+      capGrp.add(dome, rim, visor, emblem, btn);
+      accGroup.add(capGrp);
+    } else if (config.headItem === 'beanie') {
+      const knitCol = headItemCol || '#D89A48';
+      const knitMat = clayMat(knitCol, 0.78);
+      const cuffMat = clayMat(shadeHex(knitCol, -0.1).getHex(), 0.8);
+      const pomMat = clayMat('#F8F4EC', 0.82);
+
+      const beanieGrp = new THREE.Group();
+      beanieGrp.position.set(crownTop.position.x, crownTop.position.y - 0.112, crownTop.position.z - 0.006);
+      beanieGrp.rotation.set(-0.1, 0, 0);
+
+      // Oversized plush knit beanie sitting snugly over hair without poke-through
+      const pts = [
+        new THREE.Vector2(0.352, -0.076),
+        new THREE.Vector2(0.388, -0.068),
+        new THREE.Vector2(0.384, 0.018),
+        new THREE.Vector2(0.326, 0.112),
+        new THREE.Vector2(0.195, 0.168),
+        new THREE.Vector2(0.0, 0.178),
+      ];
+      const domeGeo = new THREE.LatheGeometry(pts, 32);
+      domeGeo.scale(1.06, 1.0, 1.0);
+      const dome = new THREE.Mesh(domeGeo, knitMat);
+
+      const cuffGeo = new THREE.TorusGeometry(0.368, 0.048, 12, 32);
+      cuffGeo.rotateX(Math.PI / 2);
+      cuffGeo.scale(1.06, 1.0, 1.0);
+      const cuff = new THREE.Mesh(cuffGeo, cuffMat);
+      cuff.position.y = -0.064;
+
+      const pom = new THREE.Mesh(new THREE.SphereGeometry(0.064, 16, 12), pomMat);
+      pom.position.set(0, 0.2, -0.01);
+
+      beanieGrp.add(dome, cuff, pom);
+      accGroup.add(beanieGrp);
+    } else if (config.headItem === 'bucket_hat') {
+      const hatCol = headItemCol || '#DFBA87';
+      const hatMat = clayMat(hatCol, 0.72);
+      const bandMat = clayMat(shadeHex(hatCol, -0.14).getHex(), 0.74);
+
+      const bucketGrp = new THREE.Group();
+      bucketGrp.position.set(crownTop.position.x, crownTop.position.y - 0.132, crownTop.position.z - 0.004);
+      bucketGrp.rotation.set(-0.08, 0, 0);
+
+      // Tapered flat-top bucket crown + downward bell brim (all in one smooth LatheGeometry)
+      const pts = [
+        new THREE.Vector2(0.354, -0.044),
+        new THREE.Vector2(0.45, -0.072),
+        new THREE.Vector2(0.506, -0.098),
+        new THREE.Vector2(0.498, -0.08),
+        new THREE.Vector2(0.435, -0.052),
+        new THREE.Vector2(0.376, -0.022),
+        new THREE.Vector2(0.362, 0.055),
+        new THREE.Vector2(0.324, 0.135),
+        new THREE.Vector2(0.278, 0.158),
+        new THREE.Vector2(0.14, 0.164),
+        new THREE.Vector2(0.0, 0.162),
+      ];
+      const bucketGeo = new THREE.LatheGeometry(pts, 32);
+      bucketGeo.scale(1.06, 1.0, 1.01);
+      const bucketMesh = new THREE.Mesh(bucketGeo, hatMat);
+
+      const band = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.372, 0.382, 0.036, 32),
+        bandMat,
+      );
+      band.scale.set(1.06, 1, 1.01);
+      band.position.y = 0.0;
+
+      bucketGrp.add(bucketMesh, band);
+      accGroup.add(bucketGrp);
+    } else if (config.headItem === 'cat_ears') {
+      const bandR = headbandArc.radius;
+      const band = new THREE.Mesh(
+        new THREE.TorusGeometry(bandR, 0.019, 10, 28, Math.PI),
+        clayMat('#3A2B28', 0.65),
+      );
+      band.scale.set(1.01, 0.99, 1.0);
+      band.position.copy(headbandArc.center);
+      band.rotation.x = headbandArc.tiltX;
+      accGroup.add(band);
+
+      const earTopY = headbandArc.center.y + bandR * 0.99 * Math.cos(headbandArc.tiltX) - 0.012;
+      const earZ = headbandArc.center.z - bandR * Math.sin(headbandArc.tiltX) * 0.52 + 0.022;
+      [-1, 1].forEach((side) => {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.084, 0.145, 14), clayMat('#FFF8F2'));
+        ear.scale.set(1.0, 1.0, 0.62);
+        ear.position.set(side * 0.21, earTopY, earZ);
+        ear.rotation.z = -side * 0.3;
+        ear.rotation.x = headbandArc.tiltX;
+        const inner = new THREE.Mesh(
+          new THREE.ConeGeometry(0.046, 0.095, 12),
+          clayMat(headItemCol || '#F497AC'),
+        );
+        inner.scale.set(1.0, 1.0, 0.52);
+        inner.position.set(side * 0.21, earTopY - 0.012, earZ + 0.022);
+        inner.rotation.z = -side * 0.3;
+        inner.rotation.x = headbandArc.tiltX;
+        accGroup.add(ear, inner);
+      });
+    } else if (config.headItem === 'flower_crown') {
+      const bandR = headbandArc.radius;
+      const band = new THREE.Mesh(
+        new THREE.TorusGeometry(bandR, 0.017, 10, 28, Math.PI),
+        clayMat('#5E9E69', 0.72),
+      );
+      band.scale.set(1.01, 0.99, 1.0);
+      band.position.copy(headbandArc.center);
+      band.rotation.x = headbandArc.tiltX;
+      accGroup.add(band);
+
+      const petalGeo = new THREE.SphereGeometry(0.019, 10, 8);
+      petalGeo.scale(0.85, 1.15, 0.45);
+      const coreMat = clayMat('#F7C844', 0.58);
+
+      for (let i = 0; i < 5; i++) {
+        const ang = -1.06 + i * 0.53;
+        const fx = Math.sin(ang) * (bandR * 1.01 + 0.014);
+        const fy = headbandArc.center.y + Math.cos(ang) * (bandR * 0.99 + 0.014) * Math.cos(headbandArc.tiltX);
+        const fz = headbandArc.center.z - Math.cos(ang) * (bandR + 0.014) * Math.sin(headbandArc.tiltX);
+
+        const flowerGrp = new THREE.Group();
+        flowerGrp.position.set(fx, fy, fz);
+        const radialN = new THREE.Vector3(
+          Math.sin(ang),
+          Math.cos(ang) * Math.cos(headbandArc.tiltX),
+          -Math.cos(ang) * Math.sin(headbandArc.tiltX) + 0.22,
+        ).normalize();
+        flowerGrp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), radialN);
+
+        const pMat = clayMat(i % 2 === 0 ? headItemCol || '#F7A8B8' : '#FFF3B8', 0.62);
+        for (let p = 0; p < 5; p++) {
+          const pa = (p / 5) * Math.PI * 2;
+          const petal = new THREE.Mesh(petalGeo, pMat);
+          petal.position.set(Math.cos(pa) * 0.022, Math.sin(pa) * 0.022, 0);
+          petal.rotation.z = pa - Math.PI / 2;
+          flowerGrp.add(petal);
+        }
+        const bud = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), coreMat);
+        bud.scale.set(1, 1, 0.65);
+        bud.position.z = 0.006;
+        flowerGrp.add(bud);
+        accGroup.add(flowerGrp);
+      }
+    } else if (config.headItem === 'ribbon_bow') {
+      const bowMat = clayMat(headItemCol || '#6BAEE6', 0.56);
+      const knotMat = clayMat(shadeHex(headItemCol || '#6BAEE6', -0.1).getHex(), 0.58);
+      const bandR = headbandArc.radius;
+
+      // Band sits flush on outer hair envelope
+      const band = new THREE.Mesh(
+        new THREE.TorusGeometry(bandR, 0.02, 10, 28, Math.PI),
+        bowMat,
+      );
+      band.scale.set(1.01, 0.99, 1.0);
+      band.position.copy(headbandArc.center);
+      band.rotation.x = headbandArc.tiltX;
+      accGroup.add(band);
+
+      // Sculpted bow mounted cleanly ON TOP of the headband arch so hair never hides it
+      const bowAng = 0.56;
+      const archR = bandR + 0.022;
+      const bowGrp = new THREE.Group();
+      bowGrp.position.set(
+        Math.sin(bowAng) * archR * 1.01,
+        headbandArc.center.y + Math.cos(bowAng) * archR * 0.99 * Math.cos(headbandArc.tiltX),
+        headbandArc.center.z - Math.cos(bowAng) * archR * Math.sin(headbandArc.tiltX) + 0.012,
+      );
+      bowGrp.rotation.set(headbandArc.tiltX, -0.16, -bowAng * 0.72);
+
+      [-1, 1].forEach((side) => {
+        const wing = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 12), bowMat);
+        wing.scale.set(1.25, 0.76, 0.54);
+        wing.position.set(side * 0.064, 0.008, 0);
+        wing.rotation.z = side * 0.24;
+
+        const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.016, 0.056, 6, 8), bowMat);
+        tail.position.set(side * 0.036, -0.048, -0.006);
+        tail.rotation.z = side * 0.42;
+        bowGrp.add(wing, tail);
+      });
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 10), knotMat);
+      knot.scale.set(1.05, 0.92, 0.85);
+      knot.position.set(0, 0.004, 0.016);
+      bowGrp.add(knot);
+      accGroup.add(bowGrp);
+    } else if (config.headItem === 'hair_clip') {
+      const clipMat1 = clayMat(headItemCol || '#F4A261', 0.45);
+      const clipMat2 = clayMat('#FDF2D6', 0.48);
+      const clipGrp = new THREE.Group();
+      clipGrp.position.copy(templeRight.position);
+      clipGrp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), templeRight.normal);
+
+      const barGeo = new THREE.CapsuleGeometry(0.011, 0.068, 6, 10);
+      barGeo.rotateZ(Math.PI / 2);
+      const bar1 = new THREE.Mesh(barGeo, clipMat1);
+      bar1.position.set(0, 0.013, 0.006);
+      bar1.rotation.z = 0.08;
+      const bar2 = new THREE.Mesh(barGeo, clipMat2);
+      bar2.position.set(0, -0.013, 0.006);
+      bar2.rotation.z = -0.06;
+      const gem = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), clipMat2);
+      gem.position.set(0.028, 0.013, 0.01);
+      clipGrp.add(bar1, bar2, gem);
+      accGroup.add(clipGrp);
+    } else if (config.headItem === 'flower_pin') {
+      const petalMat = clayMat(headItemCol || '#FFF9F0', 0.58);
+      const coreMat = clayMat('#F4B942', 0.54);
+      const pinGrp = new THREE.Group();
+      pinGrp.position.copy(templeLeft.position);
+      pinGrp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), templeLeft.normal);
+
+      const petalGeo = new THREE.SphereGeometry(0.022, 10, 10);
+      petalGeo.scale(0.85, 1.15, 0.45);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const p = new THREE.Mesh(petalGeo, petalMat);
+        p.position.set(Math.cos(a) * 0.026, Math.sin(a) * 0.026, 0.005);
+        p.rotation.z = a - Math.PI / 2;
+        pinGrp.add(p);
+      }
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 8), coreMat);
+      core.scale.set(1, 1, 0.65);
+      core.position.set(0, 0, 0.011);
+      pinGrp.add(core);
+      accGroup.add(pinGrp);
     }
-  } else if (config.headItem === 'ribbon_bow') {
-    const bowMat = clayMat(headItemCol || '#6BAEE6', 0.56);
-    const knotMat = clayMat(shadeHex(headItemCol || '#6BAEE6', -0.1).getHex(), 0.58);
-    const bandR = headbandArc.radius;
-
-    // Band sits flush on outer hair envelope
-    const band = new THREE.Mesh(
-      new THREE.TorusGeometry(bandR, 0.02, 10, 28, Math.PI),
-      bowMat,
-    );
-    band.scale.set(1.01, 0.99, 1.0);
-    band.position.copy(headbandArc.center);
-    band.rotation.x = headbandArc.tiltX;
-    accGroup.add(band);
-
-    // Sculpted bow mounted cleanly ON TOP of the headband arch so hair never hides it
-    const bowAng = 0.56;
-    const archR = bandR + 0.022;
-    const bowGrp = new THREE.Group();
-    bowGrp.position.set(
-      Math.sin(bowAng) * archR * 1.01,
-      headbandArc.center.y + Math.cos(bowAng) * archR * 0.99 * Math.cos(headbandArc.tiltX),
-      headbandArc.center.z - Math.cos(bowAng) * archR * Math.sin(headbandArc.tiltX) + 0.012,
-    );
-    bowGrp.rotation.set(headbandArc.tiltX, -0.16, -bowAng * 0.72);
-
-    [-1, 1].forEach((side) => {
-      const wing = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 12), bowMat);
-      wing.scale.set(1.25, 0.76, 0.54);
-      wing.position.set(side * 0.064, 0.008, 0);
-      wing.rotation.z = side * 0.24;
-
-      const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.016, 0.056, 6, 8), bowMat);
-      tail.position.set(side * 0.036, -0.048, -0.006);
-      tail.rotation.z = side * 0.42;
-      bowGrp.add(wing, tail);
-    });
-    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 10), knotMat);
-    knot.scale.set(1.05, 0.92, 0.85);
-    knot.position.set(0, 0.004, 0.016);
-    bowGrp.add(knot);
-    accGroup.add(bowGrp);
-  } else if (config.headItem === 'hair_clip') {
-    const clipMat1 = clayMat(headItemCol || '#F4A261', 0.45);
-    const clipMat2 = clayMat('#FDF2D6', 0.48);
-    const clipGrp = new THREE.Group();
-    clipGrp.position.copy(templeRight.position);
-    clipGrp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), templeRight.normal);
-
-    const barGeo = new THREE.CapsuleGeometry(0.011, 0.068, 6, 10);
-    barGeo.rotateZ(Math.PI / 2);
-    const bar1 = new THREE.Mesh(barGeo, clipMat1);
-    bar1.position.set(0, 0.013, 0.006);
-    bar1.rotation.z = 0.08;
-    const bar2 = new THREE.Mesh(barGeo, clipMat2);
-    bar2.position.set(0, -0.013, 0.006);
-    bar2.rotation.z = -0.06;
-    const gem = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), clipMat2);
-    gem.position.set(0.028, 0.013, 0.01);
-    clipGrp.add(bar1, bar2, gem);
-    accGroup.add(clipGrp);
-  } else if (config.headItem === 'flower_pin') {
-    const petalMat = clayMat(headItemCol || '#FFF9F0', 0.58);
-    const coreMat = clayMat('#F4B942', 0.54);
-    const pinGrp = new THREE.Group();
-    pinGrp.position.copy(templeLeft.position);
-    pinGrp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), templeLeft.normal);
-
-    const petalGeo = new THREE.SphereGeometry(0.022, 10, 10);
-    petalGeo.scale(0.85, 1.15, 0.45);
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2;
-      const p = new THREE.Mesh(petalGeo, petalMat);
-      p.position.set(Math.cos(a) * 0.026, Math.sin(a) * 0.026, 0.005);
-      p.rotation.z = a - Math.PI / 2;
-      pinGrp.add(p);
-    }
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 8), coreMat);
-    core.scale.set(1, 1, 0.65);
-    core.position.set(0, 0, 0.011);
-    pinGrp.add(core);
-    accGroup.add(pinGrp);
   }
 
   // ========== SCULPTED ACCESSORIES ==========
@@ -4461,6 +4658,8 @@ export function buildAvatarRig(
     toolType: equippedTool,
     rodBobber: rodBobberObj,
     rodLine: rodLineObj,
+    rodMidPivot,
+    rodTipPivot,
     heldPetRig,
     headTopAbovePivot,
   };
@@ -4501,7 +4700,9 @@ export function updateAvatarRigAnimation(
   const isBikePose = pose === 'bike_idle' || pose === 'bike_ride';
   const isSkatePose = pose === 'skate_idle' || pose === 'skate_ride' || pose === 'skate_push';
 
-  // Reset shared mount/sit offsets cleanly on every pose transition
+  // Reset shared mount/sit offsets & fishing rod flex cleanly on every pose transition
+  if (rig.rodMidPivot) rig.rodMidPivot.rotation.x = 0;
+  if (rig.rodTipPivot) rig.rodTipPivot.rotation.x = 0;
   rig.bodyPivot.position.x = 0;
   rig.bodyPivot.position.z = 0;
   rig.bodyPivot.rotation.y = 0;
@@ -4745,23 +4946,29 @@ export function updateAvatarRigAnimation(
     rig.headPivot.rotation.z = 0;
   } else if (pose === 'fish_pull') {
     const u = THREE.MathUtils.clamp(poseProgress, 0, 1);
-    const snap = Math.sin(Math.min(1, u * 1.45) * Math.PI);
-    rig.leftLeg.rotation.x = 0.12 * snap;
-    rig.rightLeg.rotation.x = -0.14 * snap;
-    rig.leftLeg.rotation.z = 0;
-    rig.rightLeg.rotation.z = 0;
-    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.12 * snap;
-    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.18 * snap;
-    rig.leftArm.rotation.x = -0.35 * snap;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.45 * snap;
-    rig.rightArm.rotation.x = THREE.MathUtils.lerp(-0.48, -1.32, snap);
-    if (rig.rightElbow) rig.rightElbow.rotation.x = THREE.MathUtils.lerp(-0.8, -0.58, snap);
+    const tug = 0.5 + 0.5 * Math.sin(elapsed * 9.5);
+    const snap = Math.max(0.72, Math.sin(Math.min(1, u * 1.35) * Math.PI * 0.5));
+    const pullStrength = snap * (0.76 + 0.24 * tug);
+    rig.leftLeg.rotation.x = -0.22 * snap;
+    rig.rightLeg.rotation.x = 0.24 * snap;
+    rig.leftLeg.rotation.z = -0.05;
+    rig.rightLeg.rotation.z = 0.05;
+    if (rig.leftKnee) rig.leftKnee.rotation.x = 0.28 * snap;
+    if (rig.rightKnee) rig.rightKnee.rotation.x = 0.24 * snap;
+    rig.leftArm.rotation.x = -0.58 - 0.16 * tug;
+    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.66;
+    rig.rightArm.rotation.x = THREE.MathUtils.lerp(-0.62, -1.24, pullStrength);
+    if (rig.rightElbow) rig.rightElbow.rotation.x = THREE.MathUtils.lerp(-0.82, -0.56, pullStrength);
     if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
     rig.headPivot.position.y = HEAD_PIVOT_Y;
-    rig.bodyPivot.position.y = 0.02 * snap;
-    rig.bodyPivot.rotation.x = -0.14 * snap;
-    rig.headPivot.rotation.x = 0;
-    rig.headPivot.rotation.z = 0;
+    rig.bodyPivot.position.y = -0.025 * snap + Math.sin(elapsed * 11) * 0.01;
+    rig.bodyPivot.rotation.x = -0.22 * snap - 0.11 * tug;
+    rig.headPivot.rotation.x = 0.12 * snap;
+    rig.headPivot.rotation.z = Math.sin(elapsed * 6.5) * 0.035;
+    // Universal downward bend on ANY fishing rod under struggle tension
+    const rodBend = (0.82 + 0.22 * Math.sin(elapsed * 12.5)) * snap;
+    if (rig.rodMidPivot) rig.rodMidPivot.rotation.x = 0.36 * rodBend;
+    if (rig.rodTipPivot) rig.rodTipPivot.rotation.x = 0.68 * rodBend;
   } else if (pose === 'sit') {
     const sitBreath = Math.sin(elapsed * 1.9);
     const breath01 = 0.5 + 0.5 * sitBreath;
@@ -5058,30 +5265,75 @@ export function updateAvatarRigAnimation(
     solvePedalLeg(rig.rightLeg, rig.rightKnee, p1Y, p1Z, 0.04);
     solvePedalLeg(rig.leftLeg, rig.leftKnee, p2Y, p2Z, -0.04);
   } else if (pose === 'swim') {
-    const stroke = elapsed * 4.4;
-    const kick = Math.sin(elapsed * 8.4);
-    const bob = Math.sin(elapsed * 2.8) * 0.04;
-    const pitch = 1.24 + Math.sin(elapsed * 2.6) * 0.04;
+    const treadBlend = THREE.MathUtils.clamp(mountAnim?.idleBlend ?? 0, 0, 1);
+    const stroke = elapsed * 4.2;
+    const kick = Math.sin(elapsed * 8.2);
+    const treadCycle = elapsed * 2.5;
+    const bob = Math.sin(elapsed * 2.6) * (0.032 - treadBlend * 0.008);
 
-    rig.bodyPivot.position.set(0, 0.62 + bob, 0);
-    rig.bodyPivot.rotation.set(pitch, 0, Math.sin(stroke) * 0.1);
+    // Blend cleanly between streamlined active swimming and upright stationary treading water
+    const pitch = THREE.MathUtils.lerp(
+      1.02 + Math.sin(elapsed * 2.4) * 0.035,
+      0.46 + Math.sin(treadCycle * 0.8) * 0.025,
+      treadBlend,
+    );
+    const bodyY = THREE.MathUtils.lerp(0.5, 0.22, treadBlend) + bob;
+    const roll = Math.sin(stroke) * 0.08 * (1 - treadBlend);
+
+    rig.bodyPivot.position.set(0, bodyY, 0);
+    rig.bodyPivot.rotation.set(pitch, 0, roll);
     if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
     rig.headPivot.position.y = HEAD_PIVOT_Y;
-    rig.headPivot.rotation.set(-0.92, Math.sin(stroke * 0.5) * 0.08, 0);
+    rig.headPivot.rotation.set(
+      THREE.MathUtils.lerp(-0.82, -0.36, treadBlend) + Math.sin(elapsed * 2.2) * 0.03,
+      Math.sin(stroke * 0.5) * 0.07 * (1 - treadBlend * 0.6),
+      0,
+    );
 
-    // Smooth breaststroke / chill ocean paddling arms
+    // Smooth breaststroke paddling when moving, calm lateral sculling when treading water
     const sweep = Math.sin(stroke);
     const sweepCos = Math.cos(stroke);
-    rig.leftArm.rotation.set(-1.35 + sweepCos * 0.52, 0, -0.42 - sweep * 0.48);
-    rig.rightArm.rotation.set(-1.35 + sweepCos * 0.52, 0, 0.42 + sweep * 0.48);
-    if (rig.leftElbow) rig.leftElbow.rotation.set(-0.45, 0, 0.14);
-    if (rig.rightElbow) rig.rightElbow.rotation.set(-0.45, 0, -0.14);
+    const scull = Math.sin(treadCycle);
+    const scullCos = Math.cos(treadCycle);
+    const activeArmX = -1.25 + sweepCos * 0.48;
+    const activeArmZ = 0.4 + sweep * 0.44;
+    const treadArmX = -0.58 + scullCos * 0.16;
+    const treadArmZ = 0.58 + scull * 0.26;
 
-    // Gentle flutter kick legs
-    rig.leftLeg.rotation.set(0.18 + kick * 0.34, 0, -0.06);
-    rig.rightLeg.rotation.set(0.18 - kick * 0.34, 0, 0.06);
-    if (rig.leftKnee) rig.leftKnee.rotation.x = Math.max(0.06, -kick * 0.25);
-    if (rig.rightKnee) rig.rightKnee.rotation.x = Math.max(0.06, kick * 0.25);
+    rig.leftArm.rotation.set(
+      THREE.MathUtils.lerp(activeArmX, treadArmX, treadBlend),
+      0,
+      THREE.MathUtils.lerp(-activeArmZ, -treadArmZ, treadBlend),
+    );
+    rig.rightArm.rotation.set(
+      THREE.MathUtils.lerp(activeArmX, treadArmX, treadBlend),
+      0,
+      THREE.MathUtils.lerp(activeArmZ, treadArmZ, treadBlend),
+    );
+    const elbowBend = THREE.MathUtils.lerp(-0.46, -0.68, treadBlend);
+    if (rig.leftElbow) rig.leftElbow.rotation.set(elbowBend, 0, 0.14);
+    if (rig.rightElbow) rig.rightElbow.rotation.set(elbowBend, 0, -0.14);
+
+    // Flutter kick while swimming -> slow relaxed treading kick while stationary
+    const treadKick = Math.sin(treadCycle * 1.35);
+    const legSwing = THREE.MathUtils.lerp(kick * 0.34, treadKick * 0.2, treadBlend);
+    const legBase = THREE.MathUtils.lerp(0.18, -0.12, treadBlend);
+    rig.leftLeg.rotation.set(legBase + legSwing, 0, -0.06);
+    rig.rightLeg.rotation.set(legBase - legSwing, 0, 0.06);
+    if (rig.leftKnee) {
+      rig.leftKnee.rotation.x = THREE.MathUtils.lerp(
+        Math.max(0.06, -kick * 0.24),
+        Math.max(0.18, 0.36 - treadKick * 0.22),
+        treadBlend,
+      );
+    }
+    if (rig.rightKnee) {
+      rig.rightKnee.rotation.x = THREE.MathUtils.lerp(
+        Math.max(0.06, kick * 0.24),
+        Math.max(0.18, 0.36 + treadKick * 0.22),
+        treadBlend,
+      );
+    }
   } else if (pose === 'climb') {
     const cycle = elapsed * 8.2;
     const reach = Math.sin(cycle);
@@ -5089,23 +5341,23 @@ export function updateAvatarRigAnimation(
 
     rig.leftLeg.position.z = 0;
     rig.rightLeg.position.z = 0;
-    rig.bodyPivot.position.set(0, Math.abs(reach) * 0.018, 0);
-    rig.bodyPivot.rotation.set(0.1, 0, reach * 0.045);
+    rig.bodyPivot.position.set(0, Math.abs(reach) * 0.015, 0);
+    rig.bodyPivot.rotation.set(0.05, 0, reach * 0.04);
     if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77;
     rig.headPivot.position.y = HEAD_PIVOT_Y;
-    rig.headPivot.rotation.set(-0.24, Math.sin(cycle * 0.5) * 0.06, -reach * 0.04);
+    rig.headPivot.rotation.set(-0.22, Math.sin(cycle * 0.5) * 0.05, -reach * 0.035);
 
-    // Alternating hand-over-hand upward reach onto rope ladder rungs
-    rig.leftArm.rotation.set(-2.18 + reach * 0.56, 0, 0.18);
-    rig.rightArm.rotation.set(-2.18 - reach * 0.56, 0, -0.18);
-    if (rig.leftElbow) rig.leftElbow.rotation.set(-0.68 - reach * 0.32, 0, 0);
-    if (rig.rightElbow) rig.rightElbow.rotation.set(-0.68 + reach * 0.32, 0, 0);
+    // Alternating hand-over-hand forward-upward reach onto rope ladder rungs cleanly in front of torso
+    rig.leftArm.rotation.set(-2.06 + reach * 0.48, 0, 0.16);
+    rig.rightArm.rotation.set(-2.06 - reach * 0.48, 0, -0.16);
+    if (rig.leftElbow) rig.leftElbow.rotation.set(-0.56 - reach * 0.28, 0, 0);
+    if (rig.rightElbow) rig.rightElbow.rotation.set(-0.56 + reach * 0.28, 0, 0);
 
-    // Alternating knee-lift rung stepping (right foot up when left hand reaches up)
-    rig.leftLeg.rotation.set(-0.34 + step * 0.42, 0, -0.04);
-    rig.rightLeg.rotation.set(-0.34 - step * 0.42, 0, 0.04);
-    if (rig.leftKnee) rig.leftKnee.rotation.x = Math.max(0.18, 0.78 - step * 0.48);
-    if (rig.rightKnee) rig.rightKnee.rotation.x = Math.max(0.18, 0.78 + step * 0.48);
+    // Alternating knee-lift rung stepping cleanly outside ladder
+    rig.leftLeg.rotation.set(-0.28 + step * 0.34, 0, -0.04);
+    rig.rightLeg.rotation.set(-0.28 - step * 0.34, 0, 0.04);
+    if (rig.leftKnee) rig.leftKnee.rotation.x = Math.max(0.16, 0.68 - step * 0.42);
+    if (rig.rightKnee) rig.rightKnee.rotation.x = Math.max(0.16, 0.68 + step * 0.42);
   } else {
     // Gentle breathing Idle: subtle body bob & soft breathing rhythm
     const breathPhase = elapsed * 2.15;

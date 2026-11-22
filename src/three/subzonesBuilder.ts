@@ -931,6 +931,16 @@ export function buildSubzoneScene(
       idleBlanket: THREE.Object3D;
       sleepBlanket: THREE.Object3D;
     }[] = [];
+    const twinkleControllers: {
+      lampId: string;
+      bulbs: Array<{
+        mesh: THREE.Mesh;
+        mat: THREE.MeshStandardMaterial;
+        phase: number;
+        baseIntensity: number;
+      }>;
+    }[] = [];
+    const vinylControllers: THREE.Object3D[] = [];
 
     setHouseLightsOnFn = (on: boolean) => {
       houseLightsOn = on;
@@ -1007,6 +1017,21 @@ export function buildSubzoneScene(
         });
       }
 
+      if (meshGroup.userData.twinkleBulbs) {
+        twinkleControllers.push({
+          lampId: pf.instanceId,
+          bulbs: meshGroup.userData.twinkleBulbs as Array<{
+            mesh: THREE.Mesh;
+            mat: THREE.MeshStandardMaterial;
+            phase: number;
+            baseIntensity: number;
+          }>,
+        });
+      }
+      if (meshGroup.userData.vinylDisc) {
+        vinylControllers.push(meshGroup.userData.vinylDisc as THREE.Object3D);
+      }
+
       const isLampItem =
         cat.interactive === 'lamp' || cat.name.toLowerCase().includes('đèn');
       if (isLampItem) {
@@ -1021,7 +1046,9 @@ export function buildSubzoneScene(
         const shadeMat = meshGroup.userData.lampShadeMat as THREE.MeshStandardMaterial | undefined;
         if (shadeMat) {
           shadeMat.emissiveIntensity = isOn ? 0.78 : 0.04;
-          shadeMat.color.set(isOn ? cat.color : '#B8ADA0');
+          if (cat.kind !== 'xmas_tree' && cat.kind !== 'xmas_wreath' && cat.kind !== 'tet_flower_wreath') {
+            shadeMat.color.set(isOn ? cat.color : '#B8ADA0');
+          }
         }
         lampControllers.push({
           id: pf.instanceId,
@@ -1056,7 +1083,13 @@ export function buildSubzoneScene(
       } else if (cat.interactive === 'sofa') {
         const front = toWorld(0, cat.halfD + 0.45);
         const seatLocalZ =
-          cat.kind === 'sofa' ? 0.22 : cat.kind === 'armchair' ? 0.21 : 0.11;
+          cat.kind === 'sofa'
+            ? 0.22
+            : cat.kind === 'armchair'
+              ? 0.21
+              : cat.kind === 'tet_chair'
+                ? 0.06
+                : 0.11;
         const seatPos = toWorld(0, seatLocalZ);
         const seatTopY = posY + (cat.surfaceHeight ?? 0.52);
         proxyData = {
@@ -1109,6 +1142,15 @@ export function buildSubzoneScene(
           catalogId: pf.catalogId,
           tx: front.wx,
           tz: front.wz,
+        };
+      } else if (cat.interactive === 'microwave' || cat.interactive === 'mini_oven') {
+        const front = toWorld(0, cat.halfD + 0.56);
+        proxyData = {
+          kind: cat.interactive,
+          furnitureId: pf.instanceId,
+          catalogId: pf.catalogId,
+          tx: THREE.MathUtils.clamp(front.wx, -12.7, 9.7),
+          tz: THREE.MathUtils.clamp(front.wz, -8.8, 6.8),
         };
       }
 
@@ -1231,6 +1273,25 @@ export function buildSubzoneScene(
           ck.minPivot.rotation.z = minAng;
           if (ck.secPivot) ck.secPivot.rotation.z = secAng;
         }
+      }
+
+      // 1b. Festive twinkling fairy lights & spinning retro vinyl platter
+      for (const tw of twinkleControllers) {
+        const lamp = lampControllers.find((l) => l.id === tw.lampId);
+        const lit = lamp ? lamp.isOn : true;
+        const seenMats = new Set<THREE.MeshStandardMaterial>();
+        for (let b = 0; b < tw.bulbs.length; b++) {
+          const bulb = tw.bulbs[b];
+          const wave = 0.5 + 0.5 * Math.sin(elapsed * 3.8 + bulb.phase);
+          bulb.mesh.scale.setScalar(lit ? 0.9 + wave * 0.28 : 0.85);
+          if (!seenMats.has(bulb.mat)) {
+            seenMats.add(bulb.mat);
+            bulb.mat.emissiveIntensity = lit ? bulb.baseIntensity * (0.78 + wave * 0.42) : 0.05;
+          }
+        }
+      }
+      for (const disc of vinylControllers) {
+        disc.rotation.y = elapsed * 1.45;
       }
 
       // 2. Flowing faucet stream & automatic neck-deep soaking water in bathtub

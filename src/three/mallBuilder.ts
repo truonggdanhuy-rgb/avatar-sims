@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {TUN_AVATAR} from '../data/avatarCatalog';
-import {TimeOfDay} from '../types/game';
+import {AvatarConfig, TimeOfDay} from '../types/game';
 import {buildAvatarRig, updateAvatarRigAnimation} from './avatar3d';
 import {
   clayMat,
@@ -1331,11 +1331,11 @@ export function buildMallInteriorScene(): SubzoneWorld {
     awningB: string;
     icon: MallIconKind;
   }[] = [
-    {bx: -24, name: 'THỜI TRANG', accent: '#F28CA3', pill: '#FFEAF0', fg: '#9A3150', awningA: '#F59BB0', awningB: '#FFF9FB', icon: 'fashion'},
-    {bx: -12, name: 'TRÀ SỮA', accent: '#4EB8A2', pill: '#E6FAF5', fg: '#1D6B5B', awningA: '#62C7B2', awningB: '#FFFDF8', icon: 'boba'},
+    {bx: -24, name: 'CARTOON DECOR', accent: '#B89CF5', pill: '#F4EEFF', fg: '#543A8C', awningA: '#C7B0FA', awningB: '#FFFDFB', icon: 'cloud_star'},
+    {bx: -12, name: 'TRÀ & CÀ PHÊ', accent: '#C68B59', pill: '#FFF3E6', fg: '#6E3F1D', awningA: '#D99E6E', awningB: '#FFFDF8', icon: 'boba'},
     {bx: 0, name: 'XE CỘ MÂY', accent: '#549EE0', pill: '#E9F4FF', fg: '#1F5588', awningA: '#6AB2EC', awningB: '#FFFFFF', icon: 'cloud_star'},
-    {bx: 12, name: 'QUÀ TẶNG', accent: '#EE8B60', pill: '#FFF0E6', fg: '#9E4020', awningA: '#F49D72', awningB: '#FFF9F4', icon: 'gift'},
-    {bx: 24, name: 'SIÊU THỊ', accent: '#6B8AD6', pill: '#EDF2FF', fg: '#2C4685', awningA: '#809EE2', awningB: '#FFFFFF', icon: 'mart'},
+    {bx: 12, name: 'ẨM THỰC & CHỢ', accent: '#5CB88A', pill: '#E8FAF0', fg: '#1E6945', awningA: '#70C99B', awningB: '#FFFDF8', icon: 'mart'},
+    {bx: 24, name: 'KHU VUI CHƠI', accent: '#F28CA3', pill: '#FFEAF0', fg: '#9A3150', awningA: '#F59BB0', awningB: '#FFF9FB', icon: 'gift'},
   ];
 
   northShops.forEach(({bx, name, accent, pill, fg, awningA, awningB, icon}) => {
@@ -1804,19 +1804,39 @@ export function buildMallInteriorScene(): SubzoneWorld {
     worldPos: new THREE.Vector3(TUN_X, TUN_BASE_Y + 2.25, TUN_Z),
   });
 
-  // ========== 7. ATRIUM LOUNGE BENCHES & POTTED PLANTS ON FLOOR 1 PERIMETER ==========
+  // ========== 7. OPEN-CONCEPT FLOOR 1 WINGS: FLAGSHIP QUÁN CÀ PHÊ MÂY, BISTRO & CHỢ, CARTOON DECOR, ARCADE & ATRIUM PLAZA ==========
   const lobbyDecor = new THREE.Group();
   const leafMat = clayMat('#52A862', 0.72);
   const potMat = clayMat('#E9DEC9', 0.68);
+  const creamFoamMat = glossyClayMat('#FFF8EE', 0.38);
+  const espressoBrownMat = clayMat('#4E3224', 0.58);
+  const latteTanMat = clayMat('#D8B388', 0.62);
+  const honeyOakMat = clayMat('#DDA96E', 0.64);
+  const sageMat = clayMat('#76BFA2', 0.56);
+  const berryPinkMat = glossyClayMat('#FF89A6', 0.36);
+  const lavenderMat = clayMat('#C6B3F7', 0.58);
+  const butterYellowMat = glossyClayMat('#FFD66E', 0.38);
+  const mintMat = clayMat('#7BDAC0', 0.52);
+  const peachBlossomMat = glossyClayMat('#FF9EB8', 0.42);
+  const clearCaseGlassMat = new THREE.MeshStandardMaterial({
+    color: '#DFF6FF',
+    roughness: 0.08,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.36,
+    depthWrite: false,
+  });
+
+  // Perimeter & Inner Atrium Potted Trees (clear of wings & escalators)
   [
-    [-12.5, -8.5],
-    [12.5, -8.5],
-    [-12.5, 8.5],
-    [12.5, 8.5],
-    [-28.5, -22.5],
-    [28.5, -22.5],
-    [-28.5, 22.5],
-    [28.5, 22.5],
+    [-10.8, -6.2],
+    [10.8, -6.2],
+    [-10.8, 6.2],
+    [10.8, 6.2],
+    [-30.2, -24.2],
+    [30.2, -24.2],
+    [-30.2, 24.2],
+    [30.2, 24.2],
   ].forEach(([px, pz], idx) => {
     const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.34, 0.58, 10), potMat);
     pot.position.set(px, 0.29, pz);
@@ -1870,6 +1890,786 @@ export function buildMallInteriorScene(): SubzoneWorld {
     colliders.push({type: 'box', id: `mall_f1_bench_${idx}`, x: bx, z: bz, hw: 1.15, hd: 0.48});
   });
 
+  // ---------- 7A. FLAGSHIP QUÁN CÀ PHÊ MÂY (SOUTH-WEST OPEN WING: x=-29..-11.4, z=+7.2..+23.2) ----------
+  const cafePad = new THREE.Mesh(
+    new RoundedBoxGeometry(17.6, 0.036, 15.8, 2, 0.015),
+    clayMat('#F2DEC3', 0.62),
+  );
+  cafePad.position.set(-20.2, 0.018, 15.2);
+  const cafeBorder = new THREE.Mesh(
+    new RoundedBoxGeometry(17.2, 0.014, 15.4, 2, 0.01),
+    clayMat('#DFBE96', 0.66),
+  );
+  cafeBorder.position.set(-20.2, 0.036, 15.2);
+  lobbyDecor.add(cafePad, cafeBorder);
+
+  // L-Shaped Open Espresso & Pastry Bar Counter (NO enclosing booth walls!)
+  const barFront = new THREE.Mesh(new RoundedBoxGeometry(7.2, 1.02, 1.1, 3, 0.06), warmWoodMat);
+  barFront.position.set(-23.6, 0.51, 20.2);
+  const barFrontTop = new THREE.Mesh(new RoundedBoxGeometry(7.38, 0.09, 1.24, 3, 0.03), creamFoamMat);
+  barFrontTop.position.set(-23.6, 1.05, 20.2);
+  const barFrontTrim = new THREE.Mesh(new RoundedBoxGeometry(6.8, 0.16, 0.08, 2, 0.02), sageMat);
+  barFrontTrim.position.set(-23.6, 0.72, 19.64);
+
+  const barSide = new THREE.Mesh(new RoundedBoxGeometry(1.1, 1.02, 2.8, 3, 0.06), warmWoodMat);
+  barSide.position.set(-27.2, 0.51, 18.8);
+  const barSideTop = new THREE.Mesh(new RoundedBoxGeometry(1.24, 0.09, 2.94, 3, 0.03), creamFoamMat);
+  barSideTop.position.set(-27.2, 1.05, 18.8);
+
+  // Back Bar Credenza + Sculpted "MÂY CAFÉ" Sign Canopy Held by Two Slender Timber Posts
+  const backBar = new THREE.Mesh(new RoundedBoxGeometry(7.0, 0.92, 0.85, 3, 0.05), espressoBrownMat);
+  backBar.position.set(-23.6, 0.46, 22.6);
+  const backBarTop = new THREE.Mesh(new RoundedBoxGeometry(7.14, 0.08, 0.96, 2, 0.025), creamFoamMat);
+  backBarTop.position.set(-23.6, 0.96, 22.6);
+  lobbyDecor.add(barFront, barFrontTop, barFrontTrim, barSide, barSideTop, backBar, backBarTop);
+
+  [-26.8, -20.4].forEach((px) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.1, 3.05, 10), espressoBrownMat);
+    post.position.set(px, 1.525, 22.6);
+    lobbyDecor.add(post);
+  });
+
+  const cafeTex = createStorefrontSignTexture('MÂY CAFÉ', '#C68B59', '#FFF6EA', '#5A341A', disposables, isDisposed);
+  const cafeSignBoard = new THREE.Mesh(new RoundedBoxGeometry(5.6, 1.25, 0.18, 3, 0.22), honeyOakMat);
+  cafeSignBoard.position.set(-23.6, 3.15, 22.6);
+  const cafeSignFace = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.2, 1.02),
+    new THREE.MeshBasicMaterial({map: cafeTex}),
+  );
+  cafeSignFace.position.set(-23.6, 3.15, 22.5);
+  cafeSignFace.rotation.y = Math.PI;
+  group.add(cafeSignFace);
+
+  // Giant Sculpted 3D Latte Cup Emblem perched atop the Café Sign
+  const giantCup = new THREE.Group();
+  giantCup.position.set(-23.6, 4.18, 22.55);
+  giantCup.rotation.y = Math.PI;
+  const gCupBody = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.28, 0.56, 18), creamFoamMat);
+  const gCupFoam = new THREE.Mesh(new THREE.SphereGeometry(0.39, 14, 10), latteTanMat);
+  gCupFoam.scale.set(1, 0.35, 1);
+  gCupFoam.position.y = 0.24;
+  const gCupHeart = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), creamFoamMat);
+  gCupHeart.position.set(0, 0.34, 0.08);
+  const gCupHandle = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.045, 8, 14, Math.PI), creamFoamMat);
+  gCupHandle.rotation.z = -Math.PI / 2;
+  gCupHandle.position.set(0.38, 0.02, 0);
+  const gSaucer = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.4, 0.07, 18), sageMat);
+  gSaucer.position.y = -0.3;
+  giantCup.add(gCupBody, gCupFoam, gCupHeart, gCupHandle, gSaucer);
+  lobbyDecor.add(cafeSignBoard, giantCup);
+
+  // Bar Counter Props: 2-Group Espresso Machine, Grinder, Cash Tablet & Glass Pastry Display Case!
+  const espBody = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.52, 0.54, 3, 0.05), silverMat);
+  espBody.position.set(-25.4, 1.35, 20.2);
+  const espTop = new THREE.Mesh(new RoundedBoxGeometry(0.96, 0.1, 0.58, 2, 0.03), berryPinkMat);
+  espTop.position.set(-25.4, 1.62, 20.2);
+  [-25.62, -25.18].forEach((gx) => {
+    const groupHead = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.14, 10), darkMetalMat);
+    groupHead.position.set(gx, 1.32, 19.95);
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.038, 0.08, 10), creamFoamMat);
+    cup.position.set(gx, 1.14, 19.95);
+    lobbyDecor.add(groupHead, cup);
+  });
+  const grinder = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.36, 12), darkMetalMat);
+  grinder.position.set(-24.3, 1.28, 20.2);
+  const hopper = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.07, 0.24, 12), latteTanMat);
+  hopper.position.set(-24.3, 1.54, 20.2);
+  const register = new THREE.Mesh(new RoundedBoxGeometry(0.38, 0.24, 0.24, 2, 0.03), creamFoamMat);
+  register.position.set(-23.2, 1.22, 20.2);
+  lobbyDecor.add(espBody, espTop, grinder, hopper, register);
+
+  // Glass Pastry Vitrine stocked with Croissants, Cupcakes & Macarons
+  const vitrineBase = new THREE.Mesh(new RoundedBoxGeometry(2.1, 0.08, 0.78, 2, 0.02), warmWoodMat);
+  vitrineBase.position.set(-21.4, 1.13, 20.2);
+  const vitrineShelf = new THREE.Mesh(new RoundedBoxGeometry(1.95, 0.04, 0.62, 1, 0.01), creamFoamMat);
+  vitrineShelf.position.set(-21.4, 1.44, 20.2);
+  const vitrineGlass = new THREE.Mesh(new RoundedBoxGeometry(2.04, 0.64, 0.72, 2, 0.03), clearCaseGlassMat);
+  vitrineGlass.position.set(-21.4, 1.49, 20.2);
+  lobbyDecor.add(vitrineBase, vitrineShelf, vitrineGlass);
+  [-22.0, -21.4, -20.8].forEach((px, idx) => {
+    const croissant = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.048, 8, 12, Math.PI * 1.15), honeyOakMat);
+    croissant.rotation.x = Math.PI / 2;
+    croissant.position.set(px, 1.21, 20.2);
+    const cupcakeBase = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.055, 0.08, 10), latteTanMat);
+    cupcakeBase.position.set(px, 1.5, 20.2);
+    const frosting = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 10, 8),
+      idx === 1 ? berryPinkMat : idx === 2 ? mintMat : creamFoamMat,
+    );
+    frosting.position.set(px, 1.57, 20.2);
+    lobbyDecor.add(croissant, cupcakeBase, frosting);
+  });
+
+  // Back Bar Coffee Syrups & Ceramic Mug Shelves
+  for (let i = 0; i < 6; i++) {
+    const sx = -25.8 + i * 0.85;
+    const bottle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.08, 0.28, 10),
+      i % 2 === 0 ? berryPinkMat : mintMat,
+    );
+    bottle.position.set(sx, 1.14, 22.55);
+    lobbyDecor.add(bottle);
+  }
+
+  // Cute Chalkboard Coffee Menu Easel near Café Entrance
+  const easelBoard = new THREE.Mesh(new RoundedBoxGeometry(0.84, 1.18, 0.07, 2, 0.025), warmWoodMat);
+  easelBoard.position.set(-26.8, 0.72, 15.2);
+  easelBoard.rotation.set(-0.16, 0.45, 0);
+  const chalkFace = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.96, 0.08), clayMat('#2E3D37', 0.85));
+  chalkFace.position.set(-26.8, 0.72, 15.2);
+  chalkFace.rotation.set(-0.16, 0.45, 0);
+  lobbyDecor.add(easelBoard, chalkFace);
+  colliders.push({type: 'circle', id: 'mall_f1_cafe_easel', x: -26.8, z: 15.2, r: 0.58});
+
+  // Café Bar Colliders & Click Proxy
+  colliders.push({type: 'box', id: 'mall_f1_cafe_front', x: -23.6, z: 20.2, hw: 3.7, hd: 0.65});
+  colliders.push({type: 'box', id: 'mall_f1_cafe_side', x: -27.2, z: 18.8, hw: 0.65, hd: 1.5});
+  colliders.push({type: 'box', id: 'mall_f1_cafe_back', x: -23.6, z: 22.6, hw: 3.6, hd: 0.55});
+  addMallProxy(
+    group,
+    [7.2, 2.2, 2.4],
+    [-23.6, 1.1, 20.6],
+    {kind: 'mall_cafe_counter', tx: -23.2, tz: 18.65},
+    clickTargets,
+  );
+
+  // Friendly Barista NPC ("Mây") behind the espresso bar
+  const BARISTA_AVATAR: AvatarConfig = {
+    name: 'Mây Barista',
+    skinTone: '#F7CEAD',
+    hairBack: 'ponytail',
+    hairFront: 'air_bangs',
+    hairColor: '#5B3A29',
+    eyeStyle: 'bright',
+    eyeColor: '#5B341E',
+    expression: 'sweet_smile',
+    blush: true,
+    top: 'cardigan_vest',
+    topColor: '#5C8A72',
+    bottom: 'midi_skirt',
+    bottomColor: '#FFF5E6',
+    shoes: 'loafers',
+    shoeColor: '#69432B',
+    headItem: 'beret',
+    headItemColor: '#C68B59',
+    accessory: 'none',
+    accessoryColor: '#4A3628',
+    handheld: 'none',
+    handheldColor: '#E8B84B',
+  };
+  const BARISTA_X = -23.2;
+  const BARISTA_Z = 21.35;
+  const baristaRig = buildAvatarRig(BARISTA_AVATAR);
+  baristaRig.root.position.set(BARISTA_X, 0.036, BARISTA_Z);
+  baristaRig.root.rotation.y = Math.PI;
+  group.add(baristaRig.root);
+  addMallProxy(
+    baristaRig.root,
+    [1.0, 1.9, 1.0],
+    [0, 0.95, 0],
+    {kind: 'mall_cafe_counter', tx: -23.2, tz: 18.65},
+    clickTargets,
+  );
+  labelAnchors.push({
+    id: 'npc_barista',
+    label: 'Barista Mây',
+    worldPos: new THREE.Vector3(BARISTA_X, 2.25, BARISTA_Z),
+  });
+
+  // 4 Open Bistro Coffee Tables & 8 Interactive Cushioned Chairs in Quán Cà Phê Mây
+  const cafeTables: [number, number][] = [
+    [-19.2, 10.2],
+    [-14.2, 10.2],
+    [-19.2, 15.2],
+    [-14.2, 15.2],
+  ];
+  cafeTables.forEach(([tx, tz], tIdx) => {
+    const tblTop = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.08, 20), creamFoamMat);
+    tblTop.position.set(tx, 0.78, tz);
+    const tblStem = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.08, 0.72, 10), darkMetalMat);
+    tblStem.position.set(tx, 0.4, tz);
+    const tblFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.06, 14), darkMetalMat);
+    tblFoot.position.set(tx, 0.05, tz);
+    // Tabletop coffee cups & mini pastry plate
+    const cupL = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.048, 0.1, 10), sageMat);
+    cupL.position.set(tx - 0.2, 0.87, tz + 0.06);
+    const cupR = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.048, 0.1, 10), berryPinkMat);
+    cupR.position.set(tx + 0.2, 0.87, tz - 0.08);
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.11, 0.03, 12), creamFoamMat);
+    plate.position.set(tx + 0.02, 0.835, tz + 0.18);
+    const cake = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), honeyOakMat);
+    cake.scale.set(1.2, 0.75, 0.9);
+    cake.position.set(tx + 0.02, 0.88, tz + 0.18);
+    lobbyDecor.add(tblTop, tblStem, tblFoot, cupL, cupR, plate, cake);
+    colliders.push({type: 'circle', id: `mall_f1_cafe_tbl_${tIdx}`, x: tx, z: tz, r: 0.68});
+
+    [-1, 1].forEach((side, cIdx) => {
+      const cx = tx + side * 0.96;
+      const sitRotY = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+      const chSeat = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.25, 0.09, 14), warmWoodMat);
+      chSeat.position.set(cx, 0.45, tz);
+      const chPad = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.24, 0.06, 14),
+        (tIdx + cIdx) % 2 === 0 ? sageMat : berryPinkMat,
+      );
+      chPad.position.set(cx, 0.515, tz);
+      const chBack = new THREE.Mesh(new RoundedBoxGeometry(0.07, 0.36, 0.42, 2, 0.03), warmWoodMat);
+      chBack.position.set(cx + side * 0.22, 0.66, tz);
+      const chLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.18, 0.42, 10), darkMetalMat);
+      chLeg.position.set(cx, 0.22, tz);
+      lobbyDecor.add(chSeat, chPad, chBack, chLeg);
+      colliders.push({type: 'circle', id: `mall_f1_cafe_ch_${tIdx}_${cIdx}`, x: cx, z: tz, r: 0.36});
+      addMallProxy(
+        group,
+        [0.64, 0.85, 0.64],
+        [cx, 0.45, tz],
+        {
+          kind: 'bench',
+          tx: cx + side * 0.28,
+          tz: tz + 0.78,
+          seatX: cx,
+          seatZ: tz,
+          seatY: 0.55,
+          sitRotY,
+          sitMessage: 'Nhâm nhi cà phê sữa & bánh ngọt tại Quán Cà Phê Mây thật thư giãn! (+Vui vẻ)',
+        },
+        clickTargets,
+      );
+    });
+  });
+
+  // ---------- 7B. NHÀ HÀNG BISTRO & CHỢ NGUYÊN LIỆU TƯƠI (SOUTH-EAST OPEN WING: x=+11.4..+29, z=+7.2..+23.2) ----------
+  const marketPad = new THREE.Mesh(
+    new RoundedBoxGeometry(17.6, 0.036, 15.8, 2, 0.015),
+    clayMat('#E8F3EA', 0.64),
+  );
+  marketPad.position.set(20.2, 0.018, 15.2);
+  lobbyDecor.add(marketPad);
+
+  // Open-Air Tiered Fresh Produce Market Stalls along South-East Corner
+  [-21.2, -24.0, -26.8].forEach((negX, idx) => {
+    const sx = -negX;
+    const stallBase = new THREE.Mesh(new RoundedBoxGeometry(2.4, 0.82, 1.35, 3, 0.05), honeyOakMat);
+    stallBase.position.set(sx, 0.41, 21.0);
+    const tierTop = new THREE.Mesh(new RoundedBoxGeometry(2.2, 0.36, 0.62, 2, 0.03), warmWoodMat);
+    tierTop.position.set(sx, 1.0, 21.3);
+    lobbyDecor.add(stallBase, tierTop);
+
+    // Crates & Baskets filled with Fruits, Veggies, Bread & Milk
+    [-0.65, 0.65].forEach((ox, bIdx) => {
+      const crate = new THREE.Mesh(new RoundedBoxGeometry(0.86, 0.24, 0.56, 2, 0.025), clayMat('#D39D62', 0.72));
+      crate.position.set(sx + ox, 0.94, 20.68);
+      lobbyDecor.add(crate);
+      for (let p = 0; p < 4; p++) {
+        const fruit = new THREE.Mesh(
+          new THREE.SphereGeometry(0.11, 10, 8),
+          (idx + bIdx + p) % 3 === 0
+            ? berryPinkMat
+            : (idx + bIdx + p) % 3 === 1
+              ? butterYellowMat
+              : leafMat,
+        );
+        fruit.position.set(sx + ox + (p - 1.5) * 0.17, 1.08 + (p % 2) * 0.05, 20.68 + ((p % 2) - 0.5) * 0.12);
+        lobbyDecor.add(fruit);
+      }
+    });
+    // Back shelf honey jars / milk bottles / golden baguettes
+    for (let j = -1; j <= 1; j++) {
+      const jar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.09, 0.095, 0.24, 10),
+        idx === 1 ? creamFoamMat : butterYellowMat,
+      );
+      jar.position.set(sx + j * 0.48, 1.3, 21.3);
+      lobbyDecor.add(jar);
+    }
+  });
+
+  // Striped Pastel Pink & Cream Canopy Overhead + Siêu Thị Mini của Peppa Signboard!
+  [19.8, 28.2].forEach((px) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 3.2, 10), warmWoodMat);
+    post.position.set(px, 1.6, 20.5);
+    lobbyDecor.add(post);
+  });
+  for (let s = 0; s < 8; s++) {
+    const aw = new THREE.Mesh(
+      new RoundedBoxGeometry(1.08, 0.12, 1.65, 2, 0.04),
+      s % 2 === 0 ? berryPinkMat : creamFoamMat,
+    );
+    aw.position.set(20.15 + s * 1.1, 3.05, 20.65);
+    aw.rotation.x = 0.22;
+    lobbyDecor.add(aw);
+  }
+  const peppaSignTex = createStorefrontSignTexture(
+    'SIÊU THỊ PEPPA',
+    '#F0689B',
+    '#FFF4F8',
+    '#8B1E47',
+    disposables,
+    isDisposed,
+  );
+  const peppaSignBoard = new THREE.Mesh(
+    new RoundedBoxGeometry(6.0, 1.24, 0.18, 3, 0.2),
+    berryPinkMat,
+  );
+  peppaSignBoard.position.set(24.0, 3.85, 21.15);
+  const peppaSignFace = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.6, 1.04),
+    new THREE.MeshBasicMaterial({map: peppaSignTex}),
+  );
+  peppaSignFace.position.set(24.0, 3.85, 21.05);
+  peppaSignFace.rotation.y = Math.PI;
+  lobbyDecor.add(peppaSignBoard);
+  group.add(peppaSignFace);
+
+  colliders.push({type: 'box', id: 'mall_f1_market_stalls', x: 24.0, z: 21.1, hw: 4.35, hd: 0.95});
+  addMallProxy(
+    group,
+    [8.4, 2.4, 2.1],
+    [24.0, 1.2, 21.0],
+    {kind: 'npc_peppa', tx: 24.0, tz: 17.7},
+    clickTargets,
+  );
+
+  // NPC Peppa — cô gái mặc mascot chú heo Peppa bán Nguyên Liệu & Công Thức nấu ăn tại Siêu Thị Mini!
+  const PEPPA_AVATAR: AvatarConfig = {
+    name: 'Peppa',
+    mascotCostume: 'peppa_pig',
+    skinTone: '#F7D2BA',
+    hairBack: 'bob_cut',
+    hairFront: 'air_bangs',
+    hairColor: '#5B3A29',
+    eyeStyle: 'bright',
+    eyeColor: '#4E2E1D',
+    expression: 'sweet_smile',
+    blush: true,
+    top: 'sundress',
+    topColor: '#E53935',
+    bottom: 'a_line_skirt',
+    bottomColor: '#E53935',
+    shoes: 'boots',
+    shoeColor: '#252329',
+    headItem: 'none',
+    headItemColor: '#F48FB1',
+    accessory: 'none',
+    accessoryColor: '#4A3628',
+    handheld: 'none',
+    handheldColor: '#E8B84B',
+  };
+  const PEPPA_X = 24.0;
+  const PEPPA_Z = 19.35;
+  const peppaRig = buildAvatarRig(PEPPA_AVATAR);
+  peppaRig.root.position.set(PEPPA_X, 0.036, PEPPA_Z);
+  peppaRig.root.rotation.y = Math.PI;
+  group.add(peppaRig.root);
+  colliders.push({type: 'circle', id: 'mall_f1_peppa', x: PEPPA_X, z: PEPPA_Z, r: 0.48});
+  addMallProxy(
+    peppaRig.root,
+    [1.1, 2.05, 1.1],
+    [0, 1.0, 0],
+    {kind: 'npc_peppa', tx: 24.0, tz: 17.7},
+    clickTargets,
+  );
+  labelAnchors.push({
+    id: 'npc_peppa',
+    label: 'Peppa',
+    worldPos: new THREE.Vector3(PEPPA_X, 2.38, PEPPA_Z),
+  });
+
+  // Cute Rolling Dessert & Pastry Pushcart at (27.4, 15.6)
+  const cartBody = new THREE.Mesh(new RoundedBoxGeometry(1.35, 0.78, 0.85, 3, 0.05), creamFoamMat);
+  cartBody.position.set(27.4, 0.58, 15.6);
+  const cartRoof = new THREE.Mesh(new RoundedBoxGeometry(1.52, 0.14, 1.02, 2, 0.04), berryPinkMat);
+  cartRoof.position.set(27.4, 1.92, 15.6);
+  [-0.58, 0.58].forEach((ox) => {
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.0, 8), honeyOakMat);
+    rod.position.set(27.4 + ox, 1.42, 15.6);
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.06, 14), warmWoodMat);
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(27.4 + ox, 0.18, 16.05);
+    lobbyDecor.add(rod, wheel);
+  });
+  const tartDome = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.18, 14), clearCaseGlassMat);
+  tartDome.position.set(27.4, 1.08, 15.6);
+  lobbyDecor.add(cartBody, cartRoof, tartDome);
+  colliders.push({type: 'box', id: 'mall_f1_dessert_cart', x: 27.4, z: 15.6, hw: 0.85, hd: 0.65});
+  addMallProxy(
+    group,
+    [1.55, 1.9, 1.1],
+    [27.4, 0.95, 15.6],
+    {kind: 'npc_peppa', tx: 25.8, tz: 15.6},
+    clickTargets,
+  );
+
+  // 2 Bistro Dining Tables & 4 Interactive Chairs in SE Wing
+  [
+    [14.6, 10.4],
+    [14.6, 15.6],
+  ].forEach(([tx, tz], tIdx) => {
+    const tblTop = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.08, 20), honeyOakMat);
+    tblTop.position.set(tx, 0.78, tz);
+    const tblLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.72, 10), darkMetalMat);
+    tblLeg.position.set(tx, 0.4, tz);
+    const tblFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.06, 14), darkMetalMat);
+    tblFoot.position.set(tx, 0.05, tz);
+    const saladPlate = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.14, 0.035, 12), creamFoamMat);
+    saladPlate.position.set(tx - 0.16, 0.84, tz);
+    const saladBowl = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), leafMat);
+    saladBowl.scale.set(1.2, 0.6, 1.2);
+    saladBowl.position.set(tx - 0.16, 0.88, tz);
+    const juice = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.15, 10), butterYellowMat);
+    juice.position.set(tx + 0.18, 0.9, tz + 0.08);
+    lobbyDecor.add(tblTop, tblLeg, tblFoot, saladPlate, saladBowl, juice);
+    colliders.push({type: 'circle', id: `mall_f1_bistro_tbl_${tIdx}`, x: tx, z: tz, r: 0.7});
+
+    [-1, 1].forEach((side, cIdx) => {
+      const cx = tx + side * 0.98;
+      const sitRotY = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+      const chSeat = new THREE.Mesh(new RoundedBoxGeometry(0.5, 0.09, 0.48, 2, 0.03), sageMat);
+      chSeat.position.set(cx, 0.48, tz);
+      const chBack = new THREE.Mesh(new RoundedBoxGeometry(0.08, 0.4, 0.46, 2, 0.03), warmWoodMat);
+      chBack.position.set(cx + side * 0.22, 0.68, tz);
+      const chLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.18, 0.42, 10), darkMetalMat);
+      chLeg.position.set(cx, 0.22, tz);
+      lobbyDecor.add(chSeat, chBack, chLeg);
+      colliders.push({type: 'circle', id: `mall_f1_bistro_ch_${tIdx}_${cIdx}`, x: cx, z: tz, r: 0.36});
+      addMallProxy(
+        group,
+        [0.64, 0.88, 0.64],
+        [cx, 0.45, tz],
+        {
+          kind: 'bench',
+          tx: cx + side * 0.3,
+          tz: tz + 0.78,
+          seatX: cx,
+          seatZ: tz,
+          seatY: 0.54,
+          sitRotY,
+          sitMessage: 'Thưởng thức món ngon tươi sạch tại Khu Ẩm Thực Bistro! (+Vui vẻ)',
+        },
+        clickTargets,
+      );
+    });
+  });
+
+  // ---------- 7C. KHU NỘI THẤT CARTOON & MASCOT MÂY (NORTH-WEST OPEN WING: x=-29..-11.8, z=-22.2..-6.5) ----------
+  const cartoonPad = new THREE.Mesh(
+    new RoundedBoxGeometry(16.8, 0.036, 15.2, 2, 0.015),
+    clayMat('#F3EBFF', 0.64),
+  );
+  cartoonPad.position.set(-20.4, 0.018, -14.4);
+  const cartoonCloudMat = buildSculptedCloud(2.6, clayMat('#FFF9FD', 0.56));
+  cartoonCloudMat.scale.set(2.8, 0.08, 2.2);
+  cartoonCloudMat.position.set(-20.2, 0.045, -16.8);
+  lobbyDecor.add(cartoonPad, cartoonCloudMat);
+
+  // Giant Sculpted Mây Bear & Cloud Mascot Stage at (-20.2, -16.8)
+  const mascotStage = new THREE.Mesh(new THREE.CylinderGeometry(1.42, 1.56, 0.34, 24), lavenderMat);
+  mascotStage.position.set(-20.2, 0.19, -16.8);
+  const mascotRim = new THREE.Mesh(new THREE.TorusGeometry(1.45, 0.055, 8, 28), butterYellowMat);
+  mascotRim.rotation.x = Math.PI / 2;
+  mascotRim.position.set(-20.2, 0.36, -16.8);
+  lobbyDecor.add(mascotStage, mascotRim);
+
+  const mascotGroup = new THREE.Group();
+  mascotGroup.position.set(-20.2, 0.36, -16.8);
+  const bearBodyMat = glossyClayMat('#FFF8EE', 0.44);
+  const bearBelly = new THREE.Mesh(new THREE.SphereGeometry(0.58, 16, 14), bearBodyMat);
+  bearBelly.scale.set(1.05, 1.15, 0.95);
+  bearBelly.position.y = 0.62;
+  const bearHead = new THREE.Mesh(new THREE.SphereGeometry(0.52, 16, 14), bearBodyMat);
+  bearHead.scale.set(1.12, 0.96, 0.96);
+  bearHead.position.y = 1.45;
+  [-0.42, 0.42].forEach((ex) => {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), bearBodyMat);
+    ear.position.set(ex, 1.88, -0.02);
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), berryPinkMat);
+    cheek.position.set(ex * 0.62, 1.4, 0.45);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.048, 8, 8), darkMetalMat);
+    eye.position.set(ex * 0.46, 1.5, 0.47);
+    const arm = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), bearBodyMat);
+    arm.scale.set(0.9, 1.35, 0.9);
+    arm.position.set(ex * 1.25, 0.78, 0.15);
+    arm.rotation.z = ex < 0 ? 0.5 : -0.5;
+    mascotGroup.add(ear, cheek, eye, arm);
+  });
+  const bearNose = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), warmWoodMat);
+  bearNose.position.set(0, 1.43, 0.51);
+  const mascotStar = buildSculptedStar(0.32, 0.09, butterYellowMat);
+  mascotStar.position.set(0, 0.86, 0.56);
+  mascotGroup.add(bearBelly, bearHead, bearNose, mascotStar);
+  lobbyDecor.add(mascotGroup);
+  colliders.push({type: 'circle', id: 'mall_f1_cartoon_mascot', x: -20.2, z: -16.8, r: 1.58});
+  addMallProxy(
+    group,
+    [2.8, 2.5, 2.8],
+    [-20.2, 1.25, -16.8],
+    {kind: 'mall_cartoon_gallery', tx: -20.2, tz: -14.4},
+    clickTargets,
+  );
+
+  // 3 Miniature Cartoon Furniture Display Pedestals
+  [
+    {px: -26.5, pz: -18.5, col: '#FF9EB5', kind: 'cloud'},
+    {px: -26.5, pz: -15.5, col: '#7ED6C2', kind: 'star'},
+    {px: -15.5, pz: -19.2, col: '#FFD66E', kind: 'bunny'},
+  ].forEach(({px, pz, col, kind}, idx) => {
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.62, 0.76, 16), creamFoamMat);
+    ped.position.set(px, 0.4, pz);
+    const accentBand = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.1, 16), glossyClayMat(col, 0.36));
+    accentBand.position.set(px, 0.74, pz);
+    lobbyDecor.add(ped, accentBand);
+    if (kind === 'cloud') {
+      const mini = buildSculptedCloud(0.7, glossyClayMat('#FFFFFF', 0.32));
+      mini.position.set(px, 1.02, pz);
+      lobbyDecor.add(mini);
+    } else if (kind === 'star') {
+      const mini = buildSculptedStar(0.28, 0.09, butterYellowMat);
+      mini.position.set(px, 1.06, pz);
+      lobbyDecor.add(mini);
+    } else {
+      const miniChair = new THREE.Mesh(new RoundedBoxGeometry(0.45, 0.34, 0.4, 2, 0.08), berryPinkMat);
+      miniChair.position.set(px, 0.98, pz);
+      [-0.12, 0.12].forEach((ex) => {
+        const ear = new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.34, 0.08, 2, 0.03), berryPinkMat);
+        ear.position.set(px + ex, 1.28, pz - 0.12);
+        lobbyDecor.add(ear);
+      });
+      lobbyDecor.add(miniChair);
+    }
+    colliders.push({type: 'circle', id: `mall_f1_cartoon_ped_${idx}`, x: px, z: pz, r: 0.7});
+    addMallProxy(
+      group,
+      [1.2, 1.5, 1.2],
+      [px, 0.75, pz],
+      {kind: 'mall_cartoon_gallery', tx: px + 1.45, tz: pz},
+      clickTargets,
+    );
+  });
+
+  // Interactive Pastel Cloud Sofa & 2 Mushroom Stools
+  const cloudSofaBase = new THREE.Mesh(new RoundedBoxGeometry(2.2, 0.44, 0.92, 3, 0.14), lavenderMat);
+  cloudSofaBase.position.set(-15.6, 0.24, -11.2);
+  const cloudSofaBack = new THREE.Mesh(new RoundedBoxGeometry(2.2, 0.56, 0.34, 3, 0.14), lavenderMat);
+  cloudSofaBack.position.set(-15.6, 0.62, -11.55);
+  lobbyDecor.add(cloudSofaBase, cloudSofaBack);
+  colliders.push({type: 'box', id: 'mall_f1_cloud_sofa', x: -15.6, z: -11.2, hw: 1.18, hd: 0.56});
+  addMallProxy(
+    group,
+    [2.3, 1.0, 1.0],
+    [-15.6, 0.5, -11.2],
+    {
+      kind: 'bench',
+      seatSlots: [
+        {seatX: -16.15, seatZ: -11.15, seatY: 0.5, sitRotY: 0, tx: -16.15, tz: -10.1},
+        {seatX: -15.05, seatZ: -11.15, seatY: 0.5, sitRotY: 0, tx: -15.05, tz: -10.1},
+      ],
+      seatX: -15.6,
+      seatZ: -11.15,
+      seatY: 0.5,
+      sitRotY: 0,
+      tx: -15.6,
+      tz: -10.1,
+      sitMessage: 'Ngồi thử Ghế Sofa Mây Pastel cực êm tại Khu Cartoon Decor! (+Vui vẻ)',
+    },
+    clickTargets,
+  );
+
+  [
+    [-18.2, -9.8],
+    [-13.6, -9.8],
+  ].forEach(([mx, mz], idx) => {
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.38, 12), creamFoamMat);
+    stem.position.set(mx, 0.21, mz);
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.38, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      idx === 0 ? berryPinkMat : mintMat,
+    );
+    cap.position.set(mx, 0.34, mz);
+    lobbyDecor.add(stem, cap);
+    colliders.push({type: 'circle', id: `mall_f1_shroom_${idx}`, x: mx, z: mz, r: 0.42});
+    addMallProxy(
+      group,
+      [0.75, 0.65, 0.75],
+      [mx, 0.32, mz],
+      {
+        kind: 'bench',
+        tx: mx,
+        tz: mz + 0.9,
+        seatX: mx,
+        seatZ: mz,
+        seatY: 0.5,
+        sitRotY: 0,
+        sitMessage: 'Ghế nấm sắc màu siêu dễ thương! (+Vui vẻ)',
+      },
+      clickTargets,
+    );
+  });
+
+  // ---------- 7D. KHU VUI CHƠI GIẢI TRÍ & GACHA (NORTH-EAST OPEN WING: x=+11.8..+29, z=-22.2..-6.5) ----------
+  const arcadePad = new THREE.Mesh(
+    new RoundedBoxGeometry(16.8, 0.036, 15.2, 2, 0.015),
+    clayMat('#E8F4FF', 0.62),
+  );
+  arcadePad.position.set(20.4, 0.018, -14.4);
+  lobbyDecor.add(arcadePad);
+
+  // 3 Claw / Gacha Prize Machines lined along z = -20.5
+  [15.8, 18.2, 20.6].forEach((cx, idx) => {
+    const machineCol = idx === 0 ? berryPinkMat : idx === 1 ? skyAccentMat : butterYellowMat;
+    const base = new THREE.Mesh(new RoundedBoxGeometry(1.38, 1.05, 1.12, 3, 0.06), machineCol);
+    base.position.set(cx, 0.54, -20.5);
+    const glassBox = new THREE.Mesh(new RoundedBoxGeometry(1.26, 1.18, 0.98, 2, 0.03), clearCaseGlassMat);
+    glassBox.position.set(cx, 1.64, -20.5);
+    const roof = new THREE.Mesh(new RoundedBoxGeometry(1.42, 0.26, 1.16, 3, 0.07), machineCol);
+    roof.position.set(cx, 2.34, -20.5);
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 8), darkMetalMat);
+    stick.position.set(cx - 0.2, 1.1, -19.86);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), berryPinkMat);
+    knob.position.set(cx - 0.2, 1.18, -19.86);
+    lobbyDecor.add(base, glassBox, roof, stick, knob);
+    for (let p = 0; p < 5; p++) {
+      const cap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.14, 10, 8),
+        p % 3 === 0 ? butterYellowMat : p % 3 === 1 ? mintMat : lavenderMat,
+      );
+      cap.position.set(cx + (p - 2) * 0.2, 1.2 + (p % 2) * 0.12, -20.5 + ((p % 2) - 0.5) * 0.25);
+      lobbyDecor.add(cap);
+    }
+  });
+  colliders.push({type: 'box', id: 'mall_f1_gacha_row', x: 18.2, z: -20.5, hw: 3.35, hd: 0.72});
+  addMallProxy(
+    group,
+    [6.6, 2.4, 1.4],
+    [18.2, 1.2, -20.5],
+    {kind: 'mall_arcade', tx: 18.2, tz: -18.5},
+    clickTargets,
+  );
+
+  // 2 Pastel Retro Arcade Cabinets at (+25.8, -20.4) & (+27.8, -20.4)
+  [25.8, 27.8].forEach((ax, idx) => {
+    const cabMat = idx === 0 ? mintMat : lavenderMat;
+    const body = new THREE.Mesh(new RoundedBoxGeometry(1.12, 1.95, 0.96, 3, 0.06), cabMat);
+    body.position.set(ax, 0.99, -20.4);
+    const screen = new THREE.Mesh(new RoundedBoxGeometry(0.84, 0.62, 0.08, 2, 0.02), windowPaneMat);
+    screen.position.set(ax, 1.46, -19.93);
+    screen.rotation.x = -0.18;
+    const marquee = new THREE.Mesh(new RoundedBoxGeometry(0.96, 0.24, 0.12, 2, 0.02), warmLampMat);
+    marquee.position.set(ax, 1.88, -19.91);
+    lobbyDecor.add(body, screen, marquee);
+  });
+  colliders.push({type: 'box', id: 'mall_f1_arcade_cabs', x: 26.8, z: -20.4, hw: 1.85, hd: 0.68});
+  addMallProxy(
+    group,
+    [3.5, 2.1, 1.3],
+    [26.8, 1.05, -20.4],
+    {kind: 'mall_arcade', tx: 26.8, tz: -18.5},
+    clickTargets,
+  );
+
+  // Mini Air-Hockey Table at (+17.2, -13.2) & Cozy Beanbag Seats at (+14.8, -9.6) & (+17.4, -9.6)
+  const hockeyBody = new THREE.Mesh(new RoundedBoxGeometry(2.15, 0.24, 1.18, 3, 0.05), skyAccentMat);
+  hockeyBody.position.set(17.2, 0.72, -13.2);
+  const hockeyRink = new THREE.Mesh(new RoundedBoxGeometry(1.88, 0.04, 0.94, 2, 0.01), creamFoamMat);
+  hockeyRink.position.set(17.2, 0.85, -13.2);
+  [-0.82, 0.82].forEach((lx) => {
+    const leg = new THREE.Mesh(new RoundedBoxGeometry(0.18, 0.64, 0.88, 2, 0.03), darkMetalMat);
+    leg.position.set(17.2 + lx, 0.34, -13.2);
+    lobbyDecor.add(leg);
+  });
+  lobbyDecor.add(hockeyBody, hockeyRink);
+  colliders.push({type: 'box', id: 'mall_f1_airhockey', x: 17.2, z: -13.2, hw: 1.2, hd: 0.72});
+  addMallProxy(
+    group,
+    [2.2, 1.0, 1.3],
+    [17.2, 0.55, -13.2],
+    {kind: 'mall_arcade', tx: 17.2, tz: -11.5},
+    clickTargets,
+  );
+
+  [14.8, 17.4].forEach((bx, idx) => {
+    const bag = new THREE.Mesh(
+      new THREE.SphereGeometry(0.56, 16, 12),
+      idx === 0 ? butterYellowMat : berryPinkMat,
+    );
+    bag.scale.set(1.12, 0.64, 1.12);
+    bag.position.set(bx, 0.26, -9.6);
+    lobbyDecor.add(bag);
+    colliders.push({type: 'circle', id: `mall_f1_beanbag_${idx}`, x: bx, z: -9.6, r: 0.56});
+    addMallProxy(
+      group,
+      [1.0, 0.65, 1.0],
+      [bx, 0.32, -9.6],
+      {
+        kind: 'bench',
+        tx: bx,
+        tz: -8.3,
+        seatX: bx,
+        seatZ: -9.6,
+        seatY: 0.44,
+        sitRotY: 0,
+        sitMessage: 'Nghỉ ngơi trên ghế lười tại Khu Vui Chơi Mây Mall! (+Vui vẻ)',
+      },
+      clickTargets,
+    );
+  });
+
+  // ---------- 7E. SOUTH-CENTRAL ATRIUM PEACH BLOSSOM FOUNTAIN & DIRECTORY BOARD ----------
+  const fountainX = 0;
+  const fountainZ = 13.2;
+  const ftnBase = new THREE.Mesh(new THREE.CylinderGeometry(1.85, 2.0, 0.42, 28), creamFoamMat);
+  ftnBase.position.set(fountainX, 0.21, fountainZ);
+  const ftnWater = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.62, 1.62, 0.08, 24),
+    glossyClayMat('#9BE4FF', 0.14),
+  );
+  ftnWater.position.set(fountainX, 0.42, fountainZ);
+  const ftnPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, 0.85, 16), creamFoamMat);
+  ftnPillar.position.set(fountainX, 0.72, fountainZ);
+  const ftnBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.42, 0.24, 20), lavenderMat);
+  ftnBowl.position.set(fountainX, 1.16, fountainZ);
+  const ftnBlossomTree = new THREE.Group();
+  ftnBlossomTree.position.set(fountainX, 1.28, fountainZ);
+  const ftnTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.13, 0.92, 10), warmWoodMat);
+  ftnTrunk.position.y = 0.44;
+  ftnBlossomTree.add(ftnTrunk);
+  [
+    [0, 1.02, 0, 0.56],
+    [-0.38, 0.86, 0.2, 0.36],
+    [0.36, 0.88, -0.18, 0.38],
+    [0.12, 1.24, 0.18, 0.32],
+  ].forEach(([bx, by, bz, br]) => {
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(br, 12, 10), peachBlossomMat);
+    puff.position.set(bx, by, bz);
+    ftnBlossomTree.add(puff);
+  });
+  lobbyDecor.add(ftnBase, ftnWater, ftnPillar, ftnBowl, ftnBlossomTree);
+  colliders.push({type: 'circle', id: 'mall_f1_atrium_fountain', x: fountainX, z: fountainZ, r: 2.02});
+
+  // Mall Directory Board near South Entrance at (-5.6, +18.8)
+  const dirStand = new THREE.Mesh(new RoundedBoxGeometry(1.55, 1.75, 0.18, 3, 0.05), creamFoamMat);
+  dirStand.position.set(-5.6, 0.96, 18.8);
+  dirStand.rotation.y = 0.35;
+  const dirBase = new THREE.Mesh(new RoundedBoxGeometry(1.65, 0.16, 0.58, 2, 0.04), warmWoodMat);
+  dirBase.position.set(-5.6, 0.08, 18.8);
+  dirBase.rotation.y = 0.35;
+  const dirTex = createStorefrontSignTexture('BẢN ĐỒ MALL', '#549EE0', '#E9F4FF', '#1F5588', disposables, isDisposed);
+  const dirFace = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.36, 0.42),
+    new THREE.MeshBasicMaterial({map: dirTex}),
+  );
+  dirFace.position.set(-5.56, 1.48, 18.9);
+  dirFace.rotation.y = 0.35;
+  lobbyDecor.add(dirStand, dirBase);
+  group.add(dirFace);
+  colliders.push({type: 'circle', id: 'mall_f1_directory', x: -5.6, z: 18.8, r: 0.85});
+  addMallProxy(
+    group,
+    [1.6, 1.9, 0.8],
+    [-5.6, 0.95, 18.8],
+    {kind: 'mall_directory', tx: -5.0, tz: 17.4},
+    clickTargets,
+  );
+
   mergeStaticGroupByMaterial(lobbyDecor);
   group.add(lobbyDecor);
 
@@ -1918,6 +2718,7 @@ export function buildMallInteriorScene(): SubzoneWorld {
   const _stepDummy = new THREE.Object3D();
   const update = (elapsed: number, timeOfDay: TimeOfDay) => {
     updateAvatarRigAnimation(tunRig, 'idle', elapsed, false);
+    updateAvatarRigAnimation(baristaRig, 'idle', elapsed + 1.35, false);
     const isNight = timeOfDay === 'night';
     warmLampMat.emissiveIntensity = isNight ? 1.1 : 0.36;
     ceilingLightMat.emissiveIntensity = isNight ? 1.15 : 0.85;
