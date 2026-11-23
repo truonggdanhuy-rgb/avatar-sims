@@ -18,6 +18,7 @@ import {
   PeppaRecipeId,
 } from '../../data/peppaKitchenCatalog';
 import {soundFX} from '../../utils/sound';
+import {PeppaDishIcon, PeppaIngredientIcon} from './PeppaFoodIcons';
 
 interface ApplianceCookModalProps {
   appliance: KitchenApplianceId;
@@ -137,16 +138,21 @@ export const ApplianceCookModal: React.FC<ApplianceCookModalProps> = ({
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <h3 className="text-xs font-black text-[#1E3B4D]">{rec.name}</h3>
-                      {dishCount > 0 && (
-                        <span className="rounded-md bg-[#E6F7EE] px-1.5 py-0.5 text-[10px] font-extrabold text-[#1E7449]">
-                          Trong túi: {dishCount}
-                        </span>
-                      )}
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#DCEAF3] bg-[#F5FAFE]">
+                      <PeppaDishIcon id={rec.id} className="h-10 w-10" />
                     </div>
-                    <p className="mt-0.5 text-[11px] text-[#557182]">{rec.description}</p>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h3 className="text-xs font-black text-[#1E3B4D]">{rec.name}</h3>
+                        {dishCount > 0 && (
+                          <span className="rounded-md bg-[#E6F7EE] px-1.5 py-0.5 text-[10px] font-extrabold text-[#1E7449]">
+                            Trong túi: {dishCount}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-[#557182]">{rec.description}</p>
+                    </div>
                   </div>
 
                   {!isUnlocked && (
@@ -194,13 +200,16 @@ export const ApplianceCookModal: React.FC<ApplianceCookModalProps> = ({
                         return (
                           <span
                             key={req.id}
-                            className={`rounded-md px-1.5 py-0.5 ${
+                            className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${
                               ok
                                 ? 'bg-[#E6F7EE] text-[#1D7047]'
                                 : 'bg-[#FCEAEF] text-[#A82C4C]'
                             }`}
                           >
-                            {ing.name}: {have}/{req.qty}
+                            <PeppaIngredientIcon id={req.id} className="h-4 w-4 shrink-0" />
+                            <span>
+                              {ing.name}: {have}/{req.qty}
+                            </span>
                           </span>
                         );
                       })}

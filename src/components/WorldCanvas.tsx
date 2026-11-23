@@ -195,6 +195,7 @@ interface WorldCanvasProps {
   onOpenShipShop: () => void;
   onOpenTunShop: () => void;
   onOpenPeppaShop: () => void;
+  onOpenCafeShop: () => void;
   onOpenMicrowave: () => void;
   onOpenMiniOven: () => void;
   onToggleMount: (mountId: MountId) => void;
@@ -313,6 +314,8 @@ interface SeatTarget {
   standZ: number;
   isBed?: boolean;
   isSwing?: boolean;
+  isMallSwing?: boolean;
+  mallSeesawSide?: -1 | 1;
   isBath?: boolean;
 }
 
@@ -504,6 +507,8 @@ function getWallItemHalfHeight(kind: string): number {
       return 0.24;
     case 'wall_tv':
       return 0.56;
+    case 'wall_pinboard':
+      return 0.44;
     default:
       return 0.65;
   }
@@ -536,6 +541,23 @@ function getFloorObstacleMaxTop(
       return baseY + 1.38;
     case 'kitchen_l_counter':
       return baseY + 1.12;
+    case 'office_swivel_chair':
+      return baseY + 1.24;
+    case 'white_study_chair':
+      return baseY + 0.96;
+    case 'desktop_pc_set':
+      return baseY + 0.54;
+    case 'study_desk_lamp':
+      return baseY + 0.48;
+    case 'study_laptop':
+    case 'headphone_stand':
+    case 'art_supply_rack':
+    case 'pen_holder':
+    case 'book_stack':
+    case 'table_snack_tray':
+    case 'pencil_case':
+    case 'open_book':
+      return baseY + 0.34;
     default:
       return baseY + (cat.surfaceHeight ?? 1.05);
   }
@@ -1231,6 +1253,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onOpenShipShop,
   onOpenTunShop,
   onOpenPeppaShop,
+  onOpenCafeShop,
   onOpenMicrowave,
   onOpenMiniOven,
   onToggleMount,
@@ -1430,6 +1453,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onOpenShipShop,
     onOpenTunShop,
     onOpenPeppaShop,
+    onOpenCafeShop,
     onOpenMicrowave,
     onOpenMiniOven,
     onDismountMount,
@@ -1477,6 +1501,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onOpenShipShop,
     onOpenTunShop,
     onOpenPeppaShop,
+    onOpenCafeShop,
     onOpenMicrowave,
     onOpenMiniOven,
     onDismountMount,
@@ -1908,6 +1933,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       progress: 0,
       duration: 3.4,
       cooldown: 0,
+    };
+    const mallSlideCtrl = {
+      active: false,
+      elapsed: 0,
+      duration: 3.1,
+      y: 0.02,
     };
     const parachuteCtrl = {
       active: false,
@@ -2545,6 +2576,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           mallState.ridingLane = null;
           mallState.progress = 0;
           mallState.cooldown = 0;
+          mallSlideCtrl.active = false;
+          mallSlideCtrl.elapsed = 0;
+          mallSlideCtrl.y = 0.02;
           parachuteCtrl.active = false;
           parachuteCtrl.worldY = MALL_DECK_Y;
           setIsParachutingHud(false);
@@ -2692,6 +2726,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           mallState.ridingLane = null;
           mallState.progress = 0;
           mallState.cooldown = 0;
+          mallSlideCtrl.active = false;
+          mallSlideCtrl.elapsed = 0;
+          mallSlideCtrl.y = 0.02;
           if (z === 'home') {
             playerPos.x = -1.8;
             playerPos.z = 5.2;
@@ -3456,7 +3493,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         boatState.active ||
         parachuteCtrl.active ||
         swimState.active ||
-        treehouseState.climbing
+        treehouseState.climbing ||
+        mallSlideCtrl.active
       ) {
         return;
       }
@@ -5030,10 +5068,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             }
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
-              callbacksRef.current.onBoostMood();
-              showBubble(
-                'Barista Mây: "Chào mừng đến Quán Cà Phê Mây! Hãy ngồi vào bàn thưởng thức cà phê & bánh ngọt nhé!" (+Vui vẻ)',
-              );
+              playerPos.rotY = Math.atan2(-23.2 - playerPos.x, 21.35 - playerPos.z);
+              callbacksRef.current.onOpenCafeShop();
             });
             return;
           }
@@ -5058,8 +5094,86 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
               showBubble(
-                'Khu Nội Thất Cartoon & Mascot Mây — bộ sưu tập nội thất hoạt hình dễ thương sắp ra mắt!',
+                'Khu Nội Thất Cartoon & Mascot Gấu Trắng Ôm Sao — tha hồ check-in cực xinh!',
               );
+            });
+            return;
+          }
+
+          if (kind === 'mall_swing') {
+            soundFX.tap();
+            if (stateRef.current.zone === 'mall' && mallState.floor === 2) {
+              showBubble('Hãy xuống thang cuốn về Tầng 1 để chơi Xích Đu Cầu Vồng nhé!');
+              return;
+            }
+            if (mallSlideCtrl.active) return;
+            startWalkTo(
+              data.tx as number,
+              data.tz as number,
+              'sit',
+              {
+                seatX: data.seatX as number,
+                seatZ: data.seatZ as number,
+                seatY: data.seatY as number,
+                rotY: data.sitRotY as number,
+                standX: data.tx as number,
+                standZ: data.tz as number,
+                isMallSwing: true,
+              },
+              () => {
+                callbacksRef.current.onBoostMood();
+                showBubble('Đu đưa trên Xích Đu Cầu Vồng Pastel! (+Vui vẻ)');
+              },
+            );
+            return;
+          }
+
+          if (kind === 'mall_seesaw') {
+            soundFX.tap();
+            if (stateRef.current.zone === 'mall' && mallState.floor === 2) {
+              showBubble('Hãy xuống thang cuốn về Tầng 1 để chơi Bập Bênh Đám Mây nhé!');
+              return;
+            }
+            if (mallSlideCtrl.active) return;
+            const side = (data.side as -1 | 1) ?? -1;
+            startWalkTo(
+              data.tx as number,
+              data.tz as number,
+              'sit',
+              {
+                seatX: data.seatX as number,
+                seatZ: data.seatZ as number,
+                seatY: data.seatY as number,
+                rotY: data.sitRotY as number,
+                standX: data.tx as number,
+                standZ: data.tz as number,
+                mallSeesawSide: side,
+              },
+              () => {
+                callbacksRef.current.onBoostMood();
+                showBubble('Nhún nhịp nhàng trên Bập Bênh Đám Mây! (+Vui vẻ)');
+              },
+            );
+            return;
+          }
+
+          if (kind === 'mall_slide') {
+            soundFX.tap();
+            if (stateRef.current.zone === 'mall' && mallState.floor === 2) {
+              showBubble('Hãy xuống thang cuốn về Tầng 1 để chơi Cầu Tuột Mây Hồng nhé!');
+              return;
+            }
+            if (mallSlideCtrl.active) return;
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              callbacksRef.current.onDismountMount();
+              soundFX.tap();
+              mallSlideCtrl.active = true;
+              mallSlideCtrl.elapsed = 0;
+              mallSlideCtrl.y = 0.04;
+              activeTarget = null;
+              activeSeat = null;
+              jumpY = 0;
+              jumpVel = 0;
             });
             return;
           }
@@ -5071,7 +5185,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               soundFX.sparkle();
               callbacksRef.current.onBoostMood();
               showBubble(
-                'Khu Vui Chơi Giải Trí & Máy Gắp Thú — trò chơi mini rinh quà đang được chuẩn bị! (+Vui vẻ)',
+                'Khu Vui Chơi Mây Mall — thử ngay Xích Đu Cầu Vồng, Bập Bênh Đám Mây & Cầu Tuột Mây Hồng nhé! (+Vui vẻ)',
               );
             });
             return;
@@ -5797,6 +5911,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const isOnMallDeck = z === 'town' && mallElev.state === 'deck';
       const isRidingEscalator = z === 'mall' && mallState.ridingLane !== null;
       const isClimbingLadder = z === 'island' && treehouseState.climbing;
+      const isSlidingMall = z === 'mall' && mallSlideCtrl.active;
       if (z === 'mall' && !isRidingEscalator) {
         mallState.cooldown = Math.max(0, mallState.cooldown - delta);
       }
@@ -5945,11 +6060,59 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
+      if (isSlidingMall) {
+        mallSlideCtrl.elapsed += delta;
+        const st = Math.min(1, mallSlideCtrl.elapsed / mallSlideCtrl.duration);
+        playerPos.x = 25.6;
+        playerPos.rotY = 0;
+        activeTarget = null;
+        activeSeat = null;
+        jumpY = 0;
+        jumpVel = 0;
+        playPetTimer = 0;
+        if (st < 0.38) {
+          const u = st / 0.38;
+          playerPos.z = THREE.MathUtils.lerp(-19.55, -17.85, u);
+          mallSlideCtrl.y = THREE.MathUtils.lerp(0.04, 1.88, u);
+          playerPos.pose = 'climb';
+        } else if (st < 0.46) {
+          const u = (st - 0.38) / 0.08;
+          playerPos.z = THREE.MathUtils.lerp(-17.85, -17.05, u);
+          mallSlideCtrl.y = 1.88;
+          playerPos.pose = 'walk';
+        } else if (st < 0.92) {
+          const u = (st - 0.46) / 0.46;
+          const su = u * u * (3 - 2 * u);
+          playerPos.z = THREE.MathUtils.lerp(-17.05, -13.1, su);
+          mallSlideCtrl.y = THREE.MathUtils.lerp(1.88, 0.22, su);
+          playerPos.pose = 'sit';
+        } else {
+          const u = (st - 0.92) / 0.08;
+          playerPos.z = THREE.MathUtils.lerp(-13.1, -12.35, u);
+          mallSlideCtrl.y = THREE.MathUtils.lerp(0.22, 0.02, u);
+          playerPos.pose = 'walk';
+        }
+        if (st >= 1) {
+          mallSlideCtrl.active = false;
+          mallSlideCtrl.elapsed = 0;
+          mallSlideCtrl.y = 0.02;
+          playerPos.x = 25.6;
+          playerPos.z = -12.35;
+          playerPos.rotY = 0;
+          playerPos.pose = 'idle';
+          prevGroundY = 0.02;
+          soundFX.sparkle();
+          callbacksRef.current.onBoostMood();
+          showBubble('Tuột Cầu Tuột Mây Hồng siêu vui! (+Vui vẻ)');
+        }
+      }
+
       // Jump vertical physics
       if (
         !isRidingMallElevator &&
         !isRidingEscalator &&
         !isClimbingLadder &&
+        !isSlidingMall &&
         !parachuteCtrl.active &&
         (jumpY > 0 || jumpVel !== 0)
       ) {
@@ -5967,6 +6130,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         !isRidingMallElevator &&
         !isRidingEscalator &&
         !isClimbingLadder &&
+        !isSlidingMall &&
         !parachuteCtrl.active &&
         jumpY > 0.01;
 
@@ -5978,6 +6142,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         !isRidingMallElevator &&
         !isRidingEscalator &&
         !isClimbingLadder &&
+        !isSlidingMall &&
         fishCtrl.phase !== 'pulling' &&
         joy.active
           ? Math.hypot(joy.x, joy.y)
@@ -6301,7 +6466,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         if (z === 'island') {
           activeSubzone?.setSwimRingPose?.(false);
         }
-        if (isRidingMallElevator || isRidingEscalator || isClimbingLadder || fishCtrl.phase === 'pulling') {
+        if (
+          isRidingMallElevator ||
+          isRidingEscalator ||
+          isClimbingLadder ||
+          isSlidingMall ||
+          fishCtrl.phase === 'pulling'
+        ) {
           activeTarget = null;
         } else if (netSwingCtrl.active) {
           activeTarget = null;
@@ -6605,9 +6776,24 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
         if (z === 'town') {
           activeTown?.setOutdoorSwingSeated?.(Boolean(playerPos.pose === 'sit' && activeSeat?.isSwing));
+        } else if (z === 'mall') {
+          activeSubzone?.setMallSwingSeated?.(
+            Boolean(playerPos.pose === 'sit' && activeSeat?.isMallSwing),
+          );
+          activeSubzone?.setMallSeesawRider?.(
+            playerPos.pose === 'sit' && activeSeat?.mallSeesawSide
+              ? activeSeat.mallSeesawSide
+              : null,
+          );
         }
 
-        if (z === 'mall' && !isRidingEscalator && mallState.cooldown <= 0 && !activeTarget) {
+        if (
+          z === 'mall' &&
+          !isRidingEscalator &&
+          !isSlidingMall &&
+          mallState.cooldown <= 0 &&
+          !activeTarget
+        ) {
           for (let i = 0; i < MALL_ESCALATOR_LANES.length; i++) {
             const lane = MALL_ESCALATOR_LANES[i];
             if (lane.startFloor !== mallState.floor) continue;
@@ -6679,6 +6865,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 ? THREE.MathUtils.lerp(ISLAND_TREEHOUSE_DECK_Y, ISLAND_TREEHOUSE_DECK_Y - 0.08, stepT)
                 : THREE.MathUtils.lerp(ISLAND_TREEHOUSE_DECK_Y - 0.08, treehouseState.baseGroundY, climbT);
           }
+        } else if (isSlidingMall) {
+          groundOffset = mallSlideCtrl.y;
         } else if ((playerPos.pose === 'sit' || playerPos.pose === 'bath') && activeSeat) {
           groundOffset = activeSeat.seatY - 0.245;
         } else if (playerPos.pose === 'sleep' && activeSeat?.isBed) {
@@ -6702,7 +6890,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
 
         // Preserve world elevation smoothly when landing onto or stepping off elevated flower beds
-        if (isRidingMallElevator || isRidingEscalator || isClimbingLadder) {
+        if (isRidingMallElevator || isRidingEscalator || isClimbingLadder || isSlidingMall) {
           prevGroundY = groundOffset;
           jumpY = 0;
         } else {
@@ -6715,14 +6903,29 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
-      const isSwingingNow = Boolean(z === 'town' && playerPos.pose === 'sit' && activeSeat?.isSwing);
-      const swingPose = isSwingingNow ? activeTown?.getOutdoorSwingSeatPose?.() : null;
+      const isSwingingTown = Boolean(z === 'town' && playerPos.pose === 'sit' && activeSeat?.isSwing);
+      const isSwingingMall = Boolean(
+        z === 'mall' && playerPos.pose === 'sit' && activeSeat?.isMallSwing,
+      );
+      const isSeesawingMall = Boolean(
+        z === 'mall' && playerPos.pose === 'sit' && activeSeat?.mallSeesawSide,
+      );
+      const swingPose = isSwingingTown
+        ? activeTown?.getOutdoorSwingSeatPose?.()
+        : isSwingingMall
+          ? activeSubzone?.getMallSwingSeatPose?.()
+          : null;
+      const seesawPose =
+        isSeesawingMall && activeSeat?.mallSeesawSide
+          ? activeSubzone?.getMallSeesawSeatPose?.(activeSeat.mallSeesawSide)
+          : null;
+      const ridePose = swingPose ?? seesawPose;
 
       // Keep camera & OrbitControls always centered smoothly on the player character
       if (!cameraTransitionActive) {
-        const focusX = swingPose ? swingPose.x : playerPos.x;
-        const focusY = (swingPose ? swingPose.y - 0.245 : groundOffset) + 0.92;
-        const focusZ = swingPose ? swingPose.z : playerPos.z;
+        const focusX = ridePose ? ridePose.x : playerPos.x;
+        const focusY = (ridePose ? ridePose.y - 0.245 : groundOffset) + 0.92;
+        const focusZ = ridePose ? ridePose.z : playerPos.z;
         const followAlpha = 1 - Math.exp(-16 * delta);
         const nextTx = THREE.MathUtils.lerp(controls.target.x, focusX, followAlpha);
         const nextTy = THREE.MathUtils.lerp(controls.target.y, focusY, followAlpha);
@@ -7153,6 +7356,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         playerRig.root.position.set(swingPose.x, swingPose.y - 0.245, swingPose.z);
         playerRig.root.rotation.x = swingPose.pitch * 0.85;
         playerRig.root.rotation.y = playerPos.rotY;
+      } else if (seesawPose) {
+        playerRig.root.position.set(seesawPose.x, seesawPose.y - 0.22, seesawPose.z);
+        playerRig.root.rotation.x = seesawPose.pitch * 0.4;
+        playerRig.root.rotation.y = seesawPose.rotY;
       } else {
         playerRig.root.position.set(playerPos.x, groundOffset + jumpY, playerPos.z);
         playerRig.root.rotation.x = 0;
@@ -7249,10 +7456,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           !isRidingMallElevator &&
           !isRidingEscalator &&
           !isClimbingLadder &&
+          !isSlidingMall &&
           !activeSeat &&
           !netSwingCtrl.active &&
           fishCtrl.phase === 'idle' &&
-          !swingPose,
+          !swingPose &&
+          !seesawPose,
       );
       if (mountRig) {
         mountRig.root.visible = ridingMountActive;

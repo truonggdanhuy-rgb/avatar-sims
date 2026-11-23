@@ -15,6 +15,7 @@ import {PetAdoptModal} from './components/modals/PetAdoptModal';
 import {PetSupplyShopModal} from './components/modals/PetSupplyShopModal';
 import {SettingsModal} from './components/modals/SettingsModal';
 import {ShipShopModal} from './components/modals/ShipShopModal';
+import {StarterCharacterModal} from './components/modals/StarterCharacterModal';
 import {TunShopModal} from './components/modals/TunShopModal';
 import {WardrobeModal} from './components/modals/WardrobeModal';
 import {KoiShopModal} from './components/modals/KoiShopModal';
@@ -22,7 +23,9 @@ import {BbqGrillModal} from './components/modals/BbqGrillModal';
 import {VendingMachineModal} from './components/modals/VendingMachineModal';
 import {PeppaShopModal} from './components/modals/PeppaShopModal';
 import {ApplianceCookModal} from './components/modals/ApplianceCookModal';
+import {MayCafeModal} from './components/modals/MayCafeModal';
 import {WorldCanvas} from './components/WorldCanvas';
+import {MAY_CAFE_ITEMS, MayCafeItemId} from './data/mayCafeCatalog';
 import {
   createInitialPeppaDishes,
   createInitialPeppaIngredients,
@@ -373,6 +376,7 @@ export default function App() {
   const [shipShopOpen, setShipShopOpen] = useState(false);
   const [tunShopOpen, setTunShopOpen] = useState(false);
   const [peppaShopOpen, setPeppaShopOpen] = useState(false);
+  const [cafeShopOpen, setCafeShopOpen] = useState(false);
   const [activeApplianceModal, setActiveApplianceModal] = useState<KitchenApplianceId | null>(null);
   const [petSupplyShopOpen, setPetSupplyShopOpen] = useState(false);
   const [petAdoptOpen, setPetAdoptOpen] = useState(false);
@@ -460,6 +464,21 @@ export default function App() {
       // ignore storage errors
     }
     return DEFAULT_AVATAR;
+  });
+
+  const [hasCreatedCharacter, setHasCreatedCharacter] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.characterCreated === true || Boolean(parsed.avatar))) {
+          return true;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return false;
   });
 
   const [stats, setStats] = useState<GameStats>(() => {
@@ -1604,6 +1623,7 @@ export default function App() {
           STORAGE_KEY,
           JSON.stringify({
             houseVersion: HOUSE_LAYOUT_VERSION,
+            characterCreated: hasCreatedCharacter,
             avatar,
             stats,
             plots,
@@ -1665,6 +1685,7 @@ export default function App() {
       window.removeEventListener('beforeunload', persistState);
     };
   }, [
+    hasCreatedCharacter,
     avatar,
     stats,
     plots,
@@ -2923,6 +2944,28 @@ export default function App() {
     return true;
   };
 
+  const handleBuyCafeItem = (itemId: MayCafeItemId): {ok: boolean; message: string} => {
+    const def = MAY_CAFE_ITEMS[itemId];
+    if (!def) return {ok: false, message: 'Món không tồn tại trong thực đơn Quán Cà Phê Mây.'};
+    if (stats.energy >= 100 && (stats.hunger ?? 100) >= 100) {
+      return {ok: false, message: 'Thể lực & Độ no của bạn đang đầy 100% rồi!'};
+    }
+    if (stats.coins < def.price) {
+      return {ok: false, message: `Không đủ xu (cần ${def.price} xu).`};
+    }
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - def.price,
+      energy: Math.min(100, Math.round(prev.energy + def.energyRestore)),
+      hunger: Math.min(100, Math.round((prev.hunger ?? 100) + def.hungerRestore)),
+      mood: Math.min(100, Math.round(prev.mood + def.moodRestore)),
+    }));
+    return {
+      ok: true,
+      message: `Thưởng thức ${def.name}! (+${def.energyRestore}% Thể lực, +${def.hungerRestore}% Độ no)`,
+    };
+  };
+
   const handleBuyPeppaRecipe = (id: PeppaRecipeId): boolean => {
     const def = PEPPA_RECIPES[id];
     if (!def || unlockedPeppaRecipes.includes(id) || stats.coins < def.recipePrice) return false;
@@ -3008,6 +3051,18 @@ export default function App() {
   };
 
   // === AVATAR, SHOPS & HOUSE FURNITURE ===
+  const handleConfirmStarterCharacter = ({
+    avatar: chosenAvatar,
+    unlockItemIds,
+  }: {
+    avatar: AvatarConfig;
+    unlockItemIds: string[];
+  }) => {
+    setAvatar(chosenAvatar);
+    setOwnedIds((prev) => Array.from(new Set([...prev, ...unlockItemIds])));
+    setHasCreatedCharacter(true);
+  };
+
   const handleEquipAvatar = (next: AvatarConfig) => {
     setAvatar(next);
     if (next.handheld !== 'none') {
@@ -3491,6 +3546,7 @@ export default function App() {
         onOpenShipShop={() => setShipShopOpen(true)}
         onOpenTunShop={() => setTunShopOpen(true)}
         onOpenPeppaShop={() => setPeppaShopOpen(true)}
+        onOpenCafeShop={() => setCafeShopOpen(true)}
         onOpenMicrowave={() => setActiveApplianceModal('microwave')}
         onOpenMiniOven={() => setActiveApplianceModal('mini_oven')}
         onToggleMount={handleToggleMount}
@@ -3760,6 +3816,16 @@ export default function App() {
         />
       )}
 
+      {zone === 'mall' && cafeShopOpen && (
+        <MayCafeModal
+          coins={stats.coins}
+          energy={stats.energy}
+          hunger={stats.hunger ?? 100}
+          onBuyItem={handleBuyCafeItem}
+          onClose={() => setCafeShopOpen(false)}
+        />
+      )}
+
       {zone === 'home' && activeApplianceModal && (
         <ApplianceCookModal
           appliance={activeApplianceModal}
@@ -3905,6 +3971,10 @@ export default function App() {
           onToggleSound={handleToggleSound}
           onClose={() => setSettingsOpen(false)}
         />
+      )}
+
+      {!hasCreatedCharacter && (
+        <StarterCharacterModal onConfirm={handleConfirmStarterCharacter} />
       )}
     </main>
   );

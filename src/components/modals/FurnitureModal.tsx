@@ -604,6 +604,175 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
           <line x1="42" y1="21" x2="36" y2="30" stroke="#E8C366" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
       );
+    case 'white_desk':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="8" y="16" width="48" height="5" rx="2" fill={c} stroke={a} strokeWidth="1.2" />
+          <rect x="11" y="21" width="24" height="7" rx="1.5" fill={a} />
+          <circle cx="17" cy="24.5" r="1.3" fill="#DFBE73" />
+          <circle cx="29" cy="24.5" r="1.3" fill="#DFBE73" />
+          <rect x="37" y="21" width="16" height="7" rx="1.5" fill={c} stroke={a} strokeWidth="1" />
+          <line x1="13" y1="28" x2="10" y2="46" stroke={a} strokeWidth="3.2" strokeLinecap="round" />
+          <line x1="51" y1="28" x2="54" y2="46" stroke={a} strokeWidth="3.2" strokeLinecap="round" />
+        </svg>
+      );
+    case 'white_study_chair':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="20" y="10" width="24" height="10" rx="3" fill={c} stroke={a} strokeWidth="1.2" />
+          <rect x="22" y="12" width="20" height="6" rx="2" fill={a} />
+          <line x1="23" y1="20" x2="23" y2="28" stroke={a} strokeWidth="2.5" />
+          <line x1="41" y1="20" x2="41" y2="28" stroke={a} strokeWidth="2.5" />
+          <rect x="19" y="28" width="26" height="5" rx="2" fill={c} stroke={a} strokeWidth="1.2" />
+          <line x1="22" y1="33" x2="20" y2="46" stroke={a} strokeWidth="2.8" strokeLinecap="round" />
+          <line x1="42" y1="33" x2="44" y2="46" stroke={a} strokeWidth="2.8" strokeLinecap="round" />
+        </svg>
+      );
+    case 'office_swivel_chair':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="24" y="6" width="16" height="6" rx="2.5" fill={a} />
+          <rect x="21" y="13" width="22" height="17" rx="4" fill={c} stroke="#CBD5E1" strokeWidth="1.2" />
+          <rect x="23" y="15" width="18" height="13" rx="3" fill={a} />
+          <rect x="18" y="30" width="28" height="6" rx="2.5" fill={a} />
+          <line x1="17" y1="24" x2="21" y2="24" stroke="#64748B" strokeWidth="2.2" strokeLinecap="round" />
+          <line x1="43" y1="24" x2="47" y2="24" stroke="#64748B" strokeWidth="2.2" strokeLinecap="round" />
+          <rect x="30" y="36" width="4" height="7" fill="#94A3B8" />
+          <line x1="20" y1="45" x2="44" y2="45" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="20" cy="46.5" r="2" fill="#334155" />
+          <circle cx="32" cy="46.5" r="2" fill="#334155" />
+          <circle cx="44" cy="46.5" r="2" fill="#334155" />
+        </svg>
+      );
+    case 'study_laptop':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="15" y="11" width="34" height="22" rx="2.5" fill="#CBD5E1" stroke="#94A3B8" strokeWidth="1.2" />
+          <rect x="18" y="14" width="28" height="16" rx="1.5" fill={a} />
+          <circle cx="32" cy="21" r="4.5" fill="#FFFDF8" opacity="0.85" />
+          <polygon points="15,33 49,33 54,42 10,42" fill={c} stroke="#94A3B8" strokeWidth="1.2" />
+          <rect x="20" y="35" width="24" height="3" rx="1" fill="#475569" />
+          <rect x="27" y="39" width="10" height="2" rx="1" fill="#94A3B8" />
+        </svg>
+      );
+    case 'desktop_pc_set':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="8" y="11" width="30" height="20" rx="2.5" fill="#FFFFFF" stroke="#94A3B8" strokeWidth="1.3" />
+          <rect x="10.5" y="13.5" width="25" height="15" rx="1.5" fill={a} />
+          <rect x="21" y="31" width="4" height="4" fill="#CBD5E1" />
+          <rect x="16" y="35" width="14" height="2.5" rx="1" fill="#94A3B8" />
+          <rect x="11" y="40" width="21" height="4.5" rx="1.5" fill="#FFFFFF" stroke="#94A3B8" strokeWidth="1" />
+          <ellipse cx="37" cy="42" rx="3.2" ry="2.2" fill="#F4A6BE" />
+          <rect x="43" y="14" width="13" height="29" rx="2.5" fill={c} stroke="#94A3B8" strokeWidth="1.3" />
+          <circle cx="49.5" cy="23" r="3.6" fill={a} stroke="#FFFFFF" strokeWidth="1" />
+          <circle cx="49.5" cy="34" r="3.6" fill="#F7A8B8" stroke="#FFFFFF" strokeWidth="1" />
+        </svg>
+      );
+    case 'wall_pinboard':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="9" y="10" width="46" height="34" rx="3" fill="#DFB684" stroke="#B68756" strokeWidth="2.5" />
+          <rect x="14" y="15" width="12" height="11" rx="1" fill="#FFF29E" />
+          <rect x="29" y="14" width="12" height="12" rx="1" fill="#FFB8CC" />
+          <rect x="42" y="17" width="9" height="10" rx="1" fill="#B8EBD0" />
+          <rect x="16" y="29" width="14" height="10" rx="1" fill="#BDE4FF" />
+          <rect x="34" y="28" width="14" height="11" rx="1" fill="#FFFFFF" />
+          <circle cx="20" cy="17" r="1.7" fill="#E85D68" />
+          <circle cx="35" cy="16" r="1.7" fill="#5FAEE3" />
+          <circle cx="41" cy="30" r="1.7" fill="#F4C44E" />
+        </svg>
+      );
+    case 'study_desk_lamp':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M24,42 L19,26 L36,15" fill="none" stroke="#DFBE73" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <polygon points="33,12 46,16 42,26 29,21" fill={a} />
+          <circle cx="36" cy="24" r="3.2" fill={c} />
+          <ellipse cx="26" cy="43" rx="10" ry="3.5" fill={a} />
+        </svg>
+      );
+    case 'pen_holder':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <line x1="25" y1="26" x2="21" y2="11" stroke={a} strokeWidth="3.5" strokeLinecap="round" />
+          <line x1="32" y1="26" x2="33" y2="9" stroke="#79B6E8" strokeWidth="3.5" strokeLinecap="round" />
+          <line x1="38" y1="26" x2="43" y2="12" stroke="#F28BA8" strokeWidth="3.5" strokeLinecap="round" />
+          <rect x="21" y="24" width="22" height="21" rx="4" fill={c} stroke="#FFF8EE" strokeWidth="1.6" />
+        </svg>
+      );
+    case 'art_supply_rack':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="13" y="15" width="38" height="28" rx="3" fill={c} stroke="#C79D6B" strokeWidth="1.5" />
+          <line x1="14" y1="29" x2="50" y2="29" stroke="#C79D6B" strokeWidth="2" />
+          <circle cx="24" cy="22" r="5" fill="#FFF8EE" />
+          <circle cx="22" cy="21" r="1.6" fill={a} />
+          <circle cx="26" cy="23" r="1.6" fill="#5FAEE3" />
+          <rect x="35" y="17" width="10" height="10" rx="1.5" fill={a} />
+          <rect x="18" y="33" width="6" height="7" rx="1" fill="#E76F51" />
+          <rect x="26" y="33" width="6" height="7" rx="1" fill="#F4C44E" />
+          <rect x="34" y="33" width="6" height="7" rx="1" fill="#5FAEE3" />
+        </svg>
+      );
+    case 'pencil_case':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="12" y="21" width="40" height="16" rx="7" fill={c} stroke="#E484A0" strokeWidth="1.5" />
+          <rect x="16" y="20" width="32" height="3.5" rx="1.5" fill={a} />
+          <circle cx="46" cy="22" r="2.2" fill="#DFBE73" />
+          <circle cx="22" cy="29" r="3" fill={a} />
+          <line x1="16" y1="42" x2="46" y2="42" stroke="#79B6E8" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      );
+    case 'book_stack':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="14" y="35" width="36" height="8" rx="2" fill={c} />
+          <rect x="16" y="37" width="30" height="4" fill="#FFF8EA" />
+          <rect x="16" y="27" width="33" height="8" rx="2" fill={a} />
+          <rect x="18" y="29" width="27" height="4" fill="#FFF8EA" />
+          <rect x="18" y="19" width="29" height="8" rx="2" fill="#7DBB92" />
+          <circle cx="32" cy="14" r="4" fill="#E85D68" />
+        </svg>
+      );
+    case 'open_book':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="10" y="15" width="44" height="26" rx="3" fill={a} />
+          <rect x="13" y="17" width="18" height="22" rx="1.5" fill={c} />
+          <rect x="33" y="17" width="18" height="22" rx="1.5" fill={c} />
+          <line x1="16" y1="22" x2="28" y2="22" stroke="#94A3B8" strokeWidth="1.8" />
+          <line x1="16" y1="27" x2="27" y2="27" stroke="#94A3B8" strokeWidth="1.8" />
+          <circle cx="42" cy="25" r="4" fill="#F7A8B8" />
+          <line x1="31" y1="16" x2="31" y2="43" stroke="#E85D68" strokeWidth="2.2" />
+        </svg>
+      );
+    case 'headphone_stand':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="30" y="14" width="4" height="27" fill="#CBD5E1" />
+          <ellipse cx="32" cy="43" rx="11" ry="3.5" fill={c} stroke="#CBD5E1" strokeWidth="1.2" />
+          <path d="M19,28 A13,14 0 0,1 45,28" fill="none" stroke={a} strokeWidth="4.5" strokeLinecap="round" />
+          <rect x="15" y="24" width="7" height="11" rx="3.5" fill={a} />
+          <rect x="42" y="24" width="7" height="11" rx="3.5" fill={a} />
+        </svg>
+      );
+    case 'table_snack_tray':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="10" y="33" width="44" height="9" rx="3" fill={c} stroke="#C8A476" strokeWidth="1.4" />
+          <polygon points="16,20 26,20 24,33 18,33" fill="#FFB7CC" />
+          <rect x="15.5" y="17" width="11" height="3.5" rx="1.5" fill="#FFF8EE" />
+          <line x1="22" y1="17" x2="26" y2="10" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" />
+          <ellipse cx="39" cy="32" rx="10" ry="3" fill="#FFFFFF" />
+          <rect x="31" y="24" width="10" height="7" rx="1.5" fill="#F4D08A" />
+          <rect x="31" y="22" width="10" height="2.5" rx="1" fill="#FFF8EE" />
+          <circle cx="36" cy="20" r="2.2" fill="#E63946" />
+          <circle cx="44" cy="28" r="4" fill={a} />
+          <circle cx="44" cy="28" r="1.4" fill="#FFF8EE" />
+        </svg>
+      );
     case 'floor_paint':
     case 'wall_paint':
       return (

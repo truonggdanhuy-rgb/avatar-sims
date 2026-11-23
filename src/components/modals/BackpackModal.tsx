@@ -48,6 +48,7 @@ import {
 } from '../../data/insectCatalog';
 import {KITCHEN_RECIPES} from '../../data/farmCatalog';
 import {PEPPA_RECIPES, PeppaRecipeId} from '../../data/peppaKitchenCatalog';
+import {PeppaDishIcon} from './PeppaFoodIcons';
 import {BBQ_FOOD_LIST, VENDING_DRINK_LIST} from '../../data/foodCatalog';
 import {HandheldFoodIcon} from './VendingMachineModal';
 import {soundFX} from '../../utils/sound';
@@ -1160,12 +1161,17 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                               className="space-y-2 rounded-2xl border-2 border-[#D2E6F2] bg-white p-3"
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <div className="min-w-0">
-                                  <div className="truncate text-xs font-black text-[#1E3B4D]">
-                                    {r.name}
+                                <div className="flex min-w-0 items-center gap-2.5">
+                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DCEAF3] bg-[#F5FAFE]">
+                                    <PeppaDishIcon id={rid} className="h-8 w-8" />
                                   </div>
-                                  <div className="text-[10px] font-bold text-[#4C728A]">
-                                    +{r.energyRestore} Thể lực · +{r.hungerRestore} Độ no · Bán {r.sellPrice} Xu
+                                  <div className="min-w-0">
+                                    <div className="truncate text-xs font-black text-[#1E3B4D]">
+                                      {r.name}
+                                    </div>
+                                    <div className="text-[10px] font-bold text-[#4C728A]">
+                                      +{r.energyRestore} Thể lực · +{r.hungerRestore} Độ no · Bán {r.sellPrice} Xu
+                                    </div>
                                   </div>
                                 </div>
                                 <span className="shrink-0 rounded-lg bg-[#E4F2FA] px-2 py-0.5 text-[11px] font-black tabular-nums text-[#226285]">

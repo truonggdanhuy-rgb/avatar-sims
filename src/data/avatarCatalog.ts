@@ -25,6 +25,8 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   headItemColor: '#E57A6B',
   accessory: 'none',
   accessoryColor: '#4A3628',
+  backpack: 'none',
+  backpackColor: '#5CC4DF',
   handheld: 'none',
   handheldColor: '#E8B84B',
 };
@@ -180,6 +182,7 @@ export const FASHION_CATEGORIES: {key: ShopCategory; label: string}[] = [
   {key: 'face', label: 'Mặt'},
   {key: 'head', label: 'Đầu'},
   {key: 'accessories', label: 'Phụ kiện'},
+  {key: 'backpacks', label: 'Balo'},
   {key: 'shoes', label: 'Giày'},
   {key: 'handheld', label: 'Cầm tay'},
 ];
@@ -192,6 +195,99 @@ export const STARTER_OWNED_IDS = [
   'face_heroic_slate',
   'head_beret_coral',
   'shoe_mary_black',
+];
+
+export interface StarterCharacterOption {
+  id: 'boy' | 'girl';
+  genderLabel: 'Nam' | 'Nữ';
+  title: string;
+  subtitle: string;
+  defaultName: string;
+  avatar: AvatarConfig;
+  unlockItemIds: string[];
+}
+
+export const STARTER_CHARACTER_OPTIONS: StarterCharacterOption[] = [
+  {
+    id: 'girl',
+    genderLabel: 'Nữ',
+    title: 'Nhân Vật Nữ',
+    subtitle: 'Set Cardigan Hồng Phấn · Váy Trắng · Mũ Nồi',
+    defaultName: 'Mây Nhỏ',
+    avatar: {
+      name: 'Mây Nhỏ',
+      skinTone: '#F4C49F',
+      hairBack: 'long_wave',
+      hairFront: 'air_bangs',
+      hairColor: '#5B3A29',
+      eyeStyle: 'bright',
+      eyeColor: '#5B341E',
+      expression: 'sweet_smile',
+      blush: true,
+      top: 'cardigan_vest',
+      topColor: '#F5A6B4',
+      bottom: 'a_line_skirt',
+      bottomColor: '#FFFFFF',
+      shoes: 'mary_janes',
+      shoeColor: '#F2A4B6',
+      headItem: 'beret',
+      headItemColor: '#E57A6B',
+      accessory: 'none',
+      accessoryColor: '#4A3628',
+      backpack: 'none',
+      backpackColor: '#5CC4DF',
+      handheld: 'none',
+      handheldColor: '#E8B84B',
+    },
+    unlockItemIds: [
+      'hair_long_chestnut',
+      'face_bright_warm',
+      'top_cardigan_sakura',
+      'bot_aline_white',
+      'head_beret_coral',
+      'shoe_mary_pink',
+    ],
+  },
+  {
+    id: 'boy',
+    genderLabel: 'Nam',
+    title: 'Nhân Vật Nam',
+    subtitle: 'Áo Khoác Varsity B · Quần Ống Suông · Mũ Lưỡi Trai',
+    defaultName: 'Minh Khôi',
+    avatar: {
+      name: 'Minh Khôi',
+      skinTone: '#F2C29B',
+      hairBack: 'boy_1',
+      hairFront: 'side_sweep',
+      hairColor: '#1F222B',
+      eyeStyle: 'heroic',
+      eyeColor: '#3E4F66',
+      expression: 'confident',
+      blush: false,
+      top: 'varsity_jacket',
+      topColor: '#2E333E',
+      bottom: 'wide_trousers',
+      bottomColor: '#3B3E47',
+      shoes: 'sneakers',
+      shoeColor: '#5E84D6',
+      headItem: 'cap',
+      headItemColor: '#4B86B4',
+      accessory: 'none',
+      accessoryColor: '#4A3628',
+      backpack: 'none',
+      backpackColor: '#5CC4DF',
+      handheld: 'none',
+      handheldColor: '#E8B84B',
+    },
+    unlockItemIds: [
+      'hair_boy_1',
+      'face_heroic_slate',
+      'top_varsity_black',
+      'bot_trousers_charcoal',
+      'head_cap_sky',
+      'shoe_sneaker_blue',
+    ],
+  },
 ];
 
 export const SHOP_ITEMS: ShopItem[] = [
@@ -350,6 +446,53 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 0,
     patch: {top: 'zip_parka', topColor: '#4B484D'},
   },
+  {
+    id: 'top_panda_pajama_pink',
+    category: 'tops',
+    name: 'Áo Pyjama Gấu Trúc Hồng',
+    price: 195,
+    patch: {top: 'panda_pajama', topColor: '#F788C2'},
+  },
+  {
+    id: 'top_panda_pajama_blue',
+    category: 'tops',
+    name: 'Áo Pyjama Gấu Trúc Xanh',
+    price: 195,
+    patch: {top: 'panda_pajama', topColor: '#6EAFF2'},
+  },
+  {
+    id: 'top_denim_overalls',
+    category: 'tops',
+    name: 'Bộ Yếm Jean Cổ Điển',
+    price: 280,
+    patch: {
+      top: 'denim_overalls',
+      topColor: '#364A72',
+      bottom: 'overalls_pants',
+      bottomColor: '#364A72',
+    },
+  },
+  {
+    id: 'top_puffer_red',
+    category: 'tops',
+    name: 'Áo Phao Mùa Đông Đỏ',
+    price: 260,
+    patch: {top: 'puffer_jacket', topColor: '#E03B3B'},
+  },
+  {
+    id: 'top_coin_tunic_red',
+    category: 'tops',
+    name: 'Áo Dài Đồng Xu Đỏ Tết',
+    price: 310,
+    patch: {top: 'coin_tunic', topColor: '#DF3026'},
+  },
+  {
+    id: 'top_coin_tunic_blue',
+    category: 'tops',
+    name: 'Áo Dài Đồng Xu Xanh Lam',
+    price: 310,
+    patch: {top: 'coin_tunic', topColor: '#2564D0'},
+  },
 
   // ========== 2. QUẦN ==========
   {
@@ -456,6 +599,41 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Váy Xếp Ly Trắng Tinh',
     price: 0,
     patch: {bottom: 'pleated_skirt', bottomColor: '#FFFFFF'},
+  },
+  {
+    id: 'bot_panda_pajama_pink',
+    category: 'bottoms',
+    name: 'Quần Pyjama Gấu Trúc Hồng',
+    price: 165,
+    patch: {bottom: 'pajama_pants', bottomColor: '#F788C2'},
+  },
+  {
+    id: 'bot_panda_pajama_blue',
+    category: 'bottoms',
+    name: 'Quần Pyjama Gấu Trúc Xanh',
+    price: 165,
+    patch: {bottom: 'pajama_pants', bottomColor: '#6EAFF2'},
+  },
+  {
+    id: 'bot_tunic_white',
+    category: 'bottoms',
+    name: 'Quần Lụa Ống Rộng Trắng',
+    price: 185,
+    patch: {bottom: 'tunic_pants', bottomColor: '#F9F8F4'},
+  },
+  {
+    id: 'bot_sport_red',
+    category: 'bottoms',
+    name: 'Quần Short Thể Thao Đỏ',
+    price: 145,
+    patch: {bottom: 'sport_shorts', bottomColor: '#DE3939'},
+  },
+  {
+    id: 'bot_cloud_shorts',
+    category: 'bottoms',
+    name: 'Quần Short Mây Bồng Bềnh',
+    price: 155,
+    patch: {bottom: 'cloud_shorts', bottomColor: '#6DC6F7'},
   },
 
   // ========== 3. TÓC ==========
@@ -680,6 +858,48 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 0,
     patch: {headItem: 'bucket_hat', headItemColor: '#DFBA87'},
   },
+  {
+    id: 'head_frog_bucket',
+    category: 'head',
+    name: 'Mũ Tai Bèo Ếch Xanh',
+    price: 220,
+    patch: {headItem: 'frog_bucket', headItemColor: '#61A648'},
+  },
+  {
+    id: 'head_chick_hat',
+    category: 'head',
+    name: 'Mũ Vịt Vàng Đáng Yêu',
+    price: 215,
+    patch: {headItem: 'chick_hat', headItemColor: '#F6CB45'},
+  },
+  {
+    id: 'head_cloud_bucket',
+    category: 'head',
+    name: 'Mũ Tai Bèo Mây Xanh',
+    price: 190,
+    patch: {headItem: 'cloud_bucket', headItemColor: '#37BCE8'},
+  },
+  {
+    id: 'head_rainbow_cap',
+    category: 'head',
+    name: 'Mũ Lưỡi Trai Cầu Vồng',
+    price: 185,
+    patch: {headItem: 'rainbow_cap', headItemColor: '#F2B44D'},
+  },
+  {
+    id: 'head_cc_beanie',
+    category: 'head',
+    name: 'Mũ Len Nâu CC Ấm Áp',
+    price: 170,
+    patch: {headItem: 'cc_beanie', headItemColor: '#6E4730'},
+  },
+  {
+    id: 'head_angel_halo',
+    category: 'head',
+    name: 'Vòng Thiên Thần Lấp Lánh',
+    price: 290,
+    patch: {headItem: 'angel_halo', headItemColor: '#FFF3A8'},
+  },
 
   // ========== 5. PHỤ KIỆN ==========
   {
@@ -723,6 +943,71 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Vòng Cổ Ngọc Trai',
     price: 180,
     patch: {accessory: 'pearl_necklace', accessoryColor: '#FFFDF7'},
+  },
+
+  // ========== 5B. BALO / CÁNH ==========
+  {
+    id: 'bp_fish_plush',
+    category: 'backpacks',
+    name: 'Balo Bé Cá Môi Hồng',
+    price: 260,
+    patch: {backpack: 'fish_plush', backpackColor: '#5CC4DF'},
+  },
+  {
+    id: 'bp_lamb_blue',
+    category: 'backpacks',
+    name: 'Balo Cừu Bông Xanh Dương',
+    price: 275,
+    patch: {backpack: 'lamb_plush', backpackColor: '#7EC2F5'},
+  },
+  {
+    id: 'bp_lamb_red',
+    category: 'backpacks',
+    name: 'Balo Cừu Bông Đỏ Dâu',
+    price: 275,
+    patch: {backpack: 'lamb_plush', backpackColor: '#E84855'},
+  },
+  {
+    id: 'bp_lamb_pink',
+    category: 'backpacks',
+    name: 'Balo Cừu Bông Hồng Phấn',
+    price: 275,
+    patch: {backpack: 'lamb_plush', backpackColor: '#F7A8C4'},
+  },
+  {
+    id: 'bp_chick_plush',
+    category: 'backpacks',
+    name: 'Balo Vịt Con Vàng Nắng',
+    price: 225,
+    patch: {backpack: 'chick_plush', backpackColor: '#F7CF52'},
+  },
+  {
+    id: 'bp_bee_plush',
+    category: 'backpacks',
+    name: 'Balo Ong Vàng Chăm Chỉ',
+    price: 210,
+    patch: {backpack: 'bee_plush', backpackColor: '#F7C631'},
+  },
+  {
+    id: 'bp_honey_bear',
+    category: 'backpacks',
+    name: 'Balo Mật Ong Gấu Nâu',
+    price: 220,
+    patch: {backpack: 'honey_bear', backpackColor: '#F2BE38'},
+  },
+  {
+    id: 'bp_carrot_basket',
+    category: 'backpacks',
+    name: 'Gùi Mây Cà Rốt Tươi',
+    price: 185,
+    patch: {backpack: 'carrot_basket', backpackColor: '#E8B274'},
+  },
+  {
+    id: 'bp_angel_wings',
+    category: 'backpacks',
+    name: 'Cánh Thiên Thần Trắng',
+    price: 340,
+    patch: {backpack: 'angel_wings', backpackColor: '#FFF7FA'},
   },
 
   // ========== 6. GIÀY ==========
@@ -803,6 +1088,48 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 0,
     patch: {shoes: 'loafers', shoeColor: '#7C5742'},
   },
+  {
+    id: 'shoe_crocs_fish',
+    category: 'shoes',
+    name: 'Dép Crocs Cá Xanh Hồng',
+    price: 210,
+    patch: {shoes: 'crocs_fish', shoeColor: '#5CC4DF'},
+  },
+  {
+    id: 'shoe_crocs_panda',
+    category: 'shoes',
+    name: 'Dép Crocs Gấu Trúc',
+    price: 220,
+    patch: {shoes: 'crocs_panda', shoeColor: '#FFFFFF'},
+  },
+  {
+    id: 'shoe_crocs_chick',
+    category: 'shoes',
+    name: 'Dép Crocs Vịt Vàng',
+    price: 205,
+    patch: {shoes: 'crocs_chick', shoeColor: '#F8CE48'},
+  },
+  {
+    id: 'shoe_crocs_frog',
+    category: 'shoes',
+    name: 'Dép Crocs Ếch Xanh',
+    price: 215,
+    patch: {shoes: 'crocs_frog', shoeColor: '#6CC763'},
+  },
+  {
+    id: 'shoe_rain_boots_red',
+    category: 'shoes',
+    name: 'Ủng Đi Mưa Đỏ Trắng',
+    price: 180,
+    patch: {shoes: 'rain_boots', shoeColor: '#E03D45'},
+  },
+  {
+    id: 'shoe_rain_boots_cream',
+    category: 'shoes',
+    name: 'Ủng Đi Mưa Kem Vàng',
+    price: 180,
+    patch: {shoes: 'rain_boots', shoeColor: '#F5E7C6'},
+  },
 
   // ========== 7. CẦM TAY ==========
   {
@@ -825,6 +1152,20 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Bó Hoa Hướng Dương',
     price: 175,
     patch: {handheld: 'flower_bouquet', handheldColor: '#F6C445'},
+  },
+  {
+    id: 'hand_blue_roses',
+    category: 'handheld',
+    name: 'Bó Hoa Hồng Xanh',
+    price: 235,
+    patch: {handheld: 'blue_rose_bouquet', handheldColor: '#5598EE'},
+  },
+  {
+    id: 'hand_cupid_bow',
+    category: 'handheld',
+    name: 'Cung Tên Cupid Vàng',
+    price: 250,
+    patch: {handheld: 'cupid_bow', handheldColor: '#E8B24B'},
   },
   {
     id: 'hand_tote_bag',
@@ -866,6 +1207,8 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
       headItemColor: DEFAULT_AVATAR.headItemColor,
       accessory: DEFAULT_AVATAR.accessory,
       accessoryColor: DEFAULT_AVATAR.accessoryColor,
+      backpack: DEFAULT_AVATAR.backpack,
+      backpackColor: DEFAULT_AVATAR.backpackColor,
       handheld: DEFAULT_AVATAR.handheld,
       handheldColor: DEFAULT_AVATAR.handheldColor,
     },

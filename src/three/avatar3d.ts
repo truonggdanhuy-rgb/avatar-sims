@@ -1098,6 +1098,225 @@ function createVarsityBadgeTexture(
   return tex;
 }
 
+function getPandaFabricTexture(
+  baseHex: string,
+  repeatX = 3,
+  repeatY = 2,
+): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
+  const key = `panda_${baseHex}_${repeatX}_${repeatY}`;
+  const cached = _varsityPatchCache.get(key);
+  if (cached) return cached;
+
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.fillStyle = baseHex;
+  ctx.fillRect(0, 0, size, size);
+
+  const drawPandaFace = (cx: number, cy: number, r: number) => {
+    ctx.save();
+    // Ears
+    ctx.fillStyle = '#2B2427';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.72, cy - r * 0.68, r * 0.34, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.72, cy - r * 0.68, r * 0.34, 0, Math.PI * 2);
+    ctx.fill();
+    // White head
+    ctx.fillStyle = '#FFFDF9';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r, r * 0.88, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Eye patches
+    ctx.fillStyle = '#2B2427';
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.38, cy - r * 0.06, r * 0.23, r * 0.28, -0.25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx + r * 0.38, cy - r * 0.06, r * 0.23, r * 0.28, 0.25, 0, Math.PI * 2);
+    ctx.fill();
+    // White eye glints
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.36, cy - r * 0.1, r * 0.08, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.36, cy - r * 0.1, r * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    // Pink cheeks
+    ctx.fillStyle = 'rgba(244, 134, 168, 0.55)';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.58, cy + r * 0.22, r * 0.14, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.58, cy + r * 0.22, r * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+    // Nose + mouth
+    ctx.fillStyle = '#2B2427';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + r * 0.18, r * 0.12, r * 0.08, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  // Staggered tile so edges wrap seamlessly
+  const spots: [number, number][] = [
+    [64, 64],
+    [192, 64],
+    [128, 192],
+    [0, 192],
+    [256, 192],
+  ];
+  spots.forEach(([sx, sy]) => drawPandaFace(sx, sy, 34));
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(repeatX, repeatY);
+  tex.anisotropy = 4;
+  _varsityPatchCache.set(key, tex);
+  return tex;
+}
+
+function getCoinBrocadeTexture(baseHex: string): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
+  const key = `coin_${baseHex}`;
+  const cached = _varsityPatchCache.get(key);
+  if (cached) return cached;
+
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.fillStyle = baseHex;
+  ctx.fillRect(0, 0, size, size);
+
+  const drawCoin = (cx: number, cy: number, r: number) => {
+    ctx.save();
+    ctx.fillStyle = '#F7CA44';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#D18F1C';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.74, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = baseHex;
+    ctx.fillRect(cx - r * 0.24, cy - r * 0.24, r * 0.48, r * 0.48);
+    ctx.restore();
+  };
+
+  [
+    [52, 54, 24],
+    [176, 44, 20],
+    [118, 134, 26],
+    [232, 162, 22],
+    [-24, 162, 22],
+    [58, 224, 20],
+    [192, 228, 23],
+  ].forEach(([cx, cy, r]) => drawCoin(cx, cy, r));
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 2);
+  tex.anisotropy = 4;
+  _varsityPatchCache.set(key, tex);
+  return tex;
+}
+
+function getCloudShortsTexture(baseHex: string): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
+  const key = `cloudshorts_${baseHex}`;
+  const cached = _varsityPatchCache.get(key);
+  if (cached) return cached;
+
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const grad = ctx.createLinearGradient(0, 0, 0, size);
+  grad.addColorStop(0, baseHex);
+  grad.addColorStop(0.55, '#9CE0FA');
+  grad.addColorStop(1, '#FFFFFF');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  [
+    [40, 175, 22],
+    [66, 164, 26],
+    [96, 176, 20],
+    [164, 182, 24],
+    [192, 168, 28],
+    [222, 182, 21],
+  ].forEach(([cx, cy, r]) => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  [
+    [45, 75, 10],
+    [130, 52, 8],
+    [205, 88, 12],
+    [150, 118, 7],
+  ].forEach(([cx, cy, r]) => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.repeat.set(2, 1);
+  tex.anisotropy = 4;
+  _varsityPatchCache.set(key, tex);
+  return tex;
+}
+
+function getCCBeanieBadgeTexture(): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
+  const key = 'cc_beanie_badge';
+  const cached = _varsityPatchCache.get(key);
+  if (cached) return cached;
+
+  const size = 160;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.fillStyle = '#5D3B26';
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = '#EFE3D3';
+  ctx.lineWidth = 10;
+  ctx.font = '800 72px Georgia, serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#FFF8EE';
+  ctx.fillText('CC', size / 2, size * 0.54);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  _varsityPatchCache.set(key, tex);
+  return tex;
+}
+
 /**
  * Curved, softly pleated 3D knit scarf tail draping cleanly forward over chest/bust without clipping.
  */
@@ -1213,11 +1432,50 @@ export function buildAvatarRig(
 
   const skinMat = clayMat(config.skinTone, 0.54, 0.02);
   const hairMat = createHairClayMaterial(config.hairColor);
-  const topMat = clayMat(config.topColor, 0.66, 0.02);
+  const rawTopMat = clayMat(config.topColor, 0.66, 0.02);
+  const pandaTopTex =
+    config.top === 'panda_pajama' ? getPandaFabricTexture(config.topColor, 3, 2) : null;
+  const coinTopTex =
+    config.top === 'coin_tunic' ? getCoinBrocadeTexture(config.topColor) : null;
+  const topMat = pandaTopTex
+    ? new THREE.MeshStandardMaterial({
+        color: '#FFFFFF',
+        map: pandaTopTex,
+        roughness: 0.72,
+        metalness: 0.02,
+      })
+    : coinTopTex
+      ? new THREE.MeshStandardMaterial({
+          color: '#FFFFFF',
+          map: coinTopTex,
+          roughness: 0.54,
+          metalness: 0.08,
+        })
+      : rawTopMat;
   const topDarkMat = clayMat(shadeHex(config.topColor, -0.09).getHex(), 0.7, 0.02);
   const topLightMat = clayMat(shadeHex(config.topColor, 0.09).getHex(), 0.62, 0.02);
   const topTrimMat = clayMat('#FFFBF2', 0.7, 0.02);
-  const bottomMat = clayMat(config.bottomColor, 0.72, 0.02);
+
+  const rawBottomMat = clayMat(config.bottomColor, 0.72, 0.02);
+  const pandaBottomTex =
+    config.bottom === 'pajama_pants' ? getPandaFabricTexture(config.bottomColor, 2, 2) : null;
+  const cloudShortsTex =
+    config.bottom === 'cloud_shorts' ? getCloudShortsTexture(config.bottomColor) : null;
+  const bottomMat = pandaBottomTex
+    ? new THREE.MeshStandardMaterial({
+        color: '#FFFFFF',
+        map: pandaBottomTex,
+        roughness: 0.72,
+        metalness: 0.02,
+      })
+    : cloudShortsTex
+      ? new THREE.MeshStandardMaterial({
+          color: '#FFFFFF',
+          map: cloudShortsTex,
+          roughness: 0.64,
+          metalness: 0.02,
+        })
+      : rawBottomMat;
   const bottomDarkMat = clayMat(shadeHex(config.bottomColor, -0.09).getHex(), 0.74, 0.02);
   const bottomLightMat = clayMat(shadeHex(config.bottomColor, 0.07).getHex(), 0.68, 0.02);
   const cheekMat = new THREE.MeshStandardMaterial({
@@ -1256,7 +1514,12 @@ export function buildAvatarRig(
     const legPivot = new THREE.Group();
     legPivot.position.set(xOffset, 0.52, 0);
 
-    const isTrousers = config.bottom === 'wide_trousers' || config.bottom === 'office_trousers';
+    const isTrousers =
+      config.bottom === 'wide_trousers' ||
+      config.bottom === 'office_trousers' ||
+      config.bottom === 'pajama_pants' ||
+      config.bottom === 'overalls_pants' ||
+      config.bottom === 'tunic_pants';
     const legMat = isPeppaMascot ? peppaPinkMat : isTrousers ? bottomMat : skinMat;
     const hipCap = new THREE.Mesh(new THREE.SphereGeometry(0.078, 14, 12), legMat);
     legPivot.add(hipCap);
@@ -1273,7 +1536,12 @@ export function buildAvatarRig(
     kneeCap.position.y = KNEE_Y;
     legPivot.add(kneeCap);
 
-    if (config.bottom === 'wide_trousers') {
+    if (
+      config.bottom === 'wide_trousers' ||
+      config.bottom === 'pajama_pants' ||
+      config.bottom === 'overalls_pants' ||
+      config.bottom === 'tunic_pants'
+    ) {
       // Exact 1:1 joint spheres concentric with hip (y=0) & knee (y=KNEE_Y) + openEnded sleeves -> zero creases/jagged caps at 0°..120° bend!
       const hipPantCap = new THREE.Mesh(
         new THREE.SphereGeometry(0.104, 16, 14),
@@ -1351,7 +1619,7 @@ export function buildAvatarRig(
         pocketBtn.position.set(legSide * 0.118, -0.06, 0.008);
         legPivot.add(pocketBox, pocketFlap, pocketBtn);
       }
-    } else if (config.bottom === 'sport_shorts') {
+    } else if (config.bottom === 'sport_shorts' || config.bottom === 'cloud_shorts') {
       const hipShortCap = new THREE.Mesh(
         new THREE.SphereGeometry(0.107, 16, 14),
         bottomMat,
@@ -1369,13 +1637,23 @@ export function buildAvatarRig(
       hem.rotation.x = Math.PI / 2;
       hem.position.y = -0.154;
 
-      const legSide = xOffset < 0 ? -1 : 1;
-      const sideStripe = new THREE.Mesh(
-        new RoundedBoxGeometry(0.016, 0.138, 0.024, 2, 0.006),
-        whiteTrimMat,
-      );
-      sideStripe.position.set(legSide * 0.101, -0.078, 0.008);
-      legPivot.add(hipShortCap, shortMesh, hem, sideStripe);
+      if (config.bottom === 'sport_shorts') {
+        const legSide = xOffset < 0 ? -1 : 1;
+        const sideStripe = new THREE.Mesh(
+          new RoundedBoxGeometry(0.016, 0.138, 0.024, 2, 0.006),
+          whiteTrimMat,
+        );
+        sideStripe.position.set(legSide * 0.101, -0.078, 0.008);
+        legPivot.add(sideStripe);
+      } else {
+        for (let c = 0; c < 6; c++) {
+          const ang = (c / 6) * Math.PI * 2;
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 8), whiteTrimMat);
+          puff.position.set(Math.cos(ang) * 0.1, -0.152, Math.sin(ang) * 0.1);
+          legPivot.add(puff);
+        }
+      }
+      legPivot.add(hipShortCap, shortMesh, hem);
     }
 
     // Lower leg (shin + socks + shoes) pivoted at KNEE_Y so knees bend naturally when sitting/cycling
@@ -1390,17 +1668,43 @@ export function buildAvatarRig(
     shinMesh.position.y = -0.112;
     kneePivot.add(shinMesh);
 
-    if (config.bottom === 'wide_trousers') {
+    if (
+      config.bottom === 'wide_trousers' ||
+      config.bottom === 'pajama_pants' ||
+      config.bottom === 'overalls_pants' ||
+      config.bottom === 'tunic_pants'
+    ) {
+      const isTunicPants = config.bottom === 'tunic_pants';
       const shinPant = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.105, 0.114, 0.195, 20, 1, true),
+        new THREE.CylinderGeometry(
+          0.105,
+          isTunicPants ? 0.124 : 0.114,
+          0.195,
+          20,
+          1,
+          true,
+        ),
         bottomMat,
       );
       shinPant.position.y = -0.097;
       kneePivot.add(shinPant);
 
+      const cuffMat =
+        config.bottom === 'pajama_pants'
+          ? clayMat('#FFFDF9', 0.62)
+          : config.bottom === 'overalls_pants'
+            ? clayMat(shadeHex(config.bottomColor, 0.1).getHex(), 0.7)
+            : isTunicPants
+              ? bottomMat
+              : bottomDarkMat;
       const cuff = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.117, 0.119, 0.044, 20),
-        bottomDarkMat,
+        new THREE.CylinderGeometry(
+          isTunicPants ? 0.124 : 0.117,
+          isTunicPants ? 0.126 : 0.119,
+          config.bottom === 'pajama_pants' ? 0.026 : 0.044,
+          20,
+        ),
+        cuffMat,
       );
       cuff.position.y = -0.18;
       kneePivot.add(cuff);
@@ -1424,8 +1728,20 @@ export function buildAvatarRig(
       kneePivot.add(shinPant, shinCrease, tailoredHem);
     }
 
+    const isAnimalCrocs =
+      config.shoes === 'crocs_fish' ||
+      config.shoes === 'crocs_panda' ||
+      config.shoes === 'crocs_chick' ||
+      config.shoes === 'crocs_frog';
+
     // Knit ankle sock + rolled cuff bridging the lower shin smoothly into shoes
-    if (!isTrousers && !isPeppaMascot && config.shoes !== 'boots') {
+    if (
+      !isTrousers &&
+      !isPeppaMascot &&
+      config.shoes !== 'boots' &&
+      config.shoes !== 'rain_boots' &&
+      !isAnimalCrocs
+    ) {
       const sockTube = new THREE.Mesh(
         new THREE.CylinderGeometry(0.062, 0.059, 0.105, 18),
         sockMat,
@@ -1442,75 +1758,241 @@ export function buildAvatarRig(
 
     // Shoe planted flush on ground when standing (0.52 - 0.215 - 0.297 = 0.008 right above shadowDisc)
     const shoeMat = glossyClayMat(config.shoeColor || '#3A2B2B', 0.34);
-    const isSneaker = config.shoes === 'sneakers';
-    const shoeBase = new THREE.Mesh(
-      new RoundedBoxGeometry(0.154, isSneaker ? 0.092 : 0.102, 0.23, 4, isSneaker ? 0.04 : 0.044),
-      shoeMat,
-    );
-    shoeBase.position.set(0, isSneaker ? -0.239 : -0.245, 0.036);
-    kneePivot.add(shoeBase);
+    if (isAnimalCrocs) {
+      const upperColor =
+        config.shoes === 'crocs_fish'
+          ? '#5AC4DF'
+          : config.shoes === 'crocs_panda'
+            ? '#FFFFFF'
+            : config.shoes === 'crocs_chick'
+              ? '#F8CE48'
+              : '#6CC763';
+      const soleColor =
+        config.shoes === 'crocs_fish'
+          ? '#F28AA8'
+          : config.shoes === 'crocs_panda'
+            ? '#3675DE'
+            : config.shoes === 'crocs_chick'
+              ? '#E88A2C'
+              : '#F2E7B8';
+      const upperMat = glossyClayMat(upperColor, 0.32);
+      const soleMat = clayMat(soleColor, 0.44);
+      const scleraMat = glossyClayMat('#FFFFFF', 0.18);
+      const pupilMat = glossyClayMat('#1B1D24', 0.12);
 
-    const toeCap = new THREE.Mesh(new THREE.SphereGeometry(0.074, 14, 10), shoeMat);
-    toeCap.scale.set(1.0, isSneaker ? 0.6 : 0.68, 1.05);
-    toeCap.position.set(0, isSneaker ? -0.245 : -0.251, 0.114);
-    kneePivot.add(toeCap);
-
-    if (isSneaker) {
-      const outsole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.07, 0.069, 0.022, 22),
-        clayMat('#EBE5DB', 0.48),
+      // Thick cushioned Croc outsole (y bottom = -0.296 -> world y = 0.009)
+      const crocSole = new THREE.Mesh(
+        new RoundedBoxGeometry(0.168, 0.036, 0.256, 3, 0.016),
+        soleMat,
       );
-      outsole.scale.set(1.04, 1, 1.56);
-      outsole.position.set(0, -0.284, 0.056);
-      kneePivot.add(outsole);
+      crocSole.position.set(0, -0.278, 0.044);
+      const crocSoleToe = new THREE.Mesh(
+        new THREE.SphereGeometry(0.084, 14, 10),
+        soleMat,
+      );
+      crocSoleToe.scale.set(1.0, 0.24, 1.05);
+      crocSoleToe.position.set(0, -0.285, 0.118);
 
-      for (let i = 0; i < 2; i++) {
-        const lace = new THREE.Mesh(
-          new RoundedBoxGeometry(0.064, 0.014, 0.02, 2, 0.005),
-          clayMat('#FFFFFF', 0.4),
+      // Chunky sculpted Croc clog upper + big rounded toe dome
+      const crocBody = new THREE.Mesh(
+        new RoundedBoxGeometry(0.16, 0.084, 0.236, 4, 0.04),
+        upperMat,
+      );
+      crocBody.position.set(0, -0.238, 0.044);
+      const crocToeDome = new THREE.Mesh(
+        new THREE.SphereGeometry(0.084, 16, 12),
+        upperMat,
+      );
+      crocToeDome.scale.set(1.01, 0.72, 1.08);
+      crocToeDome.position.set(0, -0.242, 0.118);
+
+      // Croc heel strap + side rivets
+      const strapMat =
+        config.shoes === 'crocs_panda'
+          ? soleMat
+          : clayMat(shadeHex(upperColor, -0.1).getHex(), 0.42);
+      const heelStrap = new THREE.Mesh(
+        new THREE.TorusGeometry(0.08, 0.013, 8, 18, Math.PI),
+        strapMat,
+      );
+      heelStrap.rotation.x = Math.PI / 2 - 0.25;
+      heelStrap.rotation.z = Math.PI;
+      heelStrap.position.set(0, -0.218, -0.015);
+      kneePivot.add(crocSole, crocSoleToe, crocBody, crocToeDome, heelStrap);
+
+      if (config.shoes === 'crocs_fish') {
+        const lipMat = glossyClayMat('#F79AB6', 0.36);
+        const lips = new THREE.Mesh(new THREE.SphereGeometry(0.034, 12, 10), lipMat);
+        lips.scale.set(1.35, 0.65, 0.72);
+        lips.position.set(0, -0.256, 0.2);
+        const fin = new THREE.Mesh(
+          new RoundedBoxGeometry(0.018, 0.036, 0.044, 2, 0.008),
+          clayMat('#3B9EC2', 0.42),
         );
-        lace.position.set(0, -0.193, 0.042 + i * 0.04);
-        kneePivot.add(lace);
+        fin.position.set(0, -0.194, 0.08);
+        fin.rotation.x = -0.3;
+        kneePivot.add(lips, fin);
+
+        [-1, 1].forEach((side) => {
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(0.026, 12, 10), scleraMat);
+          eye.position.set(side * 0.03, -0.19, 0.132);
+          const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), pupilMat);
+          pupil.position.set(side * 0.03, -0.188, 0.153);
+          kneePivot.add(eye, pupil);
+        });
+      } else if (config.shoes === 'crocs_panda') {
+        const blackMat = clayMat('#222228', 0.45);
+        [-1, 1].forEach((side) => {
+          const ear = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), blackMat);
+          ear.scale.set(1, 1, 0.6);
+          ear.position.set(side * 0.044, -0.19, 0.1);
+          const patch = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), blackMat);
+          patch.scale.set(1.05, 0.85, 0.42);
+          patch.position.set(side * 0.032, -0.226, 0.188);
+          patch.rotation.z = side * 0.26;
+          const glint = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 8), scleraMat);
+          glint.position.set(side * 0.032, -0.224, 0.198);
+          kneePivot.add(ear, patch, glint);
+        });
+        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 8), blackMat);
+        nose.scale.set(1.2, 0.85, 0.65);
+        nose.position.set(0, -0.244, 0.204);
+        kneePivot.add(nose);
+      } else if (config.shoes === 'crocs_chick') {
+        const beakMat = glossyClayMat('#F27E24', 0.34);
+        const beak = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10), beakMat);
+        beak.scale.set(1.32, 0.56, 0.95);
+        beak.position.set(0, -0.252, 0.204);
+        const crest = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.012, 0.024, 5, 8),
+          upperMat,
+        );
+        crest.position.set(0, -0.186, 0.105);
+        kneePivot.add(beak, crest);
+
+        [-1, 1].forEach((side) => {
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), pupilMat);
+          eye.position.set(side * 0.032, -0.22, 0.184);
+          const cheek = new THREE.Mesh(
+            new THREE.SphereGeometry(0.015, 8, 8),
+            clayMat('#F58E9A', 0.65),
+          );
+          cheek.scale.set(1.1, 0.75, 0.45);
+          cheek.position.set(side * 0.052, -0.24, 0.172);
+          kneePivot.add(eye, cheek);
+        });
+      } else if (config.shoes === 'crocs_frog') {
+        [-1, 1].forEach((side) => {
+          const bump = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10), upperMat);
+          bump.position.set(side * 0.034, -0.192, 0.125);
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8), scleraMat);
+          eye.position.set(side * 0.034, -0.19, 0.138);
+          const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 8), pupilMat);
+          pupil.position.set(side * 0.034, -0.189, 0.155);
+          const blush = new THREE.Mesh(
+            new THREE.SphereGeometry(0.016, 8, 8),
+            clayMat('#F697AE', 0.62),
+          );
+          blush.scale.set(1.15, 0.72, 0.45);
+          blush.position.set(side * 0.05, -0.244, 0.175);
+          kneePivot.add(bump, eye, pupil, blush);
+        });
       }
-    } else if (config.shoes === 'boots') {
-      const bootShaft = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.084, 0.088, 0.165, 16),
-        shoeMat,
+    } else {
+      const isSneaker = config.shoes === 'sneakers';
+      const isRainBoot = config.shoes === 'rain_boots';
+      const bootMat = isRainBoot
+        ? glossyClayMat(config.shoeColor || '#E03D45', 0.22)
+        : shoeMat;
+      const shoeBase = new THREE.Mesh(
+        new RoundedBoxGeometry(0.154, isSneaker ? 0.092 : 0.102, 0.23, 4, isSneaker ? 0.04 : 0.044),
+        bootMat,
       );
-      bootShaft.position.set(0, -0.155, 0);
-      const collar = new THREE.Mesh(
-        new THREE.TorusGeometry(0.084, 0.015, 8, 16),
-        clayMat(shadeHex(config.shoeColor || '#3A2B2B', -0.08).getHex(), 0.45),
-      );
-      collar.rotation.x = Math.PI / 2;
-      collar.position.set(0, -0.073, 0);
-      kneePivot.add(bootShaft, collar);
-    } else if (config.shoes === 'mary_janes') {
-      const collarRim = new THREE.Mesh(
-        new THREE.TorusGeometry(0.064, 0.012, 8, 18),
-        shoeMat,
-      );
-      collarRim.rotation.x = Math.PI / 2;
-      collarRim.position.set(0, -0.195, 0.005);
-      const strap = new THREE.Mesh(
-        new RoundedBoxGeometry(0.148, 0.02, 0.03, 2, 0.008),
-        clayMat(shadeHex(config.shoeColor || '#3A2B2B', 0.08).getHex(), 0.35),
-      );
-      strap.position.set(0, -0.2, 0.032);
-      kneePivot.add(collarRim, strap);
-    } else if (config.shoes === 'loafers') {
-      const collarRim = new THREE.Mesh(
-        new THREE.TorusGeometry(0.064, 0.012, 8, 18),
-        shoeMat,
-      );
-      collarRim.rotation.x = Math.PI / 2;
-      collarRim.position.set(0, -0.195, 0.005);
-      const saddle = new THREE.Mesh(
-        new RoundedBoxGeometry(0.14, 0.02, 0.052, 2, 0.008),
-        clayMat(shadeHex(config.shoeColor || '#D8B894', -0.14).getHex(), 0.4),
-      );
-      saddle.position.set(0, -0.197, 0.054);
-      kneePivot.add(collarRim, saddle);
+      shoeBase.position.set(0, isSneaker ? -0.239 : -0.245, 0.036);
+      kneePivot.add(shoeBase);
+
+      const toeCap = new THREE.Mesh(new THREE.SphereGeometry(0.074, 14, 10), bootMat);
+      toeCap.scale.set(1.0, isSneaker ? 0.6 : 0.68, 1.05);
+      toeCap.position.set(0, isSneaker ? -0.245 : -0.251, 0.114);
+      kneePivot.add(toeCap);
+
+      if (isSneaker) {
+        const outsole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.07, 0.069, 0.022, 22),
+          clayMat('#EBE5DB', 0.48),
+        );
+        outsole.scale.set(1.04, 1, 1.56);
+        outsole.position.set(0, -0.284, 0.056);
+        kneePivot.add(outsole);
+
+        for (let i = 0; i < 2; i++) {
+          const lace = new THREE.Mesh(
+            new RoundedBoxGeometry(0.064, 0.014, 0.02, 2, 0.005),
+            clayMat('#FFFFFF', 0.4),
+          );
+          lace.position.set(0, -0.193, 0.042 + i * 0.04);
+          kneePivot.add(lace);
+        }
+      } else if (config.shoes === 'boots') {
+        const bootShaft = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.084, 0.088, 0.165, 16),
+          shoeMat,
+        );
+        bootShaft.position.set(0, -0.155, 0);
+        const collar = new THREE.Mesh(
+          new THREE.TorusGeometry(0.084, 0.015, 8, 16),
+          clayMat(shadeHex(config.shoeColor || '#3A2B2B', -0.08).getHex(), 0.45),
+        );
+        collar.rotation.x = Math.PI / 2;
+        collar.position.set(0, -0.073, 0);
+        kneePivot.add(bootShaft, collar);
+      } else if (isRainBoot) {
+        const bootShaft = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.09, 0.085, 0.195, 18),
+          bootMat,
+        );
+        bootShaft.position.set(0, -0.138, 0);
+        const rimColor = config.shoeColor === '#F5E7C6' ? '#E5A832' : '#FFFFFF';
+        const collar = new THREE.Mesh(
+          new THREE.TorusGeometry(0.09, 0.015, 8, 18),
+          clayMat(rimColor, 0.35),
+        );
+        collar.rotation.x = Math.PI / 2;
+        collar.position.set(0, -0.042, 0);
+        const lugSole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.075, 0.074, 0.026, 20),
+          clayMat(rimColor, 0.42),
+        );
+        lugSole.scale.set(1.04, 1, 1.56);
+        lugSole.position.set(0, -0.283, 0.056);
+        kneePivot.add(bootShaft, collar, lugSole);
+      } else if (config.shoes === 'mary_janes') {
+        const collarRim = new THREE.Mesh(
+          new THREE.TorusGeometry(0.064, 0.012, 8, 18),
+          shoeMat,
+        );
+        collarRim.rotation.x = Math.PI / 2;
+        collarRim.position.set(0, -0.195, 0.005);
+        const strap = new THREE.Mesh(
+          new RoundedBoxGeometry(0.148, 0.02, 0.03, 2, 0.008),
+          clayMat(shadeHex(config.shoeColor || '#3A2B2B', 0.08).getHex(), 0.35),
+        );
+        strap.position.set(0, -0.2, 0.032);
+        kneePivot.add(collarRim, strap);
+      } else if (config.shoes === 'loafers') {
+        const collarRim = new THREE.Mesh(
+          new THREE.TorusGeometry(0.064, 0.012, 8, 18),
+          shoeMat,
+        );
+        collarRim.rotation.x = Math.PI / 2;
+        collarRim.position.set(0, -0.195, 0.005);
+        const saddle = new THREE.Mesh(
+          new RoundedBoxGeometry(0.14, 0.02, 0.052, 2, 0.008),
+          clayMat(shadeHex(config.shoeColor || '#D8B894', -0.14).getHex(), 0.4),
+        );
+        saddle.position.set(0, -0.197, 0.054);
+        kneePivot.add(collarRim, saddle);
+      }
     }
 
     return {legPivot, kneePivot};
@@ -1572,7 +2054,8 @@ export function buildAvatarRig(
       : config.top === 'ribbon_blouse' ||
           config.top === 'pinafore_dress' ||
           config.top === 'sport_raglan' ||
-          config.top === 'casual_shirt'
+          config.top === 'casual_shirt' ||
+          config.top === 'denim_overalls'
         ? pureWhiteMat
         : config.top === 'raglan_clover'
           ? creamTeeMat
@@ -1580,17 +2063,25 @@ export function buildAvatarRig(
 
   const isHoodie = config.top === 'hoodie' || config.top === 'bunny_hoodie';
   const isOuterwear =
-    isHoodie || config.top === 'zip_parka' || config.top === 'varsity_jacket';
+    isHoodie ||
+    config.top === 'zip_parka' ||
+    config.top === 'varsity_jacket' ||
+    config.top === 'puffer_jacket';
   const torsoOffset = isHoodie
     ? 0.024
-    : config.top === 'zip_parka'
-      ? 0.02
-      : config.top === 'varsity_jacket'
-        ? 0.014
-        : config.top === 'star_sweater'
-          ? 0.01
-          : 0;
-  const torsoYMin = isHoodie || config.top === 'zip_parka' ? -0.215 : -0.195;
+    : config.top === 'puffer_jacket'
+      ? 0.028
+      : config.top === 'zip_parka'
+        ? 0.02
+        : config.top === 'varsity_jacket'
+          ? 0.014
+          : config.top === 'star_sweater'
+            ? 0.01
+            : 0;
+  const torsoYMin =
+    isHoodie || config.top === 'zip_parka' || config.top === 'puffer_jacket'
+      ? -0.215
+      : -0.195;
   const torsoMesh = new THREE.Mesh(
     new THREE.LatheGeometry(
       isOfficeFemale
@@ -2556,6 +3047,163 @@ export function buildAvatarRig(
       btn.position.set(0, 0.105 - i * 0.074, 0.214 + i * 0.004);
       torsoGroup.add(btn);
     }
+  } else if (config.top === 'panda_pajama') {
+    // Crisp white Peter Pan collar + button placket on cute panda-patterned pajama shirt
+    [-1, 1].forEach((s) => {
+      const collarLeaf = new THREE.Mesh(
+        new THREE.SphereGeometry(0.068, 14, 10),
+        pureWhiteMat,
+      );
+      collarLeaf.scale.set(1.18, 0.24, 0.92);
+      collarLeaf.position.set(s * 0.074, 0.184, 0.088);
+      collarLeaf.rotation.y = s * 0.36;
+      collarLeaf.rotation.z = -s * 0.28;
+      collarLeaf.rotation.x = 0.24;
+      torsoGroup.add(collarLeaf);
+    });
+    const backCollar = new THREE.Mesh(
+      new THREE.TorusGeometry(0.118, 0.018, 8, 22, Math.PI * 1.15),
+      pureWhiteMat,
+    );
+    backCollar.rotation.x = Math.PI / 2;
+    backCollar.rotation.z = Math.PI - 0.18;
+    backCollar.position.set(0, 0.192, -0.01);
+    const placket = new THREE.Mesh(
+      new RoundedBoxGeometry(0.032, 0.34, 0.016, 2, 0.006),
+      pureWhiteMat,
+    );
+    placket.position.set(0, -0.015, 0.205);
+    placket.rotation.x = -0.05;
+    torsoGroup.add(backCollar, placket);
+
+    const btnMat = clayMat('#FFF6EC', 0.4);
+    for (let i = 0; i < 4; i++) {
+      const btn = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), btnMat);
+      btn.scale.set(1, 1, 0.55);
+      btn.position.set(0, 0.115 - i * 0.078, 0.214 + i * 0.004);
+      torsoGroup.add(btn);
+    }
+  } else if (config.top === 'denim_overalls') {
+    const denimMat = clayMat(config.topColor || '#364A72', 0.72);
+    const denimDarkMat = clayMat(shadeHex(config.topColor || '#364A72', -0.08).getHex(), 0.75);
+    const brassMat = new THREE.MeshStandardMaterial({
+      color: '#F2C14E',
+      roughness: 0.26,
+      metalness: 0.65,
+    });
+    const collar = new THREE.Mesh(
+      new THREE.TorusGeometry(0.118, 0.022, 10, 22),
+      pureWhiteMat,
+    );
+    collar.rotation.x = Math.PI / 2;
+    collar.position.set(0, 0.196, 0);
+    // Lower denim wrap + bib apron
+    const waistWrap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.212, 0.222, 0.195, 26),
+      denimMat,
+    );
+    waistWrap.position.set(0, -0.125, 0);
+    const bibFront = new THREE.Mesh(
+      new RoundedBoxGeometry(0.224, 0.195, 0.044, 3, 0.014),
+      denimMat,
+    );
+    bibFront.position.set(0, 0.024, 0.188);
+    bibFront.rotation.x = -0.08;
+    const bibPocket = new THREE.Mesh(
+      new RoundedBoxGeometry(0.125, 0.085, 0.018, 2, 0.008),
+      denimDarkMat,
+    );
+    bibPocket.position.set(0, 0.036, 0.212);
+    bibPocket.rotation.x = -0.08;
+    torsoGroup.add(collar, waistWrap, bibFront, bibPocket);
+
+    [-1, 1].forEach((s) => {
+      const strap = new THREE.Mesh(
+        new RoundedBoxGeometry(0.046, 0.21, 0.22, 3, 0.016),
+        denimMat,
+      );
+      strap.position.set(s * 0.095, 0.115, 0.076);
+      strap.rotation.x = 0.08;
+      const btn = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.016, 0.016, 0.014, 12),
+        brassMat,
+      );
+      btn.rotation.x = Math.PI / 2;
+      btn.position.set(s * 0.088, 0.105, 0.205);
+      torsoGroup.add(strap, btn);
+    });
+  } else if (config.top === 'puffer_jacket') {
+    const pufferMat = topMat;
+    const greenLiningMat = clayMat('#2B7A4B', 0.68);
+    // Chunky quilted horizontal puffer baffles + green collar lining + white zipper trim
+    const baffleY = [-0.145, -0.04, 0.068, 0.165];
+    const baffleR = [0.244, 0.238, 0.228, 0.206];
+    baffleY.forEach((by, idx) => {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(baffleR[idx] - 0.028, 0.046, 12, 28),
+        pufferMat,
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(0, by, 0);
+      torsoGroup.add(ring);
+    });
+    const innerCollar = new THREE.Mesh(
+      new THREE.TorusGeometry(0.148, 0.038, 10, 24),
+      greenLiningMat,
+    );
+    innerCollar.rotation.x = Math.PI / 2;
+    innerCollar.position.set(0, 0.205, 0.008);
+    const whiteZip = new THREE.Mesh(
+      new RoundedBoxGeometry(0.03, 0.36, 0.018, 2, 0.006),
+      pureWhiteMat,
+    );
+    whiteZip.position.set(0, -0.01, 0.236);
+    whiteZip.rotation.x = -0.05;
+    const hoodCollar = new THREE.Mesh(
+      new THREE.SphereGeometry(0.185, 16, 12),
+      greenLiningMat,
+    );
+    hoodCollar.scale.set(1.12, 0.56, 0.85);
+    hoodCollar.position.set(0, 0.16, -0.155);
+    torsoGroup.add(innerCollar, whiteZip, hoodCollar);
+  } else if (config.top === 'coin_tunic') {
+    const goldEdgeMat = clayMat('#F6CA44', 0.42, 0.18);
+    // Mandarin stand collar + gold piping + diagonal Ao Dai seam + flared split flaps
+    const collar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.118, 0.128, 0.062, 24),
+      topMat,
+    );
+    collar.position.set(0, 0.202, 0);
+    const collarRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.118, 0.008, 8, 24),
+      goldEdgeMat,
+    );
+    collarRim.rotation.x = Math.PI / 2;
+    collarRim.position.set(0, 0.232, 0);
+    const frontFlap = new THREE.Mesh(
+      new RoundedBoxGeometry(0.32, 0.24, 0.032, 3, 0.012),
+      topMat,
+    );
+    frontFlap.position.set(0, -0.255, 0.175);
+    frontFlap.rotation.x = -0.14;
+    const backFlap = new THREE.Mesh(
+      new RoundedBoxGeometry(0.34, 0.24, 0.032, 3, 0.012),
+      topMat,
+    );
+    backFlap.position.set(0, -0.255, -0.175);
+    backFlap.rotation.x = 0.12;
+    const diagTrim = new THREE.Mesh(
+      new RoundedBoxGeometry(0.14, 0.014, 0.016, 2, 0.005),
+      goldEdgeMat,
+    );
+    diagTrim.position.set(0.056, 0.132, 0.194);
+    diagTrim.rotation.z = -0.52;
+    torsoGroup.add(collar, collarRim, frontFlap, backFlap, diagTrim);
+    for (let k = 0; k < 3; k++) {
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), goldEdgeMat);
+      knot.position.set(0.125, 0.092 - k * 0.068, 0.194);
+      torsoGroup.add(knot);
+    }
   }
 
   if (isPeppaMascot) {
@@ -2805,7 +3453,7 @@ export function buildAvatarRig(
     );
     buckle.position.set(0, -0.186, waistR + 0.01);
     torsoGroup.add(waist, belt, buckle);
-  } else if (config.bottom === 'sport_shorts') {
+  } else if (config.bottom === 'sport_shorts' || config.bottom === 'cloud_shorts') {
     const waist = new THREE.Mesh(
       new THREE.CylinderGeometry(0.22, 0.224, 0.078, 26),
       clayMat('#FFFFFF', 0.56),
@@ -2822,7 +3470,14 @@ export function buildAvatarRig(
       cord.rotation.z = s * 0.24;
       torsoGroup.add(cord);
     });
-  } else {
+  } else if (config.bottom === 'pajama_pants') {
+    const waist = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.224, 0.078, 26),
+      bottomMat,
+    );
+    waist.position.set(0, -0.206, 0);
+    torsoGroup.add(waist);
+  } else if (config.top !== 'denim_overalls' && config.top !== 'coin_tunic') {
     const waist = new THREE.Mesh(
       new THREE.CylinderGeometry(0.22, 0.224, 0.078, 26),
       bottomDarkMat,
@@ -2837,6 +3492,275 @@ export function buildAvatarRig(
     button.rotation.x = Math.PI / 2;
     button.position.set(0, -0.205, 0.224);
     torsoGroup.add(button);
+  }
+
+  // ========== SCULPTED 3D BACKPACKS & ANGEL WINGS ==========
+  const backpack = config.backpack && config.backpack !== 'none' ? config.backpack : null;
+  if (backpack && !isPeppaMascot) {
+    const bpCol = config.backpackColor || '#5CC4DF';
+    const bpGroup = new THREE.Group();
+    const backPadZ =
+      isHoodie || config.top === 'puffer_jacket'
+        ? -0.27
+        : config.top === 'zip_parka' || config.top === 'varsity_jacket'
+          ? -0.25
+          : -0.23;
+    bpGroup.position.set(0, 0.008, backPadZ);
+
+    // Shoulder straps (unless angel wings use delicate shoulder bands or sit flush)
+    if (backpack !== 'angel_wings') {
+      const strapMat = clayMat(
+        backpack === 'carrot_basket'
+          ? '#D49A5A'
+          : backpack === 'honey_bear'
+            ? '#5C341F'
+            : backpack === 'bee_plush'
+              ? '#3E281D'
+              : backpack === 'lamb_plush'
+                ? bpCol
+                : shadeHex(bpCol, -0.1).getHex(),
+        0.7,
+      );
+      [-1, 1].forEach((side) => {
+        const strapArc = new THREE.Mesh(
+          new THREE.TorusGeometry(0.145, 0.018, 8, 18, Math.PI * 1.15),
+          strapMat,
+        );
+        strapArc.rotation.y = Math.PI / 2;
+        strapArc.rotation.z = -0.08;
+        strapArc.position.set(side * 0.128, 0.042, -backPadZ - 0.015);
+        bpGroup.add(strapArc);
+      });
+    }
+
+    if (backpack === 'fish_plush') {
+      const fishMat = clayMat(bpCol, 0.62);
+      const bellyMat = clayMat('#92E0F2', 0.68);
+      const lipMat = glossyClayMat('#F79AB6', 0.38);
+      const scleraMat = glossyClayMat('#FFFFFF', 0.16);
+      const pupilMat = glossyClayMat('#1B1D24', 0.12);
+
+      const body = new THREE.Mesh(
+        new RoundedBoxGeometry(0.24, 0.28, 0.14, 4, 0.068),
+        fishMat,
+      );
+      const belly = new THREE.Mesh(
+        new THREE.SphereGeometry(0.092, 14, 12),
+        bellyMat,
+      );
+      belly.scale.set(1.02, 0.9, 0.45);
+      belly.position.set(0, -0.055, -0.052);
+      const lips = new THREE.Mesh(new THREE.SphereGeometry(0.046, 12, 10), lipMat);
+      lips.scale.set(1.5, 0.56, 0.72);
+      lips.position.set(0, 0.014, -0.075);
+      const dorsal = new THREE.Mesh(
+        new RoundedBoxGeometry(0.032, 0.055, 0.068, 2, 0.014),
+        clayMat('#3D9EC0', 0.58),
+      );
+      dorsal.position.set(0, 0.155, -0.008);
+      bpGroup.add(body, belly, lips, dorsal);
+
+      [-1, 1].forEach((side) => {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10), scleraMat);
+        eye.position.set(side * 0.042, 0.072, -0.068);
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 8), pupilMat);
+        pupil.position.set(side * 0.042, 0.072, -0.09);
+        const fin = new THREE.Mesh(
+          new THREE.SphereGeometry(0.036, 10, 8),
+          clayMat('#3D9EC0', 0.62),
+        );
+        fin.scale.set(0.5, 1.0, 0.85);
+        fin.position.set(side * 0.128, -0.015, -0.01);
+        fin.rotation.z = side * 0.45;
+        const foot = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.024, 0.045, 6, 8),
+          clayMat('#3D9EC0', 0.62),
+        );
+        foot.position.set(side * 0.062, -0.155, -0.018);
+        foot.rotation.x = 0.25;
+        bpGroup.add(eye, pupil, fin, foot);
+      });
+    } else if (backpack === 'lamb_plush') {
+      const hoodMat = clayMat(bpCol, 0.68);
+      const creamMat = clayMat('#FFF8F0', 0.78);
+      const pupilMat = glossyClayMat('#221E24', 0.15);
+      const cheekMat = clayMat('#F79AB4', 0.65);
+
+      const torsoPlush = new THREE.Mesh(
+        new RoundedBoxGeometry(0.18, 0.15, 0.11, 4, 0.05),
+        creamMat,
+      );
+      torsoPlush.position.set(0, -0.072, -0.01);
+      const hood = new THREE.Mesh(new THREE.SphereGeometry(0.118, 16, 14), hoodMat);
+      hood.scale.set(1.08, 0.96, 0.82);
+      hood.position.set(0, 0.062, -0.015);
+      const face = new THREE.Mesh(new THREE.SphereGeometry(0.088, 14, 12), creamMat);
+      face.scale.set(1.06, 0.94, 0.56);
+      face.position.set(0, 0.056, -0.065);
+      const flowerAccent = new THREE.Mesh(
+        new THREE.SphereGeometry(0.024, 10, 8),
+        clayMat('#FFE77A', 0.55),
+      );
+      flowerAccent.position.set(0.078, 0.132, -0.065);
+      bpGroup.add(torsoPlush, hood, face, flowerAccent);
+
+      [-1, 1].forEach((side) => {
+        const ear = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.032, 0.075, 6, 10),
+          hoodMat,
+        );
+        ear.position.set(side * 0.125, 0.055, -0.028);
+        ear.rotation.z = side * 0.52;
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), pupilMat);
+        eye.position.set(side * 0.034, 0.066, -0.112);
+        const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), cheekMat);
+        cheek.scale.set(1.1, 0.72, 0.4);
+        cheek.position.set(side * 0.056, 0.042, -0.105);
+        const paw = new THREE.Mesh(new THREE.SphereGeometry(0.026, 10, 8), creamMat);
+        paw.position.set(side * 0.056, -0.145, -0.035);
+        bpGroup.add(ear, eye, cheek, paw);
+      });
+    } else if (backpack === 'chick_plush') {
+      const yellowMat = clayMat(bpCol, 0.66);
+      const orangeMat = clayMat('#F28B30', 0.54);
+      const pupilMat = glossyClayMat('#221E24', 0.14);
+
+      const pack = new THREE.Mesh(
+        new RoundedBoxGeometry(0.24, 0.27, 0.12, 4, 0.05),
+        yellowMat,
+      );
+      const beak = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), orangeMat);
+      beak.scale.set(1.2, 0.65, 0.9);
+      beak.position.set(0, 0.036, -0.068);
+      bpGroup.add(pack, beak);
+
+      [-1, 1].forEach((side) => {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), pupilMat);
+        eye.position.set(side * 0.044, 0.066, -0.06);
+        const wing = new THREE.Mesh(
+          new RoundedBoxGeometry(0.034, 0.078, 0.055, 2, 0.015),
+          yellowMat,
+        );
+        wing.position.set(side * 0.128, -0.01, -0.008);
+        wing.rotation.z = side * 0.25;
+        const foot = new THREE.Mesh(
+          new RoundedBoxGeometry(0.036, 0.045, 0.036, 2, 0.012),
+          orangeMat,
+        );
+        foot.position.set(side * 0.056, -0.148, -0.02);
+        bpGroup.add(eye, wing, foot);
+      });
+    } else if (backpack === 'bee_plush') {
+      const beeYellow = clayMat(bpCol, 0.62);
+      const beeBrown = clayMat('#3E281D', 0.72);
+      const wingMat = glossyClayMat('#FFFFFF', 0.22);
+      const pupilMat = glossyClayMat('#1B1D24', 0.14);
+
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.135, 18, 14), beeYellow);
+      body.scale.set(1.05, 0.96, 0.78);
+      const stripe = new THREE.Mesh(
+        new THREE.TorusGeometry(0.118, 0.024, 8, 22),
+        beeBrown,
+      );
+      stripe.scale.set(1.06, 0.78, 1.0);
+      stripe.rotation.x = Math.PI / 2;
+      stripe.position.set(0, -0.024, 0);
+      bpGroup.add(body, stripe);
+
+      [-1, 1].forEach((side) => {
+        const wing = new THREE.Mesh(new THREE.SphereGeometry(0.062, 12, 10), wingMat);
+        wing.scale.set(1.15, 0.68, 0.28);
+        wing.position.set(side * 0.095, 0.115, -0.035);
+        wing.rotation.z = -side * 0.45;
+        const ant = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.01, 0.045, 5, 8),
+          beeBrown,
+        );
+        ant.position.set(side * 0.045, 0.14, -0.05);
+        ant.rotation.z = -side * 0.3;
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 8), pupilMat);
+        eye.position.set(side * 0.044, 0.045, -0.102);
+        bpGroup.add(wing, ant, eye);
+      });
+    } else if (backpack === 'honey_bear') {
+      const chocoMat = clayMat('#5C341F', 0.72);
+      const honeyMat = glossyClayMat(bpCol, 0.26);
+      const body = new THREE.Mesh(
+        new RoundedBoxGeometry(0.23, 0.27, 0.125, 4, 0.05),
+        chocoMat,
+      );
+      const honeyCap = new THREE.Mesh(
+        new RoundedBoxGeometry(0.236, 0.14, 0.132, 4, 0.048),
+        honeyMat,
+      );
+      honeyCap.position.set(0, 0.068, 0);
+      bpGroup.add(body, honeyCap);
+      [-1, 1].forEach((side) => {
+        const ear = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 10), honeyMat);
+        ear.scale.set(1, 1, 0.6);
+        ear.position.set(side * 0.085, 0.148, -0.01);
+        const drip = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.02, 0.035, 5, 8),
+          honeyMat,
+        );
+        drip.position.set(side * 0.056, -0.012, -0.062);
+        bpGroup.add(ear, drip);
+      });
+    } else if (backpack === 'carrot_basket') {
+      const rattanMat = clayMat(bpCol, 0.8);
+      const rimMat = clayMat('#C68A4B', 0.76);
+      const carrotMat = clayMat('#F46B25', 0.56);
+      const leafMat = clayMat('#4FA84B', 0.68);
+      const basket = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.125, 0.095, 0.24, 16),
+        rattanMat,
+      );
+      basket.scale.set(1.08, 1, 0.75);
+      const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.125, 0.018, 8, 18),
+        rimMat,
+      );
+      rim.rotation.x = Math.PI / 2;
+      rim.scale.set(1.08, 0.75, 1);
+      rim.position.y = 0.118;
+      bpGroup.add(basket, rim);
+
+      [-0.048, 0, 0.048].forEach((cx, idx) => {
+        const carrot = new THREE.Mesh(
+          new THREE.ConeGeometry(0.034, 0.12, 10),
+          carrotMat,
+        );
+        carrot.rotation.x = Math.PI;
+        carrot.rotation.z = (idx - 1) * 0.18;
+        carrot.position.set(cx, 0.12, -0.01);
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), leafMat);
+        leaf.scale.set(0.85, 1.4, 0.7);
+        leaf.position.set(cx, 0.195, -0.01);
+        bpGroup.add(carrot, leaf);
+      });
+    } else if (backpack === 'angel_wings') {
+      const wingWhiteMat = clayMat(bpCol, 0.58);
+      const wingTintMat = clayMat('#FCE8EF', 0.62);
+      bpGroup.position.set(0, 0.045, backPadZ + 0.025);
+      [-1, 1].forEach((side) => {
+        const wingWing = new THREE.Group();
+        wingWing.position.set(side * 0.045, 0.02, 0);
+        wingWing.rotation.y = side * 0.28;
+        for (let f = 0; f < 4; f++) {
+          const feather = new THREE.Mesh(
+            new THREE.CapsuleGeometry(0.036 - f * 0.004, 0.22 - f * 0.034, 6, 10),
+            f % 2 === 0 ? wingWhiteMat : wingTintMat,
+          );
+          feather.scale.set(1, 1, 0.36);
+          feather.position.set(side * (0.145 - f * 0.02), 0.075 - f * 0.052, -0.025);
+          feather.rotation.z = -side * (1.12 - f * 0.18);
+          wingWing.add(feather);
+        }
+        bpGroup.add(wingWing);
+      });
+    }
+
+    torsoGroup.add(bpGroup);
   }
 
   // ========== SEAMLESS ARTICULATED ARMS + REAL HANDHELD GRIP ==========
@@ -2902,7 +3826,9 @@ export function buildAvatarRig(
       ? peppaPinkMat
       : config.top === 'varsity_jacket'
         ? topTrimMat
-        : topMat;
+        : config.top === 'denim_overalls'
+          ? pureWhiteMat
+          : topMat;
     const upperMat = isPeppaMascot
       ? peppaPinkMat
       : isSleeveless
@@ -2978,7 +3904,9 @@ export function buildAvatarRig(
         ? peppaDarkPinkMat
         : config.top === 'cardigan_vest'
           ? topTrimMat
-          : config.top === 'zip_parka'
+          : config.top === 'zip_parka' ||
+              config.top === 'panda_pajama' ||
+              config.top === 'denim_overalls'
             ? pureWhiteMat
             : config.top === 'varsity_jacket'
               ? topMat
@@ -3500,6 +4428,78 @@ export function buildAvatarRig(
       tip.position.set(0, 1.405, 0);
 
       handAnchor.add(stick, hook, runner, canopy, edgeTrim, tip);
+    } else if (handheld === 'blue_rose_bouquet') {
+      const wrap = new THREE.Mesh(
+        new THREE.ConeGeometry(0.145, 0.3, 14, 1, true),
+        clayMat('#FFFDF9', 0.78),
+      );
+      wrap.rotation.x = Math.PI;
+      wrap.position.set(0, 0.065, 0);
+      const ribbonBow = new THREE.Mesh(
+        new RoundedBoxGeometry(0.095, 0.042, 0.032, 2, 0.012),
+        clayMat('#3D86EC', 0.45),
+      );
+      ribbonBow.position.set(0, 0.032, 0.035);
+      handAnchor.add(wrap, ribbonBow);
+
+      const leafMat = clayMat('#4C9A5E', 0.65);
+      [-1, 0, 1].forEach((s) => {
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), leafMat);
+        leaf.scale.set(0.75, 1.35, 0.3);
+        leaf.position.set(s * 0.08, 0.22, -0.025);
+        leaf.rotation.z = -s * 0.4;
+        handAnchor.add(leaf);
+      });
+
+      const roseMat = clayMat(hColor || '#5598EE', 0.52);
+      const roseInnerMat = clayMat('#80B8FF', 0.48);
+      const buildRose = (rx: number, ry: number, rz: number, sc: number) => {
+        const rGrp = new THREE.Group();
+        rGrp.position.set(rx, ry, rz);
+        rGrp.scale.setScalar(sc);
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 10), roseInnerMat);
+        rGrp.add(core);
+        for (let p = 0; p < 5; p++) {
+          const ang = (p / 5) * Math.PI * 2;
+          const petal = new THREE.Mesh(new THREE.SphereGeometry(0.034, 10, 8), roseMat);
+          petal.scale.set(1.1, 0.85, 0.55);
+          petal.position.set(Math.cos(ang) * 0.036, Math.sin(ang) * 0.02, Math.sin(ang) * 0.032);
+          rGrp.add(petal);
+        }
+        handAnchor.add(rGrp);
+      };
+      buildRose(0, 0.268, 0.018, 1.05);
+      buildRose(-0.072, 0.228, 0.022, 0.88);
+      buildRose(0.072, 0.228, 0.022, 0.88);
+    } else if (handheld === 'cupid_bow') {
+      const goldMat = glossyClayMat(hColor || '#E8B24B', 0.26);
+      const stringMat = clayMat('#FFF5DC', 0.4);
+      const heartMat = glossyClayMat('#E84258', 0.3);
+
+      const bowArc = new THREE.Mesh(
+        new THREE.TorusGeometry(0.24, 0.016, 10, 26, Math.PI * 1.1),
+        goldMat,
+      );
+      bowArc.rotation.z = -Math.PI * 0.55;
+      bowArc.position.set(0, 0.05, 0.06);
+      const stringRod = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.005, 0.005, 0.46, 6),
+        stringMat,
+      );
+      stringRod.position.set(0, 0.05, 0.035);
+      const arrowShaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.009, 0.009, 0.38, 8),
+        goldMat,
+      );
+      arrowShaft.rotation.x = Math.PI / 2;
+      arrowShaft.position.set(0, 0.05, 0.16);
+      const arrowHeart = new THREE.Mesh(
+        new THREE.SphereGeometry(0.034, 12, 10),
+        heartMat,
+      );
+      arrowHeart.scale.set(1.15, 0.9, 0.55);
+      arrowHeart.position.set(0, 0.05, 0.35);
+      handAnchor.add(bowArc, stringRod, arrowShaft, arrowHeart);
     } else if (equippedFood === 'bbq_meat_skewer') {
       const skewerGroup = new THREE.Group();
       skewerGroup.rotation.x = 0.24;
@@ -3728,8 +4728,8 @@ export function buildAvatarRig(
   const headMesh = new THREE.Mesh(createSculptedHeadGeometry(), skinMat);
   headPivot.add(headMesh);
 
-  // Detailed Ears nested cleanly beside Nendoroid cheek/jaw contour (hidden under mascot hood to avoid clipping!)
-  if (!isPeppaMascot) {
+  // Detailed Ears nested cleanly beside Nendoroid cheek/jaw contour
+  {
     const innerEarMat = clayMat(shadeHex(config.skinTone, -0.11).getHex(), 0.72);
     [-1, 1].forEach((side) => {
       const earGrp = new THREE.Group();
@@ -3872,113 +4872,94 @@ export function buildAvatarRig(
   });
   headPivot.add(new THREE.Mesh(mouthPatchGeo, mouthMat));
 
-  // ========== MODULAR STYLIZED 3D CLAY HAIR / PEPPA MASCOT HOOD SYSTEM ==========
-  if (isPeppaMascot) {
-    // Girl wearing a Peppa Pig mascot costume: plush open-front pink pig hood wraps skull & neck cleanly with ZERO hair clipping
-    const hoodPinkMat = clayMat('#F99EC2', 0.62);
-    const hoodDeepPinkMat = clayMat('#E96C9B', 0.56);
-    const hoodRimMat = clayMat('#FFC7DE', 0.64);
-    const mascotEyeWhiteMat = glossyClayMat('#FFFFFF', 0.2);
-    const mascotEyeDarkMat = glossyClayMat('#1E1B24', 0.18);
-    const mascotCheekMat = clayMat('#F2638E', 0.66);
-
-    const hoodGroup = new THREE.Group();
-
-    // Open-front spherical mascot hood shell wrapping crown, sides & back cleanly outside the chibi face
-    const hoodShellGeo = new THREE.SphereGeometry(
-      0.348,
-      28,
-      20,
-      0,
-      Math.PI * 2,
-      0.88,
-      Math.PI - 0.88,
-    );
-    hoodShellGeo.rotateX(-Math.PI / 2);
-    const hoodShell = new THREE.Mesh(hoodShellGeo, hoodPinkMat);
-    hoodShell.position.set(0, 0.308, -0.012);
-    hoodGroup.add(hoodShell);
-
-    // Plush stitched trim framing the open face window (+Z)
-    const rimRadius = Math.sin(0.88) * 0.348;
-    const rimZ = Math.cos(0.88) * 0.348 - 0.012;
-    const faceRim = new THREE.Mesh(new THREE.TorusGeometry(rimRadius, 0.022, 12, 32), hoodRimMat);
-    faceRim.position.set(0, 0.308, rimZ);
-    hoodGroup.add(faceRim);
-
-    // Cozy neck gaiter / chin collar closing gap between mascot hood & red dress
-    const hoodCollar = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.148, 0.172, 0.09, 18),
-      hoodPinkMat,
-    );
-    hoodCollar.position.set(0, 0.025, -0.02);
-    hoodGroup.add(hoodCollar);
-
-    // Two sculpted upright rounded pig ears atop the mascot hood
-    [-1, 1].forEach((side) => {
-      const earOuter = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 12), hoodPinkMat);
-      earOuter.scale.set(0.74, 1.38, 0.44);
-      earOuter.position.set(side * 0.145, 0.675, 0.015);
-      earOuter.rotation.z = -side * 0.22;
-      earOuter.rotation.x = 0.08;
-
-      const earInner = new THREE.Mesh(new THREE.SphereGeometry(0.044, 12, 10), hoodDeepPinkMat);
-      earInner.scale.set(0.62, 1.16, 0.26);
-      earInner.position.set(side * 0.146, 0.672, 0.036);
-      earInner.rotation.z = -side * 0.22;
-      earInner.rotation.x = 0.08;
-      hoodGroup.add(earOuter, earInner);
-    });
-
-    // Iconic cute Peppa Pig snout perched on top of the hood forehead (+Z, slight tilt to left)
-    const snoutGroup = new THREE.Group();
-    snoutGroup.position.set(0.03, 0.562, 0.225);
-    snoutGroup.rotation.set(-0.22, 0.14, 0);
-
-    const snoutBridge = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.072, 0.084, 0.155, 16),
-      hoodPinkMat,
-    );
-    snoutBridge.rotation.x = Math.PI / 2;
-    snoutBridge.position.z = 0.055;
-
-    const snoutDisc = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.076, 0.076, 0.022, 18),
-      hoodRimMat,
-    );
-    snoutDisc.rotation.x = Math.PI / 2;
-    snoutDisc.position.z = 0.132;
-
-    [-0.024, 0.024].forEach((nx) => {
-      const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), hoodDeepPinkMat);
-      nostril.scale.set(0.95, 1.15, 0.55);
-      nostril.position.set(nx, 0.004, 0.144);
-      snoutGroup.add(nostril);
-    });
-    snoutGroup.add(snoutBridge, snoutDisc);
-    hoodGroup.add(snoutGroup);
-
-    // Mascot forehead button eyes & cheek patch so the costume reads immediately as Peppa Pig
-    [-1, 1].forEach((side) => {
-      const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.036, 12, 10), mascotEyeWhiteMat);
-      eyeWhite.scale.set(1, 1.08, 0.55);
-      eyeWhite.position.set(side * 0.078 - 0.02, 0.608, 0.204);
-
-      const eyePupil = new THREE.Mesh(new THREE.SphereGeometry(0.019, 10, 8), mascotEyeDarkMat);
-      eyePupil.scale.set(1, 1, 0.6);
-      eyePupil.position.set(side * 0.078 - 0.015, 0.608, 0.221);
-      hoodGroup.add(eyeWhite, eyePupil);
-    });
-
-    const hoodCheek = new THREE.Mesh(new THREE.SphereGeometry(0.044, 12, 10), mascotCheekMat);
-    hoodCheek.scale.set(1.1, 0.85, 0.38);
-    hoodCheek.position.set(-0.138, 0.515, 0.236);
-    hoodGroup.add(hoodCheek);
-
-    headPivot.add(hoodGroup);
-  } else {
+  // ========== MODULAR STYLIZED 3D CLAY HAIR + ADORABLE PEPPA KIGURUMI CAP ==========
+  {
     const hairAssembly = buildCharacterHair(config, hairMat, topMat);
     headPivot.add(hairAssembly.root);
+
+    if (isPeppaMascot) {
+      // Cute chibi girl wearing a fluffy pastel Peppa Pig mascot cap/hood over her hair (exposes face + air bangs cleanly!)
+      const hoodPinkMat = clayMat('#FFA8CA', 0.6);
+      const hoodDeepPinkMat = clayMat('#E96C9B', 0.56);
+      const hoodRimMat = clayMat('#FFE0EE', 0.62);
+      const mascotEyeDarkMat = clayMat('#522439', 0.48);
+      const mascotCheekMat = clayMat('#FF7BA7', 0.66);
+
+      const hoodGroup = new THREE.Group();
+
+      // Soft plush piggy beret/hood cap perched smoothly over crown & back-top of hair (never covers face!)
+      const capDome = new THREE.Mesh(new THREE.SphereGeometry(0.322, 24, 16), hoodPinkMat);
+      capDome.scale.set(1.03, 0.56, 1.04);
+      capDome.position.set(0, 0.525, -0.03);
+      hoodGroup.add(capDome);
+
+      // Soft fluffy cream-pink cuff band framing the top crown just above her bangs
+      const capBand = new THREE.Mesh(new THREE.TorusGeometry(0.285, 0.026, 10, 28), hoodRimMat);
+      capBand.rotation.x = Math.PI / 2 - 0.14;
+      capBand.position.set(0, 0.485, -0.015);
+      hoodGroup.add(capBand);
+
+      // Cute soft pastel collar scarf tucked neatly at neck
+      const hoodCollar = new THREE.Mesh(
+        new THREE.TorusGeometry(0.118, 0.024, 10, 22),
+        hoodRimMat,
+      );
+      hoodCollar.rotation.x = Math.PI / 2;
+      hoodCollar.position.set(0, 0.018, -0.005);
+      hoodGroup.add(hoodCollar);
+
+      // Two soft rounded plush piggy ears on the cap
+      [-1, 1].forEach((side) => {
+        const earOuter = new THREE.Mesh(new THREE.SphereGeometry(0.064, 14, 12), hoodPinkMat);
+        earOuter.scale.set(0.76, 1.32, 0.46);
+        earOuter.position.set(side * 0.145, 0.725, -0.015);
+        earOuter.rotation.z = -side * 0.24;
+        earOuter.rotation.x = 0.06;
+
+        const earInner = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), hoodDeepPinkMat);
+        earInner.scale.set(0.62, 1.08, 0.28);
+        earInner.position.set(side * 0.146, 0.722, 0.006);
+        earInner.rotation.z = -side * 0.24;
+        earInner.rotation.x = 0.06;
+        hoodGroup.add(earOuter, earInner);
+      });
+
+      // Tiny gentle plush piggy nose charm on the cap front (no creepy long cylinder!)
+      const snoutGroup = new THREE.Group();
+      snoutGroup.position.set(0, 0.562, 0.275);
+      snoutGroup.rotation.x = -0.22;
+
+      const snoutTip = new THREE.Mesh(new THREE.SphereGeometry(0.064, 14, 12), hoodRimMat);
+      snoutTip.scale.set(1.18, 0.86, 0.64);
+      snoutGroup.add(snoutTip);
+
+      [-0.022, 0.022].forEach((nx) => {
+        const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), hoodDeepPinkMat);
+        nostril.scale.set(1.0, 1.15, 0.55);
+        nostril.position.set(nx, 0.002, 0.042);
+        snoutGroup.add(nostril);
+      });
+      hoodGroup.add(snoutGroup);
+
+      // Sweet embroidered happy piggy eyes & rosy cheeks on cap crest (gentle, cute, zero scary white bulbs)
+      [-1, 1].forEach((side) => {
+        const cuteEyeArc = new THREE.Mesh(
+          new THREE.TorusGeometry(0.024, 0.007, 8, 12, Math.PI),
+          mascotEyeDarkMat,
+        );
+        cuteEyeArc.position.set(side * 0.075, 0.618, 0.222);
+        cuteEyeArc.rotation.x = -0.35;
+        cuteEyeArc.rotation.y = side * 0.18;
+
+        const capCheek = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), mascotCheekMat);
+        capCheek.scale.set(1.2, 0.85, 0.36);
+        capCheek.position.set(side * 0.135, 0.558, 0.212);
+        capCheek.rotation.y = side * 0.42;
+        hoodGroup.add(cuteEyeArc, capCheek);
+      });
+
+      headPivot.add(hoodGroup);
+    }
 
     // ========== STANDARDIZED HEADWEAR & ACCESSORIES ON HAT ATTACHMENT POINTS ==========
     const {crownTop, crownTilted, headbandArc, templeLeft, templeRight} =
@@ -4351,6 +5332,220 @@ export function buildAvatarRig(
       core.position.set(0, 0, 0.011);
       pinGrp.add(core);
       accGroup.add(pinGrp);
+    } else if (
+      config.headItem === 'frog_bucket' ||
+      config.headItem === 'chick_hat' ||
+      config.headItem === 'cloud_bucket'
+    ) {
+      const hatCol =
+        headItemCol ||
+        (config.headItem === 'frog_bucket'
+          ? '#61A648'
+          : config.headItem === 'chick_hat'
+            ? '#F6CB45'
+            : '#37BCE8');
+      const hatMat = clayMat(hatCol, 0.68);
+      const bandMat = clayMat(shadeHex(hatCol, -0.12).getHex(), 0.72);
+
+      const bucketGrp = new THREE.Group();
+      bucketGrp.position.set(
+        crownTop.position.x,
+        crownTop.position.y - 0.132,
+        crownTop.position.z - 0.004,
+      );
+      bucketGrp.rotation.set(-0.08, 0, 0);
+
+      const pts = [
+        new THREE.Vector2(0.354, -0.044),
+        new THREE.Vector2(0.45, -0.072),
+        new THREE.Vector2(0.506, -0.098),
+        new THREE.Vector2(0.498, -0.08),
+        new THREE.Vector2(0.435, -0.052),
+        new THREE.Vector2(0.376, -0.022),
+        new THREE.Vector2(0.362, 0.055),
+        new THREE.Vector2(0.324, 0.135),
+        new THREE.Vector2(0.278, 0.158),
+        new THREE.Vector2(0.14, 0.164),
+        new THREE.Vector2(0.0, 0.162),
+      ];
+      const bucketGeo = new THREE.LatheGeometry(pts, 32);
+      bucketGeo.scale(1.06, 1.0, 1.01);
+      const bucketMesh = new THREE.Mesh(bucketGeo, hatMat);
+      const band = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.372, 0.382, 0.032, 32),
+        bandMat,
+      );
+      band.scale.set(1.06, 1, 1.01);
+      bucketGrp.add(bucketMesh, band);
+
+      if (config.headItem === 'frog_bucket') {
+        const scleraMat = glossyClayMat('#FFFFFF', 0.18);
+        const pupilMat = glossyClayMat('#1B1D24', 0.12);
+        [-1, 1].forEach((side) => {
+          const bump = new THREE.Mesh(new THREE.SphereGeometry(0.084, 14, 12), hatMat);
+          bump.position.set(side * 0.155, 0.17, 0.115);
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(0.058, 12, 10), scleraMat);
+          eye.position.set(side * 0.155, 0.178, 0.158);
+          const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), pupilMat);
+          pupil.position.set(side * 0.155, 0.18, 0.206);
+          bucketGrp.add(bump, eye, pupil);
+        });
+      } else if (config.headItem === 'chick_hat') {
+        const beakMat = glossyClayMat('#F27E24', 0.36);
+        const pupilMat = glossyClayMat('#1B1D24', 0.14);
+        const beak = new THREE.Mesh(new THREE.SphereGeometry(0.068, 12, 10), beakMat);
+        beak.scale.set(1.32, 0.56, 1.0);
+        beak.position.set(0, 0.056, 0.385);
+        const tuft = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.024, 0.055, 6, 8),
+          hatMat,
+        );
+        tuft.position.set(0, 0.185, 0.04);
+        bucketGrp.add(beak, tuft);
+        [-1, 1].forEach((side) => {
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), pupilMat);
+          eye.position.set(side * 0.105, 0.095, 0.352);
+          const cheek = new THREE.Mesh(
+            new THREE.SphereGeometry(0.028, 8, 8),
+            clayMat('#F58E9A', 0.65),
+          );
+          cheek.scale.set(1.1, 0.72, 0.4);
+          cheek.position.set(side * 0.155, 0.052, 0.335);
+          bucketGrp.add(eye, cheek);
+        });
+      } else if (config.headItem === 'cloud_bucket') {
+        const cloudMat = clayMat('#FFFFFF', 0.64);
+        [
+          [0, 0.072, 0.365, 0.044],
+          [-0.042, 0.058, 0.356, 0.034],
+          [0.042, 0.058, 0.356, 0.034],
+        ].forEach(([cx, cy, cz, r]) => {
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), cloudMat);
+          puff.scale.set(1.1, 0.9, 0.6);
+          puff.position.set(cx, cy, cz);
+          bucketGrp.add(puff);
+        });
+        const sunBadge = new THREE.Mesh(
+          new THREE.SphereGeometry(0.024, 10, 8),
+          clayMat('#F6C945', 0.5),
+        );
+        sunBadge.scale.set(1, 1, 0.6);
+        sunBadge.position.set(0.026, 0.098, 0.375);
+        bucketGrp.add(sunBadge);
+      }
+
+      accGroup.add(bucketGrp);
+    } else if (config.headItem === 'rainbow_cap') {
+      const capCol = headItemCol || '#F2B44D';
+      const capMat = clayMat(capCol, 0.6);
+      const darkCapMat = clayMat(shadeHex(capCol, -0.14).getHex(), 0.64);
+
+      const capGrp = new THREE.Group();
+      capGrp.position.set(
+        crownTop.position.x,
+        crownTop.position.y - 0.168,
+        crownTop.position.z - 0.004,
+      );
+      capGrp.rotation.set(-0.08, 0, 0);
+
+      const domeGeo = new THREE.SphereGeometry(1, 32, 18, 0, Math.PI * 2, 0, Math.PI * 0.56);
+      domeGeo.scale(0.382, 0.252, 0.368);
+      const dome = new THREE.Mesh(domeGeo, capMat);
+      const visorShape = new THREE.Shape();
+      visorShape.moveTo(-0.255, 0);
+      visorShape.bezierCurveTo(-0.25, 0.225, -0.135, 0.335, 0, 0.345);
+      visorShape.bezierCurveTo(0.135, 0.335, 0.25, 0.225, 0.255, 0);
+      visorShape.quadraticCurveTo(0, 0.078, -0.255, 0);
+      const visorGeo = new THREE.ExtrudeGeometry(visorShape, {
+        depth: 0.018,
+        bevelEnabled: true,
+        bevelThickness: 0.008,
+        bevelSize: 0.008,
+        bevelSegments: 2,
+        curveSegments: 16,
+      });
+      visorGeo.rotateX(Math.PI / 2 + 0.1);
+      const visor = new THREE.Mesh(visorGeo, capMat);
+      visor.position.set(0, 0.014, 0.272);
+      const btn = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), darkCapMat);
+      btn.scale.set(1, 0.52, 1);
+      btn.position.set(0, 0.252, 0);
+      capGrp.add(dome, visor, btn);
+
+      const rbColors = ['#F2646D', '#F6C145', '#68C27C', '#5EA8E8'];
+      rbColors.forEach((rc, idx) => {
+        const arc = new THREE.Mesh(
+          new THREE.TorusGeometry(0.068 - idx * 0.013, 0.009, 8, 18, Math.PI),
+          clayMat(rc, 0.55),
+        );
+        arc.position.set(0, 0.068, 0.348);
+        arc.rotation.x = -0.34;
+        capGrp.add(arc);
+      });
+      accGroup.add(capGrp);
+    } else if (config.headItem === 'cc_beanie') {
+      const knitCol = headItemCol || '#6E4730';
+      const knitMat = clayMat(knitCol, 0.8);
+      const cuffMat = clayMat(shadeHex(knitCol, -0.09).getHex(), 0.82);
+
+      const beanieGrp = new THREE.Group();
+      beanieGrp.position.set(
+        crownTop.position.x,
+        crownTop.position.y - 0.112,
+        crownTop.position.z - 0.006,
+      );
+      beanieGrp.rotation.set(-0.1, 0, 0);
+
+      const pts = [
+        new THREE.Vector2(0.352, -0.076),
+        new THREE.Vector2(0.388, -0.068),
+        new THREE.Vector2(0.384, 0.018),
+        new THREE.Vector2(0.326, 0.112),
+        new THREE.Vector2(0.195, 0.168),
+        new THREE.Vector2(0.0, 0.178),
+      ];
+      const domeGeo = new THREE.LatheGeometry(pts, 32);
+      domeGeo.scale(1.06, 1.0, 1.0);
+      const dome = new THREE.Mesh(domeGeo, knitMat);
+      const cuffGeo = new THREE.TorusGeometry(0.368, 0.048, 12, 32);
+      cuffGeo.rotateX(Math.PI / 2);
+      cuffGeo.scale(1.06, 1.0, 1.0);
+      const cuff = new THREE.Mesh(cuffGeo, cuffMat);
+      cuff.position.y = -0.064;
+
+      const ccTex = getCCBeanieBadgeTexture();
+      const ccBadge = new THREE.Mesh(
+        new RoundedBoxGeometry(0.115, 0.066, 0.018, 2, 0.008),
+        new THREE.MeshStandardMaterial({
+          color: '#FFFFFF',
+          map: ccTex,
+          roughness: 0.72,
+          metalness: 0,
+        }),
+      );
+      ccBadge.position.set(0, -0.056, 0.398);
+      ccBadge.rotation.x = 0.08;
+      beanieGrp.add(dome, cuff, ccBadge);
+      accGroup.add(beanieGrp);
+    } else if (config.headItem === 'angel_halo') {
+      const haloMat = new THREE.MeshStandardMaterial({
+        color: headItemCol || '#FFF3A8',
+        emissive: '#FFE885',
+        emissiveIntensity: 0.45,
+        roughness: 0.2,
+        metalness: 0.25,
+      });
+      const halo = new THREE.Mesh(
+        new THREE.TorusGeometry(0.245, 0.022, 12, 36),
+        haloMat,
+      );
+      halo.rotation.x = Math.PI / 2 + 0.08;
+      halo.position.set(
+        crownTop.position.x,
+        crownTop.position.y + 0.135,
+        crownTop.position.z - 0.01,
+      );
+      accGroup.add(halo);
     }
   }
 

@@ -16,6 +16,7 @@ interface WardrobeModalProps {
 const OPTIONAL_UNEQUIP_PATCH: Partial<Record<ShopCategory, Partial<AvatarConfig>>> = {
   head: {headItem: 'none'},
   accessories: {accessory: 'none'},
+  backpacks: {backpack: 'none'},
   handheld: {handheld: 'none'},
 };
 
@@ -39,6 +40,7 @@ export const WardrobeModal: React.FC<WardrobeModalProps> = ({
   const isUnequipped =
     (tab === 'head' && avatar.headItem === 'none') ||
     (tab === 'accessories' && avatar.accessory === 'none') ||
+    (tab === 'backpacks' && (!avatar.backpack || avatar.backpack === 'none')) ||
     (tab === 'handheld' && avatar.handheld === 'none');
 
   return (

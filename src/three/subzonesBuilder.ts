@@ -107,6 +107,12 @@ export interface SubzoneWorld {
     elapsed?: number,
   ) => void;
   setTreehouseFocus?: (active: boolean) => void;
+  setMallSwingSeated?: (seated: boolean) => void;
+  getMallSwingSeatPose?: () => {x: number; y: number; z: number; pitch: number} | null;
+  setMallSeesawRider?: (side: -1 | 1 | null) => void;
+  getMallSeesawSeatPose?: (
+    side: -1 | 1,
+  ) => {x: number; y: number; z: number; pitch: number; rotY: number} | null;
   updateInsects?: (
     playerX: number,
     playerY: number,
@@ -1180,11 +1186,24 @@ export function buildSubzoneScene(
           });
         }
       } else {
+        const isMiniDecor =
+          !cat.wallMount && !cat.surfaceHeight && Math.max(cat.halfW, cat.halfD) <= 0.26;
+        const isPcSetup = cat.kind === 'desktop_pc_set';
         const proxyCenterY = cat.wallMount ? (cat.mountHeight ?? 1.8) : 0.65;
-        const proxyH = cat.surfaceHeight ? Math.max(0.55, cat.surfaceHeight) : 1.3;
+        const proxyH = isMiniDecor
+          ? 0.42
+          : isPcSetup
+            ? 0.62
+            : cat.surfaceHeight
+              ? Math.max(0.55, cat.surfaceHeight)
+              : 1.3;
         addBoxProxy(
           meshGroup,
-          [Math.max(0.7, cat.halfW * 2), proxyH, Math.max(0.45, cat.halfD * 2)],
+          [
+            Math.max(isMiniDecor ? 0.24 : 0.7, cat.halfW * 2),
+            proxyH,
+            Math.max(isMiniDecor ? 0.24 : 0.45, cat.halfD * 2),
+          ],
           [0, cat.wallMount ? proxyCenterY : proxyH / 2, 0],
           proxyData,
           clickTargets,

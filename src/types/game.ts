@@ -61,7 +61,11 @@ export type TopStyle =
   | 'zip_parka'
   | 'safari_shirt'
   | 'sport_raglan'
-  | 'casual_shirt';
+  | 'casual_shirt'
+  | 'panda_pajama'
+  | 'denim_overalls'
+  | 'puffer_jacket'
+  | 'coin_tunic';
 
 export type BottomStyle =
   | 'pleated_skirt'
@@ -72,9 +76,22 @@ export type BottomStyle =
   | 'office_skirt'
   | 'cargo_shorts'
   | 'sport_shorts'
-  | 'a_line_skirt';
+  | 'a_line_skirt'
+  | 'pajama_pants'
+  | 'overalls_pants'
+  | 'tunic_pants'
+  | 'cloud_shorts';
 
-export type ShoeStyle = 'sneakers' | 'mary_janes' | 'boots' | 'loafers';
+export type ShoeStyle =
+  | 'sneakers'
+  | 'mary_janes'
+  | 'boots'
+  | 'loafers'
+  | 'crocs_fish'
+  | 'crocs_panda'
+  | 'crocs_chick'
+  | 'crocs_frog'
+  | 'rain_boots';
 
 export type HeadItemStyle =
   | 'none'
@@ -82,7 +99,13 @@ export type HeadItemStyle =
   | 'sunhat'
   | 'cap'
   | 'beanie'
+  | 'cc_beanie'
   | 'bucket_hat'
+  | 'frog_bucket'
+  | 'chick_hat'
+  | 'cloud_bucket'
+  | 'rainbow_cap'
+  | 'angel_halo'
   | 'cat_ears'
   | 'flower_crown'
   | 'ribbon_bow'
@@ -96,11 +119,23 @@ export type AccessoryStyle =
   | 'scarf'
   | 'pearl_necklace';
 
+export type BackpackStyle =
+  | 'none'
+  | 'fish_plush'
+  | 'lamb_plush'
+  | 'chick_plush'
+  | 'bee_plush'
+  | 'honey_bear'
+  | 'carrot_basket'
+  | 'angel_wings';
+
 export type HandheldStyle =
   | 'none'
   | 'milk_tea'
   | 'plush_bear'
   | 'flower_bouquet'
+  | 'blue_rose_bouquet'
+  | 'cupid_bow'
   | 'tote_bag'
   | 'mini_umbrella';
 
@@ -146,6 +181,8 @@ export interface AvatarConfig {
   headItemColor: string;
   accessory: AccessoryStyle;
   accessoryColor: string;
+  backpack?: BackpackStyle;
+  backpackColor?: string;
   handheld: HandheldStyle;
   handheldColor: string;
   mascotCostume?: 'peppa_pig';
@@ -164,6 +201,7 @@ export type ShopCategory =
   | 'face'
   | 'head'
   | 'accessories'
+  | 'backpacks'
   | 'shoes'
   | 'handheld';
 
@@ -462,6 +500,20 @@ export type FurnitureKind =
   | 'wall_tv'
   | 'microwave'
   | 'mini_oven'
+  | 'white_desk'
+  | 'white_study_chair'
+  | 'office_swivel_chair'
+  | 'study_laptop'
+  | 'desktop_pc_set'
+  | 'wall_pinboard'
+  | 'study_desk_lamp'
+  | 'pen_holder'
+  | 'art_supply_rack'
+  | 'pencil_case'
+  | 'book_stack'
+  | 'open_book'
+  | 'headphone_stand'
+  | 'table_snack_tray'
   | 'floor_paint'
   | 'wall_paint';
 

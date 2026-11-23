@@ -307,11 +307,31 @@ function createStorefrontSignTexture(
         ctx.fill();
       });
 
-      ctx.fillStyle = textHex;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = `700 44px ${MALL_SIGN_FONT}`;
-      ctx.fillText(shopName, w * 0.5, h * 0.5 + 2);
+      if (shopName.trim().length > 0) {
+        ctx.fillStyle = textHex;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `700 44px ${MALL_SIGN_FONT}`;
+        ctx.fillText(shopName, w * 0.5, h * 0.5 + 2);
+      } else {
+        // Decorative pastel cloud & star trio when sign text is temporarily hidden
+        ctx.fillStyle = '#FFFFFF';
+        [
+          [w * 0.5 - 32, h * 0.54, 18],
+          [w * 0.5, h * 0.48, 24],
+          [w * 0.5 + 32, h * 0.54, 18],
+        ].forEach(([cx, cy, cr]) => {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.fillStyle = accentHex;
+        [-96, 96].forEach((ox) => {
+          ctx.beginPath();
+          ctx.arc(w * 0.5 + ox, h * 0.5, 7, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
     },
     disposables,
     isDisposed,
@@ -379,7 +399,7 @@ function buildSculptedBow(mat: THREE.Material, scale = 1): THREE.Group {
   return bow;
 }
 
-type MallIconKind = 'boba' | 'bag' | 'gift' | 'cloud_star' | 'fashion' | 'mart';
+type MallIconKind = 'boba' | 'bag' | 'gift' | 'cloud_star' | 'fashion' | 'mart' | 'japanese';
 
 function buildSculptedMallIcon(kind: MallIconKind, scale = 1): THREE.Group {
   const g = new THREE.Group();
@@ -390,7 +410,33 @@ function buildSculptedMallIcon(kind: MallIconKind, scale = 1): THREE.Group {
   const skyMat = glossyClayMat('#78C7FF', 0.34);
   const chocoMat = clayMat('#4C342B', 0.55);
 
-  if (kind === 'boba') {
+  if (kind === 'japanese') {
+    const bowlMat = glossyClayMat('#EA6F52', 0.34);
+    const brothMat = glossyClayMat('#F7BD5B', 0.28);
+    const salmonMat = glossyClayMat('#FF8663', 0.32);
+    const noriMat = clayMat('#2B362E', 0.72);
+    // Ramen bowl
+    const bowl = new THREE.Mesh(
+      new THREE.SphereGeometry(0.24, 16, 12, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.55),
+      bowlMat,
+    );
+    bowl.position.set(-0.08, 0.04, 0);
+    const broth = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.03, 16), brothMat);
+    broth.position.set(-0.08, 0.02, 0);
+    const naruto = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.03, 12), creamMat);
+    naruto.position.set(-0.1, 0.04, 0.05);
+    const chop1 = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.008, 0.42, 6), goldMat);
+    chop1.position.set(-0.02, 0.14, -0.02);
+    chop1.rotation.z = -1.1;
+    // Salmon nigiri beside bowl
+    const rice = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.1, 0.12, 2, 0.035), creamMat);
+    rice.position.set(0.18, -0.14, 0.06);
+    const salmon = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.045, 0.13, 2, 0.02), salmonMat);
+    salmon.position.set(0.18, -0.08, 0.06);
+    const noriBand = new THREE.Mesh(new RoundedBoxGeometry(0.04, 0.13, 0.135, 1, 0.008), noriMat);
+    noriBand.position.set(0.18, -0.11, 0.06);
+    g.add(bowl, broth, naruto, chop1, rice, salmon, noriBand);
+  } else if (kind === 'boba') {
     const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.17, 0.44, 16), creamMat);
     cup.position.y = -0.06;
     const teaBand = new THREE.Mesh(new THREE.CylinderGeometry(0.225, 0.19, 0.22, 16), berryMat);
@@ -1332,8 +1378,8 @@ export function buildMallInteriorScene(): SubzoneWorld {
     icon: MallIconKind;
   }[] = [
     {bx: -24, name: 'CARTOON DECOR', accent: '#B89CF5', pill: '#F4EEFF', fg: '#543A8C', awningA: '#C7B0FA', awningB: '#FFFDFB', icon: 'cloud_star'},
-    {bx: -12, name: 'TRÀ & CÀ PHÊ', accent: '#C68B59', pill: '#FFF3E6', fg: '#6E3F1D', awningA: '#D99E6E', awningB: '#FFFDF8', icon: 'boba'},
-    {bx: 0, name: 'XE CỘ MÂY', accent: '#549EE0', pill: '#E9F4FF', fg: '#1F5588', awningA: '#6AB2EC', awningB: '#FFFFFF', icon: 'cloud_star'},
+    {bx: -12, name: 'NHÀ HÀNG NHẬT', accent: '#E06D53', pill: '#FFF2EB', fg: '#7A2714', awningA: '#EB8267', awningB: '#FFF8F2', icon: 'japanese'},
+    {bx: 0, name: '', accent: '#549EE0', pill: '#E9F4FF', fg: '#1F5588', awningA: '#6AB2EC', awningB: '#FFFFFF', icon: 'cloud_star'},
     {bx: 12, name: 'ẨM THỰC & CHỢ', accent: '#5CB88A', pill: '#E8FAF0', fg: '#1E6945', awningA: '#70C99B', awningB: '#FFFDF8', icon: 'mart'},
     {bx: 24, name: 'KHU VUI CHƠI', accent: '#F28CA3', pill: '#FFEAF0', fg: '#9A3150', awningA: '#F59BB0', awningB: '#FFF9FB', icon: 'gift'},
   ];
@@ -1341,7 +1387,10 @@ export function buildMallInteriorScene(): SubzoneWorld {
   northShops.forEach(({bx, name, accent, pill, fg, awningA, awningB, icon}) => {
     const bayFrame = new THREE.Mesh(new RoundedBoxGeometry(9.4, 4.4, 0.18, 2, 0.04), creamTrimMat);
     bayFrame.position.set(bx, 2.35, -MALL_HALF_D + 0.22);
-    const bayPane = new THREE.Mesh(new THREE.BoxGeometry(8.5, 3.6, 0.08), skyAccentMat);
+    const bayPane = new THREE.Mesh(
+      new THREE.BoxGeometry(8.5, 3.6, 0.08),
+      icon === 'japanese' ? clayMat('#FFF1E2', 0.62) : skyAccentMat,
+    );
     bayPane.position.set(bx, 2.35, -MALL_HALF_D + 0.36);
 
     const shopTex = createStorefrontSignTexture(name, accent, pill, fg, disposables, isDisposed);
@@ -1360,6 +1409,22 @@ export function buildMallInteriorScene(): SubzoneWorld {
     const signBadge = buildSculptedMallIcon(icon, 1.05);
     signBadge.position.set(bx - 3.65, 5.55, -MALL_HALF_D + 0.56);
     group.add(signBadge);
+
+    // Play Together-inspired warm Japanese chochin lanterns & cozy wood counter accent at Nhà Hàng Nhật (bx = -12)
+    if (icon === 'japanese') {
+      [-3.85, 3.85].forEach((lx) => {
+        const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.36, 6), darkMetalMat);
+        cord.position.set(bx + lx, 4.02, -MALL_HALF_D + 0.92);
+        const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 12), warmLampMat);
+        lantern.scale.set(0.86, 1.28, 0.86);
+        lantern.position.set(bx + lx, 3.68, -MALL_HALF_D + 0.92);
+        const capTop = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.06, 12), darkMetalMat);
+        capTop.position.set(bx + lx, 3.98, -MALL_HALF_D + 0.92);
+        const capBot = capTop.clone();
+        capBot.position.y = 3.38;
+        shellGroup.add(cord, lantern, capTop, capBot);
+      });
+    }
 
     // Soft rounded pastel boutique awning scallops
     for (let s = 0; s < 6; s++) {
@@ -1850,45 +1915,7 @@ export function buildMallInteriorScene(): SubzoneWorld {
     colliders.push({type: 'circle', id: `mall_f1_plant_${idx}`, x: px, z: pz, r: 0.58});
   });
 
-  // 4 Interactive Atrium Benches on Floor 1
-  [
-    {bx: -8.5, bz: 9.2, rotY: 0},
-    {bx: 8.5, bz: 9.2, rotY: 0},
-    {bx: -8.5, bz: -9.2, rotY: Math.PI},
-    {bx: 8.5, bz: -9.2, rotY: Math.PI},
-  ].forEach(({bx, bz, rotY}, idx) => {
-    const bench = new THREE.Group();
-    bench.position.set(bx, 0, bz);
-    bench.rotation.y = rotY;
-    const seat = new THREE.Mesh(new RoundedBoxGeometry(2.1, 0.14, 0.72, 2, 0.04), warmWoodMat);
-    seat.position.y = 0.42;
-    const cushion = new THREE.Mesh(new RoundedBoxGeometry(1.9, 0.08, 0.62, 2, 0.03), clayMat('#F4EFE4', 0.75));
-    cushion.position.y = 0.51;
-    [-0.85, 0.85].forEach((lx) => {
-      const leg = new THREE.Mesh(new RoundedBoxGeometry(0.12, 0.4, 0.6, 1, 0.02), darkMetalMat);
-      leg.position.set(lx, 0.2, 0);
-      bench.add(leg);
-    });
-    bench.add(seat, cushion);
-    lobbyDecor.add(bench);
-    const frontOffZ = rotY === 0 ? 1.05 : -1.05;
-    addMallProxy(
-      group,
-      [2.2, 0.85, 0.95],
-      [bx, 0.42, bz + frontOffZ * 0.25],
-      {
-        kind: 'bench',
-        tx: bx,
-        tz: bz + frontOffZ,
-        seatX: bx,
-        seatZ: bz,
-        seatY: 0.56,
-        sitRotY: rotY,
-      },
-      clickTargets,
-    );
-    colliders.push({type: 'box', id: `mall_f1_bench_${idx}`, x: bx, z: bz, hw: 1.15, hd: 0.48});
-  });
+  // Central atrium around Tun kept open & spacious (no clutter benches)
 
   // ---------- 7A. FLAGSHIP QUÁN CÀ PHÊ MÂY (SOUTH-WEST OPEN WING: x=-29..-11.4, z=+7.2..+23.2) ----------
   const cafePad = new THREE.Mesh(
@@ -1958,47 +1985,159 @@ export function buildMallInteriorScene(): SubzoneWorld {
   giantCup.add(gCupBody, gCupFoam, gCupHeart, gCupHandle, gSaucer);
   lobbyDecor.add(cafeSignBoard, giantCup);
 
-  // Bar Counter Props: 2-Group Espresso Machine, Grinder, Cash Tablet & Glass Pastry Display Case!
-  const espBody = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.52, 0.54, 3, 0.05), silverMat);
-  espBody.position.set(-25.4, 1.35, 20.2);
-  const espTop = new THREE.Mesh(new RoundedBoxGeometry(0.96, 0.1, 0.58, 2, 0.03), berryPinkMat);
-  espTop.position.set(-25.4, 1.62, 20.2);
-  [-25.62, -25.18].forEach((gx) => {
-    const groupHead = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.14, 10), darkMetalMat);
-    groupHead.position.set(gx, 1.32, 19.95);
-    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.038, 0.08, 10), creamFoamMat);
-    cup.position.set(gx, 1.14, 19.95);
-    lobbyDecor.add(groupHead, cup);
-  });
-  const grinder = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.36, 12), darkMetalMat);
-  grinder.position.set(-24.3, 1.28, 20.2);
-  const hopper = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.07, 0.24, 12), latteTanMat);
-  hopper.position.set(-24.3, 1.54, 20.2);
-  const register = new THREE.Mesh(new RoundedBoxGeometry(0.38, 0.24, 0.24, 2, 0.03), creamFoamMat);
-  register.position.set(-23.2, 1.22, 20.2);
-  lobbyDecor.add(espBody, espTop, grinder, hopper, register);
+  // Bar Counter Props: Detailed 2-Group Italian Espresso Machine, Grinder, Register & Glass Pastry Vitrine
+  const espGroup = new THREE.Group();
+  espGroup.position.set(-25.4, 1.095, 20.2);
 
-  // Glass Pastry Vitrine stocked with Croissants, Cupcakes & Macarons
-  const vitrineBase = new THREE.Mesh(new RoundedBoxGeometry(2.1, 0.08, 0.78, 2, 0.02), warmWoodMat);
-  vitrineBase.position.set(-21.4, 1.13, 20.2);
-  const vitrineShelf = new THREE.Mesh(new RoundedBoxGeometry(1.95, 0.04, 0.62, 1, 0.01), creamFoamMat);
-  vitrineShelf.position.set(-21.4, 1.44, 20.2);
-  const vitrineGlass = new THREE.Mesh(new RoundedBoxGeometry(2.04, 0.64, 0.72, 2, 0.03), clearCaseGlassMat);
-  vitrineGlass.position.set(-21.4, 1.49, 20.2);
-  lobbyDecor.add(vitrineBase, vitrineShelf, vitrineGlass);
-  [-22.0, -21.4, -20.8].forEach((px, idx) => {
-    const croissant = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.048, 8, 12, Math.PI * 1.15), honeyOakMat);
-    croissant.rotation.x = Math.PI / 2;
-    croissant.position.set(px, 1.21, 20.2);
-    const cupcakeBase = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.055, 0.08, 10), latteTanMat);
-    cupcakeBase.position.set(px, 1.5, 20.2);
-    const frosting = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 10, 8),
-      idx === 1 ? berryPinkMat : idx === 2 ? mintMat : creamFoamMat,
+  // Lower stainless base & drip tray grate extending forward (-Z)
+  const espFoot = new THREE.Mesh(new RoundedBoxGeometry(1.06, 0.09, 0.58, 2, 0.025), silverMat);
+  espFoot.position.set(0, 0.045, 0);
+  const dripTray = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.055, 0.22, 2, 0.015), darkMetalMat);
+  dripTray.position.set(0, 0.048, -0.27);
+  const dripGrate = new THREE.Mesh(new RoundedBoxGeometry(0.86, 0.012, 0.17, 1, 0.004), silverMat);
+  dripGrate.position.set(0, 0.08, -0.27);
+
+  // Sculpted pastel sage & cream body shell + top cup-warmer tray
+  const espBody = new THREE.Mesh(new RoundedBoxGeometry(1.02, 0.44, 0.48, 3, 0.055), sageMat);
+  espBody.position.set(0, 0.31, 0.03);
+  const espFrontFace = new THREE.Mesh(new RoundedBoxGeometry(0.94, 0.36, 0.04, 2, 0.015), silverMat);
+  espFrontFace.position.set(0, 0.3, -0.2);
+  const espCap = new THREE.Mesh(new RoundedBoxGeometry(1.06, 0.08, 0.52, 3, 0.025), creamFoamMat);
+  espCap.position.set(0, 0.54, 0.03);
+  const cupRail = new THREE.Mesh(new RoundedBoxGeometry(0.98, 0.055, 0.44, 2, 0.01), goldMat);
+  cupRail.position.set(0, 0.605, 0.03);
+
+  // Stacked porcelain espresso cups atop the warmer rail
+  [-0.32, -0.11, 0.11, 0.32].forEach((cx, idx) => {
+    const saucer = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.05, 0.014, 12), creamFoamMat);
+    saucer.position.set(cx, 0.59, 0.02);
+    const cup = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.052, 0.038, 0.072, 12),
+      idx % 2 === 0 ? creamFoamMat : berryPinkMat,
     );
-    frosting.position.set(px, 1.57, 20.2);
-    lobbyDecor.add(croissant, cupcakeBase, frosting);
+    cup.position.set(cx, 0.632, 0.02);
+    espGroup.add(saucer, cup);
   });
+
+  // Pressure dial gauge in center front
+  const gaugeBezel = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.028, 16), goldMat);
+  gaugeBezel.rotation.x = Math.PI / 2;
+  gaugeBezel.position.set(0, 0.42, -0.22);
+  const gaugeFace = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.032, 14), creamFoamMat);
+  gaugeFace.rotation.x = Math.PI / 2;
+  gaugeFace.position.set(0, 0.42, -0.222);
+
+  // Two precision group heads + angled portafilters + shot glasses + side steam wands
+  [-0.25, 0.25].forEach((gx) => {
+    const groupHead = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.062, 0.095, 14), silverMat);
+    groupHead.position.set(gx, 0.35, -0.245);
+    const pfBasket = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.048, 0.045, 14), goldMat);
+    pfBasket.position.set(gx, 0.285, -0.255);
+    const pfHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.022, 0.18, 10), darkMetalMat);
+    pfHandle.rotation.x = Math.PI / 2 + 0.18;
+    pfHandle.position.set(gx, 0.265, -0.36);
+
+    const shotGlass = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.032, 0.068, 12), creamFoamMat);
+    shotGlass.position.set(gx, 0.122, -0.265);
+    const cremaTop = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.012, 12), espressoBrownMat);
+    cremaTop.position.set(gx, 0.156, -0.265);
+
+    const wand = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.009, 0.18, 8), silverMat);
+    wand.position.set(gx * 1.72, 0.26, -0.25);
+    wand.rotation.z = gx < 0 ? 0.26 : -0.26;
+    wand.rotation.x = -0.2;
+    espGroup.add(groupHead, pfBasket, pfHandle, shotGlass, cremaTop, wand);
+  });
+
+  espGroup.add(espFoot, dripTray, dripGrate, espBody, espFrontFace, espCap, cupRail, gaugeBezel, gaugeFace);
+  lobbyDecor.add(espGroup);
+
+  const grinder = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.36, 12), darkMetalMat);
+  grinder.position.set(-24.25, 1.28, 20.2);
+  const hopper = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.075, 0.24, 12), latteTanMat);
+  hopper.position.set(-24.25, 1.54, 20.2);
+  const register = new THREE.Mesh(new RoundedBoxGeometry(0.4, 0.26, 0.24, 2, 0.03), creamFoamMat);
+  register.position.set(-23.25, 1.22, 20.2);
+  const registerScreen = new THREE.Mesh(new RoundedBoxGeometry(0.32, 0.18, 0.04, 1, 0.01), windowPaneMat);
+  registerScreen.position.set(-23.25, 1.28, 20.1);
+  lobbyDecor.add(grinder, hopper, register, registerScreen);
+
+  // Illuminated Open-Frame Glass Pastry Vitrine stocked with Layered Cakes, Frosted Donuts, Croissants & Macarons
+  const vitrineGroup = new THREE.Group();
+  vitrineGroup.position.set(-21.35, 1.095, 20.2);
+  const vitrineBase = new THREE.Mesh(new RoundedBoxGeometry(2.24, 0.09, 0.82, 2, 0.025), warmWoodMat);
+  vitrineBase.position.y = 0.045;
+  const vitrineMidShelf = new THREE.Mesh(new RoundedBoxGeometry(2.08, 0.035, 0.68, 1, 0.01), creamFoamMat);
+  vitrineMidShelf.position.y = 0.36;
+  const vitrineTopCap = new THREE.Mesh(new RoundedBoxGeometry(2.22, 0.055, 0.8, 2, 0.02), warmWoodMat);
+  vitrineTopCap.position.y = 0.72;
+  const vitrineLightBar = new THREE.Mesh(new RoundedBoxGeometry(1.96, 0.028, 0.08, 1, 0.01), warmLampMat);
+  vitrineLightBar.position.set(0, 0.68, -0.24);
+
+  [
+    [-1.06, -0.35],
+    [1.06, -0.35],
+    [-1.06, 0.35],
+    [1.06, 0.35],
+  ].forEach(([px, pz]) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.66, 8), goldMat);
+    post.position.set(px, 0.39, pz);
+    vitrineGroup.add(post);
+  });
+  const frontGlass = new THREE.Mesh(new THREE.BoxGeometry(2.08, 0.58, 0.025), clearCaseGlassMat);
+  frontGlass.position.set(0, 0.39, -0.36);
+
+  // Lower Shelf: 3 Layered Cake Slices on porcelain trays + 2 Golden Croissants
+  [-0.78, -0.32, 0.14].forEach((cx, idx) => {
+    const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.02, 14), creamFoamMat);
+    tray.position.set(cx, 0.1, 0);
+    const sponge = new THREE.Mesh(
+      new RoundedBoxGeometry(0.17, 0.12, 0.16, 2, 0.02),
+      idx === 0 ? berryPinkMat : idx === 1 ? espressoBrownMat : mintMat,
+    );
+    sponge.position.set(cx, 0.17, 0);
+    const creamLayer = new THREE.Mesh(new RoundedBoxGeometry(0.18, 0.03, 0.17, 1, 0.008), creamFoamMat);
+    creamLayer.position.set(cx, 0.165, 0);
+    const topping = new THREE.Mesh(
+      new THREE.SphereGeometry(0.036, 10, 8),
+      idx === 1 ? butterYellowMat : berryPinkMat,
+    );
+    topping.position.set(cx, 0.25, 0);
+    vitrineGroup.add(tray, sponge, creamLayer, topping);
+  });
+  [0.56, 0.86].forEach((cx) => {
+    const cro = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.044, 8, 12, Math.PI * 1.18), honeyOakMat);
+    cro.rotation.x = Math.PI / 2;
+    cro.position.set(cx, 0.135, 0);
+    vitrineGroup.add(cro);
+  });
+
+  // Upper Shelf: 3 Glazed Donuts & 2 Macaron Stacks
+  [-0.72, -0.28, 0.16].forEach((dx, idx) => {
+    const dough = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.042, 10, 16), honeyOakMat);
+    dough.rotation.x = Math.PI / 2;
+    dough.position.set(dx, 0.42, 0);
+    const glaze = new THREE.Mesh(
+      new THREE.TorusGeometry(0.085, 0.036, 10, 16),
+      idx === 0 ? berryPinkMat : idx === 1 ? espressoBrownMat : mintMat,
+    );
+    glaze.rotation.x = Math.PI / 2;
+    glaze.position.set(dx, 0.435, 0);
+    vitrineGroup.add(dough, glaze);
+  });
+  [0.58, 0.85].forEach((mx, idx) => {
+    for (let layer = 0; layer < 2; layer++) {
+      const mac = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.068, 0.068, 0.052, 12),
+        (idx + layer) % 2 === 0 ? lavenderMat : butterYellowMat,
+      );
+      mac.position.set(mx, 0.405 + layer * 0.056, 0);
+      vitrineGroup.add(mac);
+    }
+  });
+
+  vitrineGroup.add(vitrineBase, vitrineMidShelf, vitrineTopCap, vitrineLightBar, frontGlass);
+  lobbyDecor.add(vitrineGroup);
 
   // Back Bar Coffee Syrups & Ceramic Mug Shelves
   for (let i = 0; i < 6; i++) {
@@ -2086,21 +2225,77 @@ export function buildMallInteriorScene(): SubzoneWorld {
   cafeTables.forEach(([tx, tz], tIdx) => {
     const tblTop = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.08, 20), creamFoamMat);
     tblTop.position.set(tx, 0.78, tz);
+    const tblRim = new THREE.Mesh(new THREE.TorusGeometry(0.61, 0.022, 8, 28), warmWoodMat);
+    tblRim.rotation.x = Math.PI / 2;
+    tblRim.position.set(tx, 0.78, tz);
     const tblStem = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.08, 0.72, 10), darkMetalMat);
     tblStem.position.set(tx, 0.4, tz);
     const tblFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.06, 14), darkMetalMat);
     tblFoot.position.set(tx, 0.05, tz);
-    // Tabletop coffee cups & mini pastry plate
-    const cupL = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.048, 0.1, 10), sageMat);
-    cupL.position.set(tx - 0.2, 0.87, tz + 0.06);
-    const cupR = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.048, 0.1, 10), berryPinkMat);
-    cupR.position.set(tx + 0.2, 0.87, tz - 0.08);
-    const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.11, 0.03, 12), creamFoamMat);
-    plate.position.set(tx + 0.02, 0.835, tz + 0.18);
-    const cake = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), honeyOakMat);
-    cake.scale.set(1.2, 0.75, 0.9);
-    cake.position.set(tx + 0.02, 0.88, tz + 0.18);
-    lobbyDecor.add(tblTop, tblStem, tblFoot, cupL, cupR, plate, cake);
+
+    // Detailed Latte Mug with saucer, curved handle & latte art foam (Left)
+    const saucerL = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.085, 0.018, 16), creamFoamMat);
+    saucerL.position.set(tx - 0.24, 0.829, tz + 0.04);
+    const mugL = new THREE.Mesh(new THREE.CylinderGeometry(0.072, 0.054, 0.11, 14), sageMat);
+    mugL.position.set(tx - 0.24, 0.892, tz + 0.04);
+    const handleL = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.011, 8, 12, Math.PI), sageMat);
+    handleL.rotation.z = -Math.PI / 2;
+    handleL.position.set(tx - 0.168, 0.895, tz + 0.04);
+    const coffeeL = new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.064, 0.014, 14), latteTanMat);
+    coffeeL.position.set(tx - 0.24, 0.944, tz + 0.04);
+    const foamHeartL = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), creamFoamMat);
+    foamHeartL.scale.set(1.2, 0.45, 1.0);
+    foamHeartL.position.set(tx - 0.24, 0.952, tz + 0.04);
+
+    // Tall Iced Drink Glass with Dome Lid & Straw (Right)
+    const icedCup = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.046, 0.15, 14), clearCaseGlassMat);
+    icedCup.position.set(tx + 0.22, 0.895, tz - 0.08);
+    const icedDrink = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.054, 0.042, 0.11, 12),
+      tIdx % 2 === 0 ? espressoBrownMat : peachBlossomMat,
+    );
+    icedDrink.position.set(tx + 0.22, 0.88, tz - 0.08);
+    const icedLid = new THREE.Mesh(
+      new THREE.SphereGeometry(0.064, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5),
+      creamFoamMat,
+    );
+    icedLid.position.set(tx + 0.22, 0.968, tz - 0.08);
+    const strawR = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.14, 8), berryPinkMat);
+    strawR.position.set(tx + 0.235, 1.03, tz - 0.08);
+    strawR.rotation.z = -0.22;
+
+    // Dessert Plate with Layered Cake Slice
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.145, 0.11, 0.024, 16), creamFoamMat);
+    plate.position.set(tx + 0.02, 0.832, tz + 0.2);
+    const cakeBody = new THREE.Mesh(
+      new RoundedBoxGeometry(0.14, 0.075, 0.11, 2, 0.015),
+      tIdx % 2 === 0 ? honeyOakMat : berryPinkMat,
+    );
+    cakeBody.position.set(tx + 0.02, 0.88, tz + 0.2);
+    const cakeIcing = new THREE.Mesh(new RoundedBoxGeometry(0.146, 0.022, 0.116, 1, 0.006), creamFoamMat);
+    cakeIcing.position.set(tx + 0.02, 0.92, tz + 0.2);
+    const cherry = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), berryPinkMat);
+    cherry.position.set(tx + 0.02, 0.945, tz + 0.2);
+
+    lobbyDecor.add(
+      tblTop,
+      tblRim,
+      tblStem,
+      tblFoot,
+      saucerL,
+      mugL,
+      handleL,
+      coffeeL,
+      foamHeartL,
+      icedCup,
+      icedDrink,
+      icedLid,
+      strawR,
+      plate,
+      cakeBody,
+      cakeIcing,
+      cherry,
+    );
     colliders.push({type: 'circle', id: `mall_f1_cafe_tbl_${tIdx}`, x: tx, z: tz, r: 0.68});
 
     [-1, 1].forEach((side, cIdx) => {
@@ -2146,43 +2341,138 @@ export function buildMallInteriorScene(): SubzoneWorld {
   marketPad.position.set(20.2, 0.018, 15.2);
   lobbyDecor.add(marketPad);
 
-  // Open-Air Tiered Fresh Produce Market Stalls along South-East Corner
-  [-21.2, -24.0, -26.8].forEach((negX, idx) => {
-    const sx = -negX;
-    const stallBase = new THREE.Mesh(new RoundedBoxGeometry(2.4, 0.82, 1.35, 3, 0.05), honeyOakMat);
-    stallBase.position.set(sx, 0.41, 21.0);
-    const tierTop = new THREE.Mesh(new RoundedBoxGeometry(2.2, 0.36, 0.62, 2, 0.03), warmWoodMat);
-    tierTop.position.set(sx, 1.0, 21.3);
-    lobbyDecor.add(stallBase, tierTop);
+  // Clean Play-Together Style Mini Supermarket Shelves stocked with recognizable Milk, Eggs, Cheese, Popcorn, Noodles & Jams
+  [21.2, 24.0, 26.8].forEach((sx, idx) => {
+    const rackGroup = new THREE.Group();
+    rackGroup.position.set(sx, 0.036, 21.05);
 
-    // Crates & Baskets filled with Fruits, Veggies, Bread & Milk
-    [-0.65, 0.65].forEach((ox, bIdx) => {
-      const crate = new THREE.Mesh(new RoundedBoxGeometry(0.86, 0.24, 0.56, 2, 0.025), clayMat('#D39D62', 0.72));
-      crate.position.set(sx + ox, 0.94, 20.68);
-      lobbyDecor.add(crate);
-      for (let p = 0; p < 4; p++) {
-        const fruit = new THREE.Mesh(
-          new THREE.SphereGeometry(0.11, 10, 8),
-          (idx + bIdx + p) % 3 === 0
-            ? berryPinkMat
-            : (idx + bIdx + p) % 3 === 1
-              ? butterYellowMat
-              : leafMat,
+    const counterBase = new THREE.Mesh(new RoundedBoxGeometry(2.52, 0.82, 1.32, 3, 0.05), creamFoamMat);
+    counterBase.position.set(0, 0.41, 0);
+    const pinkSkirt = new THREE.Mesh(new RoundedBoxGeometry(2.54, 0.22, 1.34, 2, 0.03), berryPinkMat);
+    pinkSkirt.position.set(0, 0.12, 0);
+    const lowerShelf = new THREE.Mesh(new RoundedBoxGeometry(2.48, 0.08, 1.24, 2, 0.02), honeyOakMat);
+    lowerShelf.position.set(0, 0.85, 0);
+    const upperShelf = new THREE.Mesh(new RoundedBoxGeometry(2.38, 0.08, 0.62, 2, 0.02), honeyOakMat);
+    upperShelf.position.set(0, 1.38, 0.32);
+    const backBoard = new THREE.Mesh(new RoundedBoxGeometry(2.42, 0.82, 0.08, 2, 0.02), creamFoamMat);
+    backBoard.position.set(0, 1.24, 0.62);
+    rackGroup.add(counterBase, pinkSkirt, lowerShelf, upperShelf, backBoard);
+
+    if (idx === 0) {
+      // Shelf 1: Dairy & Eggs (Milk Cartons, Egg Trays, Cheese Wedges, Butter Blocks)
+      [-0.85, -0.58].forEach((mx) => {
+        const carton = new THREE.Mesh(new RoundedBoxGeometry(0.18, 0.32, 0.18, 2, 0.02), skyAccentMat);
+        carton.position.set(mx, 1.58, 0.32);
+        const cap = new THREE.Mesh(new RoundedBoxGeometry(0.19, 0.1, 0.19, 2, 0.02), creamFoamMat);
+        cap.position.set(mx, 1.72, 0.32);
+        rackGroup.add(carton, cap);
+      });
+      [0.05, 0.62].forEach((ex) => {
+        const tray = new THREE.Mesh(new RoundedBoxGeometry(0.44, 0.09, 0.32, 2, 0.02), latteTanMat);
+        tray.position.set(ex, 1.46, 0.32);
+        rackGroup.add(tray);
+        for (let r = 0; r < 2; r++) {
+          const egg = new THREE.Mesh(new THREE.SphereGeometry(0.058, 10, 8), creamFoamMat);
+          egg.scale.set(0.85, 1.22, 0.85);
+          egg.position.set(ex + (r - 0.5) * 0.16, 1.54, 0.32);
+          rackGroup.add(egg);
+        }
+      });
+      // Lower shelf: Cheese wedges & butter blocks inside baskets
+      [-0.65, 0.55].forEach((bx, bIdx) => {
+        const basket = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.16, 0.54, 2, 0.025), clayMat('#DDA96E', 0.68));
+        basket.position.set(bx, 0.96, -0.26);
+        rackGroup.add(basket);
+        [-0.22, 0.08, 0.34].forEach((ox) => {
+          const block = new THREE.Mesh(
+            bIdx === 0 ? new THREE.CylinderGeometry(0.11, 0.11, 0.12, 3) : new RoundedBoxGeometry(0.2, 0.11, 0.15, 2, 0.02),
+            butterYellowMat,
+          );
+          block.position.set(bx + ox, 1.07, -0.26);
+          rackGroup.add(block);
+        });
+      });
+    } else if (idx === 1) {
+      // Shelf 2: Popcorn Buckets, Noodle Cups, Flour Bags & Cacao Tins
+      [-0.78, -0.28].forEach((px) => {
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.1, 0.28, 12), berryPinkMat);
+        cup.position.set(px, 1.56, 0.32);
+        rackGroup.add(cup);
+        [-0.04, 0, 0.04].forEach((kx, kIdx) => {
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), butterYellowMat);
+          puff.position.set(px + kx, 1.72 + (kIdx % 2) * 0.03, 0.32);
+          rackGroup.add(puff);
+        });
+      });
+      [0.32, 0.78].forEach((nx, nIdx) => {
+        const tin = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.12, 0.12, 0.26, 12),
+          nIdx === 0 ? espressoBrownMat : creamFoamMat,
         );
-        fruit.position.set(sx + ox + (p - 1.5) * 0.17, 1.08 + (p % 2) * 0.05, 20.68 + ((p % 2) - 0.5) * 0.12);
-        lobbyDecor.add(fruit);
-      }
-    });
-    // Back shelf honey jars / milk bottles / golden baguettes
-    for (let j = -1; j <= 1; j++) {
-      const jar = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.09, 0.095, 0.24, 10),
-        idx === 1 ? creamFoamMat : butterYellowMat,
-      );
-      jar.position.set(sx + j * 0.48, 1.3, 21.3);
-      lobbyDecor.add(jar);
+        tin.position.set(nx, 1.55, 0.32);
+        const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.128, 0.128, 0.05, 12), honeyOakMat);
+        lid.position.set(nx, 1.69, 0.32);
+        rackGroup.add(tin, lid);
+      });
+      // Lower shelf: Flour sacks & golden noodle packs
+      [-0.65, 0.55].forEach((bx, bIdx) => {
+        const basket = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.16, 0.54, 2, 0.025), clayMat('#DDA96E', 0.68));
+        basket.position.set(bx, 0.96, -0.26);
+        rackGroup.add(basket);
+        [-0.2, 0.2].forEach((ox) => {
+          const pack = new THREE.Mesh(
+            new RoundedBoxGeometry(0.28, 0.22, 0.18, 2, 0.04),
+            bIdx === 0 ? creamFoamMat : butterYellowMat,
+          );
+          pack.position.set(bx + ox, 1.08, -0.26);
+          rackGroup.add(pack);
+        });
+      });
+    } else {
+      // Shelf 3: Strawberry Jam Jars, Honey Jars, Sausage & Chicken Packs
+      [-0.82, -0.35, 0.14, 0.62].forEach((jx, jIdx) => {
+        const jar = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.1, 0.1, 0.24, 12),
+          jIdx < 2 ? berryPinkMat : butterYellowMat,
+        );
+        jar.position.set(jx, 1.54, 0.32);
+        const cap = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.088, 0.088, 0.055, 12),
+          jIdx < 2 ? creamFoamMat : honeyOakMat,
+        );
+        cap.position.set(jx, 1.68, 0.32);
+        rackGroup.add(jar, cap);
+      });
+      [-0.65, 0.55].forEach((bx, bIdx) => {
+        const basket = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.16, 0.54, 2, 0.025), clayMat('#DDA96E', 0.68));
+        basket.position.set(bx, 0.96, -0.26);
+        rackGroup.add(basket);
+        [-0.22, 0.16].forEach((ox) => {
+          const tray = new THREE.Mesh(new RoundedBoxGeometry(0.32, 0.08, 0.28, 2, 0.02), creamFoamMat);
+          tray.position.set(bx + ox, 1.03, -0.26);
+          const meat = new THREE.Mesh(
+            new RoundedBoxGeometry(0.22, 0.06, 0.16, 2, 0.025),
+            bIdx === 0 ? clayMat('#D95B43', 0.55) : clayMat('#F29E7C', 0.55),
+          );
+          meat.position.set(bx + ox, 1.09, -0.26);
+          rackGroup.add(tray, meat);
+        });
+      });
     }
+    lobbyDecor.add(rackGroup);
   });
+
+  // Neat Peppa Checkout Counter beside Peppa (replaces awkward rolling cart!)
+  const checkoutCounter = new THREE.Mesh(new RoundedBoxGeometry(1.65, 0.88, 0.78, 3, 0.05), creamFoamMat);
+  checkoutCounter.position.set(25.75, 0.44, 19.35);
+  const checkoutTop = new THREE.Mesh(new RoundedBoxGeometry(1.74, 0.08, 0.86, 2, 0.03), berryPinkMat);
+  checkoutTop.position.set(25.75, 0.92, 19.35);
+  const peppaReg = new THREE.Mesh(new RoundedBoxGeometry(0.38, 0.26, 0.22, 2, 0.03), creamFoamMat);
+  peppaReg.position.set(25.65, 1.09, 19.35);
+  const peppaBasket = new THREE.Mesh(new RoundedBoxGeometry(0.42, 0.2, 0.3, 2, 0.03), skyAccentMat);
+  peppaBasket.position.set(26.18, 1.06, 19.35);
+  lobbyDecor.add(checkoutCounter, checkoutTop, peppaReg, peppaBasket);
+  colliders.push({type: 'box', id: 'mall_f1_peppa_checkout', x: 25.75, z: 19.35, hw: 0.92, hd: 0.48});
 
   // Striped Pastel Pink & Cream Canopy Overhead + Siêu Thị Mini của Peppa Signboard!
   [19.8, 28.2].forEach((px) => {
@@ -2274,31 +2564,6 @@ export function buildMallInteriorScene(): SubzoneWorld {
     label: 'Peppa',
     worldPos: new THREE.Vector3(PEPPA_X, 2.38, PEPPA_Z),
   });
-
-  // Cute Rolling Dessert & Pastry Pushcart at (27.4, 15.6)
-  const cartBody = new THREE.Mesh(new RoundedBoxGeometry(1.35, 0.78, 0.85, 3, 0.05), creamFoamMat);
-  cartBody.position.set(27.4, 0.58, 15.6);
-  const cartRoof = new THREE.Mesh(new RoundedBoxGeometry(1.52, 0.14, 1.02, 2, 0.04), berryPinkMat);
-  cartRoof.position.set(27.4, 1.92, 15.6);
-  [-0.58, 0.58].forEach((ox) => {
-    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.0, 8), honeyOakMat);
-    rod.position.set(27.4 + ox, 1.42, 15.6);
-    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.06, 14), warmWoodMat);
-    wheel.rotation.x = Math.PI / 2;
-    wheel.position.set(27.4 + ox, 0.18, 16.05);
-    lobbyDecor.add(rod, wheel);
-  });
-  const tartDome = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.18, 14), clearCaseGlassMat);
-  tartDome.position.set(27.4, 1.08, 15.6);
-  lobbyDecor.add(cartBody, cartRoof, tartDome);
-  colliders.push({type: 'box', id: 'mall_f1_dessert_cart', x: 27.4, z: 15.6, hw: 0.85, hd: 0.65});
-  addMallProxy(
-    group,
-    [1.55, 1.9, 1.1],
-    [27.4, 0.95, 15.6],
-    {kind: 'npc_peppa', tx: 25.8, tz: 15.6},
-    clickTargets,
-  );
 
   // 2 Bistro Dining Tables & 4 Interactive Chairs in SE Wing
   [
@@ -2446,172 +2711,299 @@ export function buildMallInteriorScene(): SubzoneWorld {
     );
   });
 
-  // Interactive Pastel Cloud Sofa & 2 Mushroom Stools
-  const cloudSofaBase = new THREE.Mesh(new RoundedBoxGeometry(2.2, 0.44, 0.92, 3, 0.14), lavenderMat);
-  cloudSofaBase.position.set(-15.6, 0.24, -11.2);
-  const cloudSofaBack = new THREE.Mesh(new RoundedBoxGeometry(2.2, 0.56, 0.34, 3, 0.14), lavenderMat);
-  cloudSofaBack.position.set(-15.6, 0.62, -11.55);
-  lobbyDecor.add(cloudSofaBase, cloudSofaBack);
-  colliders.push({type: 'box', id: 'mall_f1_cloud_sofa', x: -15.6, z: -11.2, hw: 1.18, hd: 0.56});
-  addMallProxy(
-    group,
-    [2.3, 1.0, 1.0],
-    [-15.6, 0.5, -11.2],
-    {
-      kind: 'bench',
-      seatSlots: [
-        {seatX: -16.15, seatZ: -11.15, seatY: 0.5, sitRotY: 0, tx: -16.15, tz: -10.1},
-        {seatX: -15.05, seatZ: -11.15, seatY: 0.5, sitRotY: 0, tx: -15.05, tz: -10.1},
-      ],
-      seatX: -15.6,
-      seatZ: -11.15,
-      seatY: 0.5,
-      sitRotY: 0,
-      tx: -15.6,
-      tz: -10.1,
-      sitMessage: 'Ngồi thử Ghế Sofa Mây Pastel cực êm tại Khu Cartoon Decor! (+Vui vẻ)',
-    },
-    clickTargets,
-  );
-
+  // Giant Pastel Rainbow Arch + Cartoon Cloud Floor Lamp + Plush/Gift Display Shelf (ZERO sinking seats!)
+  const rainbowGroup = new THREE.Group();
+  rainbowGroup.position.set(-15.6, 0.036, -11.4);
   [
-    [-18.2, -9.8],
-    [-13.6, -9.8],
-  ].forEach(([mx, mz], idx) => {
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.38, 12), creamFoamMat);
-    stem.position.set(mx, 0.21, mz);
-    const cap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.38, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55),
-      idx === 0 ? berryPinkMat : mintMat,
-    );
-    cap.position.set(mx, 0.34, mz);
-    lobbyDecor.add(stem, cap);
-    colliders.push({type: 'circle', id: `mall_f1_shroom_${idx}`, x: mx, z: mz, r: 0.42});
-    addMallProxy(
-      group,
-      [0.75, 0.65, 0.75],
-      [mx, 0.32, mz],
-      {
-        kind: 'bench',
-        tx: mx,
-        tz: mz + 0.9,
-        seatX: mx,
-        seatZ: mz,
-        seatY: 0.5,
-        sitRotY: 0,
-        sitMessage: 'Ghế nấm sắc màu siêu dễ thương! (+Vui vẻ)',
-      },
-      clickTargets,
-    );
+    {r: 1.55, tube: 0.12, mat: berryPinkMat},
+    {r: 1.33, tube: 0.11, mat: butterYellowMat},
+    {r: 1.12, tube: 0.11, mat: mintMat},
+    {r: 0.91, tube: 0.1, mat: skyAccentMat},
+  ].forEach(({r, tube, mat}) => {
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(r, tube, 10, 28, Math.PI), mat);
+    arc.position.y = 0.35;
+    rainbowGroup.add(arc);
   });
+  [-1.25, 1.25].forEach((cx) => {
+    const baseCloud = buildSculptedCloud(0.95, creamFoamMat);
+    baseCloud.position.set(cx, 0.25, 0);
+    rainbowGroup.add(baseCloud);
+  });
+  lobbyDecor.add(rainbowGroup);
+  colliders.push({type: 'circle', id: 'mall_f1_rainbow_l', x: -16.85, z: -11.4, r: 0.56});
+  colliders.push({type: 'circle', id: 'mall_f1_rainbow_r', x: -14.35, z: -11.4, r: 0.56});
+  addMallProxy(
+    group,
+    [3.2, 2.2, 1.1],
+    [-15.6, 1.1, -11.4],
+    {kind: 'mall_cartoon_gallery', tx: -15.6, tz: -9.5},
+    clickTargets,
+  );
 
-  // ---------- 7D. KHU VUI CHƠI GIẢI TRÍ & GACHA (NORTH-EAST OPEN WING: x=+11.8..+29, z=-22.2..-6.5) ----------
-  const arcadePad = new THREE.Mesh(
+  // Oversized Cartoon Cloud Floor Lamp at (-13.4, -14.8)
+  const lampPost = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.85, 10), goldMat);
+  lampPost.position.set(-13.4, 0.95, -14.8);
+  const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.44, 0.12, 14), lavenderMat);
+  lampBase.position.set(-13.4, 0.09, -14.8);
+  const lampCloud = buildSculptedCloud(0.92, warmLampMat);
+  lampCloud.position.set(-13.4, 1.98, -14.8);
+  lobbyDecor.add(lampPost, lampBase, lampCloud);
+  colliders.push({type: 'circle', id: 'mall_f1_cartoon_lamp', x: -13.4, z: -14.8, r: 0.48});
+
+  // Pastel Plush & Gift Display Shelf at (-26.8, -11.4)
+  const plushShelf = new THREE.Mesh(new RoundedBoxGeometry(2.1, 1.75, 0.64, 3, 0.06), lavenderMat);
+  plushShelf.position.set(-26.8, 0.91, -11.4);
+  const shelfStepA = new THREE.Mesh(new RoundedBoxGeometry(1.9, 0.08, 0.56, 2, 0.02), creamFoamMat);
+  shelfStepA.position.set(-26.8, 0.72, -11.35);
+  const shelfStepB = shelfStepA.clone();
+  shelfStepB.position.y = 1.28;
+  lobbyDecor.add(plushShelf, shelfStepA, shelfStepB);
+  [-27.3, -26.8, -26.3].forEach((px, idx) => {
+    const gift = new THREE.Mesh(
+      new RoundedBoxGeometry(0.32, 0.28, 0.28, 2, 0.04),
+      idx === 0 ? berryPinkMat : idx === 1 ? butterYellowMat : mintMat,
+    );
+    gift.position.set(px, 1.46, -11.24);
+    const plush = new THREE.Mesh(
+      new THREE.SphereGeometry(0.16, 10, 8),
+      idx === 1 ? creamFoamMat : berryPinkMat,
+    );
+    plush.position.set(px, 0.92, -11.24);
+    lobbyDecor.add(gift, plush);
+  });
+  colliders.push({type: 'box', id: 'mall_f1_plush_shelf', x: -26.8, z: -11.4, hw: 1.15, hd: 0.42});
+  addMallProxy(
+    group,
+    [2.1, 1.8, 0.8],
+    [-26.8, 0.9, -11.4],
+    {kind: 'mall_cartoon_gallery', tx: -26.8, tz: -9.7},
+    clickTargets,
+  );
+
+  // ---------- 7D. KHU VUI CHƠI MỀM PASTEL (NORTH-EAST OPEN WING: x=+11.8..+29, z=-22.2..-6.5) ----------
+  const playPad = new THREE.Mesh(
     new RoundedBoxGeometry(16.8, 0.036, 15.2, 2, 0.015),
-    clayMat('#E8F4FF', 0.62),
+    clayMat('#EEF6FF', 0.62),
   );
-  arcadePad.position.set(20.4, 0.018, -14.4);
-  lobbyDecor.add(arcadePad);
+  playPad.position.set(20.4, 0.018, -14.4);
+  lobbyDecor.add(playPad);
 
-  // 3 Claw / Gacha Prize Machines lined along z = -20.5
-  [15.8, 18.2, 20.6].forEach((cx, idx) => {
-    const machineCol = idx === 0 ? berryPinkMat : idx === 1 ? skyAccentMat : butterYellowMat;
-    const base = new THREE.Mesh(new RoundedBoxGeometry(1.38, 1.05, 1.12, 3, 0.06), machineCol);
-    base.position.set(cx, 0.54, -20.5);
-    const glassBox = new THREE.Mesh(new RoundedBoxGeometry(1.26, 1.18, 0.98, 2, 0.03), clearCaseGlassMat);
-    glassBox.position.set(cx, 1.64, -20.5);
-    const roof = new THREE.Mesh(new RoundedBoxGeometry(1.42, 0.26, 1.16, 3, 0.07), machineCol);
-    roof.position.set(cx, 2.34, -20.5);
-    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 8), darkMetalMat);
-    stick.position.set(cx - 0.2, 1.1, -19.86);
-    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), berryPinkMat);
-    knob.position.set(cx - 0.2, 1.18, -19.86);
-    lobbyDecor.add(base, glassBox, roof, stick, knob);
-    for (let p = 0; p < 5; p++) {
-      const cap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.14, 10, 8),
-        p % 3 === 0 ? butterYellowMat : p % 3 === 1 ? mintMat : lavenderMat,
-      );
-      cap.position.set(cx + (p - 2) * 0.2, 1.2 + (p % 2) * 0.12, -20.5 + ((p % 2) - 0.5) * 0.25);
-      lobbyDecor.add(cap);
-    }
+  // Soft Foam Pastel Play Mat Zones (clearly distinct from Town's outdoor grass/wood playground!)
+  [
+    {x: 15.6, z: -14.0, w: 4.4, d: 4.2, mat: clayMat('#FFE6EE', 0.66)},
+    {x: 21.2, z: -11.8, w: 5.0, d: 3.4, mat: clayMat('#E5F7EF', 0.66)},
+    {x: 25.6, z: -16.2, w: 4.4, d: 8.6, mat: clayMat('#FFF5DA', 0.66)},
+  ].forEach(({x, z, w, d, mat}) => {
+    const foam = new THREE.Mesh(new RoundedBoxGeometry(w, 0.032, d, 2, 0.014), mat);
+    foam.position.set(x, 0.042, z);
+    lobbyDecor.add(foam);
   });
-  colliders.push({type: 'box', id: 'mall_f1_gacha_row', x: 18.2, z: -20.5, hw: 3.35, hd: 0.72});
-  addMallProxy(
-    group,
-    [6.6, 2.4, 1.4],
-    [18.2, 1.2, -20.5],
-    {kind: 'mall_arcade', tx: 18.2, tz: -18.5},
-    clickTargets,
-  );
 
-  // 2 Pastel Retro Arcade Cabinets at (+25.8, -20.4) & (+27.8, -20.4)
-  [25.8, 27.8].forEach((ax, idx) => {
-    const cabMat = idx === 0 ? mintMat : lavenderMat;
-    const body = new THREE.Mesh(new RoundedBoxGeometry(1.12, 1.95, 0.96, 3, 0.06), cabMat);
-    body.position.set(ax, 0.99, -20.4);
-    const screen = new THREE.Mesh(new RoundedBoxGeometry(0.84, 0.62, 0.08, 2, 0.02), windowPaneMat);
-    screen.position.set(ax, 1.46, -19.93);
-    screen.rotation.x = -0.18;
-    const marquee = new THREE.Mesh(new RoundedBoxGeometry(0.96, 0.24, 0.12, 2, 0.02), warmLampMat);
-    marquee.position.set(ax, 1.88, -19.91);
-    lobbyDecor.add(body, screen, marquee);
-  });
-  colliders.push({type: 'box', id: 'mall_f1_arcade_cabs', x: 26.8, z: -20.4, hw: 1.85, hd: 0.68});
-  addMallProxy(
-    group,
-    [3.5, 2.1, 1.3],
-    [26.8, 1.05, -20.4],
-    {kind: 'mall_arcade', tx: 26.8, tz: -18.5},
-    clickTargets,
-  );
+  // (1) Interactive Pastel Rainbow Swing (Xích Đu Cầu Vồng) at (15.6, -14.0)
+  let mallSwingPivot: THREE.Group | null = null;
+  let mallSwingSeated = false;
+  let mallSwingPhase = 0;
+  let mallSwingAmp = 0.06;
+  {
+    const swingBase = new THREE.Group();
+    swingBase.position.set(15.6, 0.036, -14.0);
 
-  // Mini Air-Hockey Table at (+17.2, -13.2) & Cozy Beanbag Seats at (+14.8, -9.6) & (+17.4, -9.6)
-  const hockeyBody = new THREE.Mesh(new RoundedBoxGeometry(2.15, 0.24, 1.18, 3, 0.05), skyAccentMat);
-  hockeyBody.position.set(17.2, 0.72, -13.2);
-  const hockeyRink = new THREE.Mesh(new RoundedBoxGeometry(1.88, 0.04, 0.94, 2, 0.01), creamFoamMat);
-  hockeyRink.position.set(17.2, 0.85, -13.2);
-  [-0.82, 0.82].forEach((lx) => {
-    const leg = new THREE.Mesh(new RoundedBoxGeometry(0.18, 0.64, 0.88, 2, 0.03), darkMetalMat);
-    leg.position.set(17.2 + lx, 0.34, -13.2);
-    lobbyDecor.add(leg);
-  });
-  lobbyDecor.add(hockeyBody, hockeyRink);
-  colliders.push({type: 'box', id: 'mall_f1_airhockey', x: 17.2, z: -13.2, hw: 1.2, hd: 0.72});
-  addMallProxy(
-    group,
-    [2.2, 1.0, 1.3],
-    [17.2, 0.55, -13.2],
-    {kind: 'mall_arcade', tx: 17.2, tz: -11.5},
-    clickTargets,
-  );
+    [-1.24, 1.24].forEach((sx) => {
+      const legF = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.095, 2.6, 10), skyAccentMat);
+      legF.position.set(sx, 1.24, 0.42);
+      legF.rotation.x = -0.3;
+      const legB = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.095, 2.6, 10), berryPinkMat);
+      legB.position.set(sx, 1.24, -0.42);
+      legB.rotation.x = 0.3;
+      const cloudCap = buildSculptedCloud(0.58, creamFoamMat);
+      cloudCap.position.set(sx, 2.46, 0);
+      swingBase.add(legF, legB, cloudCap);
+    });
+    const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 2.7, 12), butterYellowMat);
+    crossbar.rotation.z = Math.PI / 2;
+    crossbar.position.y = 2.44;
+    const rainbowTop = new THREE.Mesh(new THREE.TorusGeometry(1.18, 0.075, 10, 24, Math.PI), berryPinkMat);
+    rainbowTop.position.set(0, 2.44, 0);
+    swingBase.add(crossbar, rainbowTop);
 
-  [14.8, 17.4].forEach((bx, idx) => {
-    const bag = new THREE.Mesh(
-      new THREE.SphereGeometry(0.56, 16, 12),
-      idx === 0 ? butterYellowMat : berryPinkMat,
-    );
-    bag.scale.set(1.12, 0.64, 1.12);
-    bag.position.set(bx, 0.26, -9.6);
-    lobbyDecor.add(bag);
-    colliders.push({type: 'circle', id: `mall_f1_beanbag_${idx}`, x: bx, z: -9.6, r: 0.56});
+    mallSwingPivot = new THREE.Group();
+    mallSwingPivot.position.set(0, 2.44, 0);
+    [-0.54, 0.54].forEach((rx) => {
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 1.8, 8), goldMat);
+      chain.position.set(rx, -0.9, 0);
+      mallSwingPivot!.add(chain);
+    });
+    const swingSeat = new THREE.Mesh(new RoundedBoxGeometry(1.22, 0.11, 0.5, 2, 0.04), berryPinkMat);
+    swingSeat.position.y = -1.8;
+    const seatCushion = new THREE.Mesh(new RoundedBoxGeometry(1.04, 0.05, 0.4, 2, 0.02), creamFoamMat);
+    seatCushion.position.y = -1.73;
+    mallSwingPivot.add(swingSeat, seatCushion);
+    swingBase.add(mallSwingPivot);
+    group.add(swingBase);
+
+    colliders.push({type: 'box', id: 'mall_f1_swing', x: 15.6, z: -14.0, hw: 1.45, hd: 0.72});
     addMallProxy(
       group,
-      [1.0, 0.65, 1.0],
-      [bx, 0.32, -9.6],
+      [2.6, 2.6, 1.5],
+      [15.6, 1.3, -14.0],
       {
-        kind: 'bench',
-        tx: bx,
-        tz: -8.3,
-        seatX: bx,
-        seatZ: -9.6,
-        seatY: 0.44,
+        kind: 'mall_swing',
+        tx: 15.6,
+        tz: -12.15,
+        seatX: 15.6,
+        seatZ: -14.0,
+        seatY: 0.72,
         sitRotY: 0,
-        sitMessage: 'Nghỉ ngơi trên ghế lười tại Khu Vui Chơi Mây Mall! (+Vui vẻ)',
       },
       clickTargets,
     );
-  });
+  }
+
+  // (2) Interactive Pastel Cloud Seesaw (Bập Bênh Đám Mây) at (21.2, -11.8)
+  let mallSeesawPivot: THREE.Group | null = null;
+  let mallSeesawRiderSide: -1 | 1 | null = null;
+  let mallSeesawPhase = 0;
+  let mallSeesawAngle = 0.08;
+  {
+    const seesawBase = new THREE.Group();
+    seesawBase.position.set(21.2, 0.036, -11.8);
+
+    const fulcrumBase = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.46, 0.56, 14), lavenderMat);
+    fulcrumBase.position.y = 0.28;
+    const starHub = buildSculptedStar(0.24, 0.09, butterYellowMat);
+    starHub.position.set(0, 0.48, 0.28);
+    seesawBase.add(fulcrumBase, starHub);
+
+    mallSeesawPivot = new THREE.Group();
+    mallSeesawPivot.position.set(0, 0.56, 0);
+    const beam = new THREE.Mesh(new RoundedBoxGeometry(3.25, 0.14, 0.52, 3, 0.05), skyAccentMat);
+    mallSeesawPivot.add(beam);
+
+    ([-1, 1] as const).forEach((side) => {
+      const seatXLocal = side * 1.18;
+      const pad = new THREE.Mesh(
+        new RoundedBoxGeometry(0.56, 0.1, 0.46, 2, 0.04),
+        side < 0 ? berryPinkMat : mintMat,
+      );
+      pad.position.set(seatXLocal, 0.11, 0);
+      const handleStem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.34, 8), butterYellowMat);
+      handleStem.position.set(side * 0.74, 0.22, 0);
+      const handleBar = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.38, 8), butterYellowMat);
+      handleBar.rotation.x = Math.PI / 2;
+      handleBar.position.set(side * 0.74, 0.38, 0);
+      mallSeesawPivot!.add(pad, handleStem, handleBar);
+    });
+    seesawBase.add(mallSeesawPivot);
+    group.add(seesawBase);
+
+    colliders.push({type: 'box', id: 'mall_f1_seesaw', x: 21.2, z: -11.8, hw: 1.75, hd: 0.55});
+    ([-1, 1] as const).forEach((side) => {
+      const seatWorldX = 21.2 + side * 1.18;
+      addMallProxy(
+        group,
+        [1.15, 1.0, 0.95],
+        [seatWorldX, 0.68, -11.8],
+        {
+          kind: 'mall_seesaw',
+          side,
+          tx: seatWorldX,
+          tz: -10.55,
+          seatX: seatWorldX,
+          seatZ: -11.8,
+          seatY: 0.76,
+          sitRotY: side < 0 ? Math.PI / 2 : -Math.PI / 2,
+        },
+        clickTargets,
+      );
+    });
+  }
+
+  // (3) Interactive Pastel Pink Cloud Slide (Cầu Tuột Mây Hồng) at (25.6, -16.8)
+  {
+    const slideGroup = new THREE.Group();
+    slideGroup.position.set(25.6, 0.036, 0);
+
+    // Top landing deck at z = -17.6, y = 1.85
+    [-0.58, 0.58].forEach((lx) => {
+      [-18.2, -17.0].forEach((lz) => {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.075, 2.7, 10), creamFoamMat);
+        post.position.set(lx, 1.35, lz);
+        slideGroup.add(post);
+      });
+    });
+    const deck = new THREE.Mesh(new RoundedBoxGeometry(1.36, 0.14, 1.36, 2, 0.04), berryPinkMat);
+    deck.position.set(0, 1.82, -17.6);
+    const canopyArch = new THREE.Mesh(new THREE.SphereGeometry(0.86, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), skyAccentMat);
+    canopyArch.scale.set(1.0, 0.65, 1.05);
+    canopyArch.position.set(0, 2.68, -17.6);
+    const canopyStar = buildSculptedStar(0.22, 0.06, butterYellowMat);
+    canopyStar.position.set(0, 3.35, -17.6);
+    slideGroup.add(deck, canopyArch, canopyStar);
+
+    // Back climbing steps from z = -19.2 up to z = -18.2
+    for (let st = 0; st < 5; st++) {
+      const step = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.1, 0.28, 2, 0.03), mintMat);
+      step.position.set(0, 0.3 + st * 0.34, -19.2 + st * 0.24);
+      slideGroup.add(step);
+    }
+    [-0.52, 0.52].forEach((rx) => {
+      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.1, 8), butterYellowMat);
+      rail.position.set(rx, 1.25, -18.75);
+      rail.rotation.x = 0.55;
+      slideGroup.add(rail);
+    });
+
+    // Smooth Curved Slide Chute descending forward (+Z) from z=-17.0 down to z=-13.2
+    const chuteSteps = 14;
+    for (let i = 0; i < chuteSteps; i++) {
+      const u = i / (chuteSteps - 1);
+      const cz = THREE.MathUtils.lerp(-17.0, -13.15, u);
+      const cy = THREE.MathUtils.lerp(1.76, 0.12, u * u * (3 - 2 * u));
+      const slopePitch = Math.atan2(1.64, 3.85) * (0.4 + 0.6 * Math.sin(u * Math.PI));
+      const seg = new THREE.Mesh(new RoundedBoxGeometry(0.94, 0.1, 0.42, 2, 0.03), berryPinkMat);
+      seg.position.set(0, cy, cz);
+      seg.rotation.x = slopePitch;
+      slideGroup.add(seg);
+
+      [-0.49, 0.49].forEach((wx) => {
+        const wall = new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.22, 0.42, 2, 0.025), creamFoamMat);
+        wall.position.set(wx, cy + 0.11, cz);
+        wall.rotation.x = slopePitch;
+        slideGroup.add(wall);
+      });
+    }
+
+    lobbyDecor.add(slideGroup);
+    colliders.push({type: 'box', id: 'mall_f1_slide', x: 25.6, z: -16.4, hw: 1.05, hd: 2.85});
+    addMallProxy(
+      group,
+      [1.8, 3.2, 6.2],
+      [25.6, 1.6, -16.2],
+      {kind: 'mall_slide', tx: 25.6, tz: -19.85},
+      clickTargets,
+    );
+  }
+
+  // (4) Cute Mini Pastel Ball Pit at (16.2, -19.6)
+  {
+    const pitWall = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.24, 12, 28), mintMat);
+    pitWall.rotation.x = Math.PI / 2;
+    pitWall.position.set(16.2, 0.24, -19.6);
+    const pitFloor = new THREE.Mesh(new THREE.CylinderGeometry(1.48, 1.48, 0.06, 24), creamFoamMat);
+    pitFloor.position.set(16.2, 0.06, -19.6);
+    lobbyDecor.add(pitWall, pitFloor);
+    for (let b = 0; b < 18; b++) {
+      const ang = (b / 18) * Math.PI * 2 + (b % 3) * 0.4;
+      const rad = 0.28 + ((b * 7) % 10) * 0.1;
+      const ball = new THREE.Mesh(
+        new THREE.SphereGeometry(0.15, 10, 8),
+        b % 4 === 0 ? berryPinkMat : b % 4 === 1 ? butterYellowMat : b % 4 === 2 ? skyAccentMat : lavenderMat,
+      );
+      ball.position.set(16.2 + Math.cos(ang) * rad, 0.2 + (b % 2) * 0.08, -19.6 + Math.sin(ang) * rad);
+      lobbyDecor.add(ball);
+    }
+    colliders.push({type: 'circle', id: 'mall_f1_ballpit', x: 16.2, z: -19.6, r: 1.75});
+  }
 
   // ---------- 7E. SOUTH-CENTRAL ATRIUM PEACH BLOSSOM FOUNTAIN & DIRECTORY BOARD ----------
   const fountainX = 0;
@@ -2714,9 +3106,16 @@ export function buildMallInteriorScene(): SubzoneWorld {
   const floor1RayMeshes: THREE.Object3D[] = [groundMesh];
   const floor2RayMeshes: THREE.Object3D[] = floor2WalkGroup.children;
 
-  // Dynamic Update: Tun idle breathing + smooth continuous fixed escalator step loop!
+  // Dynamic Update: Tun & Barista idle breathing + smooth escalator step loop + indoor Swing & Seesaw animations!
   const _stepDummy = new THREE.Object3D();
+  const _swingWorldPos = new THREE.Vector3();
+  const _seesawWorldPos = new THREE.Vector3();
+  let lastElapsed = 0;
+
   const update = (elapsed: number, timeOfDay: TimeOfDay) => {
+    const dt = Math.min(0.05, Math.max(0.001, elapsed - lastElapsed));
+    lastElapsed = elapsed;
+
     updateAvatarRigAnimation(tunRig, 'idle', elapsed, false);
     updateAvatarRigAnimation(baristaRig, 'idle', elapsed + 1.35, false);
     const isNight = timeOfDay === 'night';
@@ -2724,6 +3123,25 @@ export function buildMallInteriorScene(): SubzoneWorld {
     ceilingLightMat.emissiveIntensity = isNight ? 1.15 : 0.85;
     windowPaneMat.emissive.set(isNight ? '#3B6DA6' : '#8ED8F8');
     windowPaneMat.emissiveIntensity = isNight ? 0.28 : 0.16;
+
+    // Indoor Rainbow Swing pendulum
+    const targetSwingAmp = mallSwingSeated ? 0.48 : 0.065;
+    const swingFreq = mallSwingSeated ? 2.4 : 1.3;
+    mallSwingAmp = THREE.MathUtils.lerp(mallSwingAmp, targetSwingAmp, 1 - Math.exp(-3.6 * dt));
+    mallSwingPhase += dt * swingFreq;
+    if (mallSwingPivot) {
+      mallSwingPivot.rotation.x = Math.sin(mallSwingPhase) * mallSwingAmp;
+    }
+
+    // Indoor Cloud Seesaw gentle rocking
+    const seesawTargetAmp = mallSeesawRiderSide !== null ? 0.22 : 0.08;
+    const seesawFreq = mallSeesawRiderSide !== null ? 2.3 : 1.2;
+    mallSeesawPhase += dt * seesawFreq;
+    const targetRoll = Math.sin(mallSeesawPhase) * seesawTargetAmp;
+    mallSeesawAngle = THREE.MathUtils.lerp(mallSeesawAngle, targetRoll, 1 - Math.exp(-5.0 * dt));
+    if (mallSeesawPivot) {
+      mallSeesawPivot.rotation.z = mallSeesawAngle;
+    }
 
     // Smoothly scroll all 4 escalator lanes in 1 shared InstancedMesh (UP moves 0->UPPER, DOWN moves UPPER->0!)
     let instIdx = 0;
@@ -2752,6 +3170,35 @@ export function buildMallInteriorScene(): SubzoneWorld {
     clickTargets,
     labelAnchors,
     colliders,
+    setMallSwingSeated: (seated: boolean) => {
+      mallSwingSeated = seated;
+    },
+    getMallSwingSeatPose: () => {
+      if (!mallSwingPivot) return null;
+      mallSwingPivot.updateMatrixWorld(true);
+      _swingWorldPos.set(0, -1.7, 0).applyMatrix4(mallSwingPivot.matrixWorld);
+      return {
+        x: _swingWorldPos.x,
+        y: _swingWorldPos.y,
+        z: _swingWorldPos.z,
+        pitch: mallSwingPivot.rotation.x,
+      };
+    },
+    setMallSeesawRider: (side: -1 | 1 | null) => {
+      mallSeesawRiderSide = side;
+    },
+    getMallSeesawSeatPose: (side: -1 | 1) => {
+      if (!mallSeesawPivot) return null;
+      mallSeesawPivot.updateMatrixWorld(true);
+      _seesawWorldPos.set(side * 1.18, 0.18, 0).applyMatrix4(mallSeesawPivot.matrixWorld);
+      return {
+        x: _seesawWorldPos.x,
+        y: _seesawWorldPos.y,
+        z: _seesawWorldPos.z,
+        pitch: mallSeesawPivot.rotation.z * (side < 0 ? 0.35 : -0.35),
+        rotY: side < 0 ? Math.PI / 2 : -Math.PI / 2,
+      };
+    },
     update,
     dispose: () => {
       disposed = true;
