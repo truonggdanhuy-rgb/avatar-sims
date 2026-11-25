@@ -175,7 +175,7 @@ export const BoutiqueModal: React.FC<BoutiqueModalProps> = ({
 
               <div className="grid grid-cols-2 gap-2.5 pb-2 sm:grid-cols-3">
                 {items.map((item) => {
-                  const owned = ownedIds.includes(item.id) || item.price === 0;
+                  const owned = ownedIds.includes(item.id);
                   const equipped = isItemEquipped(avatar, item);
                   const previewing = isItemEquipped(previewAvatar, item);
                   const canAfford = coins >= item.price;

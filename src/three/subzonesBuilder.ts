@@ -2,13 +2,16 @@ import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {BOB_AVATAR, IVAN_AVATAR, TINA_AVATAR} from '../data/avatarCatalog';
 import {POND_FISH_SPECIES} from '../data/farmCatalog';
+import {FARM_DECOR_BY_ID} from '../data/farmDecorCatalog';
 import {FURNITURE_BY_ID, getHouseRoomAt, HouseRoomId} from '../data/furnitureCatalog';
 import {
+  BoatId,
   CoopKind,
   CoopTroughs,
   GardenPlotState,
   LivestockAnimalState,
   PaintStyleSpec,
+  PlacedFarmDecor,
   PlacedFurniture,
   PondFishState,
   TimeOfDay,
@@ -16,6 +19,7 @@ import {
 } from '../types/game';
 import {buildAvatarRig, updateAvatarRigAnimation} from './avatar3d';
 import {buildPlotBotanicalDecor} from './crops3d';
+import {buildFarmDecorMesh} from './farmDecor3d';
 import {
   createFishingSpotVisuals,
   FishingSpotVisuals,
@@ -105,6 +109,7 @@ export interface SubzoneWorld {
     rotY?: number,
     moving?: boolean,
     elapsed?: number,
+    boatId?: BoatId,
   ) => void;
   setTreehouseFocus?: (active: boolean) => void;
   setMallSwingSeated?: (seated: boolean) => void;
@@ -235,6 +240,8 @@ export function buildSubzoneScene(
     fishingState: 'idle' | 'waiting' | 'bite';
     placedFurniture?: PlacedFurniture[];
     editFurnitureMode?: boolean;
+    placedFarmDecor?: PlacedFarmDecor[];
+    editFarmDecorMode?: boolean;
     openDoors?: Record<string, boolean>;
     houseLightsOn?: boolean;
     lampStates?: Record<string, boolean>;
@@ -1093,8 +1100,8 @@ export function buildSubzoneScene(
             ? 0.22
             : cat.kind === 'armchair'
               ? 0.21
-              : cat.kind === 'tet_chair'
-                ? 0.06
+              : cat.kind === 'tet_chair' || cat.kind === 'beanbag_chair' || cat.kind === 'terrace_swing_egg'
+                ? 0.08
                 : 0.11;
         const seatPos = toWorld(0, seatLocalZ);
         const seatTopY = posY + (cat.surfaceHeight ?? 0.52);
@@ -1428,11 +1435,11 @@ export function buildSubzoneScene(
       }
     };
   } else if (zone === 'garden') {
-    // Spacious Open Farm Estate (54m x 40m) — lush grass, tall trees, 2 wide coops with low fences, big fish pond + bridge, back workshop row + mini warehouse & 20 crop beds
-    const farmGrassTex = createGrassTexture(13, 10);
+    // Spacious Expanded Farm Estate (74m x 56m) — extra open meadow & garden plots + Farm Decor Stall
+    const farmGrassTex = createGrassTexture(18, 14);
 
     const grassFloor = new THREE.Mesh(
-      new THREE.PlaneGeometry(54.0, 40.0),
+      new THREE.PlaneGeometry(74.0, 56.0),
       new THREE.MeshStandardMaterial({map: farmGrassTex, roughness: 0.88, metalness: 0}),
     );
     grassFloor.rotation.x = -Math.PI / 2;
@@ -1444,8 +1451,8 @@ export function buildSubzoneScene(
 
     // Sparse Town-Style Natural Stepping Stones directly on the grass (1 lightweight InstancedMesh draw call)
     const stepStoneSpots: [number, number, number, number][] = [];
-    // Main center north-south stepping stones
-    for (let i = 0, pz = -4.2; pz <= 12.2; i++, pz += 1.18) {
+    // Main center north-south stepping stones extending down to expanded exit gate (z = 21.8)
+    for (let i = 0, pz = -4.2; pz <= 20.6; i++, pz += 1.24) {
       const sx = (i % 2 === 0 ? -0.44 : 0.44) + ((i % 3) - 1) * 0.08;
       const scale = 0.88 + (i % 3) * 0.14;
       stepStoneSpots.push([sx, pz, scale, (i * 0.55) % (Math.PI * 2)]);
@@ -1480,38 +1487,43 @@ export function buildSubzoneScene(
     stepStoneIM.computeBoundingSphere();
     group.add(stepStoneIM);
 
-    // Tall broad-canopy trees surrounding the expanded Farm Estate perimeter (3 draw calls total!)
+    // Tall broad-canopy trees surrounding the expanded 74x56 Farm Estate perimeter
     const {trunkGeo, lowerCanopyGeo, upperCanopyGeo} = createTreeGeometries();
     const farmTreeList: [number, number, number][] = [
       // Back grove (-Z)
-      [-23.5, -17.2, 1.72],
-      [-17.5, -17.4, 1.62],
-      [-11.5, -17.5, 1.7],
-      [-5.5, -17.6, 1.66],
-      [0.5, -17.6, 1.76],
-      [6.5, -17.5, 1.64],
-      [12.5, -17.4, 1.6],
-      [18.5, -17.3, 1.7],
-      [23.8, -17.0, 1.74],
+      [-33.0, -24.5, 1.74],
+      [-25.8, -24.8, 1.68],
+      [-18.6, -24.9, 1.72],
+      [-11.4, -25.0, 1.66],
+      [-4.2, -25.0, 1.76],
+      [3.0, -25.0, 1.68],
+      [10.2, -24.9, 1.66],
+      [17.4, -24.8, 1.72],
+      [24.6, -24.7, 1.66],
+      [32.5, -24.4, 1.75],
       // Left forest border (-X)
-      [-24.2, -12.2, 1.68],
-      [-24.4, -5.8, 1.76],
-      [-24.4, 0.8, 1.66],
-      [-24.2, 7.4, 1.72],
-      [-23.6, 13.8, 1.62],
+      [-33.6, -18.0, 1.7],
+      [-33.8, -10.4, 1.76],
+      [-33.8, -2.6, 1.68],
+      [-33.8, 5.2, 1.74],
+      [-33.6, 13.0, 1.68],
+      [-33.0, 20.6, 1.65],
       // Right forest border (+X)
-      [24.0, -12.0, 1.68],
-      [24.4, -5.6, 1.75],
-      [24.4, 1.0, 1.66],
-      [24.2, 7.6, 1.7],
-      [23.5, 13.8, 1.6],
-      // Front corner shade trees flanking the entrance (clear of center gate)
-      [-19.2, 16.0, 1.6],
-      [-12.8, 16.2, 1.54],
-      [-6.8, 16.4, 1.5],
-      [6.8, 16.4, 1.52],
-      [12.8, 16.2, 1.56],
-      [19.2, 16.0, 1.62],
+      [33.4, -18.0, 1.7],
+      [33.8, -10.4, 1.76],
+      [33.8, -2.6, 1.68],
+      [33.8, 5.2, 1.74],
+      [33.6, 13.0, 1.66],
+      [32.8, 20.6, 1.64],
+      // Front corner shade trees flanking the expanded south gate (x = 0, z = 21.8 stays clear)
+      [-26.2, 23.6, 1.64],
+      [-18.8, 23.8, 1.58],
+      [-11.6, 23.8, 1.56],
+      [-5.8, 23.8, 1.52],
+      [5.8, 23.8, 1.54],
+      [11.6, 23.8, 1.56],
+      [18.8, 23.8, 1.58],
+      [26.2, 23.6, 1.64],
     ];
     const treeTrunkIM = new THREE.InstancedMesh(
       trunkGeo,
@@ -3737,21 +3749,170 @@ export function buildSubzoneScene(
       });
     }
 
+    // === 9. SẠP TRANG TRÍ NÔNG TRẠI (13.4, 13.8) + ĐỒ TRANG TRÍ NÔNG TRẠI ĐÃ ĐẶT ===
+    {
+      const stallPos = {x: 13.4, z: 13.8};
+      const stall = new THREE.Group();
+      stall.position.set(stallPos.x, 0, stallPos.z);
+      stall.rotation.y = -0.32;
+
+      const woodDark = clayMat('#7D4F2B', 0.78);
+      const woodWarm = clayMat('#C68D56', 0.7);
+      const mintMat = clayMat('#5CB689', 0.58);
+      const creamMat = clayMat('#FFF8EA', 0.65);
+
+      const deck = new THREE.Mesh(new RoundedBoxGeometry(3.4, 0.14, 2.2, 2, 0.04), woodWarm);
+      deck.position.y = 0.07;
+      const counter = new THREE.Mesh(new RoundedBoxGeometry(3.0, 0.92, 0.74, 2, 0.04), woodWarm);
+      counter.position.set(0, 0.54, 0.42);
+      const counterTop = new THREE.Mesh(new RoundedBoxGeometry(3.16, 0.1, 0.88, 2, 0.03), creamMat);
+      counterTop.position.set(0, 1.03, 0.42);
+      stall.add(deck, counter, counterTop);
+
+      [
+        [-1.38, -0.78],
+        [1.38, -0.78],
+        [-1.38, 0.76],
+        [1.38, 0.76],
+      ].forEach(([px, pz]) => {
+        const post = new THREE.Mesh(new RoundedBoxGeometry(0.14, 2.38, 0.14, 2, 0.03), woodDark);
+        post.position.set(px, 1.24, pz);
+        stall.add(post);
+      });
+
+      const roofGroup = new THREE.Group();
+      roofGroup.position.set(0, 2.48, 0);
+      roofGroup.rotation.x = 0.18;
+      for (let i = 0; i < 7; i++) {
+        const sw = 3.55 / 7;
+        const stripe = new THREE.Mesh(
+          new RoundedBoxGeometry(sw - 0.015, 0.11, 2.15, 2, 0.03),
+          i % 2 === 0 ? mintMat : creamMat,
+        );
+        stripe.position.set(-3.55 / 2 + sw * (i + 0.5), 0, 0);
+        roofGroup.add(stripe);
+      }
+      stall.add(roofGroup);
+
+      // Cute display flower pot & mini windmill crest on counter/roof
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.16, 0.24, 10), clayMat('#D67B52', 0.72));
+      pot.position.set(-0.85, 1.18, 0.44);
+      const blossom = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 7), glossyClayMat('#F7C53B', 0.35));
+      blossom.position.set(-0.85, 1.38, 0.44);
+      const signPlaque = new THREE.Mesh(new RoundedBoxGeometry(1.75, 0.42, 0.1, 2, 0.03), woodDark);
+      signPlaque.position.set(0, 2.86, 0.85);
+      const signFace = new THREE.Mesh(new RoundedBoxGeometry(1.56, 0.3, 0.12, 1, 0.02), creamMat);
+      signFace.position.set(0, 2.86, 0.86);
+      const miniBenchProp = new THREE.Mesh(new RoundedBoxGeometry(0.62, 0.24, 0.32, 2, 0.03), mintMat);
+      miniBenchProp.position.set(0.75, 1.18, 0.44);
+      stall.add(pot, blossom, signPlaque, signFace, miniBenchProp);
+
+      staticGardenGroup.add(stall);
+      colliders.push({type: 'box', x: stallPos.x, z: stallPos.z, hw: 1.75, hd: 1.15, rotY: -0.32});
+      addBoxProxy(
+        group,
+        [3.6, 2.8, 2.5],
+        [stallPos.x, 1.4, stallPos.z],
+        {kind: 'open_farm_decor_shop', tx: 12.2, tz: 16.1},
+        clickTargets,
+      );
+      labelAnchors.push({
+        id: 'farm_decor_stall',
+        label: 'Sạp Trang Trí',
+        worldPos: new THREE.Vector3(stallPos.x, 3.25, stallPos.z),
+      });
+    }
+
+    const farmDecorWindmills: THREE.Object3D[] = [];
+    const farmDecorBees: THREE.Object3D[] = [];
+    const farmDecorDucks: THREE.Object3D[] = [];
+    const farmDecorLanternMats: THREE.MeshStandardMaterial[] = [];
+    const placedFarmDecorList = options.placedFarmDecor ?? [];
+    placedFarmDecorList.forEach((pf) => {
+      const cat = FARM_DECOR_BY_ID[pf.catalogId];
+      if (!cat) return;
+      const built = buildFarmDecorMesh(cat, {isNight: false});
+      built.group.position.set(pf.x, 0, pf.z);
+      built.group.rotation.y = pf.rotY;
+      group.add(built.group);
+
+      if (built.windmillBlades) farmDecorWindmills.push(built.windmillBlades);
+      if (built.hoverBees) farmDecorBees.push(built.hoverBees);
+      if (built.floatingDuck) farmDecorDucks.push(built.floatingDuck);
+      if (built.lanternMat) farmDecorLanternMats.push(built.lanternMat);
+
+      if (!cat.walkable) {
+        colliders.push({
+          type: 'box',
+          id: pf.instanceId,
+          x: pf.x,
+          z: pf.z,
+          hw: cat.halfW,
+          hd: cat.halfD,
+          rotY: pf.rotY,
+        });
+      }
+
+      addBoxProxy(
+        built.group,
+        [Math.max(0.9, cat.halfW * 2.1), 1.65, Math.max(0.9, cat.halfD * 2.1)],
+        [0, 0.82, 0],
+        {kind: 'farm_decor', farmDecorId: pf.instanceId, catalogId: pf.catalogId},
+        clickTargets,
+      );
+    });
+
+    if (options.editFarmDecorMode) {
+      const guideMat = clayMat('#FFF8D6', 0.45);
+      const borderSpecs: [number, number, number, number][] = [
+        [0, -21.5, 61.0, 0.14],
+        [0, 21.5, 61.0, 0.14],
+        [-30.5, 0, 0.14, 43.0],
+        [30.5, 0, 0.14, 43.0],
+      ];
+      borderSpecs.forEach(([bx, bz, bw, bd]) => {
+        const line = new THREE.Mesh(new RoundedBoxGeometry(bw, 0.04, bd, 1, 0.01), guideMat);
+        line.position.set(bx, 0.025, bz);
+        staticGardenGroup.add(line);
+      });
+    }
+
     mergeStaticGroupByMaterial(
       staticGardenGroup,
       animatedMillWheel ? new Set([animatedMillWheel]) : undefined,
     );
     group.add(staticGardenGroup);
-    group.add(createExitDoorway('Cổng Thị Trấn', [0, 0, 12.6], '#6EA85C', clickTargets, labelAnchors));
+    group.add(createExitDoorway('Cổng Thị Trấn', [0, 0, 21.8], '#6EA85C', clickTargets, labelAnchors));
 
     let prevFarmElapsed = 0;
     let wanderSeed = 11;
     let millAnimAccum = 0;
-    updateFn = (elapsed, _tod, context) => {
+    let lastFarmTod: TimeOfDay | null = null;
+    updateFn = (elapsed, tod, context) => {
       const dt = prevFarmElapsed > 0 ? Math.min(0.08, elapsed - prevFarmElapsed) : 0.016;
       prevFarmElapsed = elapsed;
       const camX = context?.cameraPos?.x ?? 0;
       const camZ = context?.cameraPos?.z ?? 6;
+
+      if (tod !== lastFarmTod) {
+        lastFarmTod = tod;
+        const nightEmissive = tod === 'night' ? 1.85 : 0.22;
+        farmDecorLanternMats.forEach((m) => {
+          m.emissiveIntensity = nightEmissive;
+        });
+      }
+
+      farmDecorWindmills.forEach((blades, idx) => {
+        blades.rotation.z = -elapsed * 0.72 + idx * 0.5;
+      });
+      farmDecorBees.forEach((bees, idx) => {
+        bees.rotation.y = elapsed * 1.45 + idx * 0.9;
+        bees.position.y = 0.88 + Math.sin(elapsed * 3.4 + idx) * 0.04;
+      });
+      farmDecorDucks.forEach((duck, idx) => {
+        duck.position.y = 0.14 + Math.sin(elapsed * 2.5 + idx) * 0.022;
+        duck.rotation.y = Math.sin(elapsed * 0.7 + idx) * 0.35;
+      });
 
       if (animatedMillWheel) {
         const millDistSq = (camX + 6.6) * (camX + 6.6) + (camZ + 8.6) * (camZ + 8.6);

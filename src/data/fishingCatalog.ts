@@ -1,4 +1,6 @@
 import {
+  BoatId,
+  BoatsState,
   FishDexRecord,
   FishRarity,
   FishSpeciesDefinition,
@@ -13,11 +15,94 @@ export const WOODEN_ROD_PRICE = 90;
 export const WOODEN_ROD_MAX_DURABILITY = 25;
 export const WOODEN_ROD_FULL_REPAIR_COST = 28;
 export const WOODEN_BOAT_PRICE = 240;
+export const DUCK_BOAT_PRICE = 420;
+export const SWAN_PRINCESS_BOAT_PRICE = 560;
+export const PIRATE_GALLEON_BOAT_PRICE = 680;
+export const SPEEDBOAT_RETRO_PRICE = 780;
+export const LOTUS_LANTERN_BOAT_PRICE = 620;
+
+export interface BoatDefinition {
+  id: BoatId;
+  name: string;
+  price: number;
+  subtitle: string;
+  description: string;
+}
+
+export const BOAT_CATALOG: Record<BoatId, BoatDefinition> = {
+  wooden_boat: {
+    id: 'wooden_boat',
+    name: 'Thuyền Gỗ',
+    price: WOODEN_BOAT_PRICE,
+    subtitle: 'Thuyền chèo gỗ sồi ấm áp có đèn lồng mũi',
+    description:
+      'Chèo êm trên Sông Khu Sinh Thái và Biển Đảo Mây, vừa lướt sóng vừa quăng cần câu cá.',
+  },
+  duck_boat: {
+    id: 'duck_boat',
+    name: 'Thuyền Đạp Vịt',
+    price: DUCK_BOAT_PRICE,
+    subtitle: 'Thuyền vịt trắng đạp chân dễ thương có guồng nước xoay',
+    description:
+      'Mẫu thuyền đạp vịt công viên bo tròn đáng yêu, ghế đôi thoải mái, tay lái & bàn đạp nhịp nhàng khi lướt sông và biển.',
+  },
+  swan_princess_boat: {
+    id: 'swan_princess_boat',
+    name: 'Thuyền Thiên Nga Hồng',
+    price: SWAN_PRINCESS_BOAT_PRICE,
+    subtitle: 'Thuyền thiên nga hồng phấn đội vương miện vàng kiêu sa',
+    description:
+      'Đạp nước thanh lịch trên thân thiên nga ngọc trai hồng viền vàng, guồng nước lấp lánh dưới nắng.',
+  },
+  pirate_galleon_boat: {
+    id: 'pirate_galleon_boat',
+    name: 'Thuyền Hải Tặc Mini',
+    price: PIRATE_GALLEON_BOAT_PRICE,
+    subtitle: 'Chiến hạm gỗ nâu gắn cờ đầu lâu và đại bác đồng',
+    description:
+      'Chèo thuyền hải tặc tí hon đầy cá tính với lá cờ phất phơ trước mũi và bánh lái gỗ cổ điển.',
+  },
+  speedboat_retro: {
+    id: 'speedboat_retro',
+    name: 'Ca Nô Thể Thao Retro',
+    price: SPEEDBOAT_RETRO_PRICE,
+    subtitle: 'Ca nô cổ điển xanh bạc hà kính chắn gió & chân vịt xoay',
+    description:
+      'Lướt sóng cực ngầu cùng ca nô hai tông màu retro sang trọng, gắn động cơ chân vịt phía đuôi.',
+  },
+  lotus_lantern_boat: {
+    id: 'lotus_lantern_boat',
+    name: 'Thuyền Hoa Sen Đêm Trăng',
+    price: LOTUS_LANTERN_BOAT_PRICE,
+    subtitle: 'Thuyền cánh sen hồng ngọc treo đèn lồng ấm áp',
+    description:
+      'Con thuyền cánh sen dịu dàng mang đèn lồng phát sáng lung linh mỗi khi màn đêm buông xuống.',
+  },
+};
+
+export const BOAT_IDS: BoatId[] = [
+  'wooden_boat',
+  'duck_boat',
+  'swan_princess_boat',
+  'pirate_galleon_boat',
+  'speedboat_retro',
+  'lotus_lantern_boat',
+];
+
+export const BOAT_LIST: BoatDefinition[] = BOAT_IDS.map((id) => BOAT_CATALOG[id]);
 
 export function createInitialWoodenBoat(): WoodenBoatState {
   return {
     owned: false,
     purchasedAt: null,
+  };
+}
+
+export function createInitialBoatsState(): BoatsState {
+  return {
+    ownedIds: [],
+    activeBoatId: 'wooden_boat',
+    purchasedAt: {},
   };
 }
 

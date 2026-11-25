@@ -65,7 +65,17 @@ export type TopStyle =
   | 'panda_pajama'
   | 'denim_overalls'
   | 'puffer_jacket'
-  | 'coin_tunic';
+  | 'coin_tunic'
+  | 'ao_dai_lotus'
+  | 'ao_dai_peach'
+  | 'ao_dai_white'
+  | 'ao_dai_nam'
+  | 'lolita_dress'
+  | 'trench_coat'
+  | 'academy_blazer'
+  | 'bomber_jacket'
+  | 'turtleneck_sweater'
+  | 'hawaii_shirt';
 
 export type BottomStyle =
   | 'pleated_skirt'
@@ -80,7 +90,12 @@ export type BottomStyle =
   | 'pajama_pants'
   | 'overalls_pants'
   | 'tunic_pants'
-  | 'cloud_shorts';
+  | 'cloud_shorts'
+  | 'silk_culottes'
+  | 'tiered_lace_skirt'
+  | 'cargo_pants'
+  | 'plaid_skirt'
+  | 'flare_jeans';
 
 export type ShoeStyle =
   | 'sneakers'
@@ -91,6 +106,10 @@ export type ShoeStyle =
   | 'crocs_panda'
   | 'crocs_chick'
   | 'crocs_frog'
+  | 'crocs_bunny'
+  | 'crocs_dino'
+  | 'platform_sneakers'
+  | 'ribbon_heels'
   | 'rain_boots';
 
 export type HeadItemStyle =
@@ -110,14 +129,22 @@ export type HeadItemStyle =
   | 'flower_crown'
   | 'ribbon_bow'
   | 'hair_clip'
-  | 'flower_pin';
+  | 'flower_pin'
+  | 'non_la'
+  | 'khan_dong'
+  | 'bunny_beanie'
+  | 'royal_crown'
+  | 'headphone';
 
 export type AccessoryStyle =
   | 'none'
   | 'glasses'
   | 'sunglasses'
   | 'scarf'
-  | 'pearl_necklace';
+  | 'pearl_necklace'
+  | 'star_glasses'
+  | 'pearl_ribbon_choker'
+  | 'camera_strap';
 
 export type BackpackStyle =
   | 'none'
@@ -127,7 +154,11 @@ export type BackpackStyle =
   | 'bee_plush'
   | 'honey_bear'
   | 'carrot_basket'
-  | 'angel_wings';
+  | 'angel_wings'
+  | 'bunny_plush'
+  | 'strawberry_bear'
+  | 'astro_pack'
+  | 'crystal_wings';
 
 export type HandheldStyle =
   | 'none'
@@ -137,7 +168,10 @@ export type HandheldStyle =
   | 'blue_rose_bouquet'
   | 'cupid_bow'
   | 'tote_bag'
-  | 'mini_umbrella';
+  | 'mini_umbrella'
+  | 'paper_lantern'
+  | 'lotus_fan'
+  | 'matcha_latte';
 
 export type AvatarPose =
   | 'idle'
@@ -419,18 +453,20 @@ export interface BbqFoodDefinition {
   description: string;
 }
 
+export type DailyQuestKey =
+  | 'garden'
+  | 'livestock'
+  | 'fishing'
+  | 'insects'
+  | 'cooking'
+  | 'pet'
+  | 'decor'
+  | 'delivery';
+
 export interface DailyQuestProgress {
   date: string;
-  tasks: {
-    garden: boolean;
-    fishing: boolean;
-    dressup: boolean;
-  };
-  claimed: {
-    garden: boolean;
-    fishing: boolean;
-    dressup: boolean;
-  };
+  tasks: Record<DailyQuestKey, boolean>;
+  claimed: Record<DailyQuestKey, boolean>;
 }
 
 export type FurnitureCategory =
@@ -514,6 +550,18 @@ export type FurnitureKind =
   | 'open_book'
   | 'headphone_stand'
   | 'table_snack_tray'
+  | 'cozy_fireplace'
+  | 'fish_aquarium'
+  | 'beanbag_chair'
+  | 'cat_tree_tower'
+  | 'wall_gallery_frames'
+  | 'wall_mirror_arch'
+  | 'plush_bear_giant'
+  | 'coffee_maker_bar'
+  | 'toast_toaster_set'
+  | 'piano_keyboard'
+  | 'record_shelf_cabinet'
+  | 'terrace_swing_egg'
   | 'floor_paint'
   | 'wall_paint';
 
@@ -576,9 +624,23 @@ export interface BugNetState {
   maxDurability: number;
 }
 
+export type BoatId =
+  | 'wooden_boat'
+  | 'duck_boat'
+  | 'swan_princess_boat'
+  | 'pirate_galleon_boat'
+  | 'speedboat_retro'
+  | 'lotus_lantern_boat';
+
 export interface WoodenBoatState {
   owned: boolean;
   purchasedAt: number | null;
+}
+
+export interface BoatsState {
+  ownedIds: BoatId[];
+  activeBoatId: BoatId;
+  purchasedAt: Partial<Record<BoatId, number>>;
 }
 
 export type FishWaterType = 'river' | 'sea';
@@ -792,6 +854,91 @@ export interface OwnedMountsState {
   activeMountId: MountId | null;
   lastMountId: MountId | null;
 }
+
+export interface CheckInState {
+  completedDays: number; // 0..7 in current 7-day cycle
+  lastClaimDate: string | null; // YYYY-MM-DD
+}
+
+export type FarmDecorCategory =
+  | 'all'
+  | 'fence'
+  | 'garden'
+  | 'landmark'
+  | 'relax';
+
+export type FarmDecorKind =
+  | 'farm_fence_white'
+  | 'farm_fence_ranch'
+  | 'farm_hay_bale'
+  | 'farm_scarecrow'
+  | 'farm_flower_cart'
+  | 'farm_garden_bench'
+  | 'farm_lantern_post'
+  | 'farm_signpost'
+  | 'farm_sunflower_barrel'
+  | 'farm_picnic_blanket'
+  | 'farm_floral_arch'
+  | 'farm_mini_windmill'
+  | 'farm_stone_well'
+  | 'farm_birdbath_fountain'
+  | 'farm_wooden_pergola'
+  | 'farm_pumpkin_patch'
+  | 'farm_beehive_stand'
+  | 'farm_watering_trough'
+  | 'farm_duck_pond_mini'
+  | 'farm_mailbox_cute'
+  | 'farm_hammock_stand'
+  | 'farm_tractor_decor';
+
+export interface FarmDecorCatalogItem {
+  id: string;
+  kind: FarmDecorKind;
+  category: Exclude<FarmDecorCategory, 'all'>;
+  name: string;
+  price: number;
+  color: string;
+  accentColor: string;
+  halfW: number;
+  halfD: number;
+  walkable?: boolean;
+  description: string;
+}
+
+export interface PlacedFarmDecor {
+  instanceId: string;
+  catalogId: string;
+  x: number;
+  z: number;
+  rotY: number;
+}
+
+export type JoyboyTargetNpcId =
+  | 'koi'
+  | 'ship'
+  | 'tina'
+  | 'bob'
+  | 'ivan'
+  | 'tun'
+  | 'peppa'
+  | 'cafe';
+
+export interface JoyboyDeliveryOrder {
+  id: string;
+  targetNpcId: JoyboyTargetNpcId;
+  targetNpcName: string;
+  locationHint: string;
+  parcelName: string;
+  rewardCoins: number;
+  createdAt: number;
+}
+
+export interface JoyboyDeliveryState {
+  date: string;
+  completedCount: number; // max 2 / day
+  activeOrder: JoyboyDeliveryOrder | null;
+}
+
 
 
 

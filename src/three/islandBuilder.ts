@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import {TimeOfDay} from '../types/game';
+import {BoatId, TimeOfDay} from '../types/game';
 import {
   createFishingSpotVisuals,
   FishingSpotVisuals,
@@ -20,8 +20,10 @@ import {
   glossyClayMat,
   mergeStaticGroupByMaterial,
 } from './materials';
+import {BOAT_IDS} from '../data/fishingCatalog';
+import {buildBoatById, BuiltBoatRig} from './boat3d';
 import type {SubzoneUpdateContext, SubzoneWorld} from './subzonesBuilder';
-import {buildWoodenRowboat, TownAnchor, WorldCollider} from './townBuilder';
+import {TownAnchor, WorldCollider} from './townBuilder';
 
 export const ISLAND_WATER_Y = -0.35;
 export const ISLAND_SWIM_MAX_R = 72.0;
@@ -1032,30 +1034,34 @@ export function buildIslandScene(options?: {
     clickTargets,
   );
 
-  // Choice 2: Crafted Regular Wooden Rowboat moored cleanly parallel at East berth + Active Steerable Sea Boat
-  const mooredBoatBuilt = buildWoodenRowboat(false);
-  const mooredIslandBoat = mooredBoatBuilt.boat;
-  mooredIslandBoat.position.set(2.8, ISLAND_WATER_Y + 0.05, 31.7);
-  mooredIslandBoat.rotation.y = 0;
-  addBoxProxy(
-    mooredIslandBoat,
-    [1.85, 1.5, 3.1],
-    [0, 0.55, 0.1],
-    {
-      kind: 'island_boat_board',
-      tx: ISLAND_BOAT_INTERACT.tx,
-      tz: ISLAND_BOAT_INTERACT.tz,
-    },
-    clickTargets,
-  );
-  group.add(mooredIslandBoat);
+  // Choice 2: Crafted Boats (All 6 skins) moored cleanly parallel at East berth
+  const mooredIslandBoats: Partial<Record<BoatId, THREE.Group>> = {};
+  const activeIslandBoats: Partial<Record<BoatId, BuiltBoatRig>> = {};
+  for (const id of BOAT_IDS) {
+    const mooredBuilt = buildBoatById(id, false);
+    const mBoat = mooredBuilt.boat;
+    mBoat.position.set(2.8, ISLAND_WATER_Y + 0.05, 31.7);
+    mBoat.rotation.y = 0;
+    mBoat.visible = id === 'wooden_boat';
+    addBoxProxy(
+      mBoat,
+      [1.95, 1.75, 3.2],
+      [0, 0.6, 0.1],
+      {
+        kind: 'island_boat_board',
+        tx: ISLAND_BOAT_INTERACT.tx,
+        tz: ISLAND_BOAT_INTERACT.tz,
+      },
+      clickTargets,
+    );
+    group.add(mBoat);
+    mooredIslandBoats[id] = mBoat;
 
-  const activeBoatBuilt = buildWoodenRowboat(true);
-  const activeIslandBoat = activeBoatBuilt.boat;
-  const activeIslandOarL = activeBoatBuilt.oarLPivot;
-  const activeIslandOarR = activeBoatBuilt.oarRPivot;
-  activeIslandBoat.visible = false;
-  group.add(activeIslandBoat);
+    const activeBuilt = buildBoatById(id, true);
+    activeBuilt.boat.visible = false;
+    group.add(activeBuilt.boat);
+    activeIslandBoats[id] = activeBuilt;
+  }
 
   // =========================================================================
   // 4. OPEN-AIR ELEVATED TREE GARDEN TERRACE ("VƯỜN TRÊN CÂY") + ROPE LADDER
@@ -3150,22 +3156,43 @@ export function buildIslandScene(options?: {
     rotY = ISLAND_BOAT_SPAWN.rotY,
     moving = false,
     elapsed = 0,
+    boatId: BoatId = 'wooden_boat',
   ) => {
-    mooredIslandBoat.visible = !active;
-    activeIslandBoat.visible = active;
+    for (const id of BOAT_IDS) {
+      const mBoat = mooredIslandBoats[id];
+      if (mBoat) mBoat.visible = !active && id === boatId;
+      const aRig = activeIslandBoats[id];
+      if (aRig) aRig.boat.visible = active && id === boatId;
+    }
+
     if (active) {
-      const bob = Math.sin(elapsed * 2.2) * 0.028;
-      activeIslandBoat.position.set(x, ISLAND_WATER_Y + 0.05 + bob, z);
-      activeIslandBoat.rotation.set(
-        moving ? Math.sin(elapsed * 4.4) * 0.02 : Math.sin(elapsed * 1.7) * 0.01,
-        rotY,
-        Math.cos(elapsed * 2.1) * 0.018,
-      );
-      if (activeIslandOarL && activeIslandOarR) {
-        const stroke = moving ? Math.sin(elapsed * 5.6) * 0.42 : 0;
-        const dip = moving ? Math.cos(elapsed * 5.6) * 0.14 : 0;
-        activeIslandOarL.rotation.set(dip, stroke, 0);
-        activeIslandOarR.rotation.set(dip, -stroke, 0);
+      const rig = activeIslandBoats[boatId] ?? activeIslandBoats.wooden_boat;
+      if (rig) {
+        const bob = Math.sin(elapsed * 2.2) * 0.028;
+        rig.boat.position.set(x, ISLAND_WATER_Y + 0.05 + bob, z);
+        rig.boat.rotation.set(
+          moving ? Math.sin(elapsed * 4.4) * 0.02 : Math.sin(elapsed * 1.7) * 0.01,
+          rotY,
+          Math.cos(elapsed * 2.1) * 0.018,
+        );
+        if (rig.driveKind === 'oars' && rig.oarLPivot && rig.oarRPivot) {
+          const stroke = moving ? Math.sin(elapsed * 5.6) * 0.42 : 0;
+          const dip = moving ? Math.cos(elapsed * 5.6) * 0.14 : 0;
+          rig.oarLPivot.rotation.set(dip, stroke, 0);
+          rig.oarRPivot.rotation.set(dip, -stroke, 0);
+        } else if (rig.driveKind === 'pedal') {
+          const spin = moving ? elapsed * 6.8 : 0;
+          if (rig.wheelPivot) rig.wheelPivot.rotation.x = spin;
+          if (rig.crankPivot) rig.crankPivot.rotation.x = spin * 0.72;
+          if (rig.pedalLPivot) rig.pedalLPivot.rotation.x = -spin * 0.72;
+          if (rig.pedalRPivot) rig.pedalRPivot.rotation.x = -spin * 0.72;
+        } else if (rig.driveKind === 'motor') {
+          if (rig.wheelPivot) rig.wheelPivot.rotation.z = moving ? elapsed * 14 : elapsed * 1.8;
+        }
+        if (rig.sailPivot) {
+          rig.sailPivot.rotation.z = Math.sin(elapsed * 2.1) * 0.06;
+          rig.sailPivot.rotation.y = moving ? Math.sin(elapsed * 4.2) * 0.14 : Math.sin(elapsed * 1.5) * 0.06;
+        }
       }
     }
   };
@@ -3188,10 +3215,16 @@ export function buildIslandScene(options?: {
     mooredSwimFloat.rotation.z = Math.sin(elapsed * 1.65) * 0.05;
     mooredSwimFloat.rotation.x = Math.cos(elapsed * 1.4) * 0.032;
 
-    if (mooredIslandBoat.visible) {
-      mooredIslandBoat.position.y = ISLAND_WATER_Y + 0.05 + Math.sin(elapsed * 1.9) * 0.035;
-      mooredIslandBoat.rotation.z = Math.sin(elapsed * 1.5) * 0.03;
-      mooredIslandBoat.rotation.x = Math.cos(elapsed * 1.3) * 0.018;
+    const bobY = ISLAND_WATER_Y + 0.05 + Math.sin(elapsed * 1.9) * 0.035;
+    const bobZ = Math.sin(elapsed * 1.5) * 0.03;
+    const bobX = Math.cos(elapsed * 1.3) * 0.018;
+    for (const id of BOAT_IDS) {
+      const mBoat = mooredIslandBoats[id];
+      if (mBoat && mBoat.visible) {
+        mBoat.position.y = bobY;
+        mBoat.rotation.z = bobZ;
+        mBoat.rotation.x = bobX;
+      }
     }
 
     const waveAmp = timeOfDay === 'night' ? 0.032 : 0.045;

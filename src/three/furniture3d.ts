@@ -5905,6 +5905,668 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
       break;
     }
 
+    case 'cozy_fireplace': {
+      // Classic Cream Mantel Fireplace with Brick Hearth, Stacked Logs & Warm Glowing Embers (no PointLight spam)
+      const mantelMat = clayMat(item.color || '#F3ECE2', 0.52);
+      const brickMat = clayMat(item.accentColor || '#C57B48', 0.78);
+      const sootMat = clayMat('#2E2623', 0.9);
+      const hearthMat = clayMat('#A99A8B', 0.72);
+      const woodLogMat = clayMat('#7D4F2D', 0.85);
+      const emberMat = new THREE.MeshStandardMaterial({
+        color: '#FF7B29',
+        emissive: '#FF5400',
+        emissiveIntensity: 0.95,
+        roughness: 0.4,
+      });
+      const flameMat = new THREE.MeshStandardMaterial({
+        color: '#FFD166',
+        emissive: '#FF9E1B',
+        emissiveIntensity: 1.05,
+        roughness: 0.35,
+      });
+
+      const hearth = new THREE.Mesh(new RoundedBoxGeometry(1.42, 0.08, 0.66, 2, 0.015), hearthMat);
+      hearth.position.set(0, 0.04, 0.02);
+
+      // Left & right pillars + back recess + chimney breast
+      [-0.5, 0.5].forEach((px) => {
+        const pillar = new THREE.Mesh(
+          new RoundedBoxGeometry(0.32, 0.92, 0.54, 2, 0.02),
+          mantelMat,
+        );
+        pillar.position.set(px, 0.54, -0.02);
+        const trim = new THREE.Mesh(
+          new RoundedBoxGeometry(0.22, 0.76, 0.04, 2, 0.01),
+          clayMat('#E4D8C7', 0.56),
+        );
+        trim.position.set(px, 0.54, 0.245);
+        g.add(pillar, trim);
+      });
+
+      const backWall = new THREE.Mesh(new RoundedBoxGeometry(0.76, 0.86, 0.14, 1, 0.01), sootMat);
+      backWall.position.set(0, 0.51, -0.2);
+
+      const archHeader = new THREE.Mesh(new RoundedBoxGeometry(1.38, 0.2, 0.56, 2, 0.02), mantelMat);
+      archHeader.position.set(0, 0.91, -0.02);
+
+      const topShelf = new THREE.Mesh(new RoundedBoxGeometry(1.46, 0.07, 0.62, 2, 0.018), clayMat('#C89866', 0.58));
+      topShelf.position.set(0, 1.045, -0.01);
+
+      // Inner brick surround
+      [-0.32, 0.32].forEach((bx) => {
+        const brickSide = new THREE.Mesh(new RoundedBoxGeometry(0.08, 0.72, 0.42, 1, 0.008), brickMat);
+        brickSide.position.set(bx, 0.44, -0.02);
+        g.add(brickSide);
+      });
+      const brickTop = new THREE.Mesh(new RoundedBoxGeometry(0.72, 0.1, 0.42, 1, 0.008), brickMat);
+      brickTop.position.set(0, 0.76, -0.02);
+
+      // Stacked firewood logs & warm glowing flames
+      [-0.12, 0.12].forEach((lx, i) => {
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.34, 10), woodLogMat);
+        log.rotation.z = Math.PI / 2;
+        log.rotation.y = i === 0 ? 0.18 : -0.18;
+        log.position.set(lx * 0.4, 0.14, -0.02 + i * 0.06);
+        g.add(log);
+      });
+      const topLog = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.052, 0.3, 10), woodLogMat);
+      topLog.rotation.z = Math.PI / 2;
+      topLog.position.set(0, 0.21, 0);
+
+      const emberBed = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 8), emberMat);
+      emberBed.scale.set(1.3, 0.32, 0.75);
+      emberBed.position.set(0, 0.11, 0);
+
+      [
+        [-0.08, 0.29, 0.01, 0.055, 0.17],
+        [0, 0.33, -0.01, 0.072, 0.24],
+        [0.085, 0.28, 0.02, 0.052, 0.15],
+      ].forEach(([fx, fy, fz, rad, h]) => {
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(rad, h, 8), flameMat);
+        flame.position.set(fx, fy, fz);
+        g.add(flame);
+      });
+
+      // Decorative brass candle & tiny framed picture on mantel shelf
+      const miniFrame = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.28, 0.03, 1, 0.006), clayMat('#B9895B', 0.55));
+      miniFrame.position.set(-0.36, 1.22, -0.06);
+      miniFrame.rotation.x = -0.08;
+      const miniCanvas = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.01), clayMat('#CDE8F6', 0.6));
+      miniCanvas.position.set(-0.36, 1.22, -0.042);
+      miniCanvas.rotation.x = -0.08;
+
+      const potBody = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.05, 0.11, 12), glossyClayMat('#9AC7B5', 0.3));
+      potBody.position.set(0.4, 1.135, 0);
+      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 10), clayMat('#64A86B', 0.72));
+      bush.position.set(0.4, 1.23, 0);
+
+      g.add(hearth, backWall, archHeader, topShelf, brickTop, topLog, emberBed, miniFrame, miniCanvas, potBody, bush);
+      break;
+    }
+
+    case 'fish_aquarium': {
+      // Wooden Cabinet Stand + Illuminated Blue Glass Aquarium with Coral, Aquatic Plants & Cute Fish
+      const standMat = clayMat(item.color || '#D8C5A3', 0.58);
+      const trimMat = clayMat('#B69870', 0.62);
+      const waterMat = new THREE.MeshStandardMaterial({
+        color: item.accentColor || '#56B8E6',
+        emissive: '#1D74A8',
+        emissiveIntensity: 0.32,
+        roughness: 0.14,
+        transparent: true,
+        opacity: 0.68,
+      });
+      const glassFrameMat = clayMat('#2B3640', 0.35);
+
+      const cabinet = new THREE.Mesh(new RoundedBoxGeometry(1.18, 0.62, 0.5, 2, 0.02), standMat);
+      cabinet.position.y = 0.33;
+      [-0.28, 0.28].forEach((dx) => {
+        const door = new THREE.Mesh(new RoundedBoxGeometry(0.52, 0.52, 0.025, 2, 0.008), trimMat);
+        door.position.set(dx, 0.33, 0.252);
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), glossyClayMat('#E8D08B', 0.22));
+        knob.position.set(dx + (dx < 0 ? 0.19 : -0.19), 0.34, 0.27);
+        g.add(door, knob);
+      });
+      const topPlinth = new THREE.Mesh(new RoundedBoxGeometry(1.22, 0.05, 0.54, 2, 0.012), trimMat);
+      topPlinth.position.y = 0.665;
+
+      // Tank water volume + dark top/bottom rims
+      const botRim = new THREE.Mesh(new RoundedBoxGeometry(1.14, 0.04, 0.46, 1, 0.008), glassFrameMat);
+      botRim.position.y = 0.71;
+      const waterBox = new THREE.Mesh(new RoundedBoxGeometry(1.08, 0.56, 0.42, 1, 0.01), waterMat);
+      waterBox.position.y = 1.0;
+      const sandBed = new THREE.Mesh(new RoundedBoxGeometry(1.06, 0.06, 0.4, 1, 0.01), clayMat('#EED8AE', 0.85));
+      sandBed.position.y = 0.75;
+      const topHood = new THREE.Mesh(new RoundedBoxGeometry(1.15, 0.06, 0.47, 2, 0.012), glassFrameMat);
+      topHood.position.y = 1.3;
+
+      // Stones, kelp blades & coral inside tank
+      [-0.36, -0.31, 0.34].forEach((kx, i) => {
+        const kelp = new THREE.Mesh(
+          new THREE.ConeGeometry(0.03, 0.28 + i * 0.05, 7),
+          clayMat('#49A068', 0.65),
+        );
+        kelp.position.set(kx, 0.9, -0.06 + i * 0.04);
+        g.add(kelp);
+      });
+      const coral = new THREE.Mesh(new THREE.DodecahedronGeometry(0.07, 0), clayMat('#F28482', 0.6));
+      coral.position.set(0.18, 0.82, 0.04);
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.075, 0), clayMat('#7D8894', 0.82));
+      rock.scale.set(1.3, 0.8, 0.9);
+      rock.position.set(-0.14, 0.81, -0.03);
+
+      // 3 colorful little aquarium fish
+      [
+        [-0.22, 1.05, 0.05, '#FF8C42', 0],
+        [0.08, 0.96, -0.04, '#FFD166', Math.PI],
+        [0.26, 1.12, 0.04, '#FF6B97', 0.25],
+      ].forEach(([fx, fy, fz, col, ry]) => {
+        const fg = new THREE.Group();
+        fg.position.set(fx as number, fy as number, fz as number);
+        fg.rotation.y = ry as number;
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.042, 10, 8), clayMat(col as string, 0.4));
+        body.scale.set(1.4, 0.85, 0.55);
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.045, 4), clayMat(col as string, 0.45));
+        tail.rotation.z = -Math.PI / 2;
+        tail.position.x = -0.06;
+        fg.add(body, tail);
+        g.add(fg);
+      });
+
+      g.add(cabinet, topPlinth, botRim, waterBox, sandBed, topHood, coral, rock);
+      break;
+    }
+
+    case 'beanbag_chair': {
+      // Cozy Tear-Drop Pastel Beanbag Lounger with Piping Seam & Mini Accent Pillow
+      const bagMat = clayMat(item.color || '#F59CA9', 0.78);
+      const seamMat = clayMat(item.accentColor || '#FFF4E6', 0.68);
+
+      const basePuff = new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 14), bagMat);
+      basePuff.scale.set(1.04, 0.66, 1.06);
+      basePuff.position.set(0, 0.25, 0.02);
+
+      const backRest = new THREE.Mesh(new THREE.SphereGeometry(0.31, 16, 12), bagMat);
+      backRest.scale.set(1.06, 1.12, 0.72);
+      backRest.position.set(0, 0.44, -0.2);
+
+      const seatDip = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.31, 0.06, 16), seamMat);
+      seatDip.position.set(0, 0.38, 0.08);
+
+      const piping = new THREE.Mesh(new THREE.TorusGeometry(0.41, 0.015, 8, 24), seamMat);
+      piping.rotation.x = Math.PI / 2;
+      piping.position.set(0, 0.16, 0.02);
+
+      const miniPillow = new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.19, 0.09, 3, 0.035), seamMat);
+      miniPillow.position.set(0.04, 0.48, -0.06);
+      miniPillow.rotation.set(-0.35, -0.18, 0.1);
+
+      g.add(basePuff, backRest, seatDip, piping, miniPillow);
+      break;
+    }
+
+    case 'cat_tree_tower': {
+      // Multi-Level Sisal & Plush Cat Tree Tower with Condo House, Perch Bed & Dangling Pom-Pom
+      const plushMat = clayMat(item.color || '#EDE0CF', 0.85);
+      const sisalMat = clayMat(item.accentColor || '#D6A77A', 0.9);
+      const darkHoleMat = clayMat('#4C3D34', 0.9);
+      const pomMat = clayMat('#F28BA8', 0.7);
+
+      const basePlate = new THREE.Mesh(new RoundedBoxGeometry(0.68, 0.06, 0.64, 2, 0.018), plushMat);
+      basePlate.position.y = 0.03;
+
+      // Cozy cube condo on left-back
+      const condo = new THREE.Mesh(new RoundedBoxGeometry(0.36, 0.34, 0.36, 2, 0.025), plushMat);
+      condo.position.set(-0.12, 0.23, -0.06);
+      const condoOpening = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.105, 0.03, 14), darkHoleMat);
+      condoOpening.rotation.x = Math.PI / 2;
+      condoOpening.position.set(-0.12, 0.22, 0.12);
+
+      // Right sisal scratching post + mid platform
+      const postRight = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.055, 0.72, 12), sisalMat);
+      postRight.position.set(0.18, 0.42, 0.08);
+      const midShelf = new THREE.Mesh(new RoundedBoxGeometry(0.42, 0.045, 0.36, 2, 0.016), plushMat);
+      midShelf.position.set(0.08, 0.79, 0.04);
+
+      // Upper post + top cushioned round cat bed with cute cat ears rim
+      const postTop = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.052, 0.52, 12), sisalMat);
+      postTop.position.set(-0.08, 1.07, -0.04);
+      const topBed = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.2, 0.08, 16), plushMat);
+      topBed.position.set(-0.08, 1.35, -0.04);
+      const topRim = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.045, 10, 18), plushMat);
+      topRim.rotation.x = Math.PI / 2;
+      topRim.position.set(-0.08, 1.4, -0.04);
+
+      // Dangling string + pink pom-pom under top bed
+      const string = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.18, 6), sisalMat);
+      string.position.set(0.11, 1.22, 0.06);
+      const pom = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 10), pomMat);
+      pom.position.set(0.11, 1.12, 0.06);
+
+      // Cute cat ear accents on top rim
+      [-0.17, 0.01].forEach((ex) => {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.042, 0.075, 4), pomMat);
+        ear.position.set(ex, 1.46, -0.21);
+        g.add(ear);
+      });
+
+      g.add(basePlate, condo, condoOpening, postRight, midShelf, postTop, topBed, topRim, string, pom);
+      break;
+    }
+
+    case 'wall_gallery_frames': {
+      // Trio of Framed Pastel Botanical & Mountain Artworks Mounted Flush Facing +Z
+      const cy = item.mountHeight ?? 1.92;
+      const frameMat = clayMat(item.color || '#DFB684', 0.56);
+      const matBoardMat = clayMat('#FFFDF7', 0.72);
+      const specs: Array<[number, number, number, string, string]> = [
+        [-0.44, 0.34, 0.44, '#CFE9F7', '#7BB892'],
+        [0, 0.42, 0.54, '#FDE3EC', '#F4A261'],
+        [0.44, 0.34, 0.44, '#E8F3E0', item.accentColor || '#8ECAE6'],
+      ];
+      specs.forEach(([fx, fw, fh, bgHex, artHex], idx) => {
+        const fg = new THREE.Group();
+        fg.position.set(fx, cy + (idx === 1 ? 0.03 : -0.02), 0.018);
+
+        const outer = new THREE.Mesh(new RoundedBoxGeometry(fw, fh, 0.034, 2, 0.008), frameMat);
+        const matBoard = new THREE.Mesh(new THREE.BoxGeometry(fw - 0.06, fh - 0.06, 0.01), matBoardMat);
+        matBoard.position.z = 0.014;
+        const innerBg = new THREE.Mesh(new THREE.BoxGeometry(fw - 0.12, fh - 0.12, 0.008), clayMat(bgHex, 0.65));
+        innerBg.position.z = 0.019;
+
+        if (idx === 0) {
+          // Cute botanical leaf shape
+          const stem = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.18, 0.006), clayMat(artHex, 0.6));
+          stem.position.set(0, -0.02, 0.024);
+          const leafL = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), clayMat(artHex, 0.6));
+          leafL.scale.set(0.65, 1.3, 0.2);
+          leafL.rotation.z = 0.45;
+          leafL.position.set(-0.035, 0.02, 0.025);
+          const leafR = leafL.clone();
+          leafR.rotation.z = -0.45;
+          leafR.position.set(0.035, 0.05, 0.025);
+          fg.add(stem, leafL, leafR);
+        } else if (idx === 1) {
+          // Sunset mountain & sun artwork
+          const sun = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.006, 14), clayMat('#FFD166', 0.5));
+          sun.rotation.x = Math.PI / 2;
+          sun.position.set(0.04, 0.08, 0.025);
+          const peak1 = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.17, 4), clayMat(artHex, 0.65));
+          peak1.rotation.y = Math.PI / 4;
+          peak1.scale.z = 0.15;
+          peak1.position.set(-0.04, -0.06, 0.025);
+          const peak2 = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.13, 4), clayMat('#E76F51', 0.65));
+          peak2.rotation.y = Math.PI / 4;
+          peak2.scale.z = 0.15;
+          peak2.position.set(0.06, -0.08, 0.026);
+          fg.add(sun, peak1, peak2);
+        } else {
+          // Abstract pastel arch & clouds
+          const arch = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.006, 14), clayMat(artHex, 0.58));
+          arch.rotation.x = Math.PI / 2;
+          arch.position.set(0, -0.04, 0.025);
+          const moonDot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 10), clayMat('#F4A261', 0.5));
+          moonDot.scale.z = 0.25;
+          moonDot.position.set(-0.04, 0.08, 0.025);
+          fg.add(arch, moonDot);
+        }
+
+        fg.add(outer, matBoard, innerBg);
+        g.add(fg);
+      });
+      break;
+    }
+
+    case 'wall_mirror_arch': {
+      // Gold-Framed Arched Vanity Wall Mirror Facing +Z
+      const cy = item.mountHeight ?? 1.82;
+      const goldMat = glossyClayMat(item.color || '#E0B967', 0.22);
+      const glassMat = new THREE.MeshStandardMaterial({
+        color: item.accentColor || '#CDE8F5',
+        emissive: '#9BCBE2',
+        emissiveIntensity: 0.15,
+        roughness: 0.08,
+        metalness: 0.42,
+      });
+      const glintMat = new THREE.MeshStandardMaterial({
+        color: '#FFFFFF',
+        emissive: '#FFFFFF',
+        emissiveIntensity: 0.3,
+        roughness: 0.1,
+        transparent: true,
+        opacity: 0.55,
+      });
+
+      const rectBack = new THREE.Mesh(new RoundedBoxGeometry(0.6, 0.72, 0.036, 2, 0.012), goldMat);
+      rectBack.position.set(0, cy - 0.12, 0.018);
+      const archBack = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.036, 22), goldMat);
+      archBack.rotation.x = Math.PI / 2;
+      archBack.position.set(0, cy + 0.24, 0.018);
+
+      const rectGlass = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.68, 0.014), glassMat);
+      rectGlass.position.set(0, cy - 0.1, 0.034);
+      const archGlass = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.014, 22), glassMat);
+      archGlass.rotation.x = Math.PI / 2;
+      archGlass.position.set(0, cy + 0.24, 0.034);
+
+      const glint = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.44, 0.005), glintMat);
+      glint.position.set(-0.11, cy + 0.06, 0.043);
+      glint.rotation.z = -0.32;
+
+      g.add(rectBack, archBack, rectGlass, archGlass, glint);
+      break;
+    }
+
+    case 'plush_bear_giant': {
+      // Huggable Seated Giant Honey Teddy Bear with Cute Bowtie & Rosy Cheeks
+      const furMat = clayMat(item.color || '#D79E68', 0.86);
+      const muzzleMat = clayMat('#F8E7CE', 0.8);
+      const bowMat = clayMat(item.accentColor || '#E86A7D', 0.6);
+      const darkMat = glossyClayMat('#2B211B', 0.22);
+      const blushMat = clayMat('#F497A6', 0.75);
+
+      const belly = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 14), furMat);
+      belly.scale.set(1.02, 1.15, 0.92);
+      belly.position.set(0, 0.25, -0.02);
+      const tummyPatch = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), muzzleMat);
+      tummyPatch.scale.set(0.95, 1.05, 0.35);
+      tummyPatch.position.set(0, 0.24, 0.17);
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 16, 14), furMat);
+      head.position.set(0, 0.56, 0.01);
+      const snout = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 10), muzzleMat);
+      snout.scale.set(1.15, 0.85, 0.9);
+      snout.position.set(0, 0.52, 0.19);
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), darkMat);
+      nose.scale.set(1.3, 0.9, 0.8);
+      nose.position.set(0, 0.545, 0.265);
+
+      [-1, 1].forEach((s) => {
+        const ear = new THREE.Mesh(new THREE.SphereGeometry(0.072, 12, 10), furMat);
+        ear.position.set(s * 0.165, 0.72, -0.01);
+        const earIn = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8), muzzleMat);
+        earIn.position.set(s * 0.165, 0.72, 0.045);
+
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), darkMat);
+        eye.position.set(s * 0.075, 0.6, 0.19);
+        const blush = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), blushMat);
+        blush.scale.set(1.2, 0.7, 0.3);
+        blush.position.set(s * 0.115, 0.55, 0.175);
+
+        const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.16, 6, 10), furMat);
+        arm.position.set(s * 0.22, 0.33, 0.08);
+        arm.rotation.set(-0.5, 0, s * 0.35);
+
+        const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.18, 6, 10), furMat);
+        leg.position.set(s * 0.15, 0.09, 0.18);
+        leg.rotation.set(Math.PI / 2 - 0.12, s * 0.24, 0);
+        const pawPad = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), muzzleMat);
+        pawPad.scale.set(0.95, 1.15, 0.3);
+        pawPad.position.set(s * 0.19, 0.1, 0.31);
+
+        g.add(ear, earIn, eye, blush, arm, leg, pawPad);
+      });
+
+      // Cute bow tie at neck
+      [-0.045, 0.045].forEach((bx, idx) => {
+        const wing = new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.07, 4), bowMat);
+        wing.rotation.z = idx === 0 ? -Math.PI / 2 : Math.PI / 2;
+        wing.position.set(bx, 0.39, 0.2);
+        g.add(wing);
+      });
+      const bowKnot = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), bowMat);
+      bowKnot.position.set(0, 0.39, 0.21);
+
+      g.add(belly, tummyPatch, head, snout, nose, bowKnot);
+      break;
+    }
+
+    case 'coffee_maker_bar': {
+      // Compact Pastel Sage Countertop Espresso Machine + Mug & Coffee Bean Jar
+      const machineMat = glossyClayMat(item.color || '#98C4AE', 0.28);
+      const chromeMat = glossyClayMat(item.accentColor || '#E8EEF2', 0.18);
+      const darkMat = clayMat('#2E2623', 0.72);
+      const mugMat = glossyClayMat('#FFF8F0', 0.22);
+
+      const baseTray = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.03, 0.2, 2, 0.008), chromeMat);
+      baseTray.position.set(-0.04, 0.015, 0);
+      const rearTower = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.27, 0.12, 2, 0.015), machineMat);
+      rearTower.position.set(-0.04, 0.15, -0.04);
+      const topHead = new THREE.Mesh(new RoundedBoxGeometry(0.23, 0.07, 0.19, 2, 0.014), machineMat);
+      topHead.position.set(-0.04, 0.275, 0);
+
+      const groupHead = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.038, 0.035, 12), chromeMat);
+      groupHead.position.set(-0.04, 0.225, 0.04);
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.012, 0.09, 8), darkMat);
+      handle.rotation.x = Math.PI / 2;
+      handle.position.set(-0.04, 0.225, 0.11);
+
+      const gauge = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.012, 12), mugMat);
+      gauge.rotation.x = Math.PI / 2;
+      gauge.position.set(-0.04, 0.275, 0.096);
+
+      const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.028, 0.062, 12), mugMat);
+      mug.position.set(-0.04, 0.062, 0.04);
+      const coffee = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.008, 12), clayMat('#52321E', 0.35));
+      coffee.position.set(-0.04, 0.09, 0.04);
+
+      // Cute glass bean canister on right
+      const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.12, 12), clayMat('#6B4429', 0.5));
+      jar.position.set(0.135, 0.062, 0.01);
+      const jarLid = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.022, 12), clayMat('#D8B282', 0.55));
+      jarLid.position.set(0.135, 0.13, 0.01);
+
+      g.add(baseTray, rearTower, topHead, groupHead, handle, gauge, mug, coffee, jar, jarLid);
+      break;
+    }
+
+    case 'toast_toaster_set': {
+      // Retro Butter-Cream Pop-Up Toaster with Two Golden Toasts + Butter Dish & Jam Jar
+      const toasterMat = glossyClayMat(item.color || '#F5E4B7', 0.24);
+      const toastMat = clayMat(item.accentColor || '#D88C51', 0.78);
+      const crumbMat = clayMat('#F4CF8A', 0.82);
+      const chromeMat = glossyClayMat('#DCE4EC', 0.2);
+
+      const body = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.135, 0.14, 3, 0.024), toasterMat);
+      body.position.set(-0.04, 0.072, 0);
+      const footBase = new THREE.Mesh(new RoundedBoxGeometry(0.21, 0.014, 0.15, 2, 0.006), chromeMat);
+      footBase.position.set(-0.04, 0.007, 0);
+
+      const lever = new THREE.Mesh(new RoundedBoxGeometry(0.024, 0.016, 0.026, 1, 0.005), chromeMat);
+      lever.position.set(0.07, 0.09, 0);
+
+      // Two crispy toast slices popping out top
+      [-0.028, 0.028].forEach((tz) => {
+        const crust = new THREE.Mesh(new RoundedBoxGeometry(0.11, 0.085, 0.022, 2, 0.006), toastMat);
+        crust.position.set(-0.04, 0.145, tz);
+        const breadFace = new THREE.Mesh(new RoundedBoxGeometry(0.094, 0.068, 0.024, 1, 0.004), crumbMat);
+        breadFace.position.set(-0.04, 0.145, tz);
+        g.add(crust, breadFace);
+      });
+
+      // Tiny strawberry jam jar beside toaster
+      const jam = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.07, 12), glossyClayMat('#E85D75', 0.3));
+      jam.position.set(0.115, 0.035, 0.025);
+      const jamLid = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.016, 12), chromeMat);
+      jamLid.position.set(0.115, 0.076, 0.025);
+
+      g.add(body, footBase, lever, jam, jamLid);
+      break;
+    }
+
+    case 'piano_keyboard': {
+      // Ivory Upright Digital Piano with Black/White Keys, Music Stand, Sheet Music & Padded Bench
+      const woodMat = glossyClayMat(item.color || '#FAF6EE', 0.34);
+      const darkMat = clayMat(item.accentColor || '#4A3F37', 0.52);
+      const whiteKeyMat = glossyClayMat('#FFFFFF', 0.22);
+      const goldMat = glossyClayMat('#D8B55B', 0.22);
+
+      const keybed = new THREE.Mesh(new RoundedBoxGeometry(1.36, 0.12, 0.44, 2, 0.016), woodMat);
+      keybed.position.set(0, 0.72, -0.02);
+      const backPanel = new THREE.Mesh(new RoundedBoxGeometry(1.34, 0.18, 0.16, 2, 0.015), woodMat);
+      backPanel.position.set(0, 0.83, -0.16);
+
+      [-0.6, 0.6].forEach((lx) => {
+        const leg = new THREE.Mesh(new RoundedBoxGeometry(0.075, 0.7, 0.36, 2, 0.012), woodMat);
+        leg.position.set(lx, 0.35, -0.02);
+        g.add(leg);
+      });
+      const modesty = new THREE.Mesh(new RoundedBoxGeometry(1.16, 0.36, 0.04, 1, 0.008), woodMat);
+      modesty.position.set(0, 0.48, -0.17);
+
+      // 3 brass pedals at floor
+      [-0.08, 0, 0.08].forEach((px) => {
+        const pedal = new THREE.Mesh(new RoundedBoxGeometry(0.035, 0.022, 0.09, 1, 0.005), goldMat);
+        pedal.position.set(px, 0.02, -0.06);
+        g.add(pedal);
+      });
+
+      // White & black piano keys
+      const whiteKeys = new THREE.Mesh(new RoundedBoxGeometry(1.18, 0.035, 0.18, 1, 0.004), whiteKeyMat);
+      whiteKeys.position.set(0, 0.785, 0.09);
+      g.add(whiteKeys);
+      for (let i = -9; i <= 9; i++) {
+        if (Math.abs(i) % 7 === 0 || Math.abs(i) % 7 === 3) continue;
+        const bk = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.032, 0.105), darkMat);
+        bk.position.set(i * 0.056, 0.805, 0.045);
+        g.add(bk);
+      }
+
+      // Music rest + open sheet music
+      const stand = new THREE.Mesh(new RoundedBoxGeometry(0.46, 0.24, 0.018, 1, 0.005), woodMat);
+      stand.position.set(0, 1.02, -0.1);
+      stand.rotation.x = -0.22;
+      const sheet = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.2, 0.01), whiteKeyMat);
+      sheet.position.set(0, 1.03, -0.086);
+      sheet.rotation.x = -0.22;
+
+      g.add(keybed, backPanel, modesty, stand, sheet);
+      break;
+    }
+
+    case 'record_shelf_cabinet': {
+      // Mid-Century Oak Turntable Console Cabinet with Vinyl Records & Retro Speaker
+      const oakMat = clayMat(item.color || '#C7925B', 0.62);
+      const darkMat = clayMat(item.accentColor || '#3A3A44', 0.48);
+      const vinylMat = glossyClayMat('#1E1E24', 0.2);
+
+      // Tapered legs
+      [
+        [-0.54, -0.2],
+        [0.54, -0.2],
+        [-0.54, 0.2],
+        [0.54, 0.2],
+      ].forEach(([lx, lz]) => {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.016, 0.22, 8), oakMat);
+        leg.position.set(lx, 0.11, lz);
+        g.add(leg);
+      });
+
+      const boxBody = new THREE.Mesh(new RoundedBoxGeometry(1.24, 0.62, 0.5, 2, 0.018), oakMat);
+      boxBody.position.y = 0.53;
+      const shelfVoid = new THREE.Mesh(new THREE.BoxGeometry(1.14, 0.52, 0.44), clayMat('#8A5F38', 0.72));
+      shelfVoid.position.set(0, 0.53, 0.035);
+      const midDivider = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.52, 0.45), oakMat);
+      midDivider.position.set(0, 0.53, 0.03);
+
+      // Colorful vinyl sleeves lined vertically on left compartment
+      ['#E76F51', '#F4C44E', '#5FAEE3', '#75C3A5', '#F28BA8', '#A78BFA', '#E9C46A'].forEach((hex, idx) => {
+        const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.44, 0.36), clayMat(hex, 0.65));
+        sleeve.position.set(-0.48 + idx * 0.068, 0.51, 0.04);
+        sleeve.rotation.z = idx === 6 ? -0.15 : 0;
+        g.add(sleeve);
+      });
+
+      // Retro mesh speaker inside right compartment
+      const speakerBox = new THREE.Mesh(new RoundedBoxGeometry(0.42, 0.38, 0.32, 2, 0.014), darkMat);
+      speakerBox.position.set(0.3, 0.48, 0.05);
+      const woofer = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.018, 8, 18), clayMat('#C8A464', 0.4));
+      woofer.position.set(0.3, 0.46, 0.212);
+
+      // Turntable platter & spinning vinyl LP on top surface (surfaceHeight = 0.88)
+      const plinth = new THREE.Mesh(new RoundedBoxGeometry(0.5, 0.045, 0.38, 2, 0.01), clayMat('#EDE2D2', 0.48));
+      plinth.position.set(-0.22, 0.862, 0);
+      const recordDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.145, 0.145, 0.008, 22), vinylMat);
+      recordDisc.position.set(-0.26, 0.89, 0);
+      const labelDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.01, 16), clayMat('#E76F51', 0.55));
+      labelDisc.position.set(-0.26, 0.891, 0);
+      const toneArm = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.17, 6), glossyClayMat('#D4DDE5', 0.2));
+      toneArm.rotation.x = Math.PI / 2;
+      toneArm.rotation.z = 0.38;
+      toneArm.position.set(-0.08, 0.9, 0.02);
+
+      // Potted mini succulent on right top
+      const miniPot = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.1, 12), clayMat('#E29578', 0.6));
+      miniPot.position.set(0.36, 0.89, -0.02);
+      const plant = new THREE.Mesh(new THREE.DodecahedronGeometry(0.075, 0), clayMat('#68B074', 0.7));
+      plant.position.set(0.36, 0.97, -0.02);
+
+      g.add(boxBody, shelfVoid, midDivider, speakerBox, woofer, plinth, recordDisc, labelDisc, toneArm, miniPot, plant);
+      break;
+    }
+
+    case 'terrace_swing_egg': {
+      // Boho Rattan Egg Swing Chair on Curved Metal Stand with Plush Pink Cushion
+      const rattanMat = clayMat(item.color || '#E2C397', 0.72);
+      const cushionMat = clayMat(item.accentColor || '#F7A8B8', 0.78);
+      const standMat = glossyClayMat('#4A4540', 0.38);
+
+      // Circular base ring + curved C-arm stand
+      const baseRing = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.026, 10, 28), standMat);
+      baseRing.rotation.x = Math.PI / 2;
+      baseRing.position.y = 0.026;
+
+      const rearPole = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.028, 1.38, 10), standMat);
+      rearPole.position.set(0, 0.72, -0.36);
+      rearPole.rotation.x = 0.08;
+
+      const archArm = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.022, 8, 18, Math.PI * 0.62), standMat);
+      archArm.rotation.y = Math.PI / 2;
+      archArm.position.set(0, 1.36, -0.02);
+
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.22, 6), glossyClayMat('#D6DEE5', 0.2));
+      chain.position.set(0, 1.5, 0.02);
+
+      // Woven rattan egg shell basket (back dome + front rim + ribs)
+      const basketBack = new THREE.Mesh(
+        new THREE.SphereGeometry(0.44, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.62),
+        rattanMat,
+      );
+      basketBack.rotation.x = -Math.PI * 0.5;
+      basketBack.scale.set(0.95, 1.0, 1.18);
+      basketBack.position.set(0, 0.84, 0.04);
+
+      const basketRim = new THREE.Mesh(new THREE.TorusGeometry(0.39, 0.032, 10, 24), rattanMat);
+      basketRim.scale.set(0.96, 1.18, 1);
+      basketRim.position.set(0, 0.84, 0.16);
+
+      // Thick plush cushion inside egg seat (surfaceHeight = 0.56)
+      const seatCushion = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 12), cushionMat);
+      seatCushion.scale.set(1.05, 0.45, 0.95);
+      seatCushion.position.set(0, 0.56, 0.06);
+
+      const backCushion = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 12), cushionMat);
+      backCushion.scale.set(1.0, 1.08, 0.45);
+      backCushion.position.set(0, 0.82, -0.11);
+
+      const throwPillow = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.18, 0.08, 2, 0.03), clayMat('#FFF8EE', 0.72));
+      throwPillow.position.set(-0.08, 0.68, 0);
+      throwPillow.rotation.set(-0.35, 0.25, 0.12);
+
+      g.add(
+        baseRing,
+        rearPole,
+        archArm,
+        chain,
+        basketBack,
+        basketRim,
+        seatCushion,
+        backCushion,
+        throwPillow,
+      );
+      break;
+    }
+
     case 'floor_paint':
     case 'wall_paint': {
       const can = new THREE.Mesh(

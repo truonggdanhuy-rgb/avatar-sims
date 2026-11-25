@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {
   ArrowLeft,
   BookOpen,
+  CalendarCheck2,
   ClipboardList,
   CloudSun,
   Coins,
@@ -24,6 +25,7 @@ import {
 } from 'lucide-react';
 import {
   AvatarConfig,
+  CheckInState,
   DailyQuestProgress,
   FishDexRecord,
   FishSpeciesId,
@@ -37,6 +39,7 @@ import {
 import {ALL_FISH_LIST, RIVER_FISH_LIST, SEA_FISH_LIST} from '../../data/fishingCatalog';
 import {INSECT_HABITAT_LABELS, INSECT_LIST} from '../../data/insectCatalog';
 import {HUNGER_HUNGRY_THRESHOLD} from '../../data/foodCatalog';
+import {DAILY_QUEST_DEFS, getTodayDateKey} from '../../data/progressionCatalog';
 import {soundFX} from '../../utils/sound';
 import {AvatarPreview3D} from '../AvatarPreview3D';
 import {FishIllustration} from '../FishingIcons';
@@ -49,6 +52,7 @@ interface PhoneMenuModalProps {
   timeOfDay: TimeOfDay;
   soundEnabled: boolean;
   dailyQuests: DailyQuestProgress;
+  checkIn: CheckInState;
   storageUsed: number;
   storageCapacity: number;
   fishDex: Partial<Record<FishSpeciesId, FishDexRecord>>;
@@ -60,6 +64,7 @@ interface PhoneMenuModalProps {
   onTeleportToPlaza: () => void;
   onOpenWardrobe: () => void;
   onOpenDailyQuests: () => void;
+  onOpenDailyCheckIn: () => void;
   onOpenSettings: () => void;
   onOpenStorage: () => void;
   onChangeTimeOfDay: (time: TimeOfDay) => void;
@@ -104,6 +109,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   timeOfDay,
   soundEnabled,
   dailyQuests,
+  checkIn,
   storageUsed,
   storageCapacity,
   fishDex,
@@ -115,6 +121,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   onTeleportToPlaza,
   onOpenWardrobe,
   onOpenDailyQuests,
+  onOpenDailyCheckIn,
   onOpenSettings,
   onOpenStorage,
   onChangeTimeOfDay,
@@ -136,12 +143,11 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
     return () => window.clearInterval(id);
   }, []);
 
-  const readyQuestCount = (['garden', 'fishing', 'dressup'] as const).filter(
-    (k) => dailyQuests.tasks[k] && !dailyQuests.claimed[k],
+  const readyQuestCount = DAILY_QUEST_DEFS.filter(
+    (q) => dailyQuests.tasks[q.key] && !dailyQuests.claimed[q.key],
   ).length;
-  const doneQuestCount = (['garden', 'fishing', 'dressup'] as const).filter(
-    (k) => dailyQuests.claimed[k],
-  ).length;
+  const doneQuestCount = DAILY_QUEST_DEFS.filter((q) => dailyQuests.claimed[q.key]).length;
+  const checkInClaimableToday = checkIn.lastClaimDate !== getTodayDateKey();
 
   const TimeIcon = timeOfDay === 'morning' ? Sun : Moon;
   const nextTime: TimeOfDay = timeOfDay === 'morning' ? 'night' : 'morning';
@@ -345,6 +351,29 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </span>
                 </button>
 
+                {/* 4. Điểm Danh 7 Ngày */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    onClose();
+                    onOpenDailyCheckIn();
+                  }}
+                  className="group relative flex flex-col items-center gap-1.5 transition-transform active:scale-95"
+                >
+                  {checkInClaimableToday && (
+                    <span className="absolute -top-1 right-2 z-10 rounded-md bg-[#E05348] px-1.5 py-0.5 text-[9px] font-extrabold text-white shadow-xs">
+                      Quà!
+                    </span>
+                  )}
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#F5C0A8] bg-gradient-to-br from-[#FFF3ED] to-[#FAD3BE] text-[#C44C2B] shadow-sm transition-transform group-hover:-translate-y-0.5">
+                    <CalendarCheck2 className="h-7 w-7" strokeWidth={2.1} />
+                  </div>
+                  <span className="text-[11px] font-bold leading-tight text-[#4A3525]">
+                    Điểm Danh
+                  </span>
+                </button>
+
                 {/* 5. Nhiệm Vụ Ngày */}
                 <button
                   type="button"
@@ -364,7 +393,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                     <ClipboardList className="h-7 w-7" strokeWidth={2.1} />
                   </div>
                   <span className="text-[11px] font-bold leading-tight text-[#4A3525]">
-                    Nhiệm Vụ ({doneQuestCount}/3)
+                    Nhiệm Vụ ({doneQuestCount}/{DAILY_QUEST_DEFS.length})
                   </span>
                 </button>
 

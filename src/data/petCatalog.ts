@@ -104,9 +104,9 @@ export const PET_SUPPLY_META: Record<
   },
   intimacyTest: {
     id: 'intimacyTest',
-    name: 'Test thân mật',
-    price: 1,
-    description: 'Thuốc thử nghiệm đặc biệt: tăng ngay +1 cấp thân mật cho thú cưng (tối đa Lv.10).',
+    name: 'Kẹo Thân Mật',
+    price: 35,
+    description: 'Món quà đặc biệt tăng ngay +1 cấp thân mật cho thú cưng (tối đa Lv.10).',
   },
 };
 

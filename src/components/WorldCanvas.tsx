@@ -15,9 +15,11 @@ import {
   Lightbulb,
   LightbulbOff,
   Move,
+  Package,
   PackageMinus,
   RotateCw,
   Sparkles,
+  Sprout,
   Trophy,
   Utensils,
   Waves,
@@ -30,11 +32,11 @@ import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {WELL_WATER_MAX} from '../data/farmCatalog';
 import {
+  BOAT_CATALOG,
   FISH_RARITY_CONFIG,
   getRodRepairCost,
   rollRandomRiverFish,
   rollRandomSeaFish,
-  WOODEN_BOAT_PRICE,
 } from '../data/fishingCatalog';
 import {getNetRepairCost} from '../data/insectCatalog';
 import {MAX_PET_INTIMACY, PET_CATALOG} from '../data/petCatalog';
@@ -50,6 +52,7 @@ import {
 } from '../data/foodCatalog';
 import {HandheldFoodIcon} from './modals/VendingMachineModal';
 import {FURNITURE_BY_ID, isPointOnFurnitureSurface} from '../data/furnitureCatalog';
+import {FARM_DECOR_BY_ID} from '../data/farmDecorCatalog';
 import {
   AvatarMountAnimParams,
   AvatarRig,
@@ -132,6 +135,7 @@ import {
   AvatarConfig,
   AvatarPose,
   BbqFoodId,
+  BoatsState,
   BugNetState,
   CoopKind,
   CoopTroughs,
@@ -145,18 +149,20 @@ import {
   GardenPlotState,
   InsectRarity,
   InsectSpeciesId,
+  JoyboyDeliveryState,
+  JoyboyTargetNpcId,
   LivestockAnimalState,
   MountId,
   OwnedMountsState,
   OwnedPetState,
   PetSpeciesId,
   PetSupplies,
+  PlacedFarmDecor,
   PlacedFurniture,
   PondFishState,
   TimeOfDay,
   ToolId,
   WellWaterState,
-  WoodenBoatState,
   ZoneId,
 } from '../types/game';
 import {soundFX} from '../utils/sound';
@@ -176,7 +182,7 @@ interface WorldCanvasProps {
   pondFeedPulse: number;
   farmPondFishPulse: number;
   fishingRod: FishingRodState;
-  woodenBoat: WoodenBoatState;
+  boats: BoatsState;
   bugNet: BugNetState;
   seeds: Partial<Record<CropType, number>>;
   bugSprayCount: number;
@@ -185,6 +191,11 @@ interface WorldCanvasProps {
   placedFurniture: PlacedFurniture[];
   editFurnitureMode: boolean;
   selectedFurnitureId: string | null;
+  placedFarmDecor: PlacedFarmDecor[];
+  editFarmDecorMode: boolean;
+  selectedFarmDecorId: string | null;
+  joyboyDelivery: JoyboyDeliveryState;
+  joyboyModalOpen: boolean;
   homeSpotRef: React.MutableRefObject<{x: number; z: number}>;
   ownedMounts: OwnedMountsState;
   teleportToPlazaPulse: number;
@@ -211,6 +222,21 @@ interface WorldCanvasProps {
   onMoveFurniture: (id: string, x: number, z: number, rotY?: number, y?: number) => void;
   onRotateFurniture: (id: string) => void;
   onStowFurniture: (id: string) => void;
+  onOpenFarmDecorShop: () => void;
+  onOpenFarmDecorBag: () => void;
+  onToggleEditFarmDecor: () => void;
+  onSelectFarmDecor: (id: string | null) => void;
+  onMoveFarmDecor: (id: string, x: number, z: number) => void;
+  onRotateFarmDecor: (id: string) => void;
+  onStowFarmDecor: (id: string) => void;
+  onOpenJoyboyModal: () => void;
+  onCompleteJoyboyDelivery: () => {
+    ok: boolean;
+    targetNpcName?: string;
+    rewardCoins?: number;
+    remainingToday?: number;
+    message?: string;
+  };
   onCatchRiverFish: (preRolled?: {
     speciesId: FishSpeciesId;
     weightKg: number;
@@ -470,7 +496,7 @@ function getZoneWalkBounds(zone: ZoneId) {
     return {minX: -12.85, maxX: 9.85, minZ: -8.95, maxZ: 6.95};
   }
   if (zone === 'garden') {
-    return {minX: -21.8, maxX: 21.8, minZ: -14.8, maxZ: 14.6};
+    return {minX: -30.5, maxX: 30.5, minZ: -21.5, maxZ: 21.2};
   }
   if (zone === 'boutique') {
     return {minX: -5.6, maxX: 5.6, minZ: -4.8, maxZ: 4.9};
@@ -509,6 +535,10 @@ function getWallItemHalfHeight(kind: string): number {
       return 0.56;
     case 'wall_pinboard':
       return 0.44;
+    case 'wall_gallery_frames':
+      return 0.42;
+    case 'wall_mirror_arch':
+      return 0.62;
     default:
       return 0.65;
   }
@@ -535,20 +565,35 @@ function getFloorObstacleMaxTop(
     case 'tet_mai_pot':
     case 'tet_peach_pot':
       return baseY + 1.68;
+    case 'terrace_swing_egg':
+      return baseY + 1.65;
+    case 'cat_tree_tower':
+      return baseY + 1.56;
     case 'tet_lantern_lamp':
       return baseY + 1.55;
+    case 'cozy_fireplace':
+      return baseY + 1.48;
     case 'xmas_snowman':
+    case 'fish_aquarium':
       return baseY + 1.38;
     case 'kitchen_l_counter':
       return baseY + 1.12;
     case 'office_swivel_chair':
       return baseY + 1.24;
+    case 'piano_keyboard':
+      return baseY + 1.05;
     case 'white_study_chair':
       return baseY + 0.96;
+    case 'plush_bear_giant':
+      return baseY + 0.72;
     case 'desktop_pc_set':
       return baseY + 0.54;
     case 'study_desk_lamp':
       return baseY + 0.48;
+    case 'coffee_maker_bar':
+      return baseY + 0.36;
+    case 'toast_toaster_set':
+      return baseY + 0.26;
     case 'study_laptop':
     case 'headphone_stand':
     case 'art_supply_rack':
@@ -1234,7 +1279,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   pondFeedPulse,
   farmPondFishPulse,
   fishingRod,
-  woodenBoat,
+  boats,
   bugNet,
   seeds,
   bugSprayCount,
@@ -1243,6 +1288,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   placedFurniture,
   editFurnitureMode,
   selectedFurnitureId,
+  placedFarmDecor,
+  editFarmDecorMode,
+  selectedFarmDecorId,
+  joyboyDelivery,
+  joyboyModalOpen,
   homeSpotRef,
   ownedMounts,
   teleportToPlazaPulse,
@@ -1267,6 +1317,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onMoveFurniture,
   onRotateFurniture,
   onStowFurniture,
+  onOpenFarmDecorShop,
+  onOpenFarmDecorBag,
+  onToggleEditFarmDecor,
+  onSelectFarmDecor,
+  onMoveFarmDecor,
+  onRotateFarmDecor,
+  onStowFarmDecor,
+  onOpenJoyboyModal,
+  onCompleteJoyboyDelivery,
   onCatchRiverFish,
   onLoseFishingDurability,
   onRepairFishingRod,
@@ -1377,6 +1436,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [nearPond, setNearPond] = useState(false);
   const [confirmPondFeed, setConfirmPondFeed] = useState(false);
   const [homeToolsOpen, setHomeToolsOpen] = useState(false);
+  const [farmToolsOpen, setFarmToolsOpen] = useState(false);
   const [webglError, setWebglError] = useState(false);
   const [jumpIdleDimmed, setJumpIdleDimmed] = useState(false);
   const jumpDimTimerRef = useRef<number | null>(null);
@@ -1398,7 +1458,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         clearTimeout(jumpDimTimerRef.current);
       }
     };
-  }, [zone, miniActive, editFurnitureMode, isParachutingHud]);
+  }, [zone, miniActive, editFurnitureMode, editFarmDecorMode, isParachutingHud]);
 
   const stateRef = useRef({
     zone,
@@ -1412,12 +1472,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     wellWater,
     fishingState,
     fishingRod,
-    woodenBoat,
+    boats,
     bugNet,
     ownedMounts,
     placedFurniture,
     editFurnitureMode,
     selectedFurnitureId,
+    placedFarmDecor,
+    editFarmDecorMode,
+    selectedFarmDecorId,
+    joyboyDelivery,
+    joyboyModalOpen,
     activePet,
     carriedPetId,
     equippedFoodId,
@@ -1434,12 +1499,17 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     wellWater,
     fishingState,
     fishingRod,
-    woodenBoat,
+    boats,
     bugNet,
     ownedMounts,
     placedFurniture,
     editFurnitureMode,
     selectedFurnitureId,
+    placedFarmDecor,
+    editFarmDecorMode,
+    selectedFarmDecorId,
+    joyboyDelivery,
+    joyboyModalOpen,
     activePet,
     carriedPetId,
     equippedFoodId,
@@ -1466,6 +1536,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onMoveFurniture,
     onRotateFurniture,
     onStowFurniture,
+    onOpenFarmDecorShop,
+    onSelectFarmDecor,
+    onMoveFarmDecor,
+    onOpenJoyboyModal,
+    onCompleteJoyboyDelivery,
     onCatchRiverFish,
     onLoseFishingDurability,
     onCatchInsect,
@@ -1514,6 +1589,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onMoveFurniture,
     onRotateFurniture,
     onStowFurniture,
+    onOpenFarmDecorShop,
+    onSelectFarmDecor,
+    onMoveFarmDecor,
+    onOpenJoyboyModal,
+    onCompleteJoyboyDelivery,
     onCatchRiverFish,
     onLoseFishingDurability,
     onCatchInsect,
@@ -1558,6 +1638,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const cancelFishingRef = useRef<(() => void) | null>(null);
   const activeTownRef = useRef<TownWorld | null>(null);
   const activeSubzoneRef = useRef<SubzoneWorld | null>(null);
+  const joyboyApproachRef = useRef<boolean>(false);
+  const isBoatingRef = useRef<boolean>(false);
   const bubbleTimerRef = useRef<number | null>(null);
   const catchTimerRef = useRef<number | null>(null);
   const fishTimerRef = useRef<number | null>(null);
@@ -1595,6 +1677,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     selectedPetRef.current = null;
     setPetArcMenuPos(null);
     if (zone !== 'town') {
+      joyboyApproachRef.current = false;
       mallElevatorHudRef.current = 'none';
       setMallElevatorHud('none');
       setIsBoatingHud(false);
@@ -1634,6 +1717,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       selectedPlotRef.current = null;
       setArcMenuPos(null);
       setConfirmPondFeed(false);
+      setFarmToolsOpen(false);
       if (nearPondRef.current) {
         nearPondRef.current = false;
         setNearPond(false);
@@ -1689,7 +1773,34 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     pondFishVisualKey,
     placedFurniture,
     editFurnitureMode,
+    placedFarmDecor,
+    editFarmDecorMode,
   ]);
+
+  useEffect(() => {
+    if (isBoatingRef.current) return;
+    if (zone === 'town') {
+      activeTownRef.current?.setRiverBoatPose?.(
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        boats.activeBoatId,
+      );
+    } else if (zone === 'island') {
+      activeSubzoneRef.current?.setIslandBoatPose?.(
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        boats.activeBoatId,
+      );
+    }
+  }, [zone, boats.activeBoatId]);
 
   useEffect(() => {
     const legacyState: 'idle' | 'waiting' | 'bite' =
@@ -2059,7 +2170,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         boatState.targetX = null;
         boatState.targetZ = null;
         boatState.moving = false;
-        activeSubzone?.setIslandBoatPose?.(false);
+        isBoatingRef.current = false;
+        activeSubzone?.setIslandBoatPose?.(
+          false,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          stateRef.current.boats.activeBoatId,
+        );
         setIsBoatingHud(false);
       }
       callbacksRef.current.onDismountMount();
@@ -2157,7 +2277,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         boatState.targetX = null;
         boatState.targetZ = null;
         boatState.moving = false;
-        activeSubzone?.setIslandBoatPose?.(false);
+        isBoatingRef.current = false;
+        activeSubzone?.setIslandBoatPose?.(
+          false,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          stateRef.current.boats.activeBoatId,
+        );
         setIsBoatingHud(false);
       }
       if (swimState.active) {
@@ -2587,7 +2716,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           boatState.targetX = null;
           boatState.targetZ = null;
           boatState.moving = false;
-          activeTown.setRiverBoatPose?.(false);
+          isBoatingRef.current = false;
+          activeTown.setRiverBoatPose?.(
+            false,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            stateRef.current.boats.activeBoatId,
+          );
           setIsBoatingHud(false);
           playPetTimer = 0;
           activeTarget = null;
@@ -2623,7 +2761,25 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         } else {
           activeTown.setMallElevatorY?.(mallElev.y);
           if (boatState.active) {
-            activeTown.setRiverBoatPose?.(true, boatState.x, boatState.z, boatState.rotY, false, 0);
+            activeTown.setRiverBoatPose?.(
+              true,
+              boatState.x,
+              boatState.z,
+              boatState.rotY,
+              false,
+              0,
+              stateRef.current.boats.activeBoatId,
+            );
+          } else {
+            activeTown.setRiverBoatPose?.(
+              false,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              stateRef.current.boats.activeBoatId,
+            );
           }
         }
       } else {
@@ -2639,6 +2795,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           boatState.targetX = null;
           boatState.targetZ = null;
           boatState.moving = false;
+          isBoatingRef.current = false;
           setIsBoatingHud(false);
           swimState.active = false;
           swimState.targetX = null;
@@ -2657,13 +2814,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         controls.maxDistance =
           z === 'island'
             ? 56
-            : z === 'garden' || z === 'home'
-              ? 26
-              : z === 'mall'
-                ? 16.5
-                : z === 'petshop'
-                  ? 22
-                  : 18;
+            : z === 'garden'
+              ? 34
+              : z === 'home'
+                ? 26
+                : z === 'mall'
+                  ? 16.5
+                  : z === 'petshop'
+                    ? 22
+                    : 18;
         controls.minPolarAngle = z === 'island' ? Math.PI * 0.12 : Math.PI * 0.16;
         controls.maxPolarAngle =
           z === 'island' ? Math.PI * 0.62 : z === 'mall' ? Math.PI * 0.48 : Math.PI * 0.45;
@@ -2672,6 +2831,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           fishingState: legacyFs,
           placedFurniture: z === 'home' ? pf : undefined,
           editFurnitureMode: z === 'home' ? stateRef.current.editFurnitureMode : undefined,
+          placedFarmDecor: z === 'garden' ? stateRef.current.placedFarmDecor : undefined,
+          editFarmDecorMode: z === 'garden' ? stateRef.current.editFarmDecorMode : undefined,
           openDoors: z === 'home' ? openDoorsRef.current : undefined,
           houseLightsOn: z === 'home' ? houseLightsOnRef.current : undefined,
           lampStates: z === 'home' ? lampStatesRef.current : undefined,
@@ -2736,7 +2897,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             homeSpotRef.current = {x: -1.8, z: 5.2};
           } else if (z === 'garden') {
             playerPos.x = 0;
-            playerPos.z = 10.2;
+            playerPos.z = 19.2;
             playerPos.rotY = Math.PI;
           } else if (z === 'petshop') {
             playerPos.x = 0;
@@ -2762,10 +2923,39 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           playerRig.root.position.set(playerPos.x, spawnSubY, playerPos.z);
           playerRig.root.rotation.y = playerPos.rotY;
           cameraTransitionActive = true;
+          if (z === 'island') {
+            activeSubzone.setIslandBoatPose?.(
+              false,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              stateRef.current.boats.activeBoatId,
+            );
+          }
         } else if (z === 'island') {
           activeSubzone.setTreehouseFocus?.(treehouseState.onTreehouse || treehouseState.climbing);
           if (boatState.active) {
-            activeSubzone.setIslandBoatPose?.(true, boatState.x, boatState.z, boatState.rotY, false, 0);
+            activeSubzone.setIslandBoatPose?.(
+              true,
+              boatState.x,
+              boatState.z,
+              boatState.rotY,
+              false,
+              0,
+              stateRef.current.boats.activeBoatId,
+            );
+          } else {
+            activeSubzone.setIslandBoatPose?.(
+              false,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              stateRef.current.boats.activeBoatId,
+            );
           }
         }
       }
@@ -3335,9 +3525,18 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       boatState.targetX = null;
       boatState.targetZ = null;
       boatState.moving = false;
+      isBoatingRef.current = false;
       setIsBoatingHud(false);
       if (zBoat === 'island') {
-        activeSubzone?.setIslandBoatPose?.(false);
+        activeSubzone?.setIslandBoatPose?.(
+          false,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          stateRef.current.boats.activeBoatId,
+        );
         playerPos.x = ISLAND_BOAT_INTERACT.tx;
         playerPos.z = ISLAND_BOAT_INTERACT.tz;
         playerPos.rotY = -Math.PI / 2;
@@ -3351,7 +3550,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
         return;
       }
-      activeTown?.setRiverBoatPose?.(false);
+      activeTown?.setRiverBoatPose?.(
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        stateRef.current.boats.activeBoatId,
+      );
       playerPos.x = -75.0;
       playerPos.z = -1.8;
       playerPos.rotY = Math.PI / 2;
@@ -3683,7 +3890,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       boatState.targetX = null;
       boatState.targetZ = null;
       boatState.moving = false;
-      activeTown?.setRiverBoatPose?.(false);
+      isBoatingRef.current = false;
+      activeTown?.setRiverBoatPose?.(
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        stateRef.current.boats.activeBoatId,
+      );
       setIsBoatingHud(false);
       playPetTimer = 0;
       activeTarget = null;
@@ -3942,6 +4158,37 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         return;
       }
 
+      // 0b. Farm Decor Edit Mode: select placed farm decor or move selected item on garden lawn
+      if (stateRef.current.zone === 'garden' && stateRef.current.editFarmDecorMode) {
+        const hits = raycaster.intersectObjects(currentClickTargets, true);
+        const selId = stateRef.current.selectedFarmDecorId;
+        for (const h of hits) {
+          let obj: THREE.Object3D | null = h.object;
+          while (obj && (!obj.userData || !obj.userData.kind)) {
+            obj = obj.parent;
+          }
+          if (obj && obj.userData.farmDecorId) {
+            const hitId = obj.userData.farmDecorId as string;
+            soundFX.tap();
+            callbacksRef.current.onSelectFarmDecor(hitId);
+            return;
+          }
+        }
+        if (selId && currentGrounds.length > 0) {
+          const groundHits = raycaster.intersectObjects(currentGrounds, false);
+          if (groundHits.length > 0) {
+            const pt = groundHits[0].point;
+            const gb = getZoneWalkBounds('garden');
+            const cx = THREE.MathUtils.clamp(pt.x, gb.minX + 0.8, gb.maxX - 0.8);
+            const cz = THREE.MathUtils.clamp(pt.z, gb.minZ + 0.8, gb.maxZ - 0.8);
+            soundFX.tap();
+            callbacksRef.current.onMoveFarmDecor(selId, cx, cz);
+          }
+        }
+        return;
+      }
+
+      joyboyApproachRef.current = false;
       selectedPlotRef.current = null;
       setArcMenuPos(null);
       selectedPetRef.current = null;
@@ -4658,6 +4905,96 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
+          const activeOrder = stateRef.current.joyboyDelivery.activeOrder;
+          const resolveDeliveryTarget = (): JoyboyTargetNpcId | null => {
+            if (kind === 'koi_shop') return 'koi';
+            if (kind === 'ship_shop' && !boatState.active) return 'ship';
+            if (kind === 'open_shop') return 'tina';
+            if (kind === 'open_furniture_shop') return 'bob';
+            if (kind === 'ivan_npc') return 'ivan';
+            if (
+              (kind === 'npc_tun' ||
+                kind === 'mall_display_bike' ||
+                kind === 'mall_display_skate') &&
+              !(stateRef.current.zone === 'mall' && mallState.floor === 2)
+            ) {
+              return 'tun';
+            }
+            if (
+              (kind === 'npc_peppa' || kind === 'mall_market_stall') &&
+              !(stateRef.current.zone === 'mall' && mallState.floor === 2)
+            ) {
+              return 'peppa';
+            }
+            if (
+              kind === 'mall_cafe_counter' &&
+              !(stateRef.current.zone === 'mall' && mallState.floor === 2)
+            ) {
+              return 'cafe';
+            }
+            return null;
+          };
+
+          const matchedDeliveryNpc = resolveDeliveryTarget();
+          if (activeOrder && matchedDeliveryNpc === activeOrder.targetNpcId) {
+            soundFX.tap();
+            const txDeliv = typeof data.tx === 'number' ? data.tx : playerPos.x;
+            const tzDeliv = typeof data.tz === 'number' ? data.tz : playerPos.z;
+            startWalkTo(txDeliv, tzDeliv, 'idle', undefined, () => {
+              const res = callbacksRef.current.onCompleteJoyboyDelivery();
+              if (res.ok) {
+                soundFX.sparkle();
+              } else {
+                soundFX.tap();
+              }
+              if (res.message) {
+                showBubble(res.message);
+              }
+            });
+            return;
+          }
+
+          if (kind === 'npc_joyboy') {
+            soundFX.tap();
+            if (boatState.active) {
+              showBubble('Hãy bấm "Lên bờ" trước khi nhận việc từ Joyboy!');
+              return;
+            }
+            if (stateRef.current.zone === 'town' && mallElev.state === 'deck') {
+              showBubble('Hãy xuống khỏi sân thượng May Mall để gặp Joyboy!');
+              return;
+            }
+            const jPos = activeTown?.getJoyboyPosition?.() ?? {x: 3.3, z: 3.8};
+            const dxJ = playerPos.x - jPos.x;
+            const dzJ = playerPos.z - jPos.z;
+            const dLen = Math.hypot(dxJ, dzJ);
+            const standDist = 1.45;
+            const rawStandX = dLen > 0.05 ? jPos.x + (dxJ / dLen) * standDist : jPos.x;
+            const rawStandZ = dLen > 0.05 ? jPos.z + (dzJ / dLen) * standDist : jPos.z + standDist;
+            const tb = getZoneWalkBounds('town');
+            const standX = THREE.MathUtils.clamp(rawStandX, tb.minX + 1, tb.maxX - 1);
+            const standZ = THREE.MathUtils.clamp(rawStandZ, tb.minZ + 1, tb.maxZ - 1);
+            joyboyApproachRef.current = true;
+            activeTown?.setJoyboyPaused?.(true);
+            startWalkTo(standX, standZ, 'idle', undefined, () => {
+              joyboyApproachRef.current = false;
+              const liveJ = activeTown?.getJoyboyPosition?.() ?? jPos;
+              playerPos.rotY = Math.atan2(liveJ.x - playerPos.x, liveJ.z - playerPos.z);
+              soundFX.sparkle();
+              callbacksRef.current.onOpenJoyboyModal();
+            });
+            return;
+          }
+
+          if (kind === 'open_farm_decor_shop') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenFarmDecorShop();
+            });
+            return;
+          }
+
           if (kind === 'open_shop') {
             soundFX.tap();
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
@@ -4776,10 +5113,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               return;
             }
             const embarkNow = () => {
-              if (!stateRef.current.woodenBoat.owned) {
+              if (stateRef.current.boats.ownedIds.length === 0) {
                 soundFX.tap();
                 showBubble(
-                  `Bạn chưa có Thuyền Gỗ (${WOODEN_BOAT_PRICE} Xu)! Ghé Sạp Thuyền của Ship ngay bên cạnh để mua nhé.`,
+                  `Bạn chưa có thuyền (từ ${BOAT_CATALOG.wooden_boat.price} Xu)! Ghé Sạp Thuyền của Ship ngay bên cạnh để chọn nhiều mẫu thuyền đẹp nhé.`,
                 );
                 return;
               }
@@ -4792,6 +5129,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 resetFishing(false);
               }
               const sp = clampRiverBoatPoint(RIVER_BOAT_SPAWN.x, RIVER_BOAT_SPAWN.z);
+              const curBoatId = stateRef.current.boats.activeBoatId;
+              const curBoatName = BOAT_CATALOG[curBoatId]?.name ?? 'Thuyền';
               boatState.active = true;
               boatState.x = sp.x;
               boatState.z = sp.z;
@@ -4799,12 +5138,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               boatState.targetX = null;
               boatState.targetZ = null;
               boatState.moving = false;
+              isBoatingRef.current = true;
               callbacksRef.current.onDismountMount();
-              activeTown?.setRiverBoatPose?.(true, boatState.x, boatState.z, boatState.rotY, false, 0);
+              activeTown?.setRiverBoatPose?.(
+                true,
+                boatState.x,
+                boatState.z,
+                boatState.rotY,
+                false,
+                0,
+                curBoatId,
+              );
               setIsBoatingHud(true);
               soundFX.splash();
               showBubble(
-                'Đã xuống Thuyền Gỗ! Kéo Joystick hoặc chạm mặt nước để chèo, cầm Cần Câu chạm nước để câu cá sông!',
+                `Đã xuống ${curBoatName}! Kéo Joystick hoặc chạm mặt nước để chèo, cầm Cần Câu chạm nước để câu cá sông!`,
               );
             };
             const distBoard = Math.hypot(
@@ -4902,11 +5250,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 return;
               }
               showBubble(
-                stateRef.current.woodenBoat.owned
+                stateRef.current.boats.ownedIds.length > 0
                   ? 'Chạm Biển hiệu Xuống Thuyền hoặc chiếc thuyền neo để xuống sông! (Hoặc cầm Cần Câu để câu từ bờ)'
                   : stateRef.current.fishingRod.owned
-                    ? `Mở Túi Đồ cầm Cần Câu để câu từ bờ, hoặc ghé Sạp Ship (${WOODEN_BOAT_PRICE} Xu) mua Thuyền Gỗ!`
-                    : `Ghé Sạp Ship (${WOODEN_BOAT_PRICE} Xu) mua Thuyền Gỗ, hoặc mua Cần Câu ở Sạp Koi để câu từ bờ!`,
+                    ? `Mở Túi Đồ cầm Cần Câu để câu từ bờ, hoặc ghé Sạp Ship (${BOAT_CATALOG.wooden_boat.price}–${BOAT_CATALOG.speedboat_retro.price} Xu) mua Thuyền!`
+                    : `Ghé Sạp Ship (${BOAT_CATALOG.wooden_boat.price}–${BOAT_CATALOG.speedboat_retro.price} Xu) mua Thuyền, hoặc mua Cần Câu ở Sạp Koi để câu từ bờ!`,
               );
               return;
             }
@@ -4969,8 +5317,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
 
           if (boatState.active) {
+            const curBoatName = BOAT_CATALOG[stateRef.current.boats.activeBoatId]?.name ?? 'Thuyền';
             soundFX.tap();
-            showBubble('Đang trên Thuyền Gỗ! Chạm mặt nước để chèo/câu hoặc bấm "Lên bờ".');
+            showBubble(`Đang trên ${curBoatName}! Chạm mặt nước để chèo/câu hoặc bấm "Lên bờ".`);
             return;
           }
 
@@ -5271,6 +5620,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               if (fishCtrl.phase !== 'idle') {
                 resetFishing(false);
               }
+              const curBoatId = stateRef.current.boats.activeBoatId;
+              const curBoatName = BOAT_CATALOG[curBoatId]?.name ?? 'Thuyền';
               const sp = clampIslandBoatPoint(ISLAND_BOAT_SPAWN.x, ISLAND_BOAT_SPAWN.z);
               boatState.active = true;
               boatState.x = sp.x;
@@ -5279,12 +5630,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               boatState.targetX = null;
               boatState.targetZ = null;
               boatState.moving = false;
+              isBoatingRef.current = true;
               callbacksRef.current.onDismountMount();
-              activeSubzone?.setIslandBoatPose?.(true, boatState.x, boatState.z, boatState.rotY, false, 0);
+              activeSubzone?.setIslandBoatPose?.(
+                true,
+                boatState.x,
+                boatState.z,
+                boatState.rotY,
+                false,
+                0,
+                curBoatId,
+              );
               setIsBoatingHud(true);
               soundFX.splash();
               showBubble(
-                'Đã xuống Thuyền Gỗ! Kéo Joystick hoặc chạm mặt biển để chèo, cầm Cần Câu để câu cá biển!',
+                `Đã xuống ${curBoatName}! Kéo Joystick hoặc chạm mặt biển để chèo, cầm Cần Câu để câu cá biển!`,
               );
             };
             if (swimState.active) {
@@ -6247,6 +6607,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             boatState.rotY,
             boatState.moving,
             elapsed,
+            stateRef.current.boats.activeBoatId,
           );
         } else {
           activeSubzone?.setIslandBoatPose?.(
@@ -6256,6 +6617,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             boatState.rotY,
             boatState.moving,
             elapsed,
+            stateRef.current.boats.activeBoatId,
           );
         }
 
@@ -7041,6 +7403,24 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           selectionRing.position.set(sel.x, cat.wallMount ? 0.03 : (sel.y ?? 0) + 0.03, sel.z);
           const ringRadius =
             Math.max(cat.halfW, cat.halfD) * 1.28 + Math.sin(elapsed * 5) * 0.035;
+          selectionRing.scale.set(ringRadius, ringRadius, 1);
+        } else {
+          selectionRing.visible = false;
+        }
+      } else if (
+        z === 'garden' &&
+        stateRef.current.editFarmDecorMode &&
+        stateRef.current.selectedFarmDecorId
+      ) {
+        const selF = stateRef.current.placedFarmDecor.find(
+          (p) => p.instanceId === stateRef.current.selectedFarmDecorId,
+        );
+        const catF = selF ? FARM_DECOR_BY_ID[selF.catalogId] : null;
+        if (selF && catF) {
+          selectionRing.visible = true;
+          selectionRing.position.set(selF.x, 0.04, selF.z);
+          const ringRadius =
+            Math.max(catF.halfW, catF.halfD) * 1.28 + Math.sin(elapsed * 5) * 0.035;
           selectionRing.scale.set(ringRadius, ringRadius, 1);
         } else {
           selectionRing.visible = false;
@@ -7881,6 +8261,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               : 'Côn trùng giật mình bay sang chỗ khác! Kéo nhẹ Joystick để đi chậm.',
           );
         }
+        activeTown?.setJoyboyPaused?.(
+          stateRef.current.joyboyModalOpen ||
+            (joyboyApproachRef.current && Boolean(activeTarget)),
+        );
         activeTown?.update(elapsed, tod, _frustum, camera.position);
       } else {
         bbqLabelArmed = true;
@@ -8339,6 +8723,15 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const selectedCatalogItem = selectedPlacedItem
     ? FURNITURE_BY_ID[selectedPlacedItem.catalogId]
     : null;
+  const selectedFarmPlacedItem =
+    zone === 'garden' && editFarmDecorMode && selectedFarmDecorId
+      ? placedFarmDecor.find((p) => p.instanceId === selectedFarmDecorId)
+      : null;
+  const selectedFarmCatalogItem = selectedFarmPlacedItem
+    ? FARM_DECOR_BY_ID[selectedFarmPlacedItem.catalogId]
+    : null;
+  const isEditingAny =
+    (zone === 'home' && editFurnitureMode) || (zone === 'garden' && editFarmDecorMode);
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -8582,7 +8975,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Top-Left Compact Smartphone Icon Button */}
-      {!miniActive && !(zone === 'home' && editFurnitureMode) && (
+      {!miniActive && !isEditingAny && (
         <button
           type="button"
           onClick={() => {
@@ -8609,7 +9002,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Top-Left Standalone Backpack ('Túi Đồ') Button beside Phone */}
-      {!miniActive && !(zone === 'home' && editFurnitureMode) && (
+      {!miniActive && !isEditingAny && (
         <button
           type="button"
           onClick={() => {
@@ -8630,7 +9023,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Top-Left Release Pet ('X') Button beside Backpack when hugging / shoulder-perching a pet */}
-      {carriedPetId && activePet && !miniActive && !(zone === 'home' && editFurnitureMode) && (
+      {carriedPetId && activePet && !miniActive && !isEditingAny && (
         <button
           type="button"
           onClick={() => {
@@ -8659,7 +9052,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       {/* Top-Left Quick Mount / Dismount Button when player owns any mount */}
       {ownedMounts.ownedIds.length > 0 &&
         !miniActive &&
-        !(zone === 'home' && editFurnitureMode) &&
+        !isEditingAny &&
         (() => {
           const quickId =
             ownedMounts.activeMountId ?? ownedMounts.lastMountId ?? ownedMounts.ownedIds[0];
@@ -8697,7 +9090,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       {/* Compact Top-Left Held Food/Drink Quick-Eat Pill & Low-Hunger (<5%) Speed Warning */}
       {!miniActive &&
-        !(zone === 'home' && editFurnitureMode) &&
+        !isEditingAny &&
         ((equippedFoodId && (bbqFoods[equippedFoodId] ?? 0) > 0) ||
           (stats.hunger ?? 100) < HUNGER_HUNGRY_THRESHOLD) && (
           <div className="phone-ui absolute top-[62px] left-2.5 z-30 flex max-w-[calc(100vw-20px)] flex-col items-start gap-1.5">
@@ -8751,6 +9144,33 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             )}
           </div>
         )}
+
+      {/* Active Joyboy Delivery Reminder Badge */}
+      {joyboyDelivery.activeOrder && !miniActive && !isEditingAny && (
+        <button
+          type="button"
+          onClick={() => {
+            soundFX.tap();
+            const o = joyboyDelivery.activeOrder!;
+            showBubble(
+              `Đơn Joyboy: Giao "${o.parcelName}" cho ${o.targetNpcName} (${o.locationHint}) · +${o.rewardCoins} Xu`,
+            );
+          }}
+          className={`phone-ui anim-pop absolute right-2.5 z-30 flex max-w-[200px] items-center gap-1.5 rounded-2xl border-2 border-[#C27829] bg-[#FFF6E3]/95 px-2.5 py-1.5 text-left text-[#593514] shadow-lg transition hover:scale-[1.02] active:scale-95 ${
+            zone === 'home' || zone === 'garden' ? 'top-12' : 'top-2.5'
+          }`}
+        >
+          <Package className="h-4 w-4 shrink-0 text-[#D97724]" />
+          <div className="min-w-0">
+            <div className="truncate text-[10px] font-black leading-tight">
+              Giao: {joyboyDelivery.activeOrder.targetNpcName}
+            </div>
+            <div className="truncate text-[9px] font-bold text-[#8A5B2C]">
+              +{joyboyDelivery.activeOrder.rewardCoins} Xu · Chạm xem nơi nhận
+            </div>
+          </div>
+        </button>
+      )}
 
       {/* Compact collapsible top-right arrow toolbar inside House */}
       {zone === 'home' && (
@@ -8823,6 +9243,60 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
+      {/* Compact collapsible top-right arrow toolbar inside Garden */}
+      {zone === 'garden' && (
+        <div className="absolute top-2.5 right-2.5 z-30 flex items-center gap-1.5">
+          {(farmToolsOpen || editFarmDecorMode) && (
+            <div className="anim-pop flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  onOpenFarmDecorBag();
+                }}
+                className="flex min-h-[30px] items-center gap-1 rounded-xl border-2 border-[#4B8A57] bg-[#F4FBF1] px-2 py-1 text-[11px] font-bold text-[#2F5B39] shadow-md transition-transform active:scale-95"
+              >
+                <Sprout className="h-3.5 w-3.5 text-[#4E9A5A]" />
+                <span>Túi trang trí</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  if (editFarmDecorMode) setFarmToolsOpen(false);
+                  onToggleEditFarmDecor();
+                }}
+                className={`flex min-h-[30px] items-center gap-1 rounded-xl border-2 px-2 py-1 text-[11px] font-bold shadow-md transition-transform active:scale-95 ${
+                  editFarmDecorMode
+                    ? 'border-[#3E7E4B] bg-[#55A063] text-white'
+                    : 'border-[#4B8A57] bg-[#F4FBF1] text-[#2F5B39]'
+                }`}
+              >
+                <Move className="h-3.5 w-3.5" />
+                <span>{editFarmDecorMode ? 'Xong' : 'Di chuyển'}</span>
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              soundFX.tap();
+              setFarmToolsOpen((prev) => !prev);
+            }}
+            aria-label="Mở công cụ trang trí nông trại"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border-2 border-[#4B8A57] bg-[#F4FBF1] text-[#2F5B39] shadow-md transition-transform active:scale-95"
+          >
+            {farmToolsOpen || editFarmDecorMode ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Proximity Door & Lamp Controls inside House */}
       {zone === 'home' && !editFurnitureMode && (nearbyDoor || nearbyLamp) && (
         <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
@@ -8865,7 +9339,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Proximity Actions beside Pond in Garden (Scatter Feed + River Fishing) */}
-      {zone === 'garden' && nearPond && (
+      {zone === 'garden' && nearPond && !editFarmDecorMode && (
         <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
           {pondFish.some((f) => f.stage === 'growing' && f.hunger < 95) &&
             (confirmPondFeed && fishFeedCount > 0 ? (
@@ -9012,6 +9486,80 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                   onToggleEditFurniture();
                 }}
                 className="rounded-xl bg-[#6BA383] px-3 py-1.5 text-white transition-transform active:scale-95"
+              >
+                Xong
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bottom Action Bar in Farm Decor Move Mode */}
+      {zone === 'garden' && editFarmDecorMode && (
+        <div className="absolute bottom-4 left-1/2 z-30 flex w-[min(95vw,470px)] -translate-x-1/2 flex-col items-center gap-1.5">
+          {selectedFarmCatalogItem && selectedFarmPlacedItem ? (
+            <>
+              <span className="rounded-lg bg-[#2F5B39]/90 px-2.5 py-0.5 text-center text-[11px] font-semibold text-amber-50 shadow-xs">
+                {`Chạm bãi cỏ nông trại để di chuyển "${selectedFarmCatalogItem.name}"`}
+              </span>
+              <div className="flex w-full items-center justify-between gap-1.5 rounded-2xl border-2 border-[#4B8A57] bg-[#F4FBF1] p-2 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    onRotateFarmDecor(selectedFarmPlacedItem.instanceId);
+                  }}
+                  className="flex min-h-[36px] flex-1 items-center justify-center gap-1 rounded-xl bg-[#4E9A5A] px-2.5 text-xs font-bold text-white transition-transform active:scale-95"
+                >
+                  <RotateCw className="h-3.5 w-3.5" />
+                  <span>Xoay</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    onStowFarmDecor(selectedFarmPlacedItem.instanceId);
+                  }}
+                  className="flex min-h-[36px] flex-1 items-center justify-center gap-1 rounded-xl bg-[#DCEFD8] px-2.5 text-xs font-bold text-[#2F5B39] transition-transform active:scale-95"
+                >
+                  <PackageMinus className="h-3.5 w-3.5" />
+                  <span>Cất</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    onSelectFarmDecor(null);
+                  }}
+                  className="flex min-h-[36px] items-center justify-center rounded-xl bg-[#EAF5E6] px-2.5 text-xs font-bold text-[#3E7649] transition-transform active:scale-95"
+                >
+                  Đổi món
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setFarmToolsOpen(false);
+                    onToggleEditFarmDecor();
+                  }}
+                  className="flex min-h-[36px] items-center justify-center gap-1 rounded-xl bg-[#3B7D48] px-3 text-xs font-bold text-white transition-transform active:scale-95"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  <span>Xong</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-3 rounded-2xl border-2 border-[#4B8A57] bg-[#F4FBF1] px-4 py-2 text-xs font-bold text-[#2F5B39] shadow-xl">
+              <span>Chạm vào món đồ trang trí để di chuyển / xoay / cất</span>
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  setFarmToolsOpen(false);
+                  onToggleEditFarmDecor();
+                }}
+                className="rounded-xl bg-[#4E9A5A] px-3 py-1.5 text-white transition-transform active:scale-95"
               >
                 Xong
               </button>
@@ -9383,7 +9931,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Fixed Dynamic Touch Joystick (Bottom-Left) — always enabled */}
-      {!miniActive && !(zone === 'home' && editFurnitureMode) && (
+      {!miniActive && !isEditingAny && (
         <div
           className="phone-ui absolute bottom-2 left-2 z-30 h-44 w-44 touch-none select-none"
           onPointerDown={(e) => {
@@ -9536,7 +10084,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         )}
 
       {/* Fixed Right-Side Jump Button — fades slightly after 5s idle while remaining clickable */}
-      {!miniActive && !isParachutingHud && !(zone === 'home' && editFurnitureMode) && (
+      {!miniActive && !isParachutingHud && !isEditingAny && (
         <button
           type="button"
           onPointerDown={(e) => {

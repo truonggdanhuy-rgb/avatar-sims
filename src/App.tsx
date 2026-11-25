@@ -1,12 +1,16 @@
 import {useEffect, useRef, useState} from 'react';
 import {BackpackModal, BagSubTab} from './components/modals/BackpackModal';
 import {BoutiqueModal} from './components/modals/BoutiqueModal';
+import {DailyCheckInModal} from './components/modals/DailyCheckInModal';
 import {DailyQuestsModal} from './components/modals/DailyQuestsModal';
+import {FarmDecorModal} from './components/modals/FarmDecorModal';
+import {FarmDecorShopModal} from './components/modals/FarmDecorShopModal';
 import {FarmShopModal} from './components/modals/FarmShopModal';
 import {FarmStorageModal} from './components/modals/FarmStorageModal';
 import {FarmWorkshopModal} from './components/modals/FarmWorkshopModal';
 import {FurnitureModal} from './components/modals/FurnitureModal';
 import {FurnitureShopModal} from './components/modals/FurnitureShopModal';
+import {JoyboyDeliveryModal} from './components/modals/JoyboyDeliveryModal';
 import {LivestockModal} from './components/modals/LivestockModal';
 import {OrderBoardModal} from './components/modals/OrderBoardModal';
 import {PhoneMenuModal} from './components/modals/PhoneMenuModal';
@@ -58,15 +62,15 @@ import {
 } from './data/petCatalog';
 import {
   ALL_FISH_CATALOG,
+  BOAT_CATALOG,
   computeFishSellPrice,
+  createInitialBoatsState,
   createInitialFishDex,
   createInitialFishingRod,
-  createInitialWoodenBoat,
   getRodRepairCost,
   rollRandomRiverFish,
   rollRandomSeaFish,
   rollRodDurabilityLoss,
-  WOODEN_BOAT_PRICE,
   WOODEN_ROD_MAX_DURABILITY,
   WOODEN_ROD_PRICE,
 } from './data/fishingCatalog';
@@ -123,19 +127,37 @@ import {
   STARTER_FURNITURE_INVENTORY,
   STARTER_PLACED_FURNITURE,
 } from './data/furnitureCatalog';
+import {FARM_DECOR_BY_ID} from './data/farmDecorCatalog';
+import {
+  CHECK_IN_REWARDS,
+  createEmptyDailyQuests,
+  createInitialCheckInState,
+  createInitialJoyboyDeliveryState,
+  getTodayDateKey,
+  MAX_JOYBOY_DELIVERIES_PER_DAY,
+  normalizeDailyQuests,
+  normalizeJoyboyDeliveryState,
+  rollJoyboyDeliveryOrder,
+} from './data/progressionCatalog';
 import {
   AnimalProduceId,
   AnimalType,
   AvatarConfig,
   BbqFoodId,
+  BoatId,
+  BoatsState,
   BugNetState,
   CaughtFishItem,
   CaughtInsectItem,
+  CheckInState,
   CookingJob,
   CoopKind,
   CoopTroughs,
   CropType,
+  DailyQuestKey,
   DailyQuestProgress,
+  FarmDecorCatalogItem,
+  FarmDecorCategory,
   FarmInventory,
   FarmItemKind,
   FarmOrder,
@@ -150,6 +172,7 @@ import {
   GardenPlotState,
   InsectDexRecord,
   InsectSpeciesId,
+  JoyboyDeliveryState,
   KitchenLevel,
   LivestockAnimalState,
   MillJob,
@@ -159,6 +182,7 @@ import {
   PetSpeciesId,
   PetSupplies,
   PetSupplyId,
+  PlacedFarmDecor,
   PlacedFurniture,
   PlotLevel,
   PondFishSpecies,
@@ -168,7 +192,6 @@ import {
   ShopItem,
   TimeOfDay,
   WellWaterState,
-  WoodenBoatState,
   ZoneId,
 } from './types/game';
 import {finalizePlayerName, sanitizePlayerNameInput} from './utils/playerName';
@@ -178,18 +201,17 @@ const STORAGE_KEY = 'thi_tran_may_save_v1';
 const HOUSE_LAYOUT_VERSION = 5;
 const TELEPORT_COOLDOWN_MS = 15000;
 
-const getTodayKey = () => new Date().toISOString().slice(0, 10);
-
-const createEmptyDailyQuests = (): DailyQuestProgress => ({
-  date: getTodayKey(),
-  tasks: {garden: false, fishing: false, dressup: false},
-  claimed: {garden: false, fishing: false, dressup: false},
-});
-
 function clampDropIntoHouse(rawX: number, rawZ: number): {x: number; z: number} {
   return {
     x: Math.max(-12.6, Math.min(9.6, rawX)),
     z: Math.max(-8.6, Math.min(6.6, rawZ)),
+  };
+}
+
+function clampDropIntoGarden(rawX: number, rawZ: number): {x: number; z: number} {
+  return {
+    x: Math.max(-29.5, Math.min(29.5, rawX)),
+    z: Math.max(-20.5, Math.min(20.5, rawZ)),
   };
 }
 
@@ -362,10 +384,18 @@ export default function App() {
   const [furnitureShopOpen, setFurnitureShopOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dailyQuestsOpen, setDailyQuestsOpen] = useState(false);
+  const [dailyCheckInOpen, setDailyCheckInOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [furnitureModalOpen, setFurnitureModalOpen] = useState(false);
   const [furnitureModalTab, setFurnitureModalTab] = useState<'all' | FurnitureCategory>('all');
   const returnToFurnitureModalRef = useRef(false);
+  const [farmDecorShopOpen, setFarmDecorShopOpen] = useState(false);
+  const [farmDecorModalOpen, setFarmDecorModalOpen] = useState(false);
+  const [farmDecorModalTab, setFarmDecorModalTab] = useState<FarmDecorCategory>('all');
+  const returnToFarmDecorModalRef = useRef(false);
+  const [editFarmDecorMode, setEditFarmDecorMode] = useState(false);
+  const [selectedFarmDecorId, setSelectedFarmDecorId] = useState<string | null>(null);
+  const [joyboyModalOpen, setJoyboyModalOpen] = useState(false);
   const [workshopTab, setWorkshopTab] = useState<'mill' | 'kitchen' | null>(null);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [storageOpen, setStorageOpen] = useState(false);
@@ -807,14 +837,91 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.dailyQuests && parsed.dailyQuests.date === getTodayKey()) {
-          return parsed.dailyQuests;
+        if (parsed.dailyQuests) {
+          return normalizeDailyQuests(parsed.dailyQuests);
         }
       }
     } catch {
       // ignore storage errors
     }
     return createEmptyDailyQuests();
+  });
+
+  const [checkIn, setCheckIn] = useState<CheckInState>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.checkIn && typeof parsed.checkIn === 'object') {
+          const completedDays =
+            typeof parsed.checkIn.completedDays === 'number'
+              ? Math.max(0, Math.min(7, Math.floor(parsed.checkIn.completedDays)))
+              : 0;
+          const lastClaimDate =
+            typeof parsed.checkIn.lastClaimDate === 'string'
+              ? parsed.checkIn.lastClaimDate
+              : null;
+          return {completedDays, lastClaimDate};
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return createInitialCheckInState();
+  });
+
+  const [placedFarmDecor, setPlacedFarmDecor] = useState<PlacedFarmDecor[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.placedFarmDecor)) {
+          return parsed.placedFarmDecor.filter(
+            (p: PlacedFarmDecor) =>
+              p && typeof p.catalogId === 'string' && Boolean(FARM_DECOR_BY_ID[p.catalogId]),
+          );
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return [];
+  });
+
+  const [farmDecorInventory, setFarmDecorInventory] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.farmDecorInventory && typeof parsed.farmDecorInventory === 'object') {
+          const out: Record<string, number> = {};
+          for (const [k, v] of Object.entries(parsed.farmDecorInventory)) {
+            if (FARM_DECOR_BY_ID[k] && typeof v === 'number' && v > 0) {
+              out[k] = Math.floor(v);
+            }
+          }
+          return out;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return {};
+  });
+
+  const [joyboyDelivery, setJoyboyDelivery] = useState<JoyboyDeliveryState>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.joyboyDelivery) {
+          return normalizeJoyboyDeliveryState(parsed.joyboyDelivery);
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return createInitialJoyboyDeliveryState();
   });
 
   const [placedFurniture, setPlacedFurniture] = useState<PlacedFurniture[]>(() => {
@@ -900,25 +1007,48 @@ export default function App() {
   const fishingRodRef = useRef(fishingRod);
   fishingRodRef.current = fishingRod;
 
-  const [woodenBoat, setWoodenBoat] = useState<WoodenBoatState>(() => {
+  const [boats, setBoats] = useState<BoatsState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.woodenBoat && typeof parsed.woodenBoat === 'object') {
+        if (parsed.boats && typeof parsed.boats === 'object') {
+          const isBoatId = (id: unknown): id is BoatId =>
+            typeof id === 'string' && id in BOAT_CATALOG;
+          const rawOwned = Array.isArray(parsed.boats.ownedIds)
+            ? parsed.boats.ownedIds.filter(isBoatId)
+            : [];
+          const ownedIds = Array.from(new Set(rawOwned)) as BoatId[];
+          const activeBoatId: BoatId =
+            isBoatId(parsed.boats.activeBoatId) &&
+            ownedIds.includes(parsed.boats.activeBoatId)
+              ? parsed.boats.activeBoatId
+              : ownedIds[0] ?? 'wooden_boat';
+          const purchasedAt: Partial<Record<BoatId, number>> = {};
+          if (parsed.boats.purchasedAt && typeof parsed.boats.purchasedAt === 'object') {
+            for (const [k, v] of Object.entries(parsed.boats.purchasedAt)) {
+              if (isBoatId(k) && typeof v === 'number') {
+                purchasedAt[k] = v;
+              }
+            }
+          }
+          return {ownedIds, activeBoatId, purchasedAt};
+        }
+        if (parsed.woodenBoat && typeof parsed.woodenBoat === 'object' && parsed.woodenBoat.owned) {
           return {
-            owned: Boolean(parsed.woodenBoat.owned),
+            ownedIds: ['wooden_boat'],
+            activeBoatId: 'wooden_boat',
             purchasedAt:
               typeof parsed.woodenBoat.purchasedAt === 'number'
-                ? parsed.woodenBoat.purchasedAt
-                : null,
+                ? {wooden_boat: parsed.woodenBoat.purchasedAt}
+                : {},
           };
         }
       }
     } catch {
       // ignore storage errors
     }
-    return createInitialWoodenBoat();
+    return createInitialBoatsState();
   });
 
   const [fishBasket, setFishBasket] = useState<CaughtFishItem[]>(() => {
@@ -1647,10 +1777,18 @@ export default function App() {
             farmOrders,
             ownedIds,
             dailyQuests,
+            checkIn,
             placedFurniture,
             furnitureInventory: pruneZeroCounts(furnitureInventory),
+            placedFarmDecor,
+            farmDecorInventory: pruneZeroCounts(farmDecorInventory),
+            joyboyDelivery,
             fishingRod,
-            woodenBoat,
+            boats,
+            woodenBoat: {
+              owned: boats.ownedIds.includes('wooden_boat'),
+              purchasedAt: boats.purchasedAt.wooden_boat ?? null,
+            },
             fishBasket,
             fishDex,
             bugNet,
@@ -1702,10 +1840,14 @@ export default function App() {
     farmOrders,
     ownedIds,
     dailyQuests,
+    checkIn,
     placedFurniture,
     furnitureInventory,
+    placedFarmDecor,
+    farmDecorInventory,
+    joyboyDelivery,
     fishingRod,
-    woodenBoat,
+    boats,
     fishBasket,
     fishDex,
     bugNet,
@@ -1748,6 +1890,11 @@ export default function App() {
       setSelectedFurnitureId(null);
     }
     if (next !== 'garden') {
+      returnToFarmDecorModalRef.current = false;
+      setFarmDecorShopOpen(false);
+      setFarmDecorModalOpen(false);
+      setEditFarmDecorMode(false);
+      setSelectedFarmDecorId(null);
       setWorkshopTab(null);
       setOrdersOpen(false);
       setStorageOpen(false);
@@ -1758,6 +1905,7 @@ export default function App() {
     if (next !== 'town') {
       setShipShopOpen(false);
       setBbqGrillOpen(false);
+      setJoyboyModalOpen(false);
     }
     if (next !== 'mall') {
       setTunShopOpen(false);
@@ -1802,12 +1950,12 @@ export default function App() {
     };
   };
 
-  const markQuestDone = (key: keyof DailyQuestProgress['tasks']) => {
-    const today = getTodayKey();
+  const markQuestDone = (key: DailyQuestKey) => {
+    const today = getTodayDateKey();
     setDailyQuests((prev) => {
-      const base = prev.date === today ? prev : createEmptyDailyQuests();
-      if (base.tasks[key]) return base;
-      return {...base, tasks: {...base.tasks, [key]: true}};
+      const normalized = prev.date === today ? normalizeDailyQuests(prev) : createEmptyDailyQuests();
+      if (normalized.tasks[key]) return normalized;
+      return {...normalized, tasks: {...normalized.tasks, [key]: true}};
     });
   };
 
@@ -1894,6 +2042,7 @@ export default function App() {
       ...prev,
       energy: Math.max(5, prev.energy - 1),
     }));
+    markQuestDone('garden');
   };
 
   const handleCollectWellWater = (): {
@@ -2074,6 +2223,7 @@ export default function App() {
       },
     ]);
     setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 1)}));
+    markQuestDone('cooking');
   };
 
   const handleCollectProcessed = (jobId: string) => {
@@ -2118,6 +2268,7 @@ export default function App() {
       },
     ]);
     setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 2)}));
+    markQuestDone('cooking');
   };
 
   const handleCollectDish = (jobId: string) => {
@@ -2129,7 +2280,7 @@ export default function App() {
       adjustFarmInventory(prev, [{kind: 'dish', id: job.recipeId, delta: 1}]),
     );
     setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 3)}));
-    markQuestDone('garden');
+    markQuestDone('cooking');
   };
 
   const handleUpgradeKitchen = () => {
@@ -2196,6 +2347,7 @@ export default function App() {
     setFarmOrders((prev) =>
       prev.map((o, idx) => (o.id === orderId ? createSingleFarmOrder(idx + 1) : o)),
     );
+    markQuestDone('cooking');
   };
 
   const handleRefreshOrder = (orderId: string) => {
@@ -2305,6 +2457,7 @@ export default function App() {
         };
       }),
     );
+    markQuestDone('livestock');
   };
 
   const handleFillCoopTrough = (coop: CoopKind) => {
@@ -2365,7 +2518,7 @@ export default function App() {
       energy: Math.max(5, prev.energy - 1),
       mood: Math.min(100, prev.mood + 3),
     }));
-    markQuestDone('garden');
+    markQuestDone('livestock');
   };
 
   const handleSellAnimal = (animalId: string) => {
@@ -2426,6 +2579,7 @@ export default function App() {
       ),
     );
     setPondFeedPulse((n) => n + 1);
+    markQuestDone('livestock');
   };
 
   const handleCureFish = (fishId: string) => {
@@ -2450,7 +2604,7 @@ export default function App() {
       coins: prev.coins + spec.matureSellPrice,
       mood: Math.min(100, prev.mood + 6),
     }));
-    markQuestDone('garden');
+    markQuestDone('livestock');
   };
 
   // === FISHING SYSTEM (KOI STALL, BAG ROD/NET, BASKET & FISHDEX) ===
@@ -2470,18 +2624,32 @@ export default function App() {
     });
   };
 
-  const handleBuyWoodenBoat = () => {
-    if (woodenBoat.owned || stats.coins < WOODEN_BOAT_PRICE) return;
+  const handleBuyBoat = (boatId: BoatId) => {
+    const spec = BOAT_CATALOG[boatId];
+    if (!spec || boats.ownedIds.includes(boatId) || stats.coins < spec.price) return;
     soundFX.sparkle();
     setStats((prev) => ({
       ...prev,
-      coins: prev.coins - WOODEN_BOAT_PRICE,
+      coins: prev.coins - spec.price,
       mood: Math.min(100, prev.mood + 8),
     }));
-    setWoodenBoat({
-      owned: true,
-      purchasedAt: Date.now(),
-    });
+    setBoats((prev) => ({
+      ownedIds: prev.ownedIds.includes(boatId) ? prev.ownedIds : [...prev.ownedIds, boatId],
+      activeBoatId: boatId,
+      purchasedAt: {
+        ...prev.purchasedAt,
+        [boatId]: Date.now(),
+      },
+    }));
+  };
+
+  const handleSelectBoat = (boatId: BoatId) => {
+    if (!boats.ownedIds.includes(boatId)) return;
+    soundFX.tap();
+    setBoats((prev) => ({
+      ...prev,
+      activeBoatId: boatId,
+    }));
   };
 
   const handleBuyMount = (mountId: MountId) => {
@@ -2794,6 +2962,7 @@ export default function App() {
       hunger: Math.max(0, (prev.hunger ?? 90) - 1),
       mood: Math.min(100, prev.mood + 2),
     }));
+    markQuestDone('insects');
 
     return {
       speciesId: spec.id,
@@ -2877,6 +3046,7 @@ export default function App() {
     }
     setStats((prev) => ({...prev, coins: prev.coins - def.price}));
     setBbqFoods((prev) => ({...prev, [foodId]: (prev[foodId] ?? 0) + 1}));
+    markQuestDone('cooking');
     return {ok: true, message: `Đã nướng thơm phức 1 ${def.name}! Mở Túi Đồ -> Thức Ăn để cầm trên tay nhé.`};
   };
 
@@ -3004,6 +3174,7 @@ export default function App() {
       [recipeId]: (prev[recipeId] ?? 0) + 1,
     }));
     setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 3)}));
+    markQuestDone('cooking');
     return {ok: true, message: `Nấu thành công 1x ${def.name}! (+Vào túi Thức Ăn)`};
   };
 
@@ -3070,7 +3241,6 @@ export default function App() {
       setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
       setEquippedFoodId(null);
     }
-    markQuestDone('dressup');
   };
 
   const handleBuyShopItem = (item: ShopItem) => {
@@ -3087,7 +3257,7 @@ export default function App() {
       setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
       setEquippedFoodId(null);
     }
-    markQuestDone('dressup');
+    markQuestDone('delivery');
   };
 
   const handleBuyFurnitureItem = (item: FurnitureCatalogItem) => {
@@ -3101,14 +3271,194 @@ export default function App() {
       ...prev,
       [item.id]: (prev[item.id] || 0) + 1,
     }));
+    markQuestDone('decor');
   };
 
-  const handleClaimQuest = (key: keyof DailyQuestProgress['tasks'], reward: number) => {
+  const handleClaimQuest = (key: DailyQuestKey, reward: number) => {
     setDailyQuests((prev) => {
-      if (!prev.tasks[key] || prev.claimed[key]) return prev;
-      return {...prev, claimed: {...prev.claimed, [key]: true}};
+      const normalized = normalizeDailyQuests(prev);
+      if (!normalized.tasks[key] || normalized.claimed[key]) return normalized;
+      return {...normalized, claimed: {...normalized.claimed, [key]: true}};
     });
     addCoins(reward);
+  };
+
+  // === ĐIỂM DANH 7 NGÀY & NGHỀ GIAO HÀNG JOYBOY ===
+  const handleClaimDailyCheckIn = () => {
+    const today = getTodayDateKey();
+    if (checkIn.lastClaimDate === today) return;
+    const prevCompleted = checkIn.completedDays >= 7 ? 0 : checkIn.completedDays;
+    const dayIndex = Math.max(0, Math.min(6, prevCompleted));
+    const spec = CHECK_IN_REWARDS[dayIndex];
+    if (!spec) return;
+
+    soundFX.sparkle();
+    setCheckIn({
+      completedDays: dayIndex + 1,
+      lastClaimDate: today,
+    });
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins + spec.coins,
+      mood: Math.min(100, prev.mood + 6),
+    }));
+    if (spec.foodReward || spec.bonusFoodReward) {
+      setBbqFoods((prev) => {
+        const next = {...prev};
+        if (spec.foodReward) {
+          next[spec.foodReward.foodId] = (next[spec.foodReward.foodId] ?? 0) + spec.foodReward.qty;
+        }
+        if (spec.bonusFoodReward) {
+          next[spec.bonusFoodReward.foodId] =
+            (next[spec.bonusFoodReward.foodId] ?? 0) + spec.bonusFoodReward.qty;
+        }
+        return next;
+      });
+    }
+  };
+
+  const handleAcceptJoyboyOrder = () => {
+    const current = normalizeJoyboyDeliveryState(joyboyDelivery);
+    if (current.activeOrder || current.completedCount >= MAX_JOYBOY_DELIVERIES_PER_DAY) {
+      return;
+    }
+    const order = rollJoyboyDeliveryOrder();
+    setJoyboyDelivery({
+      ...current,
+      activeOrder: order,
+    });
+  };
+
+  const handleCancelJoyboyOrder = () => {
+    const current = normalizeJoyboyDeliveryState(joyboyDelivery);
+    setJoyboyDelivery({
+      ...current,
+      activeOrder: null,
+    });
+  };
+
+  const handleCompleteJoyboyDelivery = () => {
+    const current = normalizeJoyboyDeliveryState(joyboyDelivery);
+    const order = current.activeOrder;
+    if (!order) {
+      return {ok: false, message: 'Bạn chưa nhận đơn giao hàng nào từ Joyboy.'};
+    }
+    soundFX.sparkle();
+    const nextCompleted = Math.min(MAX_JOYBOY_DELIVERIES_PER_DAY, current.completedCount + 1);
+    setJoyboyDelivery({
+      date: current.date,
+      completedCount: nextCompleted,
+      activeOrder: null,
+    });
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins + order.rewardCoins,
+      mood: Math.min(100, prev.mood + 6),
+    }));
+    markQuestDone('delivery');
+    const remainingToday = Math.max(0, MAX_JOYBOY_DELIVERIES_PER_DAY - nextCompleted);
+    return {
+      ok: true,
+      targetNpcName: order.targetNpcName,
+      rewardCoins: order.rewardCoins,
+      remainingToday,
+      message: `Đã giao "${order.parcelName}" cho ${order.targetNpcName}! +${order.rewardCoins} Xu`,
+    };
+  };
+
+  // === TRANG TRÍ NÔNG TRẠI (MUA, ĐẶT, DI CHUYỂN, XOAY, CẤT) ===
+  const handleBuyFarmDecorItem = (item: FarmDecorCatalogItem) => {
+    if (stats.coins < item.price) return;
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - item.price,
+      mood: Math.min(100, prev.mood + 4),
+    }));
+    setFarmDecorInventory((prev) => ({
+      ...prev,
+      [item.id]: (prev[item.id] || 0) + 1,
+    }));
+    markQuestDone('decor');
+  };
+
+  const handlePlaceFarmDecor = (catalogId: string) => {
+    const available = farmDecorInventory[catalogId] || 0;
+    const cat = FARM_DECOR_BY_ID[catalogId];
+    if (available <= 0 || !cat) return;
+
+    const spot = clampDropIntoGarden(
+      5.5 + (Math.random() - 0.5) * 3.0,
+      16.0 + (Math.random() - 0.5) * 1.8,
+    );
+    const sx = Number(spot.x.toFixed(2));
+    const sz = Number(spot.z.toFixed(2));
+    const instanceId = `fdec_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+
+    setFarmDecorInventory((prev) => ({
+      ...prev,
+      [catalogId]: Math.max(0, (prev[catalogId] || 0) - 1),
+    }));
+    setPlacedFarmDecor((prev) => [
+      ...prev,
+      {
+        instanceId,
+        catalogId,
+        x: sx,
+        z: sz,
+        rotY: 0,
+      },
+    ]);
+    markQuestDone('decor');
+    returnToFarmDecorModalRef.current = true;
+    setFarmDecorModalOpen(false);
+    setEditFarmDecorMode(true);
+    setSelectedFarmDecorId(instanceId);
+  };
+
+  const handleMoveFarmDecor = (instanceId: string, x: number, z: number) => {
+    const safe = clampDropIntoGarden(x, z);
+    const nextX = Number(safe.x.toFixed(2));
+    const nextZ = Number(safe.z.toFixed(2));
+    setPlacedFarmDecor((prev) =>
+      prev.map((item) =>
+        item.instanceId === instanceId ? {...item, x: nextX, z: nextZ} : item,
+      ),
+    );
+    markQuestDone('decor');
+  };
+
+  const handleRotateFarmDecor = (instanceId: string) => {
+    setPlacedFarmDecor((prev) =>
+      prev.map((item) =>
+        item.instanceId === instanceId
+          ? {...item, rotY: (item.rotY + Math.PI / 4) % (Math.PI * 2)}
+          : item,
+      ),
+    );
+  };
+
+  const handleStowFarmDecor = (instanceId: string) => {
+    const target = placedFarmDecor.find((item) => item.instanceId === instanceId);
+    if (!target) return;
+    setPlacedFarmDecor((prev) => prev.filter((item) => item.instanceId !== instanceId));
+    setFarmDecorInventory((prev) => ({
+      ...prev,
+      [target.catalogId]: (prev[target.catalogId] || 0) + 1,
+    }));
+    setSelectedFarmDecorId(null);
+  };
+
+  const handleToggleEditFarmDecor = () => {
+    const closingEdit = editFarmDecorMode;
+    setEditFarmDecorMode((prev) => {
+      const next = !prev;
+      if (!next) setSelectedFarmDecorId(null);
+      return next;
+    });
+    if (closingEdit && returnToFarmDecorModalRef.current) {
+      returnToFarmDecorModalRef.current = false;
+      setFarmDecorModalOpen(true);
+    }
   };
 
   const handlePlaceFurniture = (catalogId: string) => {
@@ -3168,6 +3518,7 @@ export default function App() {
     setFurnitureModalOpen(false);
     setEditFurnitureMode(true);
     setSelectedFurnitureId(instanceId);
+    markQuestDone('decor');
   };
 
   const handleMoveFurniture = (
@@ -3245,6 +3596,7 @@ export default function App() {
         return item;
       });
     });
+    markQuestDone('decor');
   };
 
   const handleRotateFurniture = (instanceId: string) => {
@@ -3327,6 +3679,7 @@ export default function App() {
     setOwnedPets((prev) => [...prev, newPet]);
     setActivePetId(newPet.id);
     setCarriedPetId(null);
+    markQuestDone('pet');
   };
 
   const handleBuyPetSupply = (supplyId: PetSupplyId, qty = 1) => {
@@ -3399,6 +3752,7 @@ export default function App() {
       ...prev,
       mood: Math.min(100, prev.mood + 3),
     }));
+    markQuestDone('pet');
     return {ok: true, message: feedRes.message};
   };
 
@@ -3418,6 +3772,7 @@ export default function App() {
       ...prev,
       mood: Math.min(100, prev.mood + 4),
     }));
+    markQuestDone('pet');
   };
 
   const handlePlayWithPet = (petId: string): {ok: boolean; gainedXp: boolean; message: string} => {
@@ -3435,6 +3790,7 @@ export default function App() {
       ...prev,
       mood: Math.min(100, prev.mood + 4),
     }));
+    markQuestDone('pet');
     return {ok: true, gainedXp: playRes.gainedXp, message: playRes.message};
   };
 
@@ -3457,6 +3813,7 @@ export default function App() {
       setPetSupplies((prev) => ({...prev, petFood: Math.max(0, prev.petFood - 1)}));
       setOwnedPets((prev) => prev.map((p) => (p.id === petId ? feedRes.pet : p)));
       setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 3)}));
+      markQuestDone('pet');
       return {ok: true, message: feedRes.message};
     }
 
@@ -3477,6 +3834,7 @@ export default function App() {
         prev.map((p) => (p.id === petId ? applyPetCureCare(p) : p)),
       );
       setStats((prev) => ({...prev, mood: Math.min(100, prev.mood + 4)}));
+      markQuestDone('pet');
       return {ok: true, message: `Đã chữa khỏi bệnh cho ${target.name} (+1 thân mật)!`};
     }
 
@@ -3493,11 +3851,15 @@ export default function App() {
     setOwnedPets((prev) =>
       prev.map((p) => (p.id === petId ? applyPetLevelStep(p, 1) : p)),
     );
+    markQuestDone('pet');
     return {
       ok: true,
       message: `Test thân mật thành công! ${target.name} đã lên Lv.${nextLv}!`,
     };
   };
+
+  const activeDailyQuests = normalizeDailyQuests(dailyQuests);
+  const activeJoyboyDelivery = normalizeJoyboyDeliveryState(joyboyDelivery);
 
   return (
     <main className="relative h-[100dvh] w-full overflow-hidden bg-[#BFE6F7] select-none">
@@ -3514,7 +3876,7 @@ export default function App() {
         pondFeedPulse={pondFeedPulse}
         farmPondFishPulse={farmPondFishPulse}
         fishingRod={fishingRod}
-        woodenBoat={woodenBoat}
+        boats={boats}
         bugNet={bugNet}
         seeds={farmInventory.seeds}
         bugSprayCount={farmInventory.supplies.bugSpray}
@@ -3523,6 +3885,11 @@ export default function App() {
         placedFurniture={placedFurniture}
         editFurnitureMode={editFurnitureMode}
         selectedFurnitureId={selectedFurnitureId}
+        placedFarmDecor={placedFarmDecor}
+        editFarmDecorMode={editFarmDecorMode}
+        selectedFarmDecorId={selectedFarmDecorId}
+        joyboyDelivery={activeJoyboyDelivery}
+        joyboyModalOpen={joyboyModalOpen}
         homeSpotRef={homeSpotRef}
         ownedMounts={ownedMounts}
         teleportToPlazaPulse={teleportToPlazaPulse}
@@ -3580,6 +3947,20 @@ export default function App() {
         onMoveFurniture={handleMoveFurniture}
         onRotateFurniture={handleRotateFurniture}
         onStowFurniture={handleStowFurniture}
+        onOpenFarmDecorShop={() => setFarmDecorShopOpen(true)}
+        onOpenFarmDecorBag={() => {
+          returnToFarmDecorModalRef.current = false;
+          setEditFarmDecorMode(false);
+          setSelectedFarmDecorId(null);
+          setFarmDecorModalOpen(true);
+        }}
+        onToggleEditFarmDecor={handleToggleEditFarmDecor}
+        onSelectFarmDecor={setSelectedFarmDecorId}
+        onMoveFarmDecor={handleMoveFarmDecor}
+        onRotateFarmDecor={handleRotateFarmDecor}
+        onStowFarmDecor={handleStowFarmDecor}
+        onOpenJoyboyModal={() => setJoyboyModalOpen(true)}
+        onCompleteJoyboyDelivery={handleCompleteJoyboyDelivery}
         onCatchRiverFish={handleCatchRiverFish}
         onLoseFishingDurability={handleLoseFishingDurability}
         onRepairFishingRod={handleRepairFishingRod}
@@ -3626,6 +4007,34 @@ export default function App() {
           onTabChange={setFurnitureModalTab}
           onPlaceItem={handlePlaceFurniture}
           onClose={() => setFurnitureModalOpen(false)}
+        />
+      )}
+
+      {zone === 'garden' && farmDecorShopOpen && (
+        <FarmDecorShopModal
+          coins={stats.coins}
+          inventory={farmDecorInventory}
+          placed={placedFarmDecor}
+          onBuyItem={handleBuyFarmDecorItem}
+          onOpenBag={() => {
+            setFarmDecorShopOpen(false);
+            returnToFarmDecorModalRef.current = false;
+            setEditFarmDecorMode(false);
+            setSelectedFarmDecorId(null);
+            setFarmDecorModalOpen(true);
+          }}
+          onClose={() => setFarmDecorShopOpen(false)}
+        />
+      )}
+
+      {zone === 'garden' && farmDecorModalOpen && (
+        <FarmDecorModal
+          inventory={farmDecorInventory}
+          placed={placedFarmDecor}
+          tab={farmDecorModalTab}
+          onTabChange={setFarmDecorModalTab}
+          onPlaceItem={handlePlaceFarmDecor}
+          onClose={() => setFarmDecorModalOpen(false)}
         />
       )}
 
@@ -3779,14 +4188,24 @@ export default function App() {
       {zone === 'town' && shipShopOpen && (
         <ShipShopModal
           coins={stats.coins}
-          woodenBoat={woodenBoat}
-          onBuyBoat={handleBuyWoodenBoat}
+          boats={boats}
+          onBuyBoat={handleBuyBoat}
+          onSelectBoat={handleSelectBoat}
           onOpenBagBoats={() => {
             setShipShopOpen(false);
             setBagInitialSubTab('boats');
             setBagOpen(true);
           }}
           onClose={() => setShipShopOpen(false)}
+        />
+      )}
+
+      {zone === 'town' && joyboyModalOpen && (
+        <JoyboyDeliveryModal
+          deliveryState={activeJoyboyDelivery}
+          onAcceptOrder={handleAcceptJoyboyOrder}
+          onCancelOrder={handleCancelJoyboyOrder}
+          onClose={() => setJoyboyModalOpen(false)}
         />
       )}
 
@@ -3865,9 +4284,17 @@ export default function App() {
 
       {dailyQuestsOpen && (
         <DailyQuestsModal
-          quests={dailyQuests}
+          quests={activeDailyQuests}
           onClaimQuest={handleClaimQuest}
           onClose={() => setDailyQuestsOpen(false)}
+        />
+      )}
+
+      {dailyCheckInOpen && (
+        <DailyCheckInModal
+          checkIn={checkIn}
+          onClaimToday={handleClaimDailyCheckIn}
+          onClose={() => setDailyCheckInOpen(false)}
         />
       )}
 
@@ -3875,7 +4302,7 @@ export default function App() {
         <BackpackModal
           fishingRod={fishingRod}
           bugNet={bugNet}
-          woodenBoat={woodenBoat}
+          boats={boats}
           ownedMounts={ownedMounts}
           ownedPets={ownedPets}
           activePetId={activePetId}
@@ -3887,6 +4314,7 @@ export default function App() {
           initialSubTab={bagInitialSubTab}
           onToggleEquipRod={handleToggleEquipRod}
           onToggleEquipNet={handleToggleEquipNet}
+          onSelectBoat={handleSelectBoat}
           onToggleEquipFood={handleToggleEquipFood}
           onEatPeppaDish={handleEatPeppaDish}
           onSellPeppaDish={handleSellPeppaDish}
@@ -3905,7 +4333,8 @@ export default function App() {
           stats={stats}
           timeOfDay={timeOfDay}
           soundEnabled={soundEnabled}
-          dailyQuests={dailyQuests}
+          dailyQuests={activeDailyQuests}
+          checkIn={checkIn}
           storageUsed={storageUsed}
           storageCapacity={storageCapacity}
           fishDex={fishDex}
@@ -3922,6 +4351,10 @@ export default function App() {
           onOpenDailyQuests={() => {
             setPhoneOpen(false);
             setDailyQuestsOpen(true);
+          }}
+          onOpenDailyCheckIn={() => {
+            setPhoneOpen(false);
+            setDailyCheckInOpen(true);
           }}
           onOpenSettings={() => {
             setPhoneOpen(false);

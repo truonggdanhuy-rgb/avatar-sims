@@ -1,9 +1,12 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import {TimeOfDay, ZoneId} from '../types/game';
-import {KOI_AVATAR, SHIP_AVATAR} from '../data/avatarCatalog';
+import {BoatId, TimeOfDay, ZoneId} from '../types/game';
+import {JOYBOY_AVATAR, KOI_AVATAR, SHIP_AVATAR} from '../data/avatarCatalog';
+import {BOAT_IDS} from '../data/fishingCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from './avatar3d';
+import {buildBoatById, BuiltBoatRig} from './boat3d';
+import {buildMountRig, MountRig, updateMountAnimation} from './mounts3d';
 import {
   createFishingSpotVisuals,
   FishingSpotVisuals,
@@ -333,7 +336,10 @@ export interface TownWorld {
     rotY?: number,
     moving?: boolean,
     elapsed?: number,
+    boatId?: BoatId,
   ) => void;
+  setJoyboyPaused?: (paused: boolean) => void;
+  getJoyboyPosition?: () => {x: number; z: number};
   updateInsects?: (
     playerX: number,
     playerY: number,
@@ -807,218 +813,6 @@ function buildFramedWindow(
     });
   }
   return g;
-}
-
-export function buildWoodenRowboat(
-  withOarPivots = false,
-  lampBulbsOut?: THREE.MeshStandardMaterial[],
-): {
-  boat: THREE.Group;
-  oarLPivot: THREE.Group | null;
-  oarRPivot: THREE.Group | null;
-} {
-  const getMat = createMatPool();
-  const boat = new THREE.Group();
-  const oakHull = getMat('#A46233', 0.68);
-  const oakInner = getMat('#C88E56', 0.72);
-  const oakTrim = getMat('#DDA86F', 0.62);
-  const oakDark = getMat('#5D351A', 0.78);
-  const brassMat = getMat('#D8A94B', 0.34, 0.72);
-  const ropeHempMat = getMat('#DCC194', 0.86);
-  const cushionRed = getMat('#C65943', 0.74);
-  const sailBlue = getMat('#3D8EB8', 0.58);
-
-  const STATIONS = 11;
-  const PROW_Z = 1.52;
-  const STERN_Z = -1.18;
-  const hullHalfW = (t: number) => {
-    if (t > 0.58) {
-      const u = (1 - t) / 0.42;
-      return 0.64 * Math.pow(Math.max(0.02, u), 0.62);
-    }
-    if (t < 0.22) {
-      return THREE.MathUtils.lerp(0.46, 0.62, t / 0.22);
-    }
-    return 0.62 + 0.03 * Math.sin(((t - 0.22) / 0.36) * Math.PI);
-  };
-  const sheerLift = (t: number) =>
-    Math.pow(Math.max(0, (t - 0.55) / 0.45), 1.7) * 0.2 + (t < 0.2 ? 0.04 : 0);
-
-  const makeHullShellGeo = (wallOffset: number, yOffset: number) => {
-    const verts: number[] = [];
-    const indices: number[] = [];
-    const RING = 7;
-    for (let i = 0; i <= STATIONS; i++) {
-      const t = i / STATIONS;
-      const z = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t);
-      const hw = Math.max(0.03, hullHalfW(t) + wallOffset);
-      const sheerY = 0.38 + sheerLift(t) + yOffset;
-      const chineY = 0.11 + sheerLift(t) * 0.35 + yOffset;
-      const keelY = 0.02 + sheerLift(t) * 0.28 + yOffset;
-      const pts: [number, number][] = [
-        [-hw, sheerY],
-        [-hw * 0.84, chineY],
-        [-hw * 0.42, keelY + 0.02],
-        [0, keelY],
-        [hw * 0.42, keelY + 0.02],
-        [hw * 0.84, chineY],
-        [hw, sheerY],
-      ];
-      for (const [px, py] of pts) {
-        verts.push(px, py, z);
-      }
-    }
-    for (let i = 0; i < STATIONS; i++) {
-      const rA = i * RING;
-      const rB = (i + 1) * RING;
-      for (let j = 0; j < RING - 1; j++) {
-        const a = rA + j;
-        const b = rA + j + 1;
-        const c = rB + j;
-        const d = rB + j + 1;
-        indices.push(a, c, b, b, c, d);
-      }
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-    geo.setIndex(indices);
-    geo.computeVertexNormals();
-    return geo;
-  };
-
-  const oakHullDouble = new THREE.MeshStandardMaterial({
-    color: '#A46233',
-    roughness: 0.68,
-    side: THREE.DoubleSide,
-  });
-  const oakInnerDouble = new THREE.MeshStandardMaterial({
-    color: '#C88E56',
-    roughness: 0.72,
-    side: THREE.DoubleSide,
-  });
-  const outerShell = new THREE.Mesh(makeHullShellGeo(0, 0), oakHullDouble);
-  const innerShell = new THREE.Mesh(makeHullShellGeo(-0.055, 0.045), oakInnerDouble);
-  boat.add(outerShell, innerShell);
-
-  const transom = new THREE.Mesh(new RoundedBoxGeometry(0.94, 0.36, 0.1, 2, 0.03), oakDark);
-  transom.position.set(0, 0.22, STERN_Z + 0.03);
-  transom.rotation.x = -0.14;
-  const keelSpine = new THREE.Mesh(new RoundedBoxGeometry(0.11, 0.08, 2.38, 2, 0.02), oakDark);
-  keelSpine.position.set(0, 0.01, 0.06);
-  const stemPost = new THREE.Mesh(new RoundedBoxGeometry(0.11, 0.48, 0.18, 2, 0.03), oakDark);
-  stemPost.rotation.x = 0.56;
-  stemPost.position.set(0, 0.34, PROW_Z - 0.08);
-  boat.add(transom, keelSpine, stemPost);
-
-  [-1, 1].forEach((side) => {
-    for (let i = 0; i < STATIONS; i++) {
-      const t0 = i / STATIONS;
-      const t1 = (i + 1) / STATIONS;
-      const z0 = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t0);
-      const z1 = THREE.MathUtils.lerp(STERN_Z, PROW_Z, t1);
-      const x0 = side * hullHalfW(t0);
-      const x1 = side * hullHalfW(t1);
-      const y0 = 0.4 + sheerLift(t0);
-      const y1 = 0.4 + sheerLift(t1);
-      const segLen = Math.hypot(x1 - x0, y1 - y0, z1 - z0);
-      const rail = new THREE.Mesh(
-        new RoundedBoxGeometry(0.085, 0.075, segLen + 0.04, 1, 0.02),
-        oakTrim,
-      );
-      rail.position.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5);
-      rail.lookAt(x1, y1, z1);
-      boat.add(rail);
-    }
-  });
-
-  for (let s = -2; s <= 2; s++) {
-    const plank = new THREE.Mesh(
-      new RoundedBoxGeometry(0.11, 0.035, 1.82 - Math.abs(s) * 0.14, 1, 0.01),
-      s % 2 === 0 ? oakTrim : oakInner,
-    );
-    plank.position.set(s * 0.145, 0.1, -0.05);
-    boat.add(plank);
-  }
-  [-0.78, -0.22, 0.32, 0.82].forEach((rz) => {
-    const rib = new THREE.Mesh(new RoundedBoxGeometry(0.92, 0.04, 0.06, 1, 0.015), oakDark);
-    rib.position.set(0, 0.085, rz);
-    boat.add(rib);
-  });
-
-  const foreDeck = new THREE.Mesh(new THREE.ConeGeometry(0.54, 0.68, 4), oakTrim);
-  foreDeck.rotation.x = Math.PI / 2;
-  foreDeck.rotation.y = Math.PI / 4;
-  foreDeck.scale.set(0.95, 1, 0.14);
-  foreDeck.position.set(0, 0.38, 1.18);
-  const ropeCoil = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.028, 6, 12), ropeHempMat);
-  ropeCoil.rotation.x = Math.PI / 2;
-  ropeCoil.position.set(-0.1, 0.43, 1.06);
-  const cleat = new THREE.Mesh(new RoundedBoxGeometry(0.14, 0.035, 0.04, 1, 0.01), brassMat);
-  cleat.position.set(0.12, 0.43, 1.14);
-  boat.add(foreDeck, ropeCoil, cleat);
-
-  const aftBench = new THREE.Mesh(new RoundedBoxGeometry(1.06, 0.075, 0.4, 2, 0.02), oakTrim);
-  aftBench.position.set(0, 0.28, -0.58);
-  const cushion = new THREE.Mesh(new RoundedBoxGeometry(0.74, 0.06, 0.32, 2, 0.025), cushionRed);
-  cushion.position.set(0, 0.33, -0.58);
-  const midThwart = new THREE.Mesh(new RoundedBoxGeometry(1.14, 0.07, 0.3, 2, 0.02), oakTrim);
-  midThwart.position.set(0, 0.27, 0.26);
-  boat.add(aftBench, cushion, midThwart);
-
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.034, 0.72, 7), oakDark);
-  mast.position.set(0, 0.72, 1.32);
-  const bowArm = new THREE.Mesh(new RoundedBoxGeometry(0.05, 0.05, 0.24, 1, 0.01), oakDark);
-  bowArm.position.set(0, 1.02, 1.42);
-  const bowCap = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.07, 6), oakDark);
-  bowCap.position.set(0, 0.94, 1.5);
-  const bowBulbMat = new THREE.MeshStandardMaterial({
-    color: '#FFF4C2',
-    emissive: '#FFCC66',
-    emissiveIntensity: 0.45,
-    roughness: 0.25,
-  });
-  lampBulbsOut?.push(bowBulbMat);
-  const bowBulb = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), bowBulbMat);
-  bowBulb.position.set(0, 0.85, 1.5);
-  const flag = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.3, 3), sailBlue);
-  flag.rotation.z = -Math.PI / 2;
-  flag.position.set(0.14, 0.96, 1.32);
-  boat.add(mast, bowArm, bowCap, bowBulb, flag);
-
-  let oarLPivot: THREE.Group | null = null;
-  let oarRPivot: THREE.Group | null = null;
-  [-1, 1].forEach((side) => {
-    const oarlock = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.09, 6), brassMat);
-    oarlock.position.set(side * 0.62, 0.44, 0.14);
-    boat.add(oarlock);
-
-    const pivot = new THREE.Group();
-    pivot.position.set(side * 0.62, 0.47, 0.14);
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.24, 6), oakDark);
-    grip.rotation.z = side * 1.16;
-    grip.position.set(-side * 0.14, 0.06, 0);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.026, 1.28, 7), oakTrim);
-    shaft.rotation.z = side * 1.16;
-    shaft.position.set(side * 0.44, -0.17, 0);
-    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.12, 7), oakDark);
-    collar.rotation.z = side * 1.16;
-    collar.position.set(side * 0.02, -0.01, 0);
-    const blade = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.028, 0.48, 2, 0.01), oakHull);
-    blade.rotation.z = side * 1.16;
-    blade.position.set(side * 0.98, -0.41, 0);
-    pivot.add(grip, collar, shaft, blade);
-    boat.add(pivot);
-    if (side < 0) oarLPivot = pivot;
-    else oarRPivot = pivot;
-  });
-
-  const skipSet = new Set<THREE.Object3D>();
-  if (withOarPivots) {
-    if (oarLPivot) skipSet.add(oarLPivot);
-    if (oarRPivot) skipSet.add(oarRPivot);
-  }
-  mergeStaticGroupByMaterial(boat, skipSet);
-  return {boat, oarLPivot, oarRPivot};
 }
 
 export function buildTownScene(): TownWorld {
@@ -6240,10 +6034,8 @@ export function buildTownScene(): TownWorld {
     speed: number;
     hop: number;
   }[] = [];
-  let mooredRiverBoat: THREE.Group | null = null;
-  let activeRiverBoat: THREE.Group | null = null;
-  let activeBoatOarL: THREE.Object3D | null = null;
-  let activeBoatOarR: THREE.Object3D | null = null;
+  const mooredRiverBoats: Partial<Record<BoatId, THREE.Group>> = {};
+  const activeRiverBoats: Partial<Record<BoatId, BuiltBoatRig>> = {};
   const westInsectAnchors: InsectAnchor[] = [];
 
   {
@@ -7125,31 +6917,32 @@ export function buildTownScene(): TownWorld {
       mergeStaticGroupByMaterial(dockGroup, new Set([dockDeck]));
       eco.add(dockGroup);
 
-      // Moored Wooden Boat floating right beside the dock
-      const mooredBuilt = buildWoodenRowboat(false, lampBulbs);
-      mooredRiverBoat = mooredBuilt.boat;
-      mooredRiverBoat.position.set(-78.8, RIVER_WATER_Y + 0.05, -2.25);
-      mooredRiverBoat.rotation.y = 0.22;
-      addInteractionProxy(
-        mooredRiverBoat,
-        [1.8, 1.5, 3.0],
-        0.55,
-        {
-          kind: 'river_boat_board',
-          tx: RIVER_BOARD_INTERACT.tx,
-          tz: RIVER_BOARD_INTERACT.tz,
-        },
-        clickTargets,
-      );
-      eco.add(mooredRiverBoat);
+      // Moored Boats floating right beside the dock (all 6 skins)
+      for (const id of BOAT_IDS) {
+        const mooredBuilt = buildBoatById(id, false, lampBulbs);
+        const mBoat = mooredBuilt.boat;
+        mBoat.position.set(-78.8, RIVER_WATER_Y + 0.05, -2.25);
+        mBoat.rotation.y = 0.22;
+        mBoat.visible = id === 'wooden_boat';
+        addInteractionProxy(
+          mBoat,
+          [1.95, 1.75, 3.2],
+          0.6,
+          {
+            kind: 'river_boat_board',
+            tx: RIVER_BOARD_INTERACT.tx,
+            tz: RIVER_BOARD_INTERACT.tz,
+          },
+          clickTargets,
+        );
+        eco.add(mBoat);
+        mooredRiverBoats[id] = mBoat;
 
-      // Active Steerable Boat (shown when player embarks onto the river)
-      const activeBuilt = buildWoodenRowboat(true, lampBulbs);
-      activeRiverBoat = activeBuilt.boat;
-      activeBoatOarL = activeBuilt.oarLPivot;
-      activeBoatOarR = activeBuilt.oarRPivot;
-      activeRiverBoat.visible = false;
-      eco.add(activeRiverBoat);
+        const activeBuilt = buildBoatById(id, true, lampBulbs);
+        activeBuilt.boat.visible = false;
+        eco.add(activeBuilt.boat);
+        activeRiverBoats[id] = activeBuilt;
+      }
     }
 
     // 6. NPC Ship's Spacious Nautical Boathouse Shop with Large Roof Boat Logo (Tiệm Thuyền của Ship)
@@ -11032,6 +10825,93 @@ export function buildTownScene(): TownWorld {
   insectAnchors.push(...westInsectAnchors);
   const insectManager = new TownInsectManager(group, insectAnchors);
 
+  // ========== JOYBOY DELIVERY NPC ON BICYCLE (CENTRAL TOWN LOOP + QUẢNG TRƯỜNG STOP) ==========
+  const JOYBOY_WAYPOINTS: {x: number; z: number; stopSec?: number; stopRotY?: number}[] = [
+    {x: 3.3, z: 3.8, stopSec: 9.5, stopRotY: -Math.PI * 0.72}, // Stops cleanly in Quảng Trường!
+    {x: 3.9, z: 0.0},
+    {x: 23.5, z: 0.0},
+    {x: 23.5, z: -12.5},
+    {x: 0, z: -12.5},
+    {x: -23.5, z: -12.5},
+    {x: -23.5, z: 26.8},
+    {x: 0, z: 26.8},
+    {x: 0, z: 15.0},
+    {x: 0, z: 6.2},
+  ];
+  const joyboyRoot = new THREE.Group();
+  const joyboyAvatarRig: AvatarRig = buildAvatarRig(JOYBOY_AVATAR);
+  const joyboyBikeRig: MountRig = buildMountRig('bicycle_classic');
+  joyboyRoot.add(joyboyBikeRig.root, joyboyAvatarRig.root);
+
+  // Rear parcel delivery rack + cardboard parcel & orange tie on Joyboy's bicycle
+  const parcelCarrier = new THREE.Group();
+  parcelCarrier.position.set(0, 0.67, -0.58);
+  const rackFrame = new THREE.Mesh(
+    new RoundedBoxGeometry(0.28, 0.04, 0.36, 1, 0.01),
+    getMat('#545D66', 0.45, 0.45),
+  );
+  const parcelCrate = new THREE.Mesh(
+    new RoundedBoxGeometry(0.32, 0.24, 0.34, 2, 0.03),
+    getMat('#E29D54', 0.68),
+  );
+  parcelCrate.position.y = 0.14;
+  const parcelLid = new THREE.Mesh(
+    new RoundedBoxGeometry(0.34, 0.06, 0.36, 2, 0.02),
+    getMat('#F4B864', 0.62),
+  );
+  parcelLid.position.y = 0.27;
+  const parcelBox = new THREE.Mesh(
+    new RoundedBoxGeometry(0.22, 0.16, 0.22, 1, 0.02),
+    getMat('#D9AF7A', 0.78),
+  );
+  parcelBox.position.y = 0.36;
+  const parcelRibbon = new THREE.Mesh(
+    new RoundedBoxGeometry(0.23, 0.035, 0.05, 1, 0.01),
+    getMat('#E85D4A', 0.5),
+  );
+  parcelRibbon.position.y = 0.445;
+  parcelCarrier.add(rackFrame, parcelCrate, parcelLid, parcelBox, parcelRibbon);
+  joyboyBikeRig.root.add(parcelCarrier);
+
+  const joyboyState = {
+    wpIdx: 0,
+    x: JOYBOY_WAYPOINTS[0].x,
+    z: JOYBOY_WAYPOINTS[0].z,
+    rotY: JOYBOY_WAYPOINTS[0].stopRotY ?? 0,
+    stopTimer: 4.5, // Starts paused briefly in Quảng Trường on first town entry!
+    pausedByUser: false,
+    wheelAngle: 0,
+    crankAngle: 0,
+    steerAngle: 0,
+    idleBlend: 1,
+  };
+  joyboyRoot.position.set(
+    joyboyState.x,
+    getTownGroundHeight(joyboyState.x, joyboyState.z),
+    joyboyState.z,
+  );
+  joyboyRoot.rotation.y = joyboyState.rotY;
+  addInteractionProxy(
+    joyboyRoot,
+    [1.35, 2.25, 1.75],
+    1.05,
+    {kind: 'npc_joyboy'},
+    clickTargets,
+  );
+  group.add(joyboyRoot);
+
+  const joyboyAnchor: TownAnchor = {
+    id: 'npc_joyboy',
+    label: 'Joyboy · Giao Hàng',
+    worldPos: new THREE.Vector3(joyboyState.x, 2.45, joyboyState.z),
+  };
+  labelAnchors.push(joyboyAnchor);
+
+  const setJoyboyPaused = (paused: boolean) => {
+    joyboyState.pausedByUser = paused;
+  };
+  const getJoyboyPosition = () => ({x: joyboyState.x, z: joyboyState.z});
+
   // Track last applied timeOfDay so emissive updates only run when changed
   let lastAppliedTod: TimeOfDay | null = null;
   let currentTod: TimeOfDay = 'morning';
@@ -11093,25 +10973,42 @@ export function buildTownScene(): TownWorld {
     rotY = RIVER_BOAT_SPAWN.rotY,
     moving = false,
     elapsed = 0,
+    boatId: BoatId = 'wooden_boat',
   ) => {
-    if (mooredRiverBoat) {
-      mooredRiverBoat.visible = !active;
+    for (const id of BOAT_IDS) {
+      const mBoat = mooredRiverBoats[id];
+      if (mBoat) mBoat.visible = !active && id === boatId;
+      const aRig = activeRiverBoats[id];
+      if (aRig) aRig.boat.visible = active && id === boatId;
     }
-    if (activeRiverBoat) {
-      activeRiverBoat.visible = active;
-      if (active) {
+
+    if (active) {
+      const rig = activeRiverBoats[boatId] ?? activeRiverBoats.wooden_boat;
+      if (rig) {
         const bob = Math.sin(elapsed * 2.2) * 0.028;
-        activeRiverBoat.position.set(x, RIVER_WATER_Y + 0.05 + bob, z);
-        activeRiverBoat.rotation.set(
+        rig.boat.position.set(x, RIVER_WATER_Y + 0.05 + bob, z);
+        rig.boat.rotation.set(
           moving ? Math.sin(elapsed * 4.4) * 0.02 : Math.sin(elapsed * 1.7) * 0.01,
           rotY,
           Math.cos(elapsed * 2.1) * 0.018,
         );
-        if (activeBoatOarL && activeBoatOarR) {
+        if (rig.driveKind === 'oars' && rig.oarLPivot && rig.oarRPivot) {
           const stroke = moving ? Math.sin(elapsed * 5.6) * 0.42 : 0;
           const dip = moving ? Math.cos(elapsed * 5.6) * 0.14 : 0;
-          activeBoatOarL.rotation.set(dip, stroke, 0);
-          activeBoatOarR.rotation.set(dip, -stroke, 0);
+          rig.oarLPivot.rotation.set(dip, stroke, 0);
+          rig.oarRPivot.rotation.set(dip, -stroke, 0);
+        } else if (rig.driveKind === 'pedal') {
+          const spin = moving ? elapsed * 6.8 : 0;
+          if (rig.wheelPivot) rig.wheelPivot.rotation.x = spin;
+          if (rig.crankPivot) rig.crankPivot.rotation.x = spin * 0.72;
+          if (rig.pedalLPivot) rig.pedalLPivot.rotation.x = -spin * 0.72;
+          if (rig.pedalRPivot) rig.pedalRPivot.rotation.x = -spin * 0.72;
+        } else if (rig.driveKind === 'motor') {
+          if (rig.wheelPivot) rig.wheelPivot.rotation.z = moving ? elapsed * 14 : elapsed * 1.8;
+        }
+        if (rig.sailPivot) {
+          rig.sailPivot.rotation.z = Math.sin(elapsed * 2.1) * 0.06;
+          rig.sailPivot.rotation.y = moving ? Math.sin(elapsed * 4.2) * 0.14 : Math.sin(elapsed * 1.5) * 0.06;
         }
       }
     }
@@ -11414,9 +11311,96 @@ export function buildTownScene(): TownWorld {
     ) {
       updateAvatarRigAnimation(shipRig, 'idle', elapsed, false);
     }
+
+    // 11. Joyboy Courier cycling Central Town loop & stopping cleanly at Quảng Trường
+    {
+      let isRiding = false;
+      const wheelRadius = 0.355;
+      const moveSpeed = 3.55;
+      if (!joyboyState.pausedByUser) {
+        if (joyboyState.stopTimer > 0) {
+          joyboyState.stopTimer = Math.max(0, joyboyState.stopTimer - dt);
+          const stopHeading = JOYBOY_WAYPOINTS[joyboyState.wpIdx].stopRotY;
+          if (stopHeading !== undefined) {
+            let hd = stopHeading - joyboyState.rotY;
+            while (hd > Math.PI) hd -= Math.PI * 2;
+            while (hd < -Math.PI) hd += Math.PI * 2;
+            joyboyState.rotY += hd * Math.min(1, dt * 6);
+          }
+          if (joyboyState.stopTimer <= 0) {
+            joyboyState.wpIdx = (joyboyState.wpIdx + 1) % JOYBOY_WAYPOINTS.length;
+          }
+        } else {
+          const targetWp = JOYBOY_WAYPOINTS[joyboyState.wpIdx];
+          const dx = targetWp.x - joyboyState.x;
+          const dz = targetWp.z - joyboyState.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist < 0.16) {
+            joyboyState.x = targetWp.x;
+            joyboyState.z = targetWp.z;
+            if (targetWp.stopSec && targetWp.stopSec > 0) {
+              joyboyState.stopTimer = targetWp.stopSec;
+            } else {
+              joyboyState.wpIdx = (joyboyState.wpIdx + 1) % JOYBOY_WAYPOINTS.length;
+            }
+          } else {
+            isRiding = true;
+            const step = Math.min(dist, moveSpeed * dt);
+            joyboyState.x += (dx / dist) * step;
+            joyboyState.z += (dz / dist) * step;
+            const desiredRot = Math.atan2(dx, dz);
+            let rd = desiredRot - joyboyState.rotY;
+            while (rd > Math.PI) rd -= Math.PI * 2;
+            while (rd < -Math.PI) rd += Math.PI * 2;
+            const prevRot = joyboyState.rotY;
+            joyboyState.rotY += rd * Math.min(1, dt * 8.5);
+            const rotRate = (joyboyState.rotY - prevRot) / Math.max(0.001, dt);
+            joyboyState.steerAngle = THREE.MathUtils.damp(
+              joyboyState.steerAngle,
+              THREE.MathUtils.clamp(rotRate * 0.14, -0.4, 0.4),
+              10,
+              dt,
+            );
+          }
+        }
+      }
+
+      if (!isRiding) {
+        joyboyState.steerAngle = THREE.MathUtils.damp(joyboyState.steerAngle, 0, 10, dt);
+      } else {
+        joyboyState.wheelAngle += (moveSpeed * dt) / wheelRadius;
+        joyboyState.crankAngle += moveSpeed * 1.05 * dt;
+      }
+      joyboyState.idleBlend = THREE.MathUtils.damp(joyboyState.idleBlend, isRiding ? 0 : 1, 9, dt);
+
+      const jGroundY = getTownGroundHeight(joyboyState.x, joyboyState.z);
+      joyboyRoot.position.set(joyboyState.x, jGroundY, joyboyState.z);
+      joyboyRoot.rotation.y = joyboyState.rotY;
+      joyboyAnchor.worldPos.set(joyboyState.x, jGroundY + 2.45, joyboyState.z);
+
+      const bikePose: 'bike_ride' | 'bike_idle' = isRiding ? 'bike_ride' : 'bike_idle';
+      updateMountAnimation(joyboyBikeRig, {
+        pose: bikePose,
+        elapsed,
+        speed: isRiding ? moveSpeed : 0,
+        wheelAngle: joyboyState.wheelAngle,
+        crankAngle: joyboyState.crankAngle,
+        steerAngle: joyboyState.steerAngle,
+        wheelRadius,
+        idleBlend: joyboyState.idleBlend,
+        leanAngle: 0,
+      });
+      updateAvatarRigAnimation(joyboyAvatarRig, bikePose, elapsed, false, 0, {
+        crankAngle: joyboyState.crankAngle,
+        steerAngle: joyboyState.steerAngle,
+        idleBlend: joyboyState.idleBlend,
+        leanAngle: 0,
+      });
+    }
   };
 
   const dispose = () => {
+    joyboyBikeRig.dispose();
     lakeFishingVisuals?.dispose();
     insectManager.dispose();
     group.traverse((obj) => {
@@ -11482,6 +11466,8 @@ export function buildTownScene(): TownWorld {
     getOutdoorSwingSeatPose,
     setMallElevatorY,
     setRiverBoatPose,
+    setJoyboyPaused,
+    getJoyboyPosition,
     updateInsects,
     tryCatchInsect,
     update,

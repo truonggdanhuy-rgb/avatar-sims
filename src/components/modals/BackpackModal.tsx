@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import {
   BbqFoodId,
+  BoatId,
+  BoatsState,
   BugNetState,
   FishingRodState,
   MountId,
@@ -22,7 +24,6 @@ import {
   PetSupplies,
   PetSupplyId,
   RecipeId,
-  WoodenBoatState,
 } from '../../types/game';
 import {MOUNT_CATALOG, MOUNT_RANK_META} from '../../data/mountCatalog';
 import {
@@ -36,8 +37,8 @@ import {
   PET_SUPPLY_LIST,
 } from '../../data/petCatalog';
 import {
+  BOAT_LIST,
   getRodRepairCost,
-  WOODEN_BOAT_PRICE,
   WOODEN_ROD_MAX_DURABILITY,
   WOODEN_ROD_PRICE,
 } from '../../data/fishingCatalog';
@@ -54,11 +55,11 @@ import {HandheldFoodIcon} from './VendingMachineModal';
 import {soundFX} from '../../utils/sound';
 import {
   BicycleMountIcon,
+  BoatSkinIcon,
   MountCarIcon,
   PetCatFaceIcon,
   RodAndNetIcon,
   SkateboardMountIcon,
-  WoodenBoatIcon,
   WoodenRodIcon,
 } from '../FishingIcons';
 import {WoodenNetIcon} from '../InsectIcons';
@@ -69,7 +70,7 @@ export type BagSubTab = 'list' | 'tools' | 'pets' | 'boats' | 'mounts' | 'food';
 interface BackpackModalProps {
   fishingRod: FishingRodState;
   bugNet: BugNetState;
-  woodenBoat: WoodenBoatState;
+  boats: BoatsState;
   ownedMounts: OwnedMountsState;
   ownedPets: OwnedPetState[];
   activePetId: string | null;
@@ -81,6 +82,7 @@ interface BackpackModalProps {
   initialSubTab?: BagSubTab;
   onToggleEquipRod: () => void;
   onToggleEquipNet: () => void;
+  onSelectBoat: (boatId: BoatId) => void;
   onToggleEquipFood: (foodId: BbqFoodId) => void;
   onEatPeppaDish: (recipeId: PeppaRecipeId) => {ok: boolean; message: string};
   onSellPeppaDish: (recipeId: PeppaRecipeId) => {ok: boolean; message: string};
@@ -94,7 +96,7 @@ interface BackpackModalProps {
 export const BackpackModal: React.FC<BackpackModalProps> = ({
   fishingRod,
   bugNet,
-  woodenBoat,
+  boats,
   ownedMounts,
   ownedPets,
   activePetId,
@@ -106,6 +108,7 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
   initialSubTab = 'list',
   onToggleEquipRod,
   onToggleEquipNet,
+  onSelectBoat,
   onToggleEquipFood,
   onEatPeppaDish,
   onSellPeppaDish,
@@ -240,13 +243,20 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                     }}
                     className="group relative flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#E8D7BC] bg-[#FFF8EB] p-3 transition hover:border-[#2E82A8] active:scale-95"
                   >
-                    {woodenBoat.owned && (
+                    {boats.ownedIds.length > 0 && (
                       <span className="absolute -top-1.5 right-1 rounded-full bg-[#2E82A8] px-1.5 py-0.5 text-[9px] font-black text-white shadow-xs">
-                        Đã có
+                        {boats.ownedIds.length} thuyền
                       </span>
                     )}
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-xs">
-                      <WoodenBoatIcon className="h-10 w-10" />
+                      <BoatSkinIcon
+                        boatId={
+                          boats.ownedIds.includes(boats.activeBoatId)
+                            ? boats.activeBoatId
+                            : 'wooden_boat'
+                        }
+                        className="h-10 w-10"
+                      />
                     </div>
                     <span className="text-xs font-extrabold text-[#4A3525]">Thuyền</span>
                   </button>
@@ -946,37 +956,69 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
 
           {bagSubTab === 'boats' && (
             <div className="space-y-2.5">
-              <div className="rounded-2xl border-2 border-[#BFE0EE] bg-white p-3.5 space-y-2.5">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#BFE0EE] bg-[#EAF6FA]">
-                    <WoodenBoatIcon className="h-11 w-11" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-black text-[#264B5E]">Thuyền Gỗ</span>
-                      {woodenBoat.owned ? (
-                        <span className="rounded-full bg-[#DCEFF8] px-2 py-0.5 text-[10px] font-black text-[#246A8A]">
-                          Đã sở hữu
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-[#F1E8D8] px-2 py-0.5 text-[10px] font-black text-[#8A7154]">
-                          Chưa có
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 text-[11px] font-bold text-[#467A94]">
-                      {woodenBoat.owned
-                        ? 'Bấm biển hiệu hình thuyền ở bến sông Khu Sinh Thái để chèo thuyền & câu cá!'
-                        : `Ghé Sạp Thuyền của NPC Ship ở Khu Sinh Thái phía Tây (${WOODEN_BOAT_PRICE} Xu) để mua.`}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-[#DCEBF2] bg-[#F4FAFD] px-3 py-2 text-[11px] font-semibold leading-relaxed text-[#436D82]">
-                  Hiện tại dùng để chèo dọc sông Khu Sinh Thái (vừa đứng trên thuyền vừa quăng cần
-                  câu cá). Sau này sẽ mở khóa tính năng bơi thuyền ra <b>Biển</b>!
-                </div>
+              <div className="rounded-xl border border-[#DCEBF2] bg-[#F4FAFD] px-3 py-2 text-[11px] font-semibold leading-relaxed text-[#436D82]">
+                Chọn thuyền đang sử dụng để chèo tại Sông Khu Sinh Thái (Thị Trấn) hoặc Biển Đảo Mây. Có thể mua thêm thuyền ở <b>Sạp Thuyền của Ship</b>!
               </div>
+
+              {BOAT_LIST.map((boat) => {
+                const owned = boats.ownedIds.includes(boat.id);
+                const isActive = owned && boats.activeBoatId === boat.id;
+                return (
+                  <div
+                    key={boat.id}
+                    className={`rounded-2xl border-2 bg-white p-3.5 space-y-2.5 ${
+                      isActive ? 'border-[#2E82A8]' : 'border-[#BFE0EE]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#BFE0EE] bg-[#EAF6FA]">
+                        <BoatSkinIcon boatId={boat.id} className="h-11 w-11" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-black text-[#264B5E]">{boat.name}</span>
+                          {isActive ? (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-[#2E82A8] px-2 py-0.5 text-[10px] font-black text-white">
+                              <Check className="h-3 w-3" />
+                              Đang dùng
+                            </span>
+                          ) : owned ? (
+                            <span className="rounded-full bg-[#DCEFF8] px-2 py-0.5 text-[10px] font-black text-[#246A8A]">
+                              Đã sở hữu
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-[#F1E8D8] px-2 py-0.5 text-[10px] font-black text-[#8A7154]">
+                              {boat.price} Xu
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-bold text-[#467A94]">
+                          {boat.subtitle}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] font-semibold leading-relaxed text-[#526B78]">
+                      {owned
+                        ? boat.description
+                        : `Chưa sở hữu. Ghé Sạp Thuyền của Ship tại Bến Sông Khu Sinh Thái (${boat.price} Xu) để mua.`}
+                    </div>
+
+                    {owned && !isActive && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFX.tap();
+                          onSelectBoat(boat.id);
+                        }}
+                        className="w-full rounded-xl bg-[#2E82A8] py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#236A8B] active:scale-95"
+                      >
+                        Chọn {boat.name} làm thuyền chính
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 

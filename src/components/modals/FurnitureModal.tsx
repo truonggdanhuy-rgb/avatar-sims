@@ -773,6 +773,149 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
           <circle cx="44" cy="28" r="1.4" fill="#FFF8EE" />
         </svg>
       );
+    case 'cozy_fireplace':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="10" y="13" width="44" height="5" rx="2" fill="#C89866" />
+          <rect x="13" y="18" width="38" height="27" rx="2" fill={c} stroke="#D5C6B2" strokeWidth="1.2" />
+          <rect x="21" y="24" width="22" height="20" rx="2" fill={a} />
+          <rect x="24" y="27" width="16" height="17" rx="2" fill="#2E2623" />
+          <path d="M27,43 Q32,31 37,43 Z" fill="#FF9E1B" />
+          <path d="M29.5,43 Q32,35 34.5,43 Z" fill="#FFD166" />
+          <rect x="8" y="44" width="48" height="4" rx="1.5" fill="#A99A8B" />
+        </svg>
+      );
+    case 'fish_aquarium':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="13" y="27" width="38" height="19" rx="2" fill={c} stroke="#B69870" strokeWidth="1.4" />
+          <line x1="32" y1="28" x2="32" y2="45" stroke="#B69870" strokeWidth="1.4" />
+          <rect x="14" y="10" width="36" height="17" rx="2" fill={a} stroke="#2B3640" strokeWidth="2" />
+          <ellipse cx="26" cy="18" rx="4" ry="2.2" fill="#FF8C42" />
+          <ellipse cx="39" cy="21" rx="3.5" ry="2" fill="#FFD166" />
+          <path d="M18,26 Q20,18 22,26" stroke="#49A068" strokeWidth="2.5" fill="none" />
+        </svg>
+      );
+    case 'beanbag_chair':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <ellipse cx="32" cy="36" rx="19" ry="11" fill={c} />
+          <circle cx="32" cy="24" r="13" fill={c} />
+          <ellipse cx="33" cy="31" rx="11" ry="6" fill={a} opacity="0.85" />
+          <path d="M15,38 Q32,44 49,38" stroke={a} strokeWidth="2" fill="none" />
+        </svg>
+      );
+    case 'cat_tree_tower':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="13" y="43" width="38" height="4" rx="2" fill={c} />
+          <rect x="16" y="29" width="17" height="14" rx="2" fill={c} stroke="#C7B299" strokeWidth="1.2" />
+          <circle cx="24.5" cy="36" r="4" fill="#4C3D34" />
+          <rect x="38" y="25" width="5" height="18" fill={a} />
+          <rect x="27" y="23" width="22" height="4" rx="1.5" fill={c} />
+          <rect x="29" y="13" width="4.5" height="10" fill={a} />
+          <ellipse cx="31" cy="12" rx="11" ry="3.5" fill={c} stroke="#C7B299" strokeWidth="1.2" />
+          <circle cx="43" cy="31" r="2.6" fill="#F28BA8" />
+        </svg>
+      );
+    case 'wall_gallery_frames':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="7" y="16" width="14" height="20" rx="2" fill={c} />
+          <rect x="9.5" y="18.5" width="9" height="15" fill="#CFE9F7" />
+          <rect x="24" y="12" width="16" height="24" rx="2" fill={c} />
+          <rect x="26.5" y="14.5" width="11" height="19" fill="#FDE3EC" />
+          <polygon points="28,31 32,22 36,31" fill="#F4A261" />
+          <rect x="43" y="16" width="14" height="20" rx="2" fill={c} />
+          <rect x="45.5" y="18.5" width="9" height="15" fill="#E8F3E0" />
+          <circle cx="50" cy="27" r="3.5" fill={a} />
+        </svg>
+      );
+    case 'wall_mirror_arch':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M19,46 L19,22 A13,13 0 0,1 45,22 L45,46 Z" fill={c} />
+          <path d="M22,43 L22,23 A10,10 0 0,1 42,23 L42,43 Z" fill={a} />
+          <line x1="26" y1="35" x2="36" y2="17" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" opacity="0.7" />
+        </svg>
+      );
+    case 'plush_bear_giant':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <circle cx="22" cy="14" r="5" fill={c} />
+          <circle cx="42" cy="14" r="5" fill={c} />
+          <ellipse cx="32" cy="36" rx="13" ry="12" fill={c} />
+          <ellipse cx="32" cy="37" rx="7" ry="7" fill="#F8E7CE" />
+          <circle cx="32" cy="20" r="10.5" fill={c} />
+          <ellipse cx="32" cy="23" rx="5" ry="3.8" fill="#F8E7CE" />
+          <circle cx="32" cy="22" r="2" fill="#2B211B" />
+          <circle cx="28" cy="18" r="1.4" fill="#2B211B" />
+          <circle cx="36" cy="18" r="1.4" fill="#2B211B" />
+          <polygon points="27,28 32,30 27,32" fill={a} />
+          <polygon points="37,28 32,30 37,32" fill={a} />
+        </svg>
+      );
+    case 'coffee_maker_bar':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="15" y="13" width="22" height="29" rx="4" fill={c} />
+          <rect x="14" y="12" width="24" height="8" rx="3" fill={c} stroke="#74A38C" strokeWidth="1.2" />
+          <rect x="19" y="23" width="14" height="16" rx="2" fill={a} />
+          <rect x="22" y="30" width="8" height="8" rx="1.5" fill="#FFF8F0" />
+          <circle cx="26" cy="16" r="2.5" fill="#FFF8F0" />
+          <rect x="41" y="25" width="9" height="16" rx="2" fill="#6B4429" />
+          <rect x="40" y="23" width="11" height="3" rx="1" fill="#D8B282" />
+        </svg>
+      );
+    case 'toast_toaster_set':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="19" y="14" width="12" height="12" rx="2" fill={a} />
+          <rect x="27" y="13" width="12" height="12" rx="2" fill="#F4CF8A" stroke={a} strokeWidth="1.8" />
+          <rect x="14" y="22" width="30" height="20" rx="5" fill={c} stroke="#D5C089" strokeWidth="1.4" />
+          <rect x="45" y="28" width="4" height="3" rx="1" fill="#CBD5E1" />
+          <rect x="46" y="32" width="8" height="10" rx="2" fill="#E85D75" />
+          <rect x="45.5" y="30" width="9" height="2.5" rx="1" fill="#CBD5E1" />
+        </svg>
+      );
+    case 'piano_keyboard':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="22" y="10" width="20" height="11" rx="1.5" fill="#FFFFFF" stroke={c} strokeWidth="1.5" />
+          <rect x="10" y="21" width="44" height="9" rx="2" fill={c} stroke="#CBBFA8" strokeWidth="1.4" />
+          <rect x="13" y="23" width="38" height="4" fill="#FFFFFF" />
+          <rect x="17" y="23" width="2.5" height="2.5" fill={a} />
+          <rect x="23" y="23" width="2.5" height="2.5" fill={a} />
+          <rect x="33" y="23" width="2.5" height="2.5" fill={a} />
+          <rect x="39" y="23" width="2.5" height="2.5" fill={a} />
+          <rect x="13" y="30" width="4" height="16" fill={c} />
+          <rect x="47" y="30" width="4" height="16" fill={c} />
+        </svg>
+      );
+    case 'record_shelf_cabinet':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x="14" y="13" width="18" height="5" rx="1.5" fill="#EDE2D2" />
+          <circle cx="22" cy="14" r="4" fill="#1E1E24" />
+          <rect x="12" y="20" width="40" height="20" rx="2.5" fill={c} />
+          <rect x="15" y="23" width="4" height="14" fill="#E76F51" />
+          <rect x="20" y="23" width="4" height="14" fill="#F4C44E" />
+          <rect x="25" y="23" width="4" height="14" fill="#5FAEE3" />
+          <rect x="35" y="24" width="13" height="12" rx="2" fill={a} />
+          <circle cx="41.5" cy="30" r="3.5" fill="#C8A464" />
+          <line x1="16" y1="40" x2="14" y2="47" stroke={c} strokeWidth="2.5" />
+          <line x1="48" y1="40" x2="50" y2="47" stroke={c} strokeWidth="2.5" />
+        </svg>
+      );
+    case 'terrace_swing_egg':
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <path d="M28,45 L28,16 Q28,8 36,9" fill="none" stroke="#4A4540" strokeWidth="2.5" strokeLinecap="round" />
+          <ellipse cx="32" cy="46" rx="14" ry="3" fill="none" stroke="#4A4540" strokeWidth="2.5" />
+          <ellipse cx="34" cy="27" rx="12" ry="15" fill={c} stroke="#B8905E" strokeWidth="1.8" />
+          <ellipse cx="34" cy="31" rx="8" ry="8" fill={a} />
+        </svg>
+      );
     case 'floor_paint':
     case 'wall_paint':
       return (

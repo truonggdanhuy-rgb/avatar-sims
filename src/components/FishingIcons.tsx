@@ -1,5 +1,5 @@
 import React from 'react';
-import {FishSpeciesId} from '../types/game';
+import {BoatId, FishSpeciesId} from '../types/game';
 
 /**
  * Combined icon showing 1 wooden fishing rod + 1 bug net together (Cần & Vợt)
@@ -361,6 +361,212 @@ export function WoodenBoatIcon({className = 'w-11 h-11'}: {className?: string}) 
       <path d="M16 17 L27 21 L16 25 Z" fill="#52A9C9" stroke="#2D6A85" strokeWidth="1.5" strokeLinejoin="round" />
     </svg>
   );
+}
+
+/**
+ * Cute Swan / Duck Pedal Boat icon for Ship's shop & Bag Thuyền tab
+ */
+export function DuckBoatIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Gentle water ripples */}
+      <path
+        d="M8 51 Q16 48 24 51 T40 51 T56 51"
+        stroke="#5DB7CE"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14 55.5 Q23 53 32 55.5 T50 55.5"
+        stroke="#92D7EA"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      {/* Aqua water-line pontoon rim */}
+      <path
+        d="M11 42 C15 47 23 48 34 48 C46 48 52 45 55 39 L51 36 H15 L11 42 Z"
+        fill="#66C2DA"
+        stroke="#276C82"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      {/* Plump cream duck hull & swept wing */}
+      <path
+        d="M12 37 C14 28 24 27 36 28 C44 28.5 52 29 56 26 L53 38 C49 43 40 45 30 45 C20 45 13 42 12 37 Z"
+        fill="#FFFDF7"
+        stroke="#8C7355"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      {/* Feathered side wing */}
+      <path
+        d="M27 34 C33 30 43 32 47 36 C42 40 32 41 27 34 Z"
+        fill="#F3EBDA"
+        stroke="#B09776"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      {/* Twin sky-blue cushions */}
+      <rect x="27" y="25" width="9" height="4.5" rx="2" fill="#5BC0D9" stroke="#286B82" strokeWidth="1.5" />
+      {/* Arched duck neck & round head */}
+      <path
+        d="M16 33 C14 25 16 17 21 14 C24 12.5 27 15 26 18.5 C25 22 22 26 22 33 Z"
+        fill="#FFFDF7"
+        stroke="#8C7355"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <circle cx="21" cy="17.5" r="6.5" fill="#FFFDF7" stroke="#8C7355" strokeWidth="2.2" />
+      {/* Orange duck bill */}
+      <path
+        d="M15 17.5 L7.5 19 C6.5 19.3 6.5 21 8 21.3 L15.5 20.5 Z"
+        fill="#FF9838"
+        stroke="#9E4F12"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      {/* Rosy cheek & bright eye */}
+      <circle cx="19" cy="16.5" r="1.4" fill="#231D1A" />
+      <circle cx="21.5" cy="19.2" r="1.6" fill="#FF9BAE" opacity="0.8" />
+      {/* Mini stern paddlewheel */}
+      <circle cx="51" cy="42" r="5" fill="#EA6B5A" stroke="#8C2F23" strokeWidth="1.8" />
+      <path d="M51 37 V47 M46 42 H56" stroke="#FFE6A8" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Pastel Rose Swan Princess Boat icon
+ */
+export function SwanPrincessBoatIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      <path d="M8 51 Q16 48 24 51 T40 51 T56 51" stroke="#62B6CB" strokeWidth="2.5" strokeLinecap="round" />
+      <path
+        d="M12 38 C15 29 24 27 36 28 C44 28.5 52 29 56 26 L53 39 C49 44 40 46 30 46 C20 46 13 43 12 38 Z"
+        fill="#FFD9E6"
+        stroke="#B86B86"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <path d="M13 41 H52" stroke="#E5B94C" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M27 34 C33 30 43 32 47 36 C42 40 32 41 27 34 Z" fill="#FFF0F5" stroke="#D188A2" strokeWidth="1.7" />
+      <path
+        d="M16 33 C14 25 16 17 21 14 C24 12.5 27 15 26 18.5 C25 22 22 26 22 33 Z"
+        fill="#FFD9E6"
+        stroke="#B86B86"
+        strokeWidth="2.1"
+      />
+      <circle cx="21" cy="17.5" r="6" fill="#FFD9E6" stroke="#B86B86" strokeWidth="2" />
+      {/* Tiny gold crown */}
+      <polygon points="17,12 19,7 21,11 23,7 25,12" fill="#FFD147" stroke="#A67414" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M15 17.5 L8 19.5 C7 20 7.5 21.3 9 21.3 L15.5 20.5 Z" fill="#F4A261" stroke="#9E4F12" strokeWidth="1.6" />
+      <circle cx="19" cy="16.5" r="1.3" fill="#231D1A" />
+      <circle cx="51" cy="42" r="4.5" fill="#F2C249" stroke="#9C6B14" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+/**
+ * Mini Pirate Galleon Rowboat icon
+ */
+export function PirateGalleonBoatIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      <path d="M8 51 Q16 48 24 51 T40 51 T56 51" stroke="#62B6CB" strokeWidth="2.5" strokeLinecap="round" />
+      {/* Mast & Jolly Roger Flag */}
+      <line x1="25" y1="32" x2="25" y2="10" stroke="#5A3318" strokeWidth="2.6" strokeLinecap="round" />
+      <rect x="26" y="11" width="16" height="11" rx="1.5" fill="#26282E" stroke="#111317" strokeWidth="1.4" />
+      <circle cx="34" cy="16.5" r="2.6" fill="#F8FAFC" />
+      <path d="M31 19 L37 14 M37 19 L31 14" stroke="#F8FAFC" strokeWidth="1.2" strokeLinecap="round" />
+      {/* Mahogany galleon hull */}
+      <path
+        d="M8 33 L15 46 H49 L56 29 L46 31 H15 L8 33 Z"
+        fill="#7C4523"
+        stroke="#46220D"
+        strokeWidth="2.3"
+        strokeLinejoin="round"
+      />
+      <path d="M11 35 H52" stroke="#E5B94C" strokeWidth="2.5" strokeLinecap="round" />
+      {/* Mini cannon port dots */}
+      <circle cx="24" cy="40" r="2" fill="#26282E" stroke="#E5B94C" strokeWidth="1" />
+      <circle cx="34" cy="40" r="2" fill="#26282E" stroke="#E5B94C" strokeWidth="1" />
+      <circle cx="44" cy="40" r="2" fill="#26282E" stroke="#E5B94C" strokeWidth="1" />
+    </svg>
+  );
+}
+
+/**
+ * Retro Mint-Aqua Speedboat icon
+ */
+export function SpeedboatRetroIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      <path d="M7 50 Q16 47 25 50 T43 50 T57 50" stroke="#5DB7CE" strokeWidth="2.5" strokeLinecap="round" />
+      {/* Sleek bow & hull */}
+      <path
+        d="M7 36 L52 33 L55 44 L14 45 C10 45 7 40 7 36 Z"
+        fill="#53C3AD"
+        stroke="#1E6B5E"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <path d="M12 37 H53" stroke="#FFF8EB" strokeWidth="3.2" strokeLinecap="round" />
+      {/* Tinted retro windshield */}
+      <path d="M23 33 L29 24 H39 L37 33 Z" fill="#9EE2F5" stroke="#255C73" strokeWidth="1.8" strokeLinejoin="round" />
+      {/* Chrome outboard motor & propeller */}
+      <rect x="52" y="30" width="6" height="12" rx="2" fill="#46525E" stroke="#262E36" strokeWidth="1.6" />
+      <path d="M55 42 V48 M52 47 L58 47" stroke="#E5B94C" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Pink Lotus & Warm Lantern Sampan Boat icon
+ */
+export function LotusLanternBoatIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      <path d="M8 51 Q16 48 24 51 T40 51 T56 51" stroke="#62B6CB" strokeWidth="2.5" strokeLinecap="round" />
+      {/* Bamboo lantern pole & warm glowing lantern */}
+      <path d="M16 36 C16 21 21 13 28 14" stroke="#8C6239" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="28" cy="20" r="4.5" fill="#FFCA5C" stroke="#C76A24" strokeWidth="1.6" />
+      {/* Pink lotus petals hull */}
+      <path
+        d="M8 32 C13 44 21 47 32 47 C43 47 51 44 56 32 C50 35 45 36 32 36 C19 36 14 35 8 32 Z"
+        fill="#F48AA8"
+        stroke="#A63F60"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <path d="M17 36 C21 29 27 29 32 35 C37 29 43 29 47 36 Z" fill="#FFB8CB" stroke="#A63F60" strokeWidth="1.6" />
+      <rect x="27" y="32" width="10" height="4" rx="1.5" fill="#6BBF8A" />
+    </svg>
+  );
+}
+
+export function BoatSkinIcon({
+  boatId,
+  className = 'w-11 h-11',
+}: {
+  boatId: BoatId;
+  className?: string;
+}) {
+  switch (boatId) {
+    case 'duck_boat':
+      return <DuckBoatIcon className={className} />;
+    case 'swan_princess_boat':
+      return <SwanPrincessBoatIcon className={className} />;
+    case 'pirate_galleon_boat':
+      return <PirateGalleonBoatIcon className={className} />;
+    case 'speedboat_retro':
+      return <SpeedboatRetroIcon className={className} />;
+    case 'lotus_lantern_boat':
+      return <LotusLanternBoatIcon className={className} />;
+    case 'wooden_boat':
+    default:
+      return <WoodenBoatIcon className={className} />;
+  }
 }
 
 /**

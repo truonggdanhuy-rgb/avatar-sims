@@ -363,23 +363,156 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
           );
         }
 
-        if (style === 'coin_tunic') {
+        if (
+          style === 'coin_tunic' ||
+          style === 'ao_dai_lotus' ||
+          style === 'ao_dai_peach' ||
+          style === 'ao_dai_white' ||
+          style === 'ao_dai_nam'
+        ) {
+          const isNam = style === 'ao_dai_nam';
+          const isWhite = style === 'ao_dai_white';
+          const trimCol = isWhite ? '#E6EDF8' : '#F4C95D';
           return (
             <g>
-              <path d="M26 20 L12 39 L19 45 L26 33 L24 65 H56 L54 33 L61 45 L68 39 L54 20 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
-              <rect x="33" y="16" width="14" height="6" rx="2" fill={col} stroke="#F6CA44" strokeWidth="1.8" />
-              <path d="M40 22 L48 31 V44" stroke="#F6CA44" strokeWidth="1.8" fill="none" />
-              {[
-                [32, 37],
-                [46, 42],
-                [33, 52],
-                [47, 56],
-              ].map(([cx, cy]) => (
-                <g key={`${cx}-${cy}`}>
-                  <circle cx={cx} cy={cy} r="3.8" fill="#F7CA44" stroke="#C88718" strokeWidth="1" />
-                  <rect x={cx - 1.2} y={cy - 1.2} width="2.4" height="2.4" fill={col} />
+              {/* Back Tà peeking behind */}
+              <path d="M27 42 H53 L58 69 H22 Z" fill={shade(col, -28)} stroke={outline} strokeWidth="1.9" strokeLinejoin="round" />
+              {/* Fitted Áo Dài Bodice + Long Sleeves + Curved Slit Front Tà */}
+              <path
+                d={
+                  isNam
+                    ? 'M26 20 L11 39 L18 45 L26 32 V40 L23 68 H57 L54 40 V32 L62 45 L69 39 L54 20 Z'
+                    : 'M27 20 L12 39 L19 45 L27 32 C28 38, 30 41, 29 44 L24 68 H56 L51 44 C50 41, 52 38, 53 32 L61 45 L68 39 L53 20 Z'
+                }
+                fill={col}
+                stroke={outline}
+                strokeWidth="2.1"
+                strokeLinejoin="round"
+              />
+              {/* Raglan Shoulder Seams */}
+              <path d="M33 21 L27 32 M47 21 L53 32" stroke={shade(col, -32)} strokeWidth="1.4" strokeLinecap="round" />
+              {/* Standing Cổ Tàu Collar */}
+              <rect x="33" y="14" width="14" height="7" rx="2.5" fill={col} stroke={trimCol} strokeWidth="1.7" />
+              {/* Diagonal Tà Chéo + Frog Buttons */}
+              <path d="M40 21 L49 29 V41" stroke={trimCol} strokeWidth="1.7" fill="none" strokeLinecap="round" />
+              <circle cx="43.5" cy="24.5" r="1.2" fill={trimCol} />
+              <circle cx="48.5" cy="29.5" r="1.2" fill={trimCol} />
+              <circle cx="48.5" cy="36" r="1.2" fill={trimCol} />
+              {/* Bottom Tà Trim */}
+              <path d="M25 65 H55" stroke={trimCol} strokeWidth="2.2" strokeLinecap="round" />
+              {/* Style Motifs */}
+              {style === 'coin_tunic' &&
+                [
+                  [33, 49],
+                  [46, 54],
+                  [34, 59],
+                ].map(([cx, cy]) => (
+                  <g key={`${cx}-${cy}`}>
+                    <circle cx={cx} cy={cy} r="3.4" fill="#F7CA44" stroke="#B77914" strokeWidth="1" />
+                    <rect x={cx - 1.1} y={cy - 1.1} width="2.2" height="2.2" fill={col} />
+                  </g>
+                ))}
+              {style === 'ao_dai_lotus' && (
+                <g transform="translate(40,54)">
+                  <ellipse cx="0" cy="-4" rx="2.6" ry="5" fill="#FFF2F6" stroke="#C86D88" strokeWidth="0.9" />
+                  <ellipse cx="-4" cy="-2" rx="2.2" ry="4.4" transform="rotate(-28 -4 -2)" fill="#F9B5C9" stroke="#C86D88" strokeWidth="0.9" />
+                  <ellipse cx="4" cy="-2" rx="2.2" ry="4.4" transform="rotate(28 4 -2)" fill="#F9B5C9" stroke="#C86D88" strokeWidth="0.9" />
+                  <path d="M-6 3 Q0 6 6 3" stroke="#539D63" strokeWidth="2" strokeLinecap="round" fill="none" />
                 </g>
-              ))}
+              )}
+              {style === 'ao_dai_peach' && (
+                <g>
+                  <path d="M31 61 Q39 51 48 45" stroke="#68432A" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+                  <circle cx="37" cy="54" r="3" fill="#FFA6BE" stroke="#C95978" strokeWidth="0.9" />
+                  <circle cx="45" cy="48" r="2.7" fill="#FFBBD0" stroke="#C95978" strokeWidth="0.9" />
+                  <circle cx="42" cy="57" r="2.5" fill="#FF92B0" stroke="#C95978" strokeWidth="0.9" />
+                </g>
+              )}
+              {style === 'ao_dai_white' && (
+                <path d="M35 37 Q40 42 45 37" stroke="#DCE5F2" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+              )}
+              {style === 'ao_dai_nam' && (
+                <g>
+                  <circle cx="40" cy="52" r="5.5" fill="none" stroke="#F4C95D" strokeWidth="1.6" />
+                  <path d="M37.5 49.5 H42.5 M40 47.5 V56.5 M37.5 54.5 H42.5" stroke="#F4C95D" strokeWidth="1.2" />
+                </g>
+              )}
+            </g>
+          );
+        }
+
+        if (style === 'lolita_dress') {
+          return (
+            <g>
+              <path d="M27 21 L14 35 L22 41 L28 31 L20 65 H60 L52 31 L58 41 L66 35 L53 21 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M31 22 L40 34 L49 22 Z" fill="#FFFDF8" stroke={outline} strokeWidth="1.5" />
+              <path d="M22 61 Q31 66 40 61 Q49 66 58 61" stroke="#FFFDF8" strokeWidth="3.2" fill="none" strokeLinecap="round" />
+              <path d="M40 36 L34 33 L35 39 Z M40 36 L46 33 L45 39 Z" fill="#FFFDF8" stroke={outline} strokeWidth="1.2" />
+            </g>
+          );
+        }
+
+        if (style === 'trench_coat') {
+          return (
+            <g>
+              <path d="M25 20 L11 39 L19 45 L26 34 L22 67 H58 L54 34 L61 45 L69 39 L55 20 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M30 20 L38 33 L32 36 L26 24 Z M50 20 L42 33 L48 36 L54 24 Z" fill={shade(col, -16)} stroke={outline} strokeWidth="1.6" />
+              <rect x="25" y="42" width="30" height="4.5" rx="1.5" fill={shade(col, -28)} stroke={outline} strokeWidth="1.4" />
+              <rect x="37" y="41.5" width="6" height="5.5" rx="1" fill="#E3B34C" stroke={outline} strokeWidth="1.1" />
+              <circle cx="35" cy="36" r="1.4" fill="#4A3525" />
+              <circle cx="45" cy="36" r="1.4" fill="#4A3525" />
+              <circle cx="35" cy="52" r="1.4" fill="#4A3525" />
+              <circle cx="45" cy="52" r="1.4" fill="#4A3525" />
+            </g>
+          );
+        }
+
+        if (style === 'academy_blazer') {
+          return (
+            <g>
+              <path d="M25 22 L12 39 L19 45 L26 34 V64 H54 V34 L61 45 L68 39 L55 22 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M33 22 L40 38 L47 22 Z" fill="#FFFFFF" stroke={outline} strokeWidth="1.5" />
+              <path d="M37 25 L40 37 L43 25 Z" fill="#C94557" />
+              <path d="M31 22 L38 35 L33 37 L27 25 Z M49 22 L42 35 L47 37 L53 25 Z" fill={dark} stroke={outline} strokeWidth="1.4" />
+              <circle cx="47" cy="37" r="3" fill="#F2C85B" stroke={outline} strokeWidth="1" />
+            </g>
+          );
+        }
+
+        if (style === 'bomber_jacket') {
+          return (
+            <g>
+              <path d="M25 22 L11 39 L19 45 L26 35 V63 H54 V35 L61 45 L69 39 L55 22 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M31 22 Q40 27 49 22" stroke="#22252D" strokeWidth="3.2" fill="none" />
+              <path d="M26 60 H54" stroke="#22252D" strokeWidth="3.6" strokeLinecap="round" />
+              <path d="M13 38 L19 43 M67 38 L61 43" stroke="#22252D" strokeWidth="3" strokeLinecap="round" />
+              <line x1="40" y1="25" x2="40" y2="61" stroke="#D9E0E8" strokeWidth="2.4" />
+              <rect x="44" y="34" width="6" height="5" rx="1.2" fill="#F2C85B" stroke={outline} strokeWidth="1.1" />
+            </g>
+          );
+        }
+
+        if (style === 'turtleneck_sweater') {
+          return (
+            <g>
+              <path d="M25 22 L12 40 L20 46 L26 35 V64 H54 V35 L60 46 L68 40 L55 22 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <rect x="32" y="15" width="16" height="9" rx="3" fill={light} stroke={outline} strokeWidth="2" />
+              <path d="M33 30 V60 M40 30 V60 M47 30 V60" stroke={dark} strokeWidth="1.5" opacity="0.45" />
+              <path d="M27 60 H53" stroke={dark} strokeWidth="2.8" strokeLinecap="round" />
+            </g>
+          );
+        }
+
+        if (style === 'hawaii_shirt') {
+          return (
+            <g>
+              <path d="M25 22 L12 36 L19 42 L26 33 V63 H54 V33 L61 42 L68 36 L55 22 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M32 22 L39 30 L33 32 L28 24 Z M48 22 L41 30 L47 32 L52 24 Z" fill={light} stroke={outline} strokeWidth="1.5" />
+              <line x1="40" y1="28" x2="40" y2="62" stroke="#D4B896" strokeWidth="1.6" />
+              <circle cx="32" cy="40" r="3.6" fill="#FF7C9C" />
+              <circle cx="48" cy="48" r="3.6" fill="#FFE066" />
+              <circle cx="33" cy="55" r="3.2" fill="#FFFFFF" />
+              <path d="M45 36 Q50 34 51 39 Q46 40 45 36 Z" fill="#46A85C" />
             </g>
           );
         }
@@ -534,6 +667,59 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <circle cx="31" cy="51" r="4.2" fill="#FFFFFF" />
               <circle cx="49" cy="51" r="4.2" fill="#FFFFFF" />
               <circle cx="56" cy="51" r="4.5" fill="#FFFFFF" />
+            </g>
+          );
+        }
+
+        if (style === 'silk_culottes') {
+          return (
+            <g>
+              <path d="M23 18 H57 L64 65 H43 L40 34 L37 65 H16 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M23 23 H57" stroke="#F4DFB0" strokeWidth="2.2" />
+              <path d="M29 29 L24 62 M51 29 L56 62" stroke={shade(col, 24)} strokeWidth="1.6" strokeLinecap="round" />
+            </g>
+          );
+        }
+
+        if (style === 'tiered_lace_skirt') {
+          return (
+            <g>
+              <path d="M26 21 H54 L59 38 C48 41, 32 41, 21 38 Z" fill={col} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <path d="M22 36 H58 L64 51 C49 55, 31 55, 16 51 Z" fill={shade(col, 14)} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <path d="M18 49 H62 L67 63 C50 67, 30 67, 13 63 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M15 61 Q27 65 40 61 Q53 65 65 61" stroke="#FFFDF8" strokeWidth="2.6" fill="none" />
+            </g>
+          );
+        }
+
+        if (style === 'plaid_skirt') {
+          return (
+            <g>
+              <path d="M25 22 H55 L63 57 C48 61, 32 61, 17 57 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M22 36 H58 M19 48 H61" stroke="#FFFDF8" strokeWidth="2" opacity="0.85" />
+              <path d="M32 24 L29 57 M40 24 V58 M48 24 L51 57" stroke={dark} strokeWidth="2" />
+              <path d="M25 26 H55" stroke={dark} strokeWidth="2.4" />
+            </g>
+          );
+        }
+
+        if (style === 'cargo_pants') {
+          return (
+            <g>
+              <path d="M24 18 H56 L61 65 H43 L40 34 L37 65 H19 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <rect x="17" y="38" width="7" height="11" rx="1.6" fill={shade(col, 15)} stroke={outline} strokeWidth="1.6" />
+              <rect x="56" y="38" width="7" height="11" rx="1.6" fill={shade(col, 15)} stroke={outline} strokeWidth="1.6" />
+              <path d="M24 22 H56" stroke="#221D1A" strokeWidth="3" />
+            </g>
+          );
+        }
+
+        if (style === 'flare_jeans') {
+          return (
+            <g>
+              <path d="M25 18 H55 L54 39 L63 65 H43 L40 36 L37 65 H17 L26 39 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M25 23 H55" stroke="#D9A34E" strokeWidth="2" />
+              <path d="M29 31 L25 60 M51 31 L55 60" stroke={shade(col, 24)} strokeWidth="2.4" strokeLinecap="round" opacity="0.7" />
             </g>
           );
         }
@@ -985,6 +1171,59 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             </g>
           );
         }
+        if (style === 'non_la') {
+          return (
+            <g>
+              <path d="M10 52 L40 20 L70 52 Q40 59 10 52 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M22 41 Q40 45 58 41 M29 33 Q40 36 51 33" stroke={shade(col, -25)} strokeWidth="1.4" fill="none" />
+              <path d="M24 53 Q40 66 56 53" stroke="#E0607E" strokeWidth="2" fill="none" />
+            </g>
+          );
+        }
+        if (style === 'khan_dong') {
+          return (
+            <g>
+              <ellipse cx="40" cy="42" rx="24" ry="12" fill={col} stroke={outline} strokeWidth="2.2" />
+              <ellipse cx="40" cy="39" rx="20" ry="9" fill={shade(col, 14)} stroke="#F4C95D" strokeWidth="1.6" />
+              <path d="M21 43 Q40 50 59 43" stroke="#F4C95D" strokeWidth="2" fill="none" />
+              <circle cx="40" cy="40" r="3.5" fill="#F4C95D" stroke={outline} strokeWidth="1.1" />
+            </g>
+          );
+        }
+        if (style === 'bunny_beanie') {
+          return (
+            <g>
+              <ellipse cx="29" cy="21" rx="5.5" ry="12" transform="rotate(-10 29 21)" fill={col} stroke={outline} strokeWidth="2" />
+              <ellipse cx="51" cy="21" rx="5.5" ry="12" transform="rotate(10 51 21)" fill={col} stroke={outline} strokeWidth="2" />
+              <ellipse cx="29" cy="22" rx="2.5" ry="7" transform="rotate(-10 29 22)" fill="#F9B8CB" />
+              <ellipse cx="51" cy="22" rx="2.5" ry="7" transform="rotate(10 51 22)" fill="#F9B8CB" />
+              <path d="M20 48 C20 27, 60 27, 60 48 Z" fill={col} stroke={outline} strokeWidth="2.2" />
+              <rect x="17" y="46" width="46" height="10" rx="5" fill={shade(col, -16)} stroke={outline} strokeWidth="2" />
+            </g>
+          );
+        }
+        if (style === 'royal_crown') {
+          return (
+            <g>
+              <path d="M18 52 L21 28 L31 38 L40 22 L49 38 L59 28 L62 52 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <rect x="17" y="50" width="46" height="7" rx="3" fill={shade(col, -18)} stroke={outline} strokeWidth="1.8" />
+              <circle cx="40" cy="43" r="3.5" fill="#E84A66" stroke={outline} strokeWidth="1.1" />
+              <circle cx="28" cy="44" r="2.6" fill="#46A8E8" stroke={outline} strokeWidth="1" />
+              <circle cx="52" cy="44" r="2.6" fill="#46A8E8" stroke={outline} strokeWidth="1" />
+            </g>
+          );
+        }
+        if (style === 'headphone') {
+          return (
+            <g>
+              <path d="M20 44 C20 18, 60 18, 60 44" stroke={col} strokeWidth="5.5" fill="none" strokeLinecap="round" />
+              <rect x="13" y="37" width="11" height="20" rx="5" fill={col} stroke={outline} strokeWidth="2" />
+              <rect x="56" y="37" width="11" height="20" rx="5" fill={col} stroke={outline} strokeWidth="2" />
+              <circle cx="18.5" cy="47" r="2.5" fill="#FFFFFF" />
+              <circle cx="61.5" cy="47" r="2.5" fill="#FFFFFF" />
+            </g>
+          );
+        }
         // ribbon_bow
         return (
           <g>
@@ -1037,6 +1276,36 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <path d="M27 21 L24 38 M53 21 L56 38" stroke="#FFF8EE" strokeWidth="2.4" strokeLinecap="round" />
               {/* Plump Cross-Knot */}
               <rect x="41" y="29" width="15" height="11" rx="5" fill={shade(col, 14)} stroke={outline} strokeWidth="2" />
+            </g>
+          );
+        }
+        if (style === 'star_glasses') {
+          return (
+            <g>
+              <polygon points="24,28 27,36 36,36 29,42 32,50 24,45 16,50 19,42 12,36 21,36" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <polygon points="56,28 59,36 68,36 61,42 64,50 56,45 48,50 51,42 44,36 53,36" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <path d="M35 39 H45" stroke="#F4C95D" strokeWidth="2.8" />
+            </g>
+          );
+        }
+        if (style === 'pearl_ribbon_choker') {
+          return (
+            <g>
+              <rect x="20" y="30" width="40" height="8" rx="4" fill={col} stroke={outline} strokeWidth="2" />
+              <path d="M40 36 L30 29 L31 41 Z M40 36 L50 29 L49 41 Z" fill={col} stroke={outline} strokeWidth="1.6" strokeLinejoin="round" />
+              <circle cx="40" cy="36" r="3.4" fill="#FFFDF8" stroke={outline} strokeWidth="1.4" />
+              <circle cx="40" cy="44" r="3" fill="#FFFDF8" stroke={outline} strokeWidth="1.3" />
+            </g>
+          );
+        }
+        if (style === 'camera_strap') {
+          return (
+            <g>
+              <path d="M22 18 L34 38 M58 18 L46 38" stroke="#5B3F2D" strokeWidth="3.5" strokeLinecap="round" />
+              <rect x="23" y="36" width="34" height="23" rx="4" fill={col} stroke={outline} strokeWidth="2.2" />
+              <rect x="33" y="31" width="14" height="6" rx="2" fill="#D8E0E8" stroke={outline} strokeWidth="1.5" />
+              <circle cx="41" cy="48" r="7.5" fill="#2A313D" stroke="#E8EDF2" strokeWidth="2" />
+              <circle cx="41" cy="48" r="3.2" fill="#5EA8E8" />
             </g>
           );
         }
@@ -1148,11 +1417,61 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             </g>
           );
         }
+        if (style === 'bunny_plush') {
+          return (
+            <g>
+              <ellipse cx="31" cy="21" rx="4.5" ry="11" transform="rotate(-10 31 21)" fill={col} stroke={outline} strokeWidth="1.9" />
+              <ellipse cx="49" cy="21" rx="4.5" ry="11" transform="rotate(10 49 21)" fill={col} stroke={outline} strokeWidth="1.9" />
+              <rect x="23" y="27" width="34" height="35" rx="14" fill={col} stroke={outline} strokeWidth="2.2" />
+              <circle cx="34" cy="39" r="1.8" fill="#221E24" />
+              <circle cx="46" cy="39" r="1.8" fill="#221E24" />
+              <circle cx="40" cy="43" r="1.8" fill="#F285A6" />
+              <circle cx="31" cy="44" r="2.3" fill="#FAD0DF" />
+              <circle cx="49" cy="44" r="2.3" fill="#FAD0DF" />
+            </g>
+          );
+        }
+        if (style === 'strawberry_bear') {
+          return (
+            <g>
+              <circle cx="27" cy="25" r="5" fill={col} stroke={outline} strokeWidth="1.8" />
+              <circle cx="53" cy="25" r="5" fill={col} stroke={outline} strokeWidth="1.8" />
+              <rect x="23" y="24" width="34" height="36" rx="13" fill={col} stroke={outline} strokeWidth="2.2" />
+              <ellipse cx="40" cy="44" rx="7" ry="5" fill="#FFF2F6" />
+              <circle cx="34" cy="37" r="1.8" fill="#221E24" />
+              <circle cx="46" cy="37" r="1.8" fill="#221E24" />
+              <circle cx="40" cy="43" r="2" fill="#D84D6B" />
+              <circle cx="40" cy="54" r="3.5" fill="#EE4B6A" stroke="#5AA85B" strokeWidth="1.5" />
+            </g>
+          );
+        }
+        if (style === 'astro_pack') {
+          return (
+            <g>
+              <rect x="22" y="21" width="36" height="38" rx="9" fill={col} stroke={outline} strokeWidth="2.2" />
+              <circle cx="40" cy="37" r="8" fill="#77D4FA" stroke="#2D3748" strokeWidth="2" />
+              <rect x="26" y="49" width="28" height="6" rx="2" fill="#F29F3D" />
+              <path d="M29 59 V66 M51 59 V66" stroke="#FF7B42" strokeWidth="4.5" strokeLinecap="round" />
+            </g>
+          );
+        }
+        if (style === 'crystal_wings') {
+          return (
+            <g>
+              <path d="M37 40 C24 20, 9 20, 12 37 C14 45, 25 46, 37 43 Z" fill={col} stroke={outline} strokeWidth="2" />
+              <path d="M37 44 C26 45, 16 53, 21 62 C27 66, 35 55, 37 47 Z" fill={shade(col, 24)} stroke={outline} strokeWidth="1.8" />
+              <path d="M43 40 C56 20, 71 20, 68 37 C66 45, 55 46, 43 43 Z" fill={col} stroke={outline} strokeWidth="2" />
+              <path d="M43 44 C54 45, 64 53, 59 62 C53 66, 45 55, 43 47 Z" fill={shade(col, 24)} stroke={outline} strokeWidth="1.8" />
+              <circle cx="40" cy="42" r="3.5" fill="#F5C953" stroke={outline} strokeWidth="1.3" />
+            </g>
+          );
+        }
         // angel_wings
         return (
           <g>
-            <path d="M38 40 C26 24, 14 23, 14 35 C14 45, 25 51, 38 47 Z" fill={col} stroke={outline} strokeWidth="2" />
-            <path d="M42 40 C54 24, 66 23, 66 35 C66 45, 55 51, 42 47 Z" fill={col} stroke={outline} strokeWidth="2" />
+            <path d="M36 42 C25 22, 10 18, 9 30 C9 37, 17 41, 24 41 C15 44, 14 52, 22 54 C28 55, 34 49, 37 45 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+            <path d="M44 42 C55 22, 70 18, 71 30 C71 37, 63 41, 56 41 C65 44, 66 52, 58 54 C52 55, 46 49, 43 45 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+            <circle cx="40" cy="43" r="3.2" fill="#F2C85B" stroke={outline} strokeWidth="1.3" />
           </g>
         );
       })()}
@@ -1165,55 +1484,88 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
         if (style === 'crocs_fish') {
           return (
             <g>
-              <ellipse cx="40" cy="52" rx="22" ry="7" fill="#F28AA8" stroke={outline} strokeWidth="2" />
-              <path d="M21 50 C21 31, 59 31, 59 50 Z" fill="#5AC4DF" stroke={outline} strokeWidth="2.2" />
-              <circle cx="33" cy="31" r="5" fill="#FFFFFF" stroke={outline} strokeWidth="1.6" />
-              <circle cx="47" cy="31" r="5" fill="#FFFFFF" stroke={outline} strokeWidth="1.6" />
-              <circle cx="33" cy="31" r="2.1" fill="#1B1D24" />
-              <circle cx="47" cy="31" r="2.1" fill="#1B1D24" />
-              <ellipse cx="40" cy="44" rx="7" ry="3.2" fill="#F79AB6" stroke={outline} strokeWidth="1.3" />
+              <path d="M14 48 H66 C66 58, 56 61, 40 61 C24 61, 14 58, 14 48 Z" fill="#F28AA8" stroke={outline} strokeWidth="2.1" />
+              <path d="M16 50 C16 28, 64 28, 64 50 Z" fill="#5AC4DF" stroke={outline} strokeWidth="2.2" />
+              <path d="M17 44 Q14 33 24 31" stroke="#399DB8" strokeWidth="4.5" strokeLinecap="round" fill="none" />
+              <circle cx="32" cy="29" r="5.5" fill="#FFFFFF" stroke={outline} strokeWidth="1.7" />
+              <circle cx="48" cy="29" r="5.5" fill="#FFFFFF" stroke={outline} strokeWidth="1.7" />
+              <circle cx="32" cy="29" r="2.3" fill="#1B1D24" />
+              <circle cx="48" cy="29" r="2.3" fill="#1B1D24" />
+              <circle cx="30" cy="39" r="1.7" fill="#2A6577" />
+              <circle cx="40" cy="37" r="1.7" fill="#2A6577" />
+              <circle cx="50" cy="39" r="1.7" fill="#2A6577" />
+              <ellipse cx="40" cy="46" rx="8" ry="3.6" fill="#F79AB6" stroke={outline} strokeWidth="1.4" />
             </g>
           );
         }
         if (style === 'crocs_panda') {
           return (
             <g>
-              <ellipse cx="40" cy="52" rx="22" ry="7" fill="#3675DE" stroke={outline} strokeWidth="2" />
-              <circle cx="27" cy="32" r="4.8" fill="#222228" />
-              <circle cx="53" cy="32" r="4.8" fill="#222228" />
-              <path d="M21 50 C21 31, 59 31, 59 50 Z" fill="#FFFFFF" stroke={outline} strokeWidth="2.2" />
-              <ellipse cx="33" cy="41" rx="4" ry="3" fill="#222228" />
-              <ellipse cx="47" cy="41" rx="4" ry="3" fill="#222228" />
-              <circle cx="33" cy="41" r="1.4" fill="#FFFFFF" />
-              <circle cx="47" cy="41" r="1.4" fill="#FFFFFF" />
-              <ellipse cx="40" cy="46" rx="2.8" ry="1.8" fill="#222228" />
+              <path d="M14 48 H66 C66 58, 56 61, 40 61 C24 61, 14 58, 14 48 Z" fill="#3675DE" stroke={outline} strokeWidth="2.1" />
+              <circle cx="25" cy="29" r="5.5" fill="#222228" />
+              <circle cx="55" cy="29" r="5.5" fill="#222228" />
+              <path d="M16 50 C16 28, 64 28, 64 50 Z" fill="#FFFFFF" stroke={outline} strokeWidth="2.2" />
+              <path d="M17 44 Q14 33 24 31" stroke="#222228" strokeWidth="4.2" strokeLinecap="round" fill="none" />
+              <ellipse cx="32" cy="40" rx="4.6" ry="3.5" fill="#222228" />
+              <ellipse cx="48" cy="40" rx="4.6" ry="3.5" fill="#222228" />
+              <circle cx="32" cy="40" r="1.6" fill="#FFFFFF" />
+              <circle cx="48" cy="40" r="1.6" fill="#FFFFFF" />
+              <ellipse cx="40" cy="46" rx="3.2" ry="2" fill="#222228" />
             </g>
           );
         }
         if (style === 'crocs_chick') {
           return (
             <g>
-              <ellipse cx="40" cy="52" rx="22" ry="7" fill="#E88A2C" stroke={outline} strokeWidth="2" />
-              <path d="M21 50 C21 31, 59 31, 59 50 Z" fill="#F8CE48" stroke={outline} strokeWidth="2.2" />
-              <circle cx="33" cy="38" r="2" fill="#1B1D24" />
-              <circle cx="47" cy="38" r="2" fill="#1B1D24" />
-              <ellipse cx="40" cy="44" rx="6.5" ry="3.2" fill="#F27E24" stroke={outline} strokeWidth="1.3" />
+              <path d="M14 48 H66 C66 58, 56 61, 40 61 C24 61, 14 58, 14 48 Z" fill="#E88A2C" stroke={outline} strokeWidth="2.1" />
+              <path d="M16 50 C16 28, 64 28, 64 50 Z" fill="#F8CE48" stroke={outline} strokeWidth="2.2" />
+              <path d="M17 44 Q14 33 24 31" stroke="#D97E26" strokeWidth="4.2" strokeLinecap="round" fill="none" />
+              <circle cx="32" cy="38" r="2.2" fill="#1B1D24" />
+              <circle cx="48" cy="38" r="2.2" fill="#1B1D24" />
+              <ellipse cx="40" cy="45" rx="7.2" ry="3.5" fill="#F27E24" stroke={outline} strokeWidth="1.4" />
             </g>
           );
         }
         if (style === 'crocs_frog') {
           return (
             <g>
-              <ellipse cx="40" cy="52" rx="22" ry="7" fill="#F2E7B8" stroke={outline} strokeWidth="2" />
-              <circle cx="31" cy="31" r="5" fill="#6CC763" stroke={outline} strokeWidth="1.8" />
-              <circle cx="49" cy="31" r="5" fill="#6CC763" stroke={outline} strokeWidth="1.8" />
-              <path d="M21 50 C21 32, 59 32, 59 50 Z" fill="#6CC763" stroke={outline} strokeWidth="2.2" />
-              <circle cx="31" cy="31" r="3" fill="#FFFFFF" />
-              <circle cx="49" cy="31" r="3" fill="#FFFFFF" />
-              <circle cx="31" cy="31" r="1.5" fill="#1B1D24" />
-              <circle cx="49" cy="31" r="1.5" fill="#1B1D24" />
-              <circle cx="29" cy="43" r="2.6" fill="#F697AE" />
-              <circle cx="51" cy="43" r="2.6" fill="#F697AE" />
+              <path d="M14 48 H66 C66 58, 56 61, 40 61 C24 61, 14 58, 14 48 Z" fill="#F2E7B8" stroke={outline} strokeWidth="2.1" />
+              <circle cx="30" cy="29" r="5.8" fill="#6CC763" stroke={outline} strokeWidth="1.8" />
+              <circle cx="50" cy="29" r="5.8" fill="#6CC763" stroke={outline} strokeWidth="1.8" />
+              <path d="M16 50 C16 29, 64 29, 64 50 Z" fill="#6CC763" stroke={outline} strokeWidth="2.2" />
+              <circle cx="30" cy="29" r="3.3" fill="#FFFFFF" />
+              <circle cx="50" cy="29" r="3.3" fill="#FFFFFF" />
+              <circle cx="30" cy="29" r="1.6" fill="#1B1D24" />
+              <circle cx="50" cy="29" r="1.6" fill="#1B1D24" />
+              <circle cx="28" cy="43" r="2.8" fill="#F697AE" />
+              <circle cx="52" cy="43" r="2.8" fill="#F697AE" />
+            </g>
+          );
+        }
+        if (style === 'crocs_bunny') {
+          return (
+            <g>
+              <path d="M14 48 H66 C66 58, 56 61, 40 61 C24 61, 14 58, 14 48 Z" fill="#FFFDF8" stroke={outline} strokeWidth="2.1" />
+              <ellipse cx="31" cy="24" rx="4" ry="10" transform="rotate(-12 31 24)" fill={col} stroke={outline} strokeWidth="1.8" />
+              <ellipse cx="49" cy="24" rx="4" ry="10" transform="rotate(12 49 24)" fill={col} stroke={outline} strokeWidth="1.8" />
+              <path d="M16 50 C16 29, 64 29, 64 50 Z" fill={col} stroke={outline} strokeWidth="2.2" />
+              <circle cx="32" cy="40" r="2" fill="#1B1D24" />
+              <circle cx="48" cy="40" r="2" fill="#1B1D24" />
+              <circle cx="40" cy="44" r="2.2" fill="#F16E94" />
+            </g>
+          );
+        }
+        if (style === 'crocs_dino') {
+          return (
+            <g>
+              <path d="M14 48 H66 C66 58, 56 61, 40 61 C24 61, 14 58, 14 48 Z" fill="#E8F0D8" stroke={outline} strokeWidth="2.1" />
+              <polygon points="34,26 40,18 46,26" fill="#F09A3E" stroke={outline} strokeWidth="1.5" />
+              <path d="M16 50 C16 29, 64 29, 64 50 Z" fill={col} stroke={outline} strokeWidth="2.2" />
+              <circle cx="32" cy="39" r="3" fill="#FFFFFF" stroke={outline} strokeWidth="1.2" />
+              <circle cx="48" cy="39" r="3" fill="#FFFFFF" stroke={outline} strokeWidth="1.2" />
+              <circle cx="32" cy="39" r="1.5" fill="#1B1D24" />
+              <circle cx="48" cy="39" r="1.5" fill="#1B1D24" />
+              <path d="M31 47 H49" stroke="#FFFFFF" strokeWidth="2.5" strokeDasharray="3 2" />
             </g>
           );
         }
@@ -1249,6 +1601,24 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             <g>
               <path d="M18 38 C24 38, 28 33, 35 33 L46 43 L61 45 C65 46, 65 56, 60 57 H19 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
               <rect x="33" y="40" width="11" height="4" rx="2" fill={shade(col, -25)} stroke={outline} strokeWidth="1.3" />
+            </g>
+          );
+        }
+        if (style === 'platform_sneakers') {
+          return (
+            <g>
+              <path d="M17 33 L33 29 L47 41 L62 43 C65 44, 65 53, 61 54 H17 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <rect x="16" y="51" width="48" height="9" rx="3.5" fill="#FFFFFF" stroke={outline} strokeWidth="2" />
+              <path d="M36 35 L40 33 M40 38 L44 36" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
+            </g>
+          );
+        }
+        if (style === 'ribbon_heels') {
+          return (
+            <g>
+              <path d="M18 42 C24 51, 39 51, 46 42 L61 46 C65 48, 65 55, 60 56 H22 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <rect x="20" y="55" width="7" height="7" rx="1.5" fill={shade(col, -25)} stroke={outline} strokeWidth="1.5" />
+              <path d="M47 43 L42 37 L47 40 L52 37 Z" fill="#FFFDF8" stroke={outline} strokeWidth="1.2" />
             </g>
           );
         }
@@ -1342,6 +1712,38 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <path d="M31 31 C31 16, 49 16, 49 31" stroke="#C59F76" strokeWidth="3.2" fill="none" />
               <rect x="22" y="30" width="36" height="33" rx="4" fill={col} stroke={outline} strokeWidth="2.2" />
               <rect x="30" y="39" width="20" height="14" rx="2" fill={shade(col, -12)} stroke={outline} strokeWidth="1.5" />
+            </g>
+          );
+        }
+        if (style === 'paper_lantern') {
+          return (
+            <g>
+              <path d="M32 16 L44 26" stroke="#7A4E2E" strokeWidth="2.8" strokeLinecap="round" />
+              <line x1="44" y1="26" x2="44" y2="33" stroke="#C59849" strokeWidth="1.8" />
+              <ellipse cx="44" cy="46" rx="14" ry="13" fill={col} stroke={outline} strokeWidth="2.2" />
+              <path d="M44 33 V59 M35 35 C38 42, 38 50, 35 57 M53 35 C50 42, 50 50, 53 57" stroke="#F4C95D" strokeWidth="1.5" fill="none" />
+              <line x1="44" y1="59" x2="44" y2="68" stroke="#E04B5A" strokeWidth="3" strokeLinecap="round" />
+            </g>
+          );
+        }
+        if (style === 'lotus_fan') {
+          return (
+            <g>
+              <circle cx="40" cy="36" r="19" fill={col} stroke="#F4C95D" strokeWidth="2.5" />
+              <ellipse cx="40" cy="36" rx="4" ry="8" fill="#FFE6EE" />
+              <ellipse cx="35" cy="38" rx="3" ry="6.5" transform="rotate(-25 35 38)" fill="#F9B5C9" />
+              <ellipse cx="45" cy="38" rx="3" ry="6.5" transform="rotate(25 45 38)" fill="#F9B5C9" />
+              <line x1="40" y1="54" x2="40" y2="69" stroke="#6E4427" strokeWidth="3.4" strokeLinecap="round" />
+            </g>
+          );
+        }
+        if (style === 'matcha_latte') {
+          return (
+            <g>
+              <path d="M42 13 L45 27" stroke="#4D8A4D" strokeWidth="3.2" strokeLinecap="round" />
+              <path d="M27 28 C27 21, 53 21, 53 28 Z" fill="#FFFFFF" stroke={outline} strokeWidth="2" />
+              <path d="M27 28 H53 L49 62 H31 Z" fill="#FFFDF8" stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M29 39 H51 L49 61 H31 Z" fill={col} />
             </g>
           );
         }
