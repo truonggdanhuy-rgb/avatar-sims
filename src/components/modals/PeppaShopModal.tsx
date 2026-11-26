@@ -122,7 +122,7 @@ export const PeppaShopModal: React.FC<PeppaShopModalProps> = ({
             <span className="flex items-start gap-1.5 text-[#6D2542]">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C94477]" />
               <span>
-                Nguyên liệu mua xong sẽ tự cất vào <b>Kho Bếp</b> (không cầm trên tay) — về nhà bấm vào Lò Vi Sóng / Lò Nướng Mini sẽ tự có sẵn để nấu!
+                Nguyên liệu mua xong tự cất vào <b>Kho Bếp</b> — về <b>Nhà Của Tôi</b>, lại gần <b>Lò Vi Sóng</b> hoặc <b>Lò Nướng Mini</b> trên bàn bếp rồi bấm nút <b>Nấu ăn</b> để chế biến! (Mua thêm Lò tại <b>Tiệm Nội Thất</b>).
               </span>
             </span>
           )}

@@ -1,4 +1,5 @@
 import {
+  ActionId,
   BbqFoodId,
   CheckInState,
   DailyQuestKey,
@@ -6,6 +7,8 @@ import {
   JoyboyDeliveryOrder,
   JoyboyDeliveryState,
   JoyboyTargetNpcId,
+  PlayerActionDefinition,
+  PlayerActionsState,
 } from '../types/game';
 
 export const MAX_JOYBOY_DELIVERIES_PER_DAY = 2;
@@ -322,3 +325,63 @@ export function rollJoyboyDeliveryOrder(excludeNpcId?: JoyboyTargetNpcId): Joybo
     createdAt: Date.now(),
   };
 }
+
+export const PLAYER_ACTION_SLOT_COUNT = 8;
+
+export const PLAYER_ACTION_CATALOG: Record<ActionId, PlayerActionDefinition> = {
+  happy: {
+    id: 'happy',
+    name: 'Vui vẻ',
+    description: 'Nhảy cẫng lên hưng phấn, vẫy tay reo mừng đầy năng lượng.',
+    durationSec: 3.4,
+    accentColor: '#DF7A20',
+    bgTint: '#FFF4E2',
+  },
+};
+
+export const PLAYER_ACTION_LIST: PlayerActionDefinition[] = Object.values(PLAYER_ACTION_CATALOG);
+
+export function createInitialPlayerActions(): PlayerActionsState {
+  const equippedSlots: (ActionId | null)[] = Array.from(
+    {length: PLAYER_ACTION_SLOT_COUNT},
+    (_, idx) => (idx === 0 ? 'happy' : null),
+  );
+  return {
+    ownedIds: ['happy'],
+    equippedSlots,
+  };
+}
+
+export function normalizePlayerActions(raw: unknown): PlayerActionsState {
+  const base = createInitialPlayerActions();
+  if (!raw || typeof raw !== 'object') return base;
+  const parsed = raw as Partial<PlayerActionsState>;
+
+  const ownedSet = new Set<ActionId>(['happy']);
+  if (Array.isArray(parsed.ownedIds)) {
+    for (const id of parsed.ownedIds) {
+      if (typeof id === 'string' && id in PLAYER_ACTION_CATALOG) {
+        ownedSet.add(id as ActionId);
+      }
+    }
+  }
+  const ownedIds = Array.from(ownedSet);
+
+  const equippedSlots: (ActionId | null)[] = Array.from(
+    {length: PLAYER_ACTION_SLOT_COUNT},
+    () => null,
+  );
+  if (Array.isArray(parsed.equippedSlots)) {
+    for (let i = 0; i < PLAYER_ACTION_SLOT_COUNT; i++) {
+      const slotVal = parsed.equippedSlots[i];
+      if (typeof slotVal === 'string' && ownedSet.has(slotVal as ActionId)) {
+        equippedSlots[i] = slotVal as ActionId;
+      }
+    }
+  } else {
+    equippedSlots[0] = 'happy';
+  }
+
+  return {ownedIds, equippedSlots};
+}
+

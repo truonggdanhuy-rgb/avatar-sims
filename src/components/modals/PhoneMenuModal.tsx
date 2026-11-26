@@ -7,6 +7,7 @@ import {
   CloudSun,
   Coins,
   Database,
+  Gamepad2,
   Gift,
   Heart,
   Home,
@@ -14,6 +15,7 @@ import {
   Send,
   Settings,
   Shirt,
+  Smile,
   Sun,
   UserCircle2,
   Utensils,
@@ -24,6 +26,7 @@ import {
   Zap,
 } from 'lucide-react';
 import {
+  ActionId,
   AvatarConfig,
   CheckInState,
   DailyQuestProgress,
@@ -33,13 +36,19 @@ import {
   GameStats,
   InsectDexRecord,
   InsectSpeciesId,
+  PlayerActionsState,
   TimeOfDay,
   ZoneId,
 } from '../../types/game';
 import {ALL_FISH_LIST, RIVER_FISH_LIST, SEA_FISH_LIST} from '../../data/fishingCatalog';
 import {INSECT_HABITAT_LABELS, INSECT_LIST} from '../../data/insectCatalog';
 import {HUNGER_HUNGRY_THRESHOLD} from '../../data/foodCatalog';
-import {DAILY_QUEST_DEFS, getTodayDateKey} from '../../data/progressionCatalog';
+import {
+  DAILY_QUEST_DEFS,
+  getTodayDateKey,
+  PLAYER_ACTION_CATALOG,
+  PLAYER_ACTION_SLOT_COUNT,
+} from '../../data/progressionCatalog';
 import {soundFX} from '../../utils/sound';
 import {AvatarPreview3D} from '../AvatarPreview3D';
 import {FishIllustration} from '../FishingIcons';
@@ -57,23 +66,26 @@ interface PhoneMenuModalProps {
   storageCapacity: number;
   fishDex: Partial<Record<FishSpeciesId, FishDexRecord>>;
   insectDex: Partial<Record<InsectSpeciesId, InsectDexRecord>>;
+  playerActions: PlayerActionsState;
   accountCreatedAt: number;
   accountId: string;
   teleportCooldownSec: number;
-  initialTab?: 'menu' | 'account' | 'guide' | 'fishdex';
+  initialTab?: 'menu' | 'account' | 'guide' | 'fishdex' | 'actions';
   onTeleportToPlaza: () => void;
   onOpenWardrobe: () => void;
   onOpenDailyQuests: () => void;
   onOpenDailyCheckIn: () => void;
   onOpenSettings: () => void;
   onOpenStorage: () => void;
+  onEquipPlayerAction: (actionId: ActionId, targetSlotIndex?: number) => void;
+  onUnequipPlayerAction: (slotIndex: number) => void;
   onChangeTimeOfDay: (time: TimeOfDay) => void;
   onToggleSound: () => void;
   onRedeemGiftCode: (code: string) => {ok: boolean; message: string};
   onClose: () => void;
 }
 
-type PhoneTab = 'menu' | 'account' | 'guide' | 'fishdex';
+type PhoneTab = 'menu' | 'account' | 'guide' | 'fishdex' | 'actions';
 
 const ZONE_LABELS: Record<ZoneId, string> = {
   town: 'Thị Trấn',
@@ -114,6 +126,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   storageCapacity,
   fishDex,
   insectDex,
+  playerActions,
   accountCreatedAt,
   accountId,
   teleportCooldownSec,
@@ -124,12 +137,15 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   onOpenDailyCheckIn,
   onOpenSettings,
   onOpenStorage,
+  onEquipPlayerAction,
+  onUnequipPlayerAction,
   onChangeTimeOfDay,
   onToggleSound,
   onRedeemGiftCode,
   onClose,
 }) => {
   const [tab, setTab] = useState<PhoneTab>(initialTab);
+  const [selectedActionSlot, setSelectedActionSlot] = useState<number>(0);
   const [dexCategory, setDexCategory] = useState<'fish' | 'insects'>('fish');
   const [fishDexWater, setFishDexWater] = useState<FishWaterType>('river');
   const [deviceTime, setDeviceTime] = useState<string>(() => formatDeviceTime());
@@ -221,10 +237,16 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 <span className="truncate text-[13px] font-extrabold text-[#4A3525]">
                   {avatar.name}
                 </span>
-                <span className="flex shrink-0 items-center gap-1 text-[11px] font-bold tabular-nums text-[#8F5928]">
-                  <Coins className="h-3.5 w-3.5 text-amber-500" />
-                  {stats.coins} Xu
-                </span>
+                <div className="flex shrink-0 items-center gap-2 text-[11px] font-bold tabular-nums">
+                  <span className="flex items-center gap-1 text-[#0F6E8C]">
+                    <Gamepad2 className="h-3.5 w-3.5 text-[#0EA5E9]" />
+                    {stats.coinGame ?? 0} CG
+                  </span>
+                  <span className="flex items-center gap-1 text-[#8F5928]">
+                    <Coins className="h-3.5 w-3.5 text-amber-500" />
+                    {stats.coins} Xu
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-1.5">
@@ -455,6 +477,23 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </div>
                   <span className="text-[11px] font-bold leading-tight text-[#4A3525]">
                     Cài Đặt
+                  </span>
+                </button>
+
+                {/* 9. Hành Động Nhân Vật (Trang bị & Gỡ tối đa 8 ô) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setTab('actions');
+                  }}
+                  className="group flex flex-col items-center gap-1.5 transition-transform active:scale-95"
+                >
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#F2CCA3] bg-gradient-to-br from-[#FFF5E8] to-[#FBDDBB] text-[#C2651A] shadow-sm transition-transform group-hover:-translate-y-0.5">
+                    <Smile className="h-7 w-7" strokeWidth={2.1} />
+                  </div>
+                  <span className="text-[11px] font-bold leading-tight text-[#4A3525]">
+                    Hành Động
                   </span>
                 </button>
               </div>
@@ -878,6 +917,173 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
             );
           })()}
 
+          {tab === 'actions' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setTab('menu');
+                  }}
+                  className="flex min-h-[34px] items-center gap-1 rounded-xl bg-[#EFE0C9] px-2.5 py-1 text-xs font-bold text-[#5B422E] active:scale-95"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <span>Quay lại</span>
+                </button>
+                <span className="text-xs font-extrabold text-[#4A3525]">Hành động</span>
+                <span className="rounded-lg bg-[#FFF0D8] px-2 py-0.5 text-[10px] font-black text-[#A65E18] tabular-nums">
+                  {playerActions.equippedSlots.filter(Boolean).length}/{PLAYER_ACTION_SLOT_COUNT}
+                </span>
+              </div>
+
+              {/* 8 Equipped Slots */}
+              <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3 shadow-xs">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] font-black text-[#4A3525]">
+                    8 Ô Hành Động (Chạm vào nhân vật để mở)
+                  </span>
+                  <span className="text-[10px] font-bold text-[#8A6D53]">
+                    Đang chọn: Ô {selectedActionSlot + 1}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {Array.from({length: PLAYER_ACTION_SLOT_COUNT}, (_, idx) => {
+                    const slotActionId = playerActions.equippedSlots[idx] ?? null;
+                    const def = slotActionId ? PLAYER_ACTION_CATALOG[slotActionId] : null;
+                    const isSelected = selectedActionSlot === idx;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => {
+                          soundFX.tap();
+                          setSelectedActionSlot(idx);
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            soundFX.tap();
+                            setSelectedActionSlot(idx);
+                          }
+                        }}
+                        className={`relative flex min-h-[58px] cursor-pointer flex-col items-center justify-center rounded-xl border px-1 py-1.5 text-center transition-all ${
+                          def
+                            ? isSelected
+                              ? 'border-[#D97724] bg-[#FFF4E2] ring-2 ring-[#F2A752]/55'
+                              : 'border-[#E6BE8A] bg-[#FFF9F0]'
+                            : isSelected
+                              ? 'border-[#C59862] bg-[#FAF1E4] ring-2 ring-[#C59862]/40'
+                              : 'border-dashed border-[#DCC9B0] bg-[#FAF5EC]'
+                        }`}
+                      >
+                        <span className="text-[9px] font-extrabold text-[#9A7D62]">
+                          Ô {idx + 1}
+                        </span>
+                        {def ? (
+                          <>
+                            <span className="mt-0.5 line-clamp-1 text-[10px] font-black text-[#4A3525]">
+                              {def.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onUnequipPlayerAction(idx);
+                              }}
+                              aria-label={`Gỡ ${def.name} khỏi Ô ${idx + 1}`}
+                              className="mt-0.5 rounded-md bg-[#F3DFC8] px-1.5 py-0.5 text-[9px] font-black text-[#8B4D24] hover:bg-[#EAD0B2] active:scale-95"
+                            >
+                              Gỡ
+                            </button>
+                          </>
+                        ) : (
+                          <span className="mt-1 text-[10px] font-bold text-[#B39C84]">
+                            Trống
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* All Owned Actions */}
+              <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3 shadow-xs">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] font-black text-[#4A3525]">
+                    Tất cả hành động đang có ({playerActions.ownedIds.length})
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {playerActions.ownedIds.map((actionId) => {
+                    const def = PLAYER_ACTION_CATALOG[actionId];
+                    if (!def) return null;
+                    const equippedIndex = playerActions.equippedSlots.indexOf(actionId);
+                    const isEquipped = equippedIndex >= 0;
+                    return (
+                      <div
+                        key={actionId}
+                        className="flex items-center justify-between gap-2.5 rounded-xl border border-[#EFE1CE] bg-[#FCF8F1] px-2.5 py-2"
+                      >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <div
+                            style={{backgroundColor: def.bgTint, color: def.accentColor}}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#E7CFAF]"
+                          >
+                            <Smile className="h-5 w-5" strokeWidth={2.2} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-xs font-black text-[#4A3525]">
+                                {def.name}
+                              </span>
+                              {isEquipped && (
+                                <span className="rounded-md bg-[#E8F6E8] px-1.5 py-0.5 text-[9px] font-black text-[#2F7D42]">
+                                  Ô {equippedIndex + 1}
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug font-medium text-[#7A6048]">
+                              {def.description}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="shrink-0">
+                          {isEquipped ? (
+                            <button
+                              type="button"
+                              onClick={() => onUnequipPlayerAction(equippedIndex)}
+                              className="min-h-[32px] rounded-xl border border-[#DFB99B] bg-[#F8E7D8] px-2.5 py-1 text-[11px] font-black text-[#8F4A23] transition-transform active:scale-95"
+                            >
+                              Gỡ
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onEquipPlayerAction(
+                                  actionId,
+                                  playerActions.equippedSlots[selectedActionSlot] === null
+                                    ? selectedActionSlot
+                                    : undefined,
+                                )
+                              }
+                              className="min-h-[32px] rounded-xl bg-[#D97724] px-2.5 py-1 text-[11px] font-black text-white shadow-xs transition-transform active:scale-95"
+                            >
+                              Trang bị
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           {tab === 'guide' && (
             <div className="divide-y divide-[#EFE2CF] rounded-2xl border border-[#E0CEB6] bg-white">
               <div className="px-3.5 py-2.5">
@@ -912,7 +1118,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 setTab('menu');
               }}
               className={`flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-colors ${
-                tab === 'menu' || tab === 'account' || tab === 'fishdex'
+                tab === 'menu' || tab === 'account' || tab === 'fishdex' || tab === 'actions'
                   ? 'bg-[#6F4E37] text-amber-50 shadow-xs'
                   : 'bg-[#E9D9C3] text-[#5B422E]'
               }`}

@@ -75,7 +75,15 @@ export type TopStyle =
   | 'academy_blazer'
   | 'bomber_jacket'
   | 'turtleneck_sweater'
-  | 'hawaii_shirt';
+  | 'hawaii_shirt'
+  | 'picnic_dress'
+  | 'picnic_shirt'
+  | 'vampire_prince_coat'
+  | 'vampire_lady_dress'
+  | 'goose_pinafore_dress'
+  | 'goose_raglan_tee'
+  | 'pompom_pajama_shirt'
+  | 'pompom_sleep_dress';
 
 export type BottomStyle =
   | 'pleated_skirt'
@@ -95,7 +103,11 @@ export type BottomStyle =
   | 'tiered_lace_skirt'
   | 'cargo_pants'
   | 'plaid_skirt'
-  | 'flare_jeans';
+  | 'flare_jeans'
+  | 'picnic_chinos'
+  | 'vampire_slit_pants'
+  | 'goose_puff_shorts'
+  | 'pompom_pajama_pants';
 
 export type ShoeStyle =
   | 'sneakers'
@@ -110,7 +122,10 @@ export type ShoeStyle =
   | 'crocs_dino'
   | 'platform_sneakers'
   | 'ribbon_heels'
-  | 'rain_boots';
+  | 'rain_boots'
+  | 'vampire_buckle_boots'
+  | 'goose_slippers'
+  | 'pompom_slippers';
 
 export type HeadItemStyle =
   | 'none'
@@ -134,7 +149,12 @@ export type HeadItemStyle =
   | 'khan_dong'
   | 'bunny_beanie'
   | 'royal_crown'
-  | 'headphone';
+  | 'headphone'
+  | 'picnic_bonnet'
+  | 'vampire_giant_bow'
+  | 'sunflower_hat'
+  | 'pompom_sleep_mask'
+  | 'pompom_ear_hood';
 
 export type AccessoryStyle =
   | 'none'
@@ -144,7 +164,9 @@ export type AccessoryStyle =
   | 'pearl_necklace'
   | 'star_glasses'
   | 'pearl_ribbon_choker'
-  | 'camera_strap';
+  | 'camera_strap'
+  | 'vampire_cross_earring'
+  | 'gingham_neckerchief';
 
 export type BackpackStyle =
   | 'none'
@@ -158,7 +180,8 @@ export type BackpackStyle =
   | 'bunny_plush'
   | 'strawberry_bear'
   | 'astro_pack'
-  | 'crystal_wings';
+  | 'crystal_wings'
+  | 'goose_cross_bag';
 
 export type HandheldStyle =
   | 'none'
@@ -171,7 +194,8 @@ export type HandheldStyle =
   | 'mini_umbrella'
   | 'paper_lantern'
   | 'lotus_fan'
-  | 'matcha_latte';
+  | 'matcha_latte'
+  | 'daisy_flower';
 
 export type AvatarPose =
   | 'idle'
@@ -193,7 +217,8 @@ export type AvatarPose =
   | 'bike_idle'
   | 'bike_ride'
   | 'swim'
-  | 'climb';
+  | 'climb'
+  | 'happy_jump';
 
 export interface AvatarConfig {
   name: string;
@@ -426,8 +451,13 @@ export interface FarmOrder {
   rewardCoins: number;
 }
 
+export const COINGAME_TO_XU_RATE = 10;
+
+export type ArcadeHubSection = 'overview' | 'blindbox' | 'exchange' | 'games';
+
 export interface GameStats {
   coins: number;
+  coinGame: number;
   energy: number; // 0..100
   mood: number; // 0..100
   hunger: number; // 0..100 (satiety / độ no)
@@ -562,6 +592,14 @@ export type FurnitureKind =
   | 'piano_keyboard'
   | 'record_shelf_cabinet'
   | 'terrace_swing_egg'
+  | 'bed_pompompurin'
+  | 'shelf_pompompurin'
+  | 'stool_pompompurin'
+  | 'pudding_flan_plate'
+  | 'wall_lamp_pompompurin'
+  | 'vampire_coffin_sofa'
+  | 'candelabra_gothic'
+  | 'picnic_gingham_set'
   | 'floor_paint'
   | 'wall_paint';
 
@@ -939,6 +977,18 @@ export interface JoyboyDeliveryState {
   activeOrder: JoyboyDeliveryOrder | null;
 }
 
+export type ActionId = 'happy';
 
+export interface PlayerActionDefinition {
+  id: ActionId;
+  name: string;
+  description: string;
+  durationSec: number;
+  accentColor: string;
+  bgTint: string;
+}
 
-
+export interface PlayerActionsState {
+  ownedIds: ActionId[];
+  equippedSlots: (ActionId | null)[];
+}

@@ -320,147 +320,133 @@ export function WoodenBoatIcon({className = 'w-11 h-11'}: {className?: string}) 
   return (
     <svg viewBox="0 0 64 64" fill="none" className={className}>
       {/* Gentle water ripples under keel */}
-      <path
-        d="M8 50 Q16 47 24 50 T40 50 T56 50"
-        stroke="#62B6CB"
-        strokeWidth="2.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="M14 55 Q23 52.5 32 55 T50 55"
-        stroke="#92D5E6"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      {/* Oar resting diagonally */}
-      <path d="M26 24 L49 46" stroke="#D9A368" strokeWidth="3.2" strokeLinecap="round" />
+      <path d="M8 50 Q16 47 24 50 T40 50 T56 50" stroke="#62B6CB" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M14 55 Q23 52.5 32 55 T50 55" stroke="#92D5E6" strokeWidth="2" strokeLinecap="round" />
+      {/* Oar resting diagonally with brass collar */}
+      <path d="M27 24 L49 46" stroke="#DDA86F" strokeWidth="3.2" strokeLinecap="round" />
+      <circle cx="32" cy="29" r="2.2" fill="#E2B24E" />
       <ellipse
         cx="50"
         cy="47"
-        rx="5.2"
+        rx="5.4"
         ry="2.6"
         transform="rotate(42 50 47)"
-        fill="#E8BC82"
-        stroke="#8C5629"
+        fill="#A46233"
+        stroke="#573017"
         strokeWidth="1.6"
       />
-      {/* Wooden hull */}
+      {/* Stern rudder blade */}
+      <path d="M53 38 L57 46 L52 47 L50 40 Z" fill="#573017" stroke="#3B1E0D" strokeWidth="1.4" strokeLinejoin="round" />
+      {/* Wooden planked hull */}
       <path
-        d="M8 34 C12 45 20 48 32 48 C44 48 52 45 56 34 L50 31 H14 L8 34 Z"
-        fill="#C98344"
-        stroke="#78421B"
-        strokeWidth="2.5"
+        d="M8 34 C12 45 20 48 32 48 C44 48 52 45 55 34 L49 31 H14 L8 34 Z"
+        fill="#B66E38"
+        stroke="#5D351A"
+        strokeWidth="2.4"
         strokeLinejoin="round"
       />
-      {/* Inner gunwale & bench seats */}
       <path d="M12 34 H52" stroke="#EAB87D" strokeWidth="3" strokeLinecap="round" />
-      <rect x="20" y="29" width="8" height="4" rx="1.2" fill="#A6642D" stroke="#78421B" strokeWidth="1.4" />
-      <rect x="35" y="29" width="8" height="4" rx="1.2" fill="#A6642D" stroke="#78421B" strokeWidth="1.4" />
-      {/* Little bow pennant */}
-      <path d="M15 31 V16" stroke="#78421B" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M16 17 L27 21 L16 25 Z" fill="#52A9C9" stroke="#2D6A85" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M15 41 Q32 43 49 41" stroke="#7A441F" strokeWidth="1.4" strokeLinecap="round" />
+      {/* Bench seats & red stitched cushion */}
+      <rect x="20" y="29" width="8" height="4" rx="1.2" fill="#A6642D" stroke="#5D351A" strokeWidth="1.4" />
+      <rect x="35" y="29" width="9" height="4" rx="1.2" fill="#C65340" stroke="#5D351A" strokeWidth="1.4" />
+      {/* Bow mast, swallowtail pennant & glowing brass storm lantern */}
+      <path d="M15 31 V15" stroke="#5D351A" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M15 16 H20" stroke="#E2B24E" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="20" cy="20" r="2.6" fill="#FFE082" stroke="#9C6A14" strokeWidth="1.2" />
+      <path d="M15 16 L9 19 L15 22 Z" fill="#3B92BD" stroke="#225B78" strokeWidth="1.3" strokeLinejoin="round" />
     </svg>
   );
 }
 
 /**
- * Cute Swan / Duck Pedal Boat icon for Ship's shop & Bag Thuyền tab
+ * Cute Duck Pedal Boat icon with layered wing plumes, sailor collar & stern paddlewheel
  */
 export function DuckBoatIcon({className = 'w-11 h-11'}: {className?: string}) {
   return (
     <svg viewBox="0 0 64 64" fill="none" className={className}>
-      {/* Gentle water ripples */}
-      <path
-        d="M8 51 Q16 48 24 51 T40 51 T56 51"
-        stroke="#5DB7CE"
-        strokeWidth="2.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="M14 55.5 Q23 53 32 55.5 T50 55.5"
-        stroke="#92D7EA"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      {/* Aqua water-line pontoon rim */}
+      <path d="M8 51 Q16 48 24 51 T40 51 T56 51" stroke="#5DB7CE" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M14 55.5 Q23 53 32 55.5 T50 55.5" stroke="#92D7EA" strokeWidth="2" strokeLinecap="round" />
+      {/* Aqua bumper trim */}
       <path
         d="M11 42 C15 47 23 48 34 48 C46 48 52 45 55 39 L51 36 H15 L11 42 Z"
-        fill="#66C2DA"
+        fill="#4AB3D6"
         stroke="#276C82"
         strokeWidth="2.2"
         strokeLinejoin="round"
       />
-      {/* Plump cream duck hull & swept wing */}
+      {/* Plump cream duck body */}
       <path
-        d="M12 37 C14 28 24 27 36 28 C44 28.5 52 29 56 26 L53 38 C49 43 40 45 30 45 C20 45 13 42 12 37 Z"
+        d="M12 37 C14 28 24 27 36 28 C44 28.5 52 29 56 25 L53 38 C49 43 40 45 30 45 C20 45 13 42 12 37 Z"
         fill="#FFFDF7"
         stroke="#8C7355"
         strokeWidth="2.2"
         strokeLinejoin="round"
       />
-      {/* Feathered side wing */}
-      <path
-        d="M27 34 C33 30 43 32 47 36 C42 40 32 41 27 34 Z"
-        fill="#F3EBDA"
-        stroke="#B09776"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      {/* Twin sky-blue cushions */}
-      <rect x="27" y="25" width="9" height="4.5" rx="2" fill="#5BC0D9" stroke="#286B82" strokeWidth="1.5" />
-      {/* Arched duck neck & round head */}
+      {/* Multi-layered feathered wing */}
+      <path d="M25 34 C31 29.5 42 31 47 35 C41 39.5 31 40 25 34 Z" fill="#F4EBDC" stroke="#A68E70" strokeWidth="1.7" />
+      <path d="M30 33 C36 30.5 43 32 45 35" stroke="#4AB3D6" strokeWidth="1.6" strokeLinecap="round" />
+      {/* Coral cushion seat & handlebar */}
+      <rect x="27" y="24.5" width="10" height="4.8" rx="2" fill="#F2786B" stroke="#9E3B30" strokeWidth="1.5" />
+      {/* Neck, sailor collar & coral bow tie */}
       <path
         d="M16 33 C14 25 16 17 21 14 C24 12.5 27 15 26 18.5 C25 22 22 26 22 33 Z"
         fill="#FFFDF7"
         stroke="#8C7355"
-        strokeWidth="2.2"
+        strokeWidth="2.1"
         strokeLinejoin="round"
       />
-      <circle cx="21" cy="17.5" r="6.5" fill="#FFFDF7" stroke="#8C7355" strokeWidth="2.2" />
-      {/* Orange duck bill */}
+      <path d="M16 25 H23" stroke="#4AB3D6" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="15" cy="25.5" r="2" fill="#F2786B" />
+      <circle cx="21" cy="17.5" r="6.5" fill="#FFFDF7" stroke="#8C7355" strokeWidth="2.1" />
+      <polygon points="19,11 21,8 23,11" fill="#FFE082" stroke="#C78A1B" strokeWidth="1" />
       <path
         d="M15 17.5 L7.5 19 C6.5 19.3 6.5 21 8 21.3 L15.5 20.5 Z"
-        fill="#FF9838"
+        fill="#FF8D2E"
         stroke="#9E4F12"
         strokeWidth="1.8"
         strokeLinejoin="round"
       />
-      {/* Rosy cheek & bright eye */}
       <circle cx="19" cy="16.5" r="1.4" fill="#231D1A" />
-      <circle cx="21.5" cy="19.2" r="1.6" fill="#FF9BAE" opacity="0.8" />
-      {/* Mini stern paddlewheel */}
-      <circle cx="51" cy="42" r="5" fill="#EA6B5A" stroke="#8C2F23" strokeWidth="1.8" />
-      <path d="M51 37 V47 M46 42 H56" stroke="#FFE6A8" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="21.5" cy="19.2" r="1.6" fill="#FF9BAE" opacity="0.85" />
+      <circle cx="51" cy="42" r="5" fill="#F2786B" stroke="#8C2F23" strokeWidth="1.8" />
+      <path d="M51 37 V47 M46 42 H56" stroke="#FFE6A8" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
 
 /**
- * Pastel Rose Swan Princess Boat icon
+ * Pastel Rose Swan Princess Boat icon with layered plumes, pearl collar & crown
  */
 export function SwanPrincessBoatIcon({className = 'w-11 h-11'}: {className?: string}) {
   return (
     <svg viewBox="0 0 64 64" fill="none" className={className}>
       <path d="M8 51 Q16 48 24 51 T40 51 T56 51" stroke="#62B6CB" strokeWidth="2.5" strokeLinecap="round" />
       <path
-        d="M12 38 C15 29 24 27 36 28 C44 28.5 52 29 56 26 L53 39 C49 44 40 46 30 46 C20 46 13 43 12 38 Z"
-        fill="#FFD9E6"
+        d="M12 38 C15 29 24 27 36 28 C44 28.5 52 28 57 23 L53 39 C49 44 40 46 30 46 C20 46 13 43 12 38 Z"
+        fill="#FFD6E5"
         stroke="#B86B86"
         strokeWidth="2.2"
         strokeLinejoin="round"
       />
-      <path d="M13 41 H52" stroke="#E5B94C" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M27 34 C33 30 43 32 47 36 C42 40 32 41 27 34 Z" fill="#FFF0F5" stroke="#D188A2" strokeWidth="1.7" />
+      <path d="M13 41 H52" stroke="#F2C249" strokeWidth="2.3" strokeLinecap="round" />
+      {/* Layered wing plumes & velvet throne */}
+      <path d="M25 34 C31 29.5 43 31 48 35 C42 40 31 40 25 34 Z" fill="#FFF3F8" stroke="#D188A2" strokeWidth="1.7" />
+      <path d="M29 33 C36 30 43 31.5 46 34.5" stroke="#F2C249" strokeWidth="1.4" strokeLinecap="round" />
+      <rect x="28" y="24" width="9" height="4.5" rx="2" fill="#D65C84" stroke="#8F2E4E" strokeWidth="1.4" />
+      {/* Curved swan neck & pearl dots */}
       <path
         d="M16 33 C14 25 16 17 21 14 C24 12.5 27 15 26 18.5 C25 22 22 26 22 33 Z"
-        fill="#FFD9E6"
+        fill="#FFD6E5"
         stroke="#B86B86"
         strokeWidth="2.1"
       />
-      <circle cx="21" cy="17.5" r="6" fill="#FFD9E6" stroke="#B86B86" strokeWidth="2" />
-      {/* Tiny gold crown */}
-      <polygon points="17,12 19,7 21,11 23,7 25,12" fill="#FFD147" stroke="#A67414" strokeWidth="1.3" strokeLinejoin="round" />
-      <path d="M15 17.5 L8 19.5 C7 20 7.5 21.3 9 21.3 L15.5 20.5 Z" fill="#F4A261" stroke="#9E4F12" strokeWidth="1.6" />
+      <circle cx="17" cy="30" r="1.4" fill="#FFFDF9" stroke="#D188A2" strokeWidth="0.8" />
+      <circle cx="20" cy="30.5" r="1.4" fill="#FFFDF9" stroke="#D188A2" strokeWidth="0.8" />
+      <circle cx="21" cy="17.5" r="6" fill="#FFD6E5" stroke="#B86B86" strokeWidth="2" />
+      <polygon points="17,12 19,6.5 21,11 23,6.5 25,12" fill="#FFD147" stroke="#A67414" strokeWidth="1.3" strokeLinejoin="round" />
+      <circle cx="21" cy="7.5" r="1.3" fill="#FF7EB6" />
+      <path d="M15 17.5 L8 19.5 C7 20 7.5 21.3 9 21.3 L15.5 20.5 Z" fill="#FF9554" stroke="#9E4F12" strokeWidth="1.6" />
       <circle cx="19" cy="16.5" r="1.3" fill="#231D1A" />
       <circle cx="51" cy="42" r="4.5" fill="#F2C249" stroke="#9C6B14" strokeWidth="1.7" />
     </svg>
@@ -468,79 +454,119 @@ export function SwanPrincessBoatIcon({className = 'w-11 h-11'}: {className?: str
 }
 
 /**
- * Mini Pirate Galleon Rowboat icon
+ * Imperial Mini Pirate Galleon icon with billowing striped mainsail, Jolly Roger & stern gallery
  */
 export function PirateGalleonBoatIcon({className = 'w-11 h-11'}: {className?: string}) {
   return (
     <svg viewBox="0 0 64 64" fill="none" className={className}>
       <path d="M8 51 Q16 48 24 51 T40 51 T56 51" stroke="#62B6CB" strokeWidth="2.5" strokeLinecap="round" />
-      {/* Mast & Jolly Roger Flag */}
-      <line x1="25" y1="32" x2="25" y2="10" stroke="#5A3318" strokeWidth="2.6" strokeLinecap="round" />
-      <rect x="26" y="11" width="16" height="11" rx="1.5" fill="#26282E" stroke="#111317" strokeWidth="1.4" />
-      <circle cx="34" cy="16.5" r="2.6" fill="#F8FAFC" />
-      <path d="M31 19 L37 14 M37 19 L31 14" stroke="#F8FAFC" strokeWidth="1.2" strokeLinecap="round" />
-      {/* Mahogany galleon hull */}
+      {/* Bowsprit + mainmast */}
+      <line x1="12" y1="33" x2="4" y2="27" stroke="#3B1E0D" strokeWidth="2.4" strokeLinecap="round" />
+      <line x1="28" y1="33" x2="28" y2="7" stroke="#3B1E0D" strokeWidth="2.6" strokeLinecap="round" />
+      {/* Billowing cream & crimson striped mainsail */}
       <path
-        d="M8 33 L15 46 H49 L56 29 L46 31 H15 L8 33 Z"
-        fill="#7C4523"
-        stroke="#46220D"
+        d="M18 17 C24 15 33 15 39 17 C41 23 41 27 38 31 C32 29.5 25 29.5 19 31 C16 27 16 23 18 17 Z"
+        fill="#FAF3E3"
+        stroke="#78421B"
+        strokeWidth="1.7"
+      />
+      <line x1="24" y1="16" x2="24" y2="30" stroke="#B8322E" strokeWidth="2.4" />
+      <line x1="33" y1="16" x2="33" y2="30" stroke="#B8322E" strokeWidth="2.4" />
+      {/* Jolly Roger top flag */}
+      <rect x="29" y="8" width="13" height="8" rx="1.2" fill="#24272D" stroke="#111317" strokeWidth="1.2" />
+      <circle cx="35.5" cy="12" r="1.9" fill="#F8FAFC" />
+      {/* Dark mahogany galleon hull + copper bottom + stern gallery windows */}
+      <path
+        d="M8 33 L15 46 H49 L56 26 L46 29 H15 L8 33 Z"
+        fill="#5B3117"
+        stroke="#3B1E0D"
         strokeWidth="2.3"
         strokeLinejoin="round"
       />
-      <path d="M11 35 H52" stroke="#E5B94C" strokeWidth="2.5" strokeLinecap="round" />
-      {/* Mini cannon port dots */}
-      <circle cx="24" cy="40" r="2" fill="#26282E" stroke="#E5B94C" strokeWidth="1" />
-      <circle cx="34" cy="40" r="2" fill="#26282E" stroke="#E5B94C" strokeWidth="1" />
-      <circle cx="44" cy="40" r="2" fill="#26282E" stroke="#E5B94C" strokeWidth="1" />
+      <path d="M13 42 H50" stroke="#7D3226" strokeWidth="3.2" strokeLinecap="round" />
+      <path d="M11 35 H53" stroke="#E8BA4C" strokeWidth="2.4" strokeLinecap="round" />
+      {/* Glowing stern gallery window & brass cannons */}
+      <rect x="46" y="29" width="5" height="4" rx="1" fill="#FFE082" stroke="#E8BA4C" strokeWidth="1" />
+      <circle cx="22" cy="39" r="2" fill="#24272D" stroke="#E8BA4C" strokeWidth="1" />
+      <circle cx="31" cy="39" r="2" fill="#24272D" stroke="#E8BA4C" strokeWidth="1" />
+      <circle cx="40" cy="39" r="2" fill="#24272D" stroke="#E8BA4C" strokeWidth="1" />
     </svg>
   );
 }
 
 /**
- * Retro Mint-Aqua Speedboat icon
+ * Luxury Riva-Mint Retro Speedboat icon with inlaid mahogany deck & framed windshield
  */
 export function SpeedboatRetroIcon({className = 'w-11 h-11'}: {className?: string}) {
   return (
     <svg viewBox="0 0 64 64" fill="none" className={className}>
       <path d="M7 50 Q16 47 25 50 T43 50 T57 50" stroke="#5DB7CE" strokeWidth="2.5" strokeLinecap="round" />
-      {/* Sleek bow & hull */}
+      {/* Sleek stepped turquoise & cream V-hull */}
       <path
-        d="M7 36 L52 33 L55 44 L14 45 C10 45 7 40 7 36 Z"
-        fill="#53C3AD"
-        stroke="#1E6B5E"
+        d="M6 36 L52 33 L54 44 L14 45 C10 45 6 40 6 36 Z"
+        fill="#34BCA4"
+        stroke="#1B6659"
         strokeWidth="2.2"
         strokeLinejoin="round"
       />
-      <path d="M12 37 H53" stroke="#FFF8EB" strokeWidth="3.2" strokeLinecap="round" />
-      {/* Tinted retro windshield */}
-      <path d="M23 33 L29 24 H39 L37 33 Z" fill="#9EE2F5" stroke="#255C73" strokeWidth="1.8" strokeLinejoin="round" />
-      {/* Chrome outboard motor & propeller */}
-      <rect x="52" y="30" width="6" height="12" rx="2" fill="#46525E" stroke="#262E36" strokeWidth="1.6" />
-      <path d="M55 42 V48 M52 47 L58 47" stroke="#E5B94C" strokeWidth="2" strokeLinecap="round" />
+      {/* Inlaid mahogany foredeck */}
+      <path d="M8 35.5 L28 33.5 L28 37 H10 Z" fill="#A85B31" stroke="#6E391B" strokeWidth="1.2" />
+      <path d="M12 37.5 H52" stroke="#FFF8EB" strokeWidth="2.8" strokeLinecap="round" />
+      <path d="M10 34.5 H52" stroke="#DCE4EC" strokeWidth="1.4" strokeLinecap="round" />
+      {/* Chrome-framed retro wrap windshield & tan bolster seat */}
+      <path d="M24 33 L30 24 H40 L38 33 Z" fill="#AEE8F8" stroke="#64748B" strokeWidth="2" strokeLinejoin="round" />
+      <rect x="38" y="29" width="8" height="4.5" rx="1.5" fill="#D8964C" stroke="#85511E" strokeWidth="1.3" />
+      {/* Cowled outboard motor & brass propeller */}
+      <rect x="52" y="29" width="6.5" height="12" rx="2.2" fill="#28313A" stroke="#181E24" strokeWidth="1.6" />
+      <rect x="52.5" y="28.5" width="5.5" height="3.5" rx="1.2" fill="#34BCA4" />
+      <path d="M55 41 V48 M51.5 47 L58.5 47" stroke="#EBB844" strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   );
 }
 
 /**
- * Pink Lotus & Warm Lantern Sampan Boat icon
+ * Imperial Pink Lotus Blossom Sampan icon with sculpted pointed petals & palace lantern
  */
 export function LotusLanternBoatIcon({className = 'w-11 h-11'}: {className?: string}) {
   return (
     <svg viewBox="0 0 64 64" fill="none" className={className}>
       <path d="M8 51 Q16 48 24 51 T40 51 T56 51" stroke="#62B6CB" strokeWidth="2.5" strokeLinecap="round" />
-      {/* Bamboo lantern pole & warm glowing lantern */}
-      <path d="M16 36 C16 21 21 13 28 14" stroke="#8C6239" strokeWidth="2.4" strokeLinecap="round" />
-      <circle cx="28" cy="20" r="4.5" fill="#FFCA5C" stroke="#C76A24" strokeWidth="1.6" />
-      {/* Pink lotus petals hull */}
+      {/* S-curved rosewood post & hexagonal glowing palace lantern */}
+      <path d="M15 37 C15 20 20 11 28 13" stroke="#6E3B26" strokeWidth="2.5" strokeLinecap="round" />
+      <polygon points="28,15 23,18 33,18" fill="#F2C249" stroke="#8C6214" strokeWidth="1.1" strokeLinejoin="round" />
+      <rect x="24.5" y="18" width="7" height="7" rx="1.2" fill="#FFE082" stroke="#C76A24" strokeWidth="1.5" />
+      <path d="M28 25 V29" stroke="#D14343" strokeWidth="2" strokeLinecap="round" />
+      {/* Emerald lotus-leaf cradle keel */}
       <path
-        d="M8 32 C13 44 21 47 32 47 C43 47 51 44 56 32 C50 35 45 36 32 36 C19 36 14 35 8 32 Z"
-        fill="#F48AA8"
-        stroke="#A63F60"
-        strokeWidth="2.2"
+        d="M9 36 C14 45 21 47 32 47 C43 47 50 45 55 36 Z"
+        fill="#2B6D54"
+        stroke="#1A4535"
+        strokeWidth="2"
         strokeLinejoin="round"
       />
-      <path d="M17 36 C21 29 27 29 32 35 C37 29 43 29 47 36 Z" fill="#FFB8CB" stroke="#A63F60" strokeWidth="1.6" />
-      <rect x="27" y="32" width="10" height="4" rx="1.5" fill="#6BBF8A" />
+      {/* Sculpted pointed blooming lotus petals */}
+      <path
+        d="M8 31 C13 33 17 38 22 42 C14 42 10 38 8 31 Z"
+        fill="#E86D96"
+        stroke="#9C3458"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M56 31 C51 33 47 38 42 42 C50 42 54 38 56 31 Z"
+        fill="#E86D96"
+        stroke="#9C3458"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M17 39 C20 28 25 27 29 39 Z M25 40 C29 27 35 27 39 40 Z M35 39 C39 28 44 28 47 39 Z"
+        fill="#FFC4D9"
+        stroke="#B84B70"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <rect x="27" y="34" width="10" height="4.5" rx="1.6" fill="#4C9B7A" stroke="#255E49" strokeWidth="1.2" />
     </svg>
   );
 }

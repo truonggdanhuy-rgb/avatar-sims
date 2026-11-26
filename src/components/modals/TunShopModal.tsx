@@ -69,8 +69,8 @@ export function TunShopModal({
             <Zap className="mt-0.5 h-4 w-4 shrink-0 text-[#D95338]" />
             <span>
               Tun chào bạn! Các phương tiện <b>Hạng B</b> chạy nhanh hơn đi bộ rõ rệt (Ván trượt giá
-              chỉ <b>{SKATEBOARD_CLASSIC_PRICE} Xu</b> ngang Thuyền Gỗ!). Hạng <b>S</b> siêu tốc sẽ
-              sớm cập bến.
+              chỉ <b>{SKATEBOARD_CLASSIC_PRICE} Xu</b>, Xe đạp giá <b>360 Xu</b>). Hạng <b>S</b> siêu
+              tốc sẽ sớm cập bến.
             </span>
           </div>
 

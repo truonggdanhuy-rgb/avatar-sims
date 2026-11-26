@@ -1,7 +1,6 @@
-import {WOODEN_BOAT_PRICE} from './fishingCatalog';
 import {MountDefinition, MountId, MountRank, OwnedMountsState} from '../types/game';
 
-export const SKATEBOARD_CLASSIC_PRICE = WOODEN_BOAT_PRICE; // Ngang giá Thuyền Gỗ (240 Xu)
+export const SKATEBOARD_CLASSIC_PRICE = 240;
 export const BICYCLE_CLASSIC_PRICE = 360;
 
 export const MOUNT_RANK_META: Record<

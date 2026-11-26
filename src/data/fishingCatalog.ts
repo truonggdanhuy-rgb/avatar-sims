@@ -14,12 +14,12 @@ import {
 export const WOODEN_ROD_PRICE = 90;
 export const WOODEN_ROD_MAX_DURABILITY = 25;
 export const WOODEN_ROD_FULL_REPAIR_COST = 28;
-export const WOODEN_BOAT_PRICE = 240;
-export const DUCK_BOAT_PRICE = 420;
-export const SWAN_PRINCESS_BOAT_PRICE = 560;
-export const PIRATE_GALLEON_BOAT_PRICE = 680;
-export const SPEEDBOAT_RETRO_PRICE = 780;
-export const LOTUS_LANTERN_BOAT_PRICE = 620;
+export const WOODEN_BOAT_PRICE = 360;
+export const DUCK_BOAT_PRICE = 560;
+export const SWAN_PRINCESS_BOAT_PRICE = 780;
+export const LOTUS_LANTERN_BOAT_PRICE = 940;
+export const PIRATE_GALLEON_BOAT_PRICE = 1120;
+export const SPEEDBOAT_RETRO_PRICE = 1320;
 
 export interface BoatDefinition {
   id: BoatId;
@@ -34,49 +34,49 @@ export const BOAT_CATALOG: Record<BoatId, BoatDefinition> = {
     id: 'wooden_boat',
     name: 'Thuyền Gỗ',
     price: WOODEN_BOAT_PRICE,
-    subtitle: 'Thuyền chèo gỗ sồi ấm áp có đèn lồng mũi',
+    subtitle: 'Thuyền gỗ sồi đóng mộng thủ công có đèn lồng mũi & bánh lái',
     description:
-      'Chèo êm trên Sông Khu Sinh Thái và Biển Đảo Mây, vừa lướt sóng vừa quăng cần câu cá.',
+      'Thân gỗ sồi ván ghép chắc chắn với sàn nan, đèn mũi đồng ấm áp và mái chèo khắc vân gỗ cổ điển.',
   },
   duck_boat: {
     id: 'duck_boat',
     name: 'Thuyền Đạp Vịt',
     price: DUCK_BOAT_PRICE,
-    subtitle: 'Thuyền vịt trắng đạp chân dễ thương có guồng nước xoay',
+    subtitle: 'Vịt trắng thắt nơ thủy thủ có đôi cánh lớp và guồng nước xoay',
     description:
-      'Mẫu thuyền đạp vịt công viên bo tròn đáng yêu, ghế đôi thoải mái, tay lái & bàn đạp nhịp nhàng khi lướt sông và biển.',
+      'Mẫu thuyền đạp vịt công viên dễ thương với đôi cánh xếp lớp mềm mại, ghế đệm êm ái và guồng nước nhịp nhàng.',
   },
   swan_princess_boat: {
     id: 'swan_princess_boat',
     name: 'Thuyền Thiên Nga Hồng',
     price: SWAN_PRINCESS_BOAT_PRICE,
-    subtitle: 'Thuyền thiên nga hồng phấn đội vương miện vàng kiêu sa',
+    subtitle: 'Thiên nga hồng ngọc đội vương miện hoàng gia & cánh lông nhiều tầng',
     description:
-      'Đạp nước thanh lịch trên thân thiên nga ngọc trai hồng viền vàng, guồng nước lấp lánh dưới nắng.',
+      'Đạp nước thanh lịch trên thân thiên nga hồng viền vàng hoàng gia, cánh xếp tầng lộng lẫy và guồng nước ánh kim.',
   },
   pirate_galleon_boat: {
     id: 'pirate_galleon_boat',
     name: 'Thuyền Hải Tặc Mini',
     price: PIRATE_GALLEON_BOAT_PRICE,
-    subtitle: 'Chiến hạm gỗ nâu gắn cờ đầu lâu và đại bác đồng',
+    subtitle: 'Chiến hạm 2 tầng boong gỗ gụ, buồm căng gió, kho báu & 4 đại bác đồng',
     description:
-      'Chèo thuyền hải tặc tí hon đầy cá tính với lá cờ phất phơ trước mũi và bánh lái gỗ cổ điển.',
+      'Tàu hải tặc chi tiết với khoang lái nâng cao, buồm sọc đón gió, cờ đầu lâu, rương kho báu vàng và 4 đại bác đồng.',
   },
   speedboat_retro: {
     id: 'speedboat_retro',
     name: 'Ca Nô Thể Thao Retro',
     price: SPEEDBOAT_RETRO_PRICE,
-    subtitle: 'Ca nô cổ điển xanh bạc hà kính chắn gió & chân vịt xoay',
+    subtitle: 'Ca nô du lịch ốp gỗ mahogany, 3 đồng hồ lái & động cơ chân vịt đồng',
     description:
-      'Lướt sóng cực ngầu cùng ca nô hai tông màu retro sang trọng, gắn động cơ chân vịt phía đuôi.',
+      'Ca nô hạng sang thân hai tầng phối gỗ gụ, kính chắn gió viền chrome, bảng đồng hồ chi tiết, ghế da thể thao và sàn bơi đuôi.',
   },
   lotus_lantern_boat: {
     id: 'lotus_lantern_boat',
     name: 'Thuyền Hoa Sen Đêm Trăng',
     price: LOTUS_LANTERN_BOAT_PRICE,
-    subtitle: 'Thuyền cánh sen hồng ngọc treo đèn lồng ấm áp',
+    subtitle: 'Đài sen hai lớp cánh cong ôm thân ngọc bích & lồng đèn cung đình',
     description:
-      'Con thuyền cánh sen dịu dàng mang đèn lồng phát sáng lung linh mỗi khi màn đêm buông xuống.',
+      'Con thuyền đài sen hai tầng cánh uốn cong mềm mại, nụ sen đầu mũi và lồng đèn lục giác tua rua phát sáng dịu dàng.',
   },
 };
 

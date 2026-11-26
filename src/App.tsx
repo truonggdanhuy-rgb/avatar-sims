@@ -28,6 +28,7 @@ import {VendingMachineModal} from './components/modals/VendingMachineModal';
 import {PeppaShopModal} from './components/modals/PeppaShopModal';
 import {ApplianceCookModal} from './components/modals/ApplianceCookModal';
 import {MayCafeModal} from './components/modals/MayCafeModal';
+import {ArcadeHubModal} from './components/modals/ArcadeHubModal';
 import {WorldCanvas} from './components/WorldCanvas';
 import {MAY_CAFE_ITEMS, MayCafeItemId} from './data/mayCafeCatalog';
 import {
@@ -133,15 +134,20 @@ import {
   createEmptyDailyQuests,
   createInitialCheckInState,
   createInitialJoyboyDeliveryState,
+  createInitialPlayerActions,
   getTodayDateKey,
   MAX_JOYBOY_DELIVERIES_PER_DAY,
   normalizeDailyQuests,
   normalizeJoyboyDeliveryState,
+  normalizePlayerActions,
+  PLAYER_ACTION_CATALOG,
   rollJoyboyDeliveryOrder,
 } from './data/progressionCatalog';
 import {
+  ActionId,
   AnimalProduceId,
   AnimalType,
+  ArcadeHubSection,
   AvatarConfig,
   BbqFoodId,
   BoatId,
@@ -184,6 +190,7 @@ import {
   PetSupplyId,
   PlacedFarmDecor,
   PlacedFurniture,
+  PlayerActionsState,
   PlotLevel,
   PondFishSpecies,
   PondFishState,
@@ -412,9 +419,12 @@ export default function App() {
   const [petAdoptOpen, setPetAdoptOpen] = useState(false);
   const [bbqGrillOpen, setBbqGrillOpen] = useState(false);
   const [vendingOpen, setVendingOpen] = useState(false);
+  const [arcadeHubSection, setArcadeHubSection] = useState<ArcadeHubSection | null>(null);
   const [bagOpen, setBagOpen] = useState(false);
   const [bagInitialSubTab, setBagInitialSubTab] = useState<BagSubTab>('list');
-  const [phoneInitialTab, setPhoneInitialTab] = useState<'menu' | 'account' | 'guide' | 'fishdex'>('menu');
+  const [phoneInitialTab, setPhoneInitialTab] = useState<
+    'menu' | 'account' | 'guide' | 'fishdex' | 'actions'
+  >('menu');
   const [nearPond, setNearPond] = useState(false);
   const [pondFeedPulse, setPondFeedPulse] = useState(0);
   const [farmPondFishPulse, setFarmPondFishPulse] = useState(0);
@@ -519,6 +529,10 @@ export default function App() {
         if (parsed.stats) {
           return {
             coins: typeof parsed.stats.coins === 'number' ? parsed.stats.coins : 150,
+            coinGame:
+              typeof parsed.stats.coinGame === 'number' && Number.isFinite(parsed.stats.coinGame)
+                ? Math.max(0, Math.floor(parsed.stats.coinGame))
+                : 0,
             energy: typeof parsed.stats.energy === 'number' ? parsed.stats.energy : 85,
             mood: typeof parsed.stats.mood === 'number' ? parsed.stats.mood : 90,
             hunger:
@@ -531,7 +545,7 @@ export default function App() {
     } catch {
       // ignore storage errors
     }
-    return {coins: 150, energy: 85, mood: 90, hunger: 90};
+    return {coins: 150, coinGame: 0, energy: 85, mood: 90, hunger: 90};
   });
 
   const [plots, setPlots] = useState<GardenPlotState[]>(() => {
@@ -922,6 +936,21 @@ export default function App() {
       // ignore storage errors
     }
     return createInitialJoyboyDeliveryState();
+  });
+
+  const [playerActions, setPlayerActions] = useState<PlayerActionsState>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.playerActions) {
+          return normalizePlayerActions(parsed.playerActions);
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return createInitialPlayerActions();
   });
 
   const [placedFurniture, setPlacedFurniture] = useState<PlacedFurniture[]>(() => {
@@ -1783,6 +1812,7 @@ export default function App() {
             placedFarmDecor,
             farmDecorInventory: pruneZeroCounts(farmDecorInventory),
             joyboyDelivery,
+            playerActions,
             fishingRod,
             boats,
             woodenBoat: {
@@ -1846,6 +1876,7 @@ export default function App() {
     placedFarmDecor,
     farmDecorInventory,
     joyboyDelivery,
+    playerActions,
     fishingRod,
     boats,
     fishBasket,
@@ -1914,6 +1945,9 @@ export default function App() {
     if (next !== 'petshop') {
       setPetSupplyShopOpen(false);
       setPetAdoptOpen(false);
+    }
+    if (next !== 'arcade') {
+      setArcadeHubSection(null);
     }
   };
 
@@ -3366,6 +3400,46 @@ export default function App() {
     };
   };
 
+  // === HÀNH ĐỘNG NHÂN VẬT (8 Ô TRANG BỊ + KHO HÀNH ĐỘNG) ===
+  const handleEquipPlayerAction = (actionId: ActionId, targetSlotIndex?: number) => {
+    if (!(actionId in PLAYER_ACTION_CATALOG)) return;
+    soundFX.tap();
+    setPlayerActions((prev) => {
+      const ownedIds = prev.ownedIds.includes(actionId)
+        ? prev.ownedIds
+        : [...prev.ownedIds, actionId];
+      const nextSlots: (ActionId | null)[] = prev.equippedSlots.map((slot) =>
+        slot === actionId ? null : slot,
+      );
+      let slotIdx =
+        typeof targetSlotIndex === 'number' &&
+        targetSlotIndex >= 0 &&
+        targetSlotIndex < nextSlots.length
+          ? targetSlotIndex
+          : nextSlots.findIndex((s) => s === null);
+      if (slotIdx < 0) slotIdx = 0;
+      nextSlots[slotIdx] = actionId;
+      return {
+        ownedIds,
+        equippedSlots: nextSlots,
+      };
+    });
+  };
+
+  const handleUnequipPlayerAction = (slotIndex: number) => {
+    soundFX.tap();
+    setPlayerActions((prev) => {
+      if (slotIndex < 0 || slotIndex >= prev.equippedSlots.length) return prev;
+      if (prev.equippedSlots[slotIndex] === null) return prev;
+      const nextSlots = [...prev.equippedSlots];
+      nextSlots[slotIndex] = null;
+      return {
+        ...prev,
+        equippedSlots: nextSlots,
+      };
+    });
+  };
+
   // === TRANG TRÍ NÔNG TRẠI (MUA, ĐẶT, DI CHUYỂN, XOAY, CẤT) ===
   const handleBuyFarmDecorItem = (item: FarmDecorCatalogItem) => {
     if (stats.coins < item.price) return;
@@ -3892,6 +3966,7 @@ export default function App() {
         joyboyModalOpen={joyboyModalOpen}
         homeSpotRef={homeSpotRef}
         ownedMounts={ownedMounts}
+        equippedActionSlots={playerActions.equippedSlots}
         teleportToPlazaPulse={teleportToPlazaPulse}
         activePet={activePet}
         carriedPetId={effectiveCarriedPetId}
@@ -3988,6 +4063,7 @@ export default function App() {
         onScatterPondFeed={handleScatterPondFeed}
         onPondProximityChange={setNearPond}
         onAddCoins={addCoins}
+        onOpenArcadeHub={(section = 'overview') => setArcadeHubSection(section)}
       />
 
       {wardrobeOpen && (
@@ -4245,6 +4321,16 @@ export default function App() {
         />
       )}
 
+      {zone === 'arcade' && arcadeHubSection && (
+        <ArcadeHubModal
+          section={arcadeHubSection}
+          coins={stats.coins}
+          coinGame={stats.coinGame ?? 0}
+          onSelectSection={setArcadeHubSection}
+          onClose={() => setArcadeHubSection(null)}
+        />
+      )}
+
       {zone === 'home' && activeApplianceModal && (
         <ApplianceCookModal
           appliance={activeApplianceModal}
@@ -4339,6 +4425,7 @@ export default function App() {
           storageCapacity={storageCapacity}
           fishDex={fishDex}
           insectDex={insectDex}
+          playerActions={playerActions}
           accountCreatedAt={accountCreatedAt}
           accountId={accountId}
           teleportCooldownSec={teleportCooldownSec}
@@ -4364,6 +4451,8 @@ export default function App() {
             setPhoneOpen(false);
             setStorageOpen(true);
           }}
+          onEquipPlayerAction={handleEquipPlayerAction}
+          onUnequipPlayerAction={handleUnequipPlayerAction}
           onChangeTimeOfDay={setTimeOfDay}
           onToggleSound={handleToggleSound}
           onRedeemGiftCode={handleRedeemGiftCode}

@@ -638,6 +638,63 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 185,
     patch: {top: 'hawaii_shirt', topColor: '#48B5D6'},
   },
+  // === BST PICNIC CARO, HALLOWEEN P.1, NGỖNG ĐI HỌC & POMPOMPURIN ===
+  {
+    id: 'top_picnic_dress_red',
+    category: 'tops',
+    name: 'Váy Yếm Caro Picnic Đỏ',
+    price: 330,
+    patch: {top: 'picnic_dress', topColor: '#E84F5E'},
+  },
+  {
+    id: 'top_picnic_shirt_red',
+    category: 'tops',
+    name: 'Áo Sơ Mi Cà Vạt Caro Picnic',
+    price: 285,
+    patch: {top: 'picnic_shirt', topColor: '#E84F5E'},
+  },
+  {
+    id: 'top_vampire_prince',
+    category: 'tops',
+    name: 'Áo Hoàng Tử Ma Cà Rồng',
+    price: 490,
+    patch: {top: 'vampire_prince_coat', topColor: '#1E1D24'},
+  },
+  {
+    id: 'top_vampire_lady',
+    category: 'tops',
+    name: 'Váy Quý Tộc Ma Cà Rồng',
+    price: 520,
+    patch: {top: 'vampire_lady_dress', topColor: '#1E1D24'},
+  },
+  {
+    id: 'top_goose_pinafore',
+    category: 'tops',
+    name: 'Váy Yếm Ngỗng Xanh Rêu',
+    price: 345,
+    patch: {top: 'goose_pinafore_dress', topColor: '#7EA83B'},
+  },
+  {
+    id: 'top_goose_raglan',
+    category: 'tops',
+    name: 'Áo Raglan Ngỗng Đi Học',
+    price: 275,
+    patch: {top: 'goose_raglan_tee', topColor: '#7EA83B'},
+  },
+  {
+    id: 'top_pompom_shirt',
+    category: 'tops',
+    name: 'Áo Pyjama Pompompurin Nâu',
+    price: 335,
+    patch: {top: 'pompom_pajama_shirt', topColor: '#9A4834'},
+  },
+  {
+    id: 'top_pompom_dress',
+    category: 'tops',
+    name: 'Váy Ngủ Pyjama Pompompurin',
+    price: 365,
+    patch: {top: 'pompom_sleep_dress', topColor: '#9A4834'},
+  },
 
   // ========== 2. QUẦN ==========
   {
@@ -835,6 +892,34 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Quần Jean Ống Loe Xanh',
     price: 190,
     patch: {bottom: 'flare_jeans', bottomColor: '#4B74A8'},
+  },
+  {
+    id: 'bot_picnic_chinos',
+    category: 'bottoms',
+    name: 'Quần Kaki Kem Thắt Lưng',
+    price: 175,
+    patch: {bottom: 'picnic_chinos', bottomColor: '#F3DFC4'},
+  },
+  {
+    id: 'bot_vampire_slit',
+    category: 'bottoms',
+    name: 'Quần Xẻ Tà Đai Đỏ Ma Cà Rồng',
+    price: 270,
+    patch: {bottom: 'vampire_slit_pants', bottomColor: '#1E1D24'},
+  },
+  {
+    id: 'bot_goose_shorts',
+    category: 'bottoms',
+    name: 'Quần Bí Xanh Rêu Bé Ngỗng',
+    price: 225,
+    patch: {bottom: 'goose_puff_shorts', bottomColor: '#7EA83B'},
+  },
+  {
+    id: 'bot_pompom_pants',
+    category: 'bottoms',
+    name: 'Quần Pyjama Pompompurin Nâu',
+    price: 195,
+    patch: {bottom: 'pompom_pajama_pants', bottomColor: '#9A4834'},
   },
 
   // ========== 3. TÓC ==========
@@ -1143,6 +1228,41 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 245,
     patch: {headItem: 'headphone', headItemColor: '#87CEEB'},
   },
+  {
+    id: 'head_picnic_bonnet',
+    category: 'head',
+    name: 'Mũ Khăn Caro Picnic Đỏ',
+    price: 215,
+    patch: {headItem: 'picnic_bonnet', headItemColor: '#E84F5E'},
+  },
+  {
+    id: 'head_vampire_bow',
+    category: 'head',
+    name: 'Nơ Nhung Đỏ Ma Cà Rồng',
+    price: 210,
+    patch: {headItem: 'vampire_giant_bow', headItemColor: '#B81D2C'},
+  },
+  {
+    id: 'head_sunflower_hat',
+    category: 'head',
+    name: 'Mũ Vành Hoa Hướng Dương',
+    price: 230,
+    patch: {headItem: 'sunflower_hat', headItemColor: '#F39A27'},
+  },
+  {
+    id: 'head_pompom_mask',
+    category: 'head',
+    name: 'Băng Đô Ngủ Pompompurin',
+    price: 195,
+    patch: {headItem: 'pompom_sleep_mask', headItemColor: '#FFE885'},
+  },
+  {
+    id: 'head_pompom_hood',
+    category: 'head',
+    name: 'Mũ Trùm Tai Dài Pompompurin',
+    price: 255,
+    patch: {headItem: 'pompom_ear_hood', headItemColor: '#FFE885'},
+  },
 
   // ========== 5. PHỤ KIỆN ==========
   {
@@ -1207,6 +1327,20 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Máy Ảnh Retro Đeo Chéo',
     price: 260,
     patch: {accessory: 'camera_strap', accessoryColor: '#3B3438'},
+  },
+  {
+    id: 'acc_vampire_cross_earring',
+    category: 'accessories',
+    name: 'Khuyên Tai Thập Giá Gothic',
+    price: 165,
+    patch: {accessory: 'vampire_cross_earring', accessoryColor: '#25232A'},
+  },
+  {
+    id: 'acc_gingham_neckerchief',
+    category: 'accessories',
+    name: 'Khăn Quàng Caro Cam Ngỗng',
+    price: 145,
+    patch: {accessory: 'gingham_neckerchief', accessoryColor: '#E96A3B'},
   },
 
   // ========== 5B. BALO / CÁNH ==========
@@ -1300,6 +1434,13 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Cánh Bướm Pha Lê Xanh',
     price: 365,
     patch: {backpack: 'crystal_wings', backpackColor: '#8ED8FF'},
+  },
+  {
+    id: 'bp_goose_cross_bag',
+    category: 'backpacks',
+    name: 'Túi Ngỗng Trắng Đeo Chéo',
+    price: 295,
+    patch: {backpack: 'goose_cross_bag', backpackColor: '#FFFDF7'},
   },
 
   // ========== 6. GIÀY ==========
@@ -1450,6 +1591,27 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 180,
     patch: {shoes: 'rain_boots', shoeColor: '#F5E7C6'},
   },
+  {
+    id: 'shoe_vampire_boots',
+    category: 'shoes',
+    name: 'Bốt Khóa Đỏ Ma Cà Rồng',
+    price: 255,
+    patch: {shoes: 'vampire_buckle_boots', shoeColor: '#1E1D24'},
+  },
+  {
+    id: 'shoe_goose_slippers',
+    category: 'shoes',
+    name: 'Dép Lê Bé Ngỗng Xanh Rêu',
+    price: 190,
+    patch: {shoes: 'goose_slippers', shoeColor: '#7EA83B'},
+  },
+  {
+    id: 'shoe_pompom_slippers',
+    category: 'shoes',
+    name: 'Dép Bông Pompompurin Vàng',
+    price: 180,
+    patch: {shoes: 'pompom_slippers', shoeColor: '#F8D45C'},
+  },
 
   // ========== 7. CẦM TAY ==========
   {
@@ -1521,6 +1683,13 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Ly Matcha Kem Cheese',
     price: 135,
     patch: {handheld: 'matcha_latte', handheldColor: '#6EBA6A'},
+  },
+  {
+    id: 'hand_daisy_flower',
+    category: 'handheld',
+    name: 'Cành Hoa Cúc Trắng Xinh',
+    price: 135,
+    patch: {handheld: 'daisy_flower', handheldColor: '#FFFFFF'},
   },
 ];
 

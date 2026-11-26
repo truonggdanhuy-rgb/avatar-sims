@@ -1200,15 +1200,15 @@ export function buildMallInteriorScene(): SubzoneWorld {
 
   // Decorative plaza medallion ring under the vehicle showroom (clean vertical offsets — zero Z-fighting)
   const plazaRingOuter = new THREE.Mesh(
-    new THREE.CylinderGeometry(8.6, 8.6, 0.04, 48),
+    new THREE.CylinderGeometry(8.6, 8.6, 0.034, 48),
     clayMat('#DFEEF7', 0.55),
   );
   plazaRingOuter.position.set(0.6, 0.025, 0);
   const plazaRingInner = new THREE.Mesh(
-    new THREE.CylinderGeometry(6.8, 6.8, 0.04, 48),
+    new THREE.CylinderGeometry(6.8, 6.8, 0.03, 48),
     clayMat('#FFF9EF', 0.52),
   );
-  plazaRingInner.position.set(0.6, 0.055, 0);
+  plazaRingInner.position.set(0.6, 0.06, 0);
   group.add(plazaRingOuter, plazaRingInner);
 
   // ========== 2. MASSIVE UPPER FLOOR 2 MEZZANINE (DISJOINT NON-OVERLAPPING DECK PANELS) ==========
@@ -1350,19 +1350,28 @@ export function buildMallInteriorScene(): SubzoneWorld {
   wallSCrown.position.set(0, 4.8 + (WALL_H - 4.8) * 0.5, MALL_HALF_D + 0.2);
   shellGroup.add(wallN, wallW, wallE, wallSL, wallSR, wallSCrown);
 
-  // Structural Columns Supporting Floor 2 Mezzanine & Enclosed Coffered Ceiling
+  // Structural Columns with Luminous Capital Bands Supporting Floor 2 & Skylight Vault
   for (let cx = -24; cx <= 24; cx += 16) {
     [-12.2, 12.2].forEach((cz) => {
       if (Math.abs(cx) === 8) return;
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, WALL_H - 0.3, 14), upperWallMat);
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, WALL_H - 0.3, 16), upperWallMat);
       col.position.set(cx, (WALL_H - 0.3) * 0.5, cz);
-      const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.62, 0.58, 14), creamTrimMat);
-      plinth.position.set(cx, 0.29, cz);
-      const goldBand = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.16, 14), goldMat);
+      const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.65, 0.62, 16), creamTrimMat);
+      plinth.position.set(cx, 0.31, cz);
+      const plinthGold = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.032, 8, 20), goldMat);
+      plinthGold.rotation.x = Math.PI / 2;
+      plinthGold.position.set(cx, 0.62, cz);
+      const goldBand = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.16, 16), goldMat);
       goldBand.position.set(cx, MALL_UPPER_Y - 0.26, cz);
-      shellGroup.add(col, plinth, goldBand);
-      colliders.push({type: 'circle', id: `mall_f1_col_${cx}_${cz}`, x: cx, z: cz, r: 0.62});
-      colliders.push({type: 'circle', id: `mall_f2_col_${cx}_${cz}`, x: cx, z: cz, r: 0.62});
+      const glowRingLow = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.035, 8, 20), warmLampMat);
+      glowRingLow.rotation.x = Math.PI / 2;
+      glowRingLow.position.set(cx, 3.65, cz);
+      const glowRingHigh = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.035, 8, 20), warmLampMat);
+      glowRingHigh.rotation.x = Math.PI / 2;
+      glowRingHigh.position.set(cx, MALL_UPPER_Y + 4.2, cz);
+      shellGroup.add(col, plinth, plinthGold, goldBand, glowRingLow, glowRingHigh);
+      colliders.push({type: 'circle', id: `mall_f1_col_${cx}_${cz}`, x: cx, z: cz, r: 0.66});
+      colliders.push({type: 'circle', id: `mall_f2_col_${cx}_${cz}`, x: cx, z: cz, r: 0.66});
     });
   }
 
@@ -1449,19 +1458,97 @@ export function buildMallInteriorScene(): SubzoneWorld {
     shellGroup.add(bayFrame, bayPane, shopSignFrame, winMannequinPad);
     group.add(shopSignMesh, winItems);
 
-    // North Floor 2 Upper Clerestory Windows
-    const f2WinFrameN = new THREE.Mesh(new RoundedBoxGeometry(9.2, 3.6, 0.16, 2, 0.04), creamTrimMat);
-    f2WinFrameN.position.set(bx, MALL_UPPER_Y + 4.8, -MALL_HALF_D + 0.21);
-    const f2WinPaneN = new THREE.Mesh(new THREE.BoxGeometry(8.4, 2.9, 0.06), windowPaneMat);
-    f2WinPaneN.position.set(bx, MALL_UPPER_Y + 4.8, -MALL_HALF_D + 0.33);
-    shellGroup.add(f2WinFrameN, f2WinPaneN);
+    // North Floor 2 Upper Boutique Storefronts (recessed against North wall — Floor 2 stays 100% walkable!)
+    const f2NorthShops: Record<number, {title: string; accent: string; pill: string; fg: string; icon: MallIconKind}> = {
+      [-24]: {title: 'MÂY FASHION', accent: '#FF86A4', pill: '#FFF0F4', fg: '#8F2948', icon: 'fashion'},
+      [-12]: {title: 'STAR TOYS', accent: '#62B6E8', pill: '#EDF7FF', fg: '#1E5882', icon: 'gift'},
+      [0]: {title: 'SKY GALLERY', accent: '#F2B84B', pill: '#FFF8E6', fg: '#7D5112', icon: 'cloud_star'},
+      [12]: {title: 'MELODY LAB', accent: '#A688F0', pill: '#F4EEFF', fg: '#4D338C', icon: 'bag'},
+      [24]: {title: 'SWEET BAKERY', accent: '#60C299', pill: '#EAFAF3', fg: '#1D6B4B', icon: 'boba'},
+    };
+    const f2Shop = f2NorthShops[bx];
+    const f2WinFrameN = new THREE.Mesh(new RoundedBoxGeometry(9.2, 4.1, 0.18, 2, 0.04), creamTrimMat);
+    f2WinFrameN.position.set(bx, MALL_UPPER_Y + 2.25, -MALL_HALF_D + 0.21);
+    const f2WinPaneN = new THREE.Mesh(new THREE.BoxGeometry(8.3, 3.3, 0.08), windowPaneMat);
+    f2WinPaneN.position.set(bx, MALL_UPPER_Y + 2.25, -MALL_HALF_D + 0.34);
+    const f2WinPadN = new THREE.Mesh(
+      new RoundedBoxGeometry(6.0, 0.38, 0.38, 2, 0.05),
+      glossyClayMat(f2Shop.accent, 0.44),
+    );
+    f2WinPadN.position.set(bx, MALL_UPPER_Y + 0.56, -MALL_HALF_D + 0.48);
+    const f2ItemsN = buildShopWindowDisplay(f2Shop.icon);
+    f2ItemsN.position.set(bx, MALL_UPPER_Y + 0.76, -MALL_HALF_D + 0.5);
+    const f2SignTex = createStorefrontSignTexture(
+      f2Shop.title,
+      f2Shop.accent,
+      f2Shop.pill,
+      f2Shop.fg,
+      disposables,
+      isDisposed,
+    );
+    const f2SignBoard = new THREE.Mesh(
+      new RoundedBoxGeometry(6.2, 1.28, 0.18, 3, 0.22),
+      glossyClayMat(f2Shop.accent, 0.4),
+    );
+    f2SignBoard.position.set(bx, MALL_UPPER_Y + 5.15, -MALL_HALF_D + 0.34);
+    const f2SignFace = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.85, 1.06),
+      new THREE.MeshBasicMaterial({map: f2SignTex}),
+    );
+    f2SignFace.position.set(bx, MALL_UPPER_Y + 5.15, -MALL_HALF_D + 0.45);
+    for (let s = 0; s < 5; s++) {
+      const aw = new THREE.Mesh(
+        new RoundedBoxGeometry(1.66, 0.2, 0.96, 2, 0.06),
+        clayMat(s % 2 === 0 ? f2Shop.accent : '#FFFDF8', 0.48),
+      );
+      aw.position.set(bx - 3.32 + s * 1.66, MALL_UPPER_Y + 4.05, -MALL_HALF_D + 0.66);
+      aw.rotation.x = 0.26;
+      shellGroup.add(aw);
+    }
+    shellGroup.add(f2WinFrameN, f2WinPaneN, f2WinPadN, f2SignBoard);
+    group.add(f2ItemsN, f2SignFace);
 
-    // South Floor 2 Upper Clerestory Windows
-    const f2WinFrameS = new THREE.Mesh(new RoundedBoxGeometry(9.2, 3.6, 0.16, 2, 0.04), creamTrimMat);
-    f2WinFrameS.position.set(bx, MALL_UPPER_Y + 4.8, MALL_HALF_D - 0.21);
-    const f2WinPaneS = new THREE.Mesh(new THREE.BoxGeometry(8.4, 2.9, 0.06), windowPaneMat);
-    f2WinPaneS.position.set(bx, MALL_UPPER_Y + 4.8, MALL_HALF_D - 0.33);
-    shellGroup.add(f2WinFrameS, f2WinPaneS);
+    // South Floor 2 Boutique Display Windows & Clerestory Trim
+    const f2WinFrameS = new THREE.Mesh(new RoundedBoxGeometry(9.2, 3.8, 0.16, 2, 0.04), creamTrimMat);
+    f2WinFrameS.position.set(bx, MALL_UPPER_Y + 4.4, MALL_HALF_D - 0.21);
+    const f2WinPaneS = new THREE.Mesh(new THREE.BoxGeometry(8.4, 3.0, 0.06), windowPaneMat);
+    f2WinPaneS.position.set(bx, MALL_UPPER_Y + 4.4, MALL_HALF_D - 0.33);
+    const f2SignS = new THREE.Mesh(
+      new RoundedBoxGeometry(5.6, 0.9, 0.16, 3, 0.18),
+      glossyClayMat(bx === 0 ? '#F2B84B' : accent, 0.44),
+    );
+    f2SignS.position.set(bx, MALL_UPPER_Y + 6.75, MALL_HALF_D - 0.34);
+    shellGroup.add(f2WinFrameS, f2WinPaneS, f2SignS);
+  });
+
+  // West & East Floor 2 Boutique Wall Showcases (x = ±31.65 — strictly flush outside walking bounds)
+  [-1, 1].forEach((side) => {
+    const wx = side * (MALL_HALF_W - 0.32);
+    const faceSign = -side;
+    [
+      {wz: -14, title: side < 0 ? 'KUMO TECH' : 'CLOUD HOME', accent: side < 0 ? '#54A6EB' : '#65C49E', pill: '#F0F9FF', fg: '#1E4E78', icon: (side < 0 ? 'bag' : 'mart') as MallIconKind},
+      {wz: 0, title: side < 0 ? 'PET CORNER' : 'GIFT STUDIO', accent: side < 0 ? '#F5A65B' : '#FF86A4', pill: '#FFF7ED', fg: '#783B12', icon: (side < 0 ? 'cloud_star' : 'gift') as MallIconKind},
+      {wz: 14, title: side < 0 ? 'BOBA CLUB' : 'SUNGLASSES', accent: side < 0 ? '#B18DF2' : '#E8735E', pill: '#F5F0FF', fg: '#4B2B85', icon: (side < 0 ? 'boba' : 'fashion') as MallIconKind},
+    ].forEach(({wz, title, accent, pill, fg, icon}) => {
+      const frame = new THREE.Mesh(new RoundedBoxGeometry(0.18, 4.0, 8.8, 2, 0.04), creamTrimMat);
+      frame.position.set(wx, MALL_UPPER_Y + 2.25, wz);
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(0.08, 3.2, 7.9), windowPaneMat);
+      pane.position.set(wx + faceSign * 0.12, MALL_UPPER_Y + 2.25, wz);
+      const sTex = createStorefrontSignTexture(title, accent, pill, fg, disposables, isDisposed);
+      const sBoard = new THREE.Mesh(
+        new RoundedBoxGeometry(0.18, 1.18, 5.8, 3, 0.2),
+        glossyClayMat(accent, 0.42),
+      );
+      sBoard.position.set(wx + faceSign * 0.12, MALL_UPPER_Y + 4.95, wz);
+      const sFace = new THREE.Mesh(new THREE.PlaneGeometry(5.45, 0.96), new THREE.MeshBasicMaterial({map: sTex}));
+      sFace.position.set(wx + faceSign * 0.24, MALL_UPPER_Y + 4.95, wz);
+      sFace.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+      const items = buildShopWindowDisplay(icon);
+      items.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+      items.position.set(wx + faceSign * 0.34, MALL_UPPER_Y + 0.65, wz);
+      shellGroup.add(frame, pane, sBoard);
+      group.add(sFace, items);
+    });
   });
 
   // Grand Suspended Sculpted 3D Atrium Welcome Banner ("CHÀO MỪNG ĐẾN MÂY MALL" + "Ăn uống · Mua sắm · Giải trí")
@@ -1550,29 +1637,82 @@ export function buildMallInteriorScene(): SubzoneWorld {
     shellGroup.add(flagMesh, bead);
   }
 
-  // Fully Enclosed Coffered Ceiling across ENTIRE 64m x 52m Interior (Zero open skylight or stray bands!)
-  const mainCeiling = new THREE.Mesh(
-    new THREE.BoxGeometry(MALL_HALF_W * 2 + 0.8, 0.4, MALL_HALF_D * 2 + 0.8),
-    upperWallMat,
-  );
-  mainCeiling.position.set(0, WALL_H + 0.2, 0);
-  shellGroup.add(mainCeiling);
+  // Perimeter Wing Coffered Ceiling + Grand Luminous Arched Glass Skylight Vault Over Central Atrium!
+  const skylitGlassMat = new THREE.MeshStandardMaterial({
+    color: '#DDF5FF',
+    emissive: '#B6EBFF',
+    emissiveIntensity: 0.42,
+    roughness: 0.12,
+    transparent: true,
+    opacity: 0.64,
+  });
 
-  // Architectural Coffer Crossbeams along Ceiling
-  for (let bz = -18; bz <= 18; bz += 9) {
+  // Solid perimeter ceiling slabs framing the 30m x 22m central skylight opening (|x| < 15, |z| < 11)
+  [
+    {cx: 0, cz: -18.7, w: MALL_HALF_W * 2 + 0.8, d: 15.4},
+    {cx: 0, cz: 18.7, w: MALL_HALF_W * 2 + 0.8, d: 15.4},
+    {cx: -23.7, cz: 0, w: 17.4, d: 22.0},
+    {cx: 23.7, cz: 0, w: 17.4, d: 22.0},
+  ].forEach(({cx, cz, w, d}) => {
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.42, d), upperWallMat);
+    slab.position.set(cx, WALL_H + 0.21, cz);
+    shellGroup.add(slab);
+  });
+
+  // Skylight perimeter cornice frame + warm coves
+  [
+    {x: 0, z: -11.0, w: 30.6, d: 0.45},
+    {x: 0, z: 11.0, w: 30.6, d: 0.45},
+    {x: -15.0, z: 0, w: 0.45, d: 22.4},
+    {x: 15.0, z: 0, w: 0.45, d: 22.4},
+  ].forEach(({x, z, w, d}) => {
+    const rim = new THREE.Mesh(new RoundedBoxGeometry(w, 0.56, d, 2, 0.06), creamTrimMat);
+    rim.position.set(x, WALL_H - 0.06, z);
+    const goldStrip = new THREE.Mesh(new RoundedBoxGeometry(w * 0.98, 0.14, d * 0.96, 1, 0.02), goldMat);
+    goldStrip.position.set(x, WALL_H - 0.32, z);
+    shellGroup.add(rim, goldStrip);
+  });
+
+  // Arched Barrel-Vault Skylight Glass Dome & Cream/Gold Roof Ribs above Atrium (y = WALL_H .. WALL_H + 3.8)
+  const vaultGlass = new THREE.Mesh(
+    new THREE.CylinderGeometry(11.0, 11.0, 30.0, 20, 1, true, 0, Math.PI),
+    skylitGlassMat,
+  );
+  vaultGlass.rotation.z = Math.PI / 2;
+  vaultGlass.scale.set(0.34, 1, 1);
+  vaultGlass.position.set(0, WALL_H, 0);
+  shellGroup.add(vaultGlass);
+
+  [-15, -9, -3, 3, 9, 15].forEach((rx) => {
+    const archRib = new THREE.Mesh(new THREE.TorusGeometry(11.0, 0.18, 8, 24, Math.PI), creamTrimMat);
+    archRib.rotation.y = Math.PI / 2;
+    archRib.scale.set(1, 0.34, 1);
+    archRib.position.set(rx, WALL_H, 0);
+    shellGroup.add(archRib);
+  });
+  [-5.5, 0, 5.5].forEach((pz) => {
+    const purlin = new THREE.Mesh(new THREE.BoxGeometry(30.0, 0.16, 0.22), goldMat);
+    const purlinY = WALL_H + Math.sqrt(Math.max(0, 11 * 11 - pz * pz)) * 0.34;
+    purlin.position.set(0, purlinY, pz);
+    shellGroup.add(purlin);
+  });
+
+  // Coffer Crossbeams along outer wings
+  [-18, 18].forEach((bz) => {
     const beamX = new THREE.Mesh(new THREE.BoxGeometry(MALL_HALF_W * 2, 0.34, 0.56), creamTrimMat);
     beamX.position.set(0, WALL_H - 0.17, bz);
     shellGroup.add(beamX);
-  }
-  for (let bx = -24; bx <= 24; bx += 12) {
+  });
+  [-24, 24].forEach((bx) => {
     const beamZ = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.34, MALL_HALF_D * 2), creamTrimMat);
     beamZ.position.set(bx, WALL_H - 0.17, 0);
     shellGroup.add(beamZ);
-  }
+  });
 
-  // Rows of Sleek Recessed Ceiling Lights (Đèn trần) + Central Atrium Accent Rings
+  // Recessed Wing Lights (Đèn trần cánh)
   [-21, -9, 9, 21].forEach((lz) => {
     [-22, -11, 0, 11, 22].forEach((lx) => {
+      if (Math.abs(lx) < 14 && Math.abs(lz) < 10) return;
       const bezel = new THREE.Mesh(new RoundedBoxGeometry(3.8, 0.12, 2.2, 2, 0.03), silverMat);
       bezel.position.set(lx, WALL_H - 0.08, lz);
       const diffuser = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.08, 1.8), ceilingLightMat);
@@ -1582,18 +1722,63 @@ export function buildMallInteriorScene(): SubzoneWorld {
     });
   });
 
-  // Grand Atrium Luminous Pendant Halos Hanging High Beneath the Closed Ceiling (y = WALL_H - 2.2)
-  [-9, 0, 9].forEach((hx) => {
-    const ringHousing = new THREE.Mesh(new THREE.TorusGeometry(2.35, 0.12, 10, 32), silverMat);
-    ringHousing.rotation.x = Math.PI / 2;
-    ringHousing.position.set(hx, WALL_H - 2.2, 0);
-    const ringGlow = new THREE.Mesh(new THREE.TorusGeometry(2.35, 0.09, 8, 32), ceilingLightMat);
-    ringGlow.rotation.x = Math.PI / 2;
-    ringGlow.position.set(hx, WALL_H - 2.31, 0);
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 8), silverMat);
-    stem.position.set(hx, WALL_H - 1.1, 0);
-    shellGroup.add(ringHousing, stem);
-    ceilingLightsGroup.add(ringGlow);
+  // 3 Grand Multi-Tier Crystal & Gold Atrium Chandeliers suspended below the Skylight Vault!
+  [-9.5, 0, 9.5].forEach((hx, hIdx) => {
+    const dropLen = hIdx === 1 ? 4.4 : 3.6;
+    const baseY = WALL_H + 3.2 - dropLen;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, dropLen, 8), goldMat);
+    stem.position.set(hx, WALL_H + 3.2 - dropLen * 0.5, 0);
+    shellGroup.add(stem);
+
+    [
+      {r: hIdx === 1 ? 2.45 : 1.95, yOff: 0.75},
+      {r: hIdx === 1 ? 1.55 : 1.2, yOff: 0},
+    ].forEach(({r, yOff}) => {
+      const ringGold = new THREE.Mesh(new THREE.TorusGeometry(r, 0.08, 10, 32), goldMat);
+      ringGold.rotation.x = Math.PI / 2;
+      ringGold.position.set(hx, baseY + yOff, 0);
+      const ringGlow = new THREE.Mesh(new THREE.TorusGeometry(r, 0.065, 8, 32), ceilingLightMat);
+      ringGlow.rotation.x = Math.PI / 2;
+      ringGlow.position.set(hx, baseY + yOff - 0.08, 0);
+      shellGroup.add(ringGold);
+      ceilingLightsGroup.add(ringGlow);
+    });
+
+    // Hanging pearl drops beneath bottom chandelier tier
+    for (let p = 0; p < 8; p++) {
+      const a = (p / 8) * Math.PI * 2;
+      const pr = hIdx === 1 ? 1.55 : 1.2;
+      const drop = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), warmLampMat);
+      drop.position.set(hx + Math.cos(a) * pr, baseY - 0.24, Math.sin(a) * pr);
+      ceilingLightsGroup.add(drop);
+    }
+  });
+
+  // Festive Pastel Floating Sky Hot-Air Balloons & Puffy Clouds high in Atrium!
+  [
+    {x: -5.2, y: 13.4, z: -6.4, col: '#FF9EB5', stripe: '#FFF8EB', s: 1.05},
+    {x: 5.4, y: 14.2, z: 6.2, col: '#78C7FF', stripe: '#FFF8EB', s: 1.15},
+    {x: -11.5, y: 12.6, z: 5.8, col: '#FFD87D', stripe: '#FF9EB5', s: 0.9},
+    {x: 11.4, y: 12.8, z: -5.8, col: '#7ED6C2', stripe: '#FFF8EB', s: 0.92},
+  ].forEach(({x, y, z, col, stripe, s}) => {
+    const bGroup = new THREE.Group();
+    bGroup.position.set(x, y, z);
+    bGroup.scale.setScalar(s);
+    const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 6.2, 6), silverMat);
+    cable.position.y = 3.6;
+    const envelope = new THREE.Mesh(new THREE.SphereGeometry(0.85, 16, 14), glossyClayMat(col, 0.34));
+    envelope.scale.set(1, 1.18, 1);
+    const belt = new THREE.Mesh(new THREE.TorusGeometry(0.84, 0.06, 8, 22), glossyClayMat(stripe, 0.34));
+    belt.rotation.x = Math.PI / 2;
+    const basket = new THREE.Mesh(new RoundedBoxGeometry(0.42, 0.32, 0.42, 2, 0.04), warmWoodMat);
+    basket.position.y = -1.32;
+    [-0.16, 0.16].forEach((rx) => {
+      const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.55, 5), goldMat);
+      rope.position.set(rx, -1.04, 0);
+      bGroup.add(rope);
+    });
+    bGroup.add(cable, envelope, belt, basket);
+    shellGroup.add(bGroup);
   });
 
   mergeStaticGroupByMaterial(shellGroup);
@@ -1867,6 +2052,8 @@ export function buildMallInteriorScene(): SubzoneWorld {
     id: 'npc_tun',
     label: 'Tun',
     worldPos: new THREE.Vector3(TUN_X, TUN_BASE_Y + 2.25, TUN_Z),
+    isNpc: true,
+    maxLabelDist: 3.1,
   });
 
   // ========== 7. OPEN-CONCEPT FLOOR 1 WINGS: FLAGSHIP QUÁN CÀ PHÊ MÂY, BISTRO & CHỢ, CARTOON DECOR, ARCADE & ATRIUM PLAZA ==========
@@ -1892,12 +2079,36 @@ export function buildMallInteriorScene(): SubzoneWorld {
     depthWrite: false,
   });
 
-  // Perimeter & Inner Atrium Potted Trees (clear of wings & escalators)
+  // Inner Atrium Circular Cushioned Planter-Bench Lounge Pods + Perimeter Potted Trees
   [
     [-10.8, -6.2],
     [10.8, -6.2],
     [-10.8, 6.2],
     [10.8, 6.2],
+  ].forEach(([px, pz], idx) => {
+    const ringBench = new THREE.Mesh(new THREE.CylinderGeometry(1.04, 1.08, 0.42, 20), creamFoamMat);
+    ringBench.position.set(px, 0.21, pz);
+    const seatPad = new THREE.Mesh(
+      new THREE.TorusGeometry(0.84, 0.14, 10, 22),
+      idx % 2 === 0 ? sageMat : berryPinkMat,
+    );
+    seatPad.rotation.x = Math.PI / 2;
+    seatPad.position.set(px, 0.44, pz);
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.46, 0.72, 14), honeyOakMat);
+    pot.position.set(px, 0.36, pz);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 1.35, 8), espressoBrownMat);
+    trunk.position.set(px, 1.16, pz);
+    const crownA = new THREE.Mesh(new THREE.SphereGeometry(0.68, 12, 10), leafMat);
+    crownA.position.set(px, 1.98, pz);
+    const crownB = new THREE.Mesh(new THREE.SphereGeometry(0.46, 10, 8), leafMat);
+    crownB.position.set(px + 0.34, 1.76, pz - 0.18);
+    const crownC = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), sageMat);
+    crownC.position.set(px - 0.3, 1.82, pz + 0.22);
+    lobbyDecor.add(ringBench, seatPad, pot, trunk, crownA, crownB, crownC);
+    colliders.push({type: 'circle', id: `mall_f1_plant_${idx}`, x: px, z: pz, r: 1.08});
+  });
+
+  [
     [-30.2, -24.2],
     [30.2, -24.2],
     [-30.2, 24.2],
@@ -1912,7 +2123,7 @@ export function buildMallInteriorScene(): SubzoneWorld {
     const crownB = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 7), leafMat);
     crownB.position.set(px + 0.28, 1.38, pz - 0.14);
     lobbyDecor.add(pot, trunk, crownA, crownB);
-    colliders.push({type: 'circle', id: `mall_f1_plant_${idx}`, x: px, z: pz, r: 0.58});
+    colliders.push({type: 'circle', id: `mall_f1_plant_${idx + 4}`, x: px, z: pz, r: 0.58});
   });
 
   // Central atrium around Tun kept open & spacious (no clutter benches)
@@ -2213,6 +2424,8 @@ export function buildMallInteriorScene(): SubzoneWorld {
     id: 'npc_barista',
     label: 'Barista Mây',
     worldPos: new THREE.Vector3(BARISTA_X, 2.25, BARISTA_Z),
+    isNpc: true,
+    maxLabelDist: 3.1,
   });
 
   // 4 Open Bistro Coffee Tables & 8 Interactive Cushioned Chairs in Quán Cà Phê Mây
@@ -2563,6 +2776,8 @@ export function buildMallInteriorScene(): SubzoneWorld {
     id: 'npc_peppa',
     label: 'Peppa',
     worldPos: new THREE.Vector3(PEPPA_X, 2.38, PEPPA_Z),
+    isNpc: true,
+    maxLabelDist: 3.1,
   });
 
   // 2 Bistro Dining Tables & 4 Interactive Chairs in SE Wing
@@ -3037,6 +3252,40 @@ export function buildMallInteriorScene(): SubzoneWorld {
   lobbyDecor.add(ftnBase, ftnWater, ftnPillar, ftnBowl, ftnBlossomTree);
   colliders.push({type: 'circle', id: 'mall_f1_atrium_fountain', x: fountainX, z: fountainZ, r: 2.02});
 
+  // Grand Promenade Champagne-Gold & Coral-Blush Velvet Carpet Runners (strict non-overlapping Y clearance)
+  const carpetGoldMat = clayMat('#E9C46A', 0.44);
+  carpetGoldMat.polygonOffset = true;
+  carpetGoldMat.polygonOffsetFactor = -2;
+  carpetGoldMat.polygonOffsetUnits = -2;
+  const carpetBlushMat = clayMat('#F28A9E', 0.72);
+  carpetBlushMat.polygonOffset = true;
+  carpetBlushMat.polygonOffsetFactor = -3;
+  carpetBlushMat.polygonOffsetUnits = -3;
+  [
+    {x: 0, z: 18.4, w: 3.4, d: 6.0},
+    {x: 0, z: 9.8, w: 3.4, d: 2.6},
+  ].forEach(({x, z, w, d}) => {
+    const runnerTrim = new THREE.Mesh(new RoundedBoxGeometry(w + 0.32, 0.024, d, 1, 0.006), carpetGoldMat);
+    runnerTrim.position.set(x, 0.03, z);
+    const runnerCore = new THREE.Mesh(new RoundedBoxGeometry(w, 0.022, d - 0.12, 1, 0.006), carpetBlushMat);
+    runnerCore.position.set(x, 0.056, z);
+    lobbyDecor.add(runnerTrim, runnerCore);
+  });
+
+  // Entrance Promenade Bollard Light Pillars flanking Walkway (clear of entrance lane)
+  [-3.8, 3.8].forEach((bx) => {
+    [16.2, 21.0].forEach((bz) => {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.28, 0.48, 12), creamFoamMat);
+      pot.position.set(bx, 0.24, bz);
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), warmLampMat);
+      glow.position.set(bx, 0.62, bz);
+      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.24, 9, 8), leafMat);
+      bush.position.set(bx, 0.5, bz);
+      lobbyDecor.add(pot, bush, glow);
+      colliders.push({type: 'circle', id: `mall_f1_bollard_${bx}_${bz}`, x: bx, z: bz, r: 0.38});
+    });
+  });
+
   // Mall Directory Board near South Entrance at (-5.6, +18.8)
   const dirStand = new THREE.Mesh(new RoundedBoxGeometry(1.55, 1.75, 0.18, 3, 0.05), creamFoamMat);
   dirStand.position.set(-5.6, 0.96, 18.8);
@@ -3062,21 +3311,44 @@ export function buildMallInteriorScene(): SubzoneWorld {
     clickTargets,
   );
 
+  // Symmetric Pastel Cloud Star Welcome Totem on Right Side of Entrance Promenade (+5.6, +18.8)
+  const promoGroup = new THREE.Group();
+  promoGroup.position.set(5.6, 0.04, 18.8);
+  promoGroup.rotation.y = -0.35;
+  const promoPlinth = new THREE.Mesh(new THREE.CylinderGeometry(0.66, 0.74, 0.36, 18), creamFoamMat);
+  promoPlinth.position.y = 0.18;
+  const promoRim = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.04, 8, 20), goldMat);
+  promoRim.rotation.x = Math.PI / 2;
+  promoRim.position.y = 0.36;
+  const promoPole = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 1.15, 10), berryPinkMat);
+  promoPole.position.y = 0.92;
+  const promoCloud = buildSculptedCloud(0.95, creamFoamMat);
+  promoCloud.position.y = 1.62;
+  const promoStar = buildSculptedStar(0.32, 0.1, butterYellowMat);
+  promoStar.position.set(0, 2.02, 0.08);
+  promoGroup.add(promoPlinth, promoRim, promoPole, promoCloud, promoStar);
+  lobbyDecor.add(promoGroup);
+  colliders.push({type: 'circle', id: 'mall_f1_promo_totem', x: 5.6, z: 18.8, r: 0.85});
+
   mergeStaticGroupByMaterial(lobbyDecor);
   group.add(lobbyDecor);
 
   // ========== 8. GRAND SOUTH GLASS EXIT PORTAL (Z = +25.4 -> BACK TO TOWN, NO EXIT LABEL) ==========
   const exitPortal = new THREE.Group();
   const exitTrim = new THREE.Mesh(
-    new RoundedBoxGeometry(4.45, 0.036, 3.85, 2, 0.012),
-    goldMat,
+    new RoundedBoxGeometry(4.45, 0.026, 3.85, 2, 0.008),
+    carpetGoldMat,
   );
-  exitTrim.position.set(0, 0.022, MALL_HALF_D - 2.2);
+  exitTrim.position.set(0, 0.03, MALL_HALF_D - 2.2);
+  const exitRugMat = clayMat('#B9464E', 0.82);
+  exitRugMat.polygonOffset = true;
+  exitRugMat.polygonOffsetFactor = -3;
+  exitRugMat.polygonOffsetUnits = -3;
   const exitRug = new THREE.Mesh(
-    new RoundedBoxGeometry(4.12, 0.04, 3.52, 2, 0.015),
-    clayMat('#B9464E', 0.82),
+    new RoundedBoxGeometry(4.12, 0.024, 3.52, 2, 0.008),
+    exitRugMat,
   );
-  exitRug.position.set(0, 0.046, MALL_HALF_D - 2.2);
+  exitRug.position.set(0, 0.058, MALL_HALF_D - 2.2);
 
   [-3.2, 3.2].forEach((px) => {
     const jamb = new THREE.Mesh(new RoundedBoxGeometry(0.32, 4.7, 0.42, 2, 0.04), creamTrimMat);

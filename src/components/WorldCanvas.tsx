@@ -1,23 +1,26 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
-  Anchor,
   Armchair,
   ArrowDown,
   Backpack,
   Building2,
   Check,
+  ChefHat,
   ChevronLeft,
   ChevronRight,
   Coins,
   DoorClosed,
   DoorOpen,
   Fish,
+  Flame,
+  Gamepad2,
   Lightbulb,
   LightbulbOff,
   Move,
   Package,
   PackageMinus,
   RotateCw,
+  Smile,
   Sparkles,
   Sprout,
   Trophy,
@@ -41,6 +44,7 @@ import {
 import {getNetRepairCost} from '../data/insectCatalog';
 import {MAX_PET_INTIMACY, PET_CATALOG} from '../data/petCatalog';
 import {getMountDefinition} from '../data/mountCatalog';
+import {PLAYER_ACTION_CATALOG, PLAYER_ACTION_SLOT_COUNT} from '../data/progressionCatalog';
 import {BicycleMountIcon, FishIllustration, SkateboardMountIcon} from './FishingIcons';
 import {InsectIllustration} from './InsectIcons';
 import {BlingBlingBadge, PetSpeciesIcon} from './PetIcons';
@@ -132,6 +136,8 @@ import {
   isPointOnIslandPier,
 } from '../three/islandBuilder';
 import {
+  ActionId,
+  ArcadeHubSection,
   AvatarConfig,
   AvatarPose,
   BbqFoodId,
@@ -198,6 +204,7 @@ interface WorldCanvasProps {
   joyboyModalOpen: boolean;
   homeSpotRef: React.MutableRefObject<{x: number; z: number}>;
   ownedMounts: OwnedMountsState;
+  equippedActionSlots: (ActionId | null)[];
   teleportToPlazaPulse: number;
   onChangeZone: (next: ZoneId) => void;
   onOpenWardrobe: () => void;
@@ -306,6 +313,7 @@ interface WorldCanvasProps {
   onScatterPondFeed: () => void;
   onPondProximityChange: (near: boolean) => void;
   onAddCoins: (amount: number) => void;
+  onOpenArcadeHub?: (section?: ArcadeHubSection) => void;
   activePet: OwnedPetState | null;
   carriedPetId: string | null;
   petSupplies: PetSupplies;
@@ -479,6 +487,16 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
     return {fov, pos: [0, 15.2, 23.2] as const, look: [0, 0.9, 0] as const};
   }
 
+  if (zone === 'arcade') {
+    if (isPortrait) {
+      return {fov, pos: [0, 9.8, 15.2] as const, look: [0, 0.9, -0.5] as const};
+    }
+    if (isSquare) {
+      return {fov, pos: [0, 9.2, 14.0] as const, look: [0, 0.9, -0.5] as const};
+    }
+    return {fov, pos: [0, 8.6, 12.8] as const, look: [0, 0.9, -0.5] as const};
+  }
+
   if (isPortrait) {
     return {fov, pos: [0, 6.8, 10.6] as const, look: [0, 0.75, -0.35] as const};
   }
@@ -512,6 +530,9 @@ function getZoneWalkBounds(zone: ZoneId) {
       maxZ: MALL_HALF_D - 1.3,
     };
   }
+  if (zone === 'arcade') {
+    return {minX: -7.4, maxX: 7.4, minZ: -6.1, maxZ: 6.35};
+  }
   return {minX: -3.45, maxX: 3.45, minZ: -4.05, maxZ: 4.05};
 }
 
@@ -539,6 +560,8 @@ function getWallItemHalfHeight(kind: string): number {
       return 0.42;
     case 'wall_mirror_arch':
       return 0.62;
+    case 'wall_lamp_pompompurin':
+      return 0.34;
     default:
       return 0.65;
   }
@@ -562,17 +585,24 @@ function getFloorObstacleMaxTop(
     case 'bookshelf':
     case 'floor_lamp':
       return baseY + 2.1;
+    case 'vampire_coffin_sofa':
+    case 'candelabra_gothic':
+      return baseY + 1.88;
     case 'tet_mai_pot':
     case 'tet_peach_pot':
       return baseY + 1.68;
     case 'terrace_swing_egg':
-      return baseY + 1.65;
+      return baseY + 2.18;
     case 'cat_tree_tower':
       return baseY + 1.56;
     case 'tet_lantern_lamp':
       return baseY + 1.55;
     case 'cozy_fireplace':
       return baseY + 1.48;
+    case 'bed_pompompurin':
+      return baseY + 1.46;
+    case 'shelf_pompompurin':
+      return baseY + 1.42;
     case 'xmas_snowman':
     case 'fish_aquarium':
       return baseY + 1.38;
@@ -586,14 +616,20 @@ function getFloorObstacleMaxTop(
       return baseY + 0.96;
     case 'plush_bear_giant':
       return baseY + 0.72;
+    case 'stool_pompompurin':
+      return baseY + 0.56;
     case 'desktop_pc_set':
       return baseY + 0.54;
     case 'study_desk_lamp':
       return baseY + 0.48;
+    case 'picnic_gingham_set':
+      return baseY + 0.42;
     case 'coffee_maker_bar':
       return baseY + 0.36;
     case 'toast_toaster_set':
       return baseY + 0.26;
+    case 'pudding_flan_plate':
+      return baseY + 0.22;
     case 'study_laptop':
     case 'headphone_stand':
     case 'art_supply_rack':
@@ -1295,6 +1331,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   joyboyModalOpen,
   homeSpotRef,
   ownedMounts,
+  equippedActionSlots,
   teleportToPlazaPulse,
   onChangeZone,
   onOpenWardrobe,
@@ -1351,6 +1388,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onScatterPondFeed,
   onPondProximityChange,
   onAddCoins,
+  onOpenArcadeHub,
   onOpenPhone,
   onOpenBag,
   activePet,
@@ -1387,9 +1425,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const jumpActionRef = useRef<(() => void) | null>(null);
   const catchActionRef = useRef<(() => void) | null>(null);
   const fishActionRef = useRef<(() => void) | null>(null);
+  const triggerPlayerActionRef = useRef<((actionId: ActionId) => void) | null>(null);
   const teleportPlazaActionRef = useRef<(() => void) | null>(null);
   const mallRideActionRef = useRef<(() => void) | null>(null);
-  const disembarkBoatActionRef = useRef<(() => void) | null>(null);
   const launchParachuteRef = useRef<(() => void) | null>(null);
   const goToIslandActionRef = useRef<(() => void) | null>(null);
   const goToTownFromIslandActionRef = useRef<(() => void) | null>(null);
@@ -1433,10 +1471,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   );
   const [houseLightsOn, setHouseLightsOn] = useState(true);
   const [nearbyLamp, setNearbyLamp] = useState<HouseLampInfo | null>(null);
+  const [nearbyAppliance, setNearbyAppliance] = useState<{
+    id: string;
+    kind: 'microwave' | 'mini_oven' | 'kitchen_counter';
+    name: string;
+  } | null>(null);
   const [nearPond, setNearPond] = useState(false);
   const [confirmPondFeed, setConfirmPondFeed] = useState(false);
   const [homeToolsOpen, setHomeToolsOpen] = useState(false);
   const [farmToolsOpen, setFarmToolsOpen] = useState(false);
+  const [actionsTrayOpen, setActionsTrayOpen] = useState(false);
   const [webglError, setWebglError] = useState(false);
   const [jumpIdleDimmed, setJumpIdleDimmed] = useState(false);
   const jumpDimTimerRef = useRef<number | null>(null);
@@ -1450,6 +1494,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       setJumpIdleDimmed(true);
     }, 5000);
   };
+
+  useEffect(() => {
+    setActionsTrayOpen(false);
+  }, [zone, miniActive, editFurnitureMode, editFarmDecorMode, isParachutingHud]);
 
   useEffect(() => {
     bumpJumpButtonVisibility();
@@ -1563,6 +1611,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onScatterPondFeed,
     onPondProximityChange,
     onAddCoins,
+    onOpenArcadeHub,
     onOpenPetSupplyShop,
     onOpenPetAdopt,
     onOpenBbqGrill,
@@ -1616,6 +1665,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onScatterPondFeed,
     onPondProximityChange,
     onAddCoins,
+    onOpenArcadeHub,
     onOpenPetSupplyShop,
     onOpenPetAdopt,
     onOpenBbqGrill,
@@ -1651,6 +1701,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const activeDoorsRef = useRef<HouseDoorHandle[]>([]);
   const nearbyDoorKeyRef = useRef<string>('');
   const nearbyLampKeyRef = useRef<string>('');
+  const nearbyApplianceKeyRef = useRef<string>('');
   const nearPondRef = useRef<boolean>(false);
   const homeExitTriggeredRef = useRef<boolean>(false);
   const selectedPlotRef = useRef<{plotId: number; worldPos: THREE.Vector3} | null>(null);
@@ -1709,8 +1760,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       activeBedIdRef.current = null;
       nearbyDoorKeyRef.current = '';
       nearbyLampKeyRef.current = '';
+      nearbyApplianceKeyRef.current = '';
       setNearbyDoor(null);
       setNearbyLamp(null);
+      setNearbyAppliance(null);
       setHomeToolsOpen(false);
     }
     if (zone !== 'garden') {
@@ -2023,8 +2076,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         bikeSteerAngle = 0;
         bikeIdleBlend = 1;
         bikeLeanAngle = 0;
+        jumpY = 0;
+        jumpVel = 0;
         playerRig.root.add(mountRig.root);
       } else if (mountRig.root.parent !== playerRig.root) {
+        jumpY = 0;
+        jumpVel = 0;
         playerRig.root.add(mountRig.root);
       }
     };
@@ -2032,6 +2089,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     syncMountRig(stateRef.current.ownedMounts.activeMountId);
 
     let playPetTimer = 0;
+    let happyActionTimer = 0;
     const mallElev = {
       state: 'ground' as 'ground' | 'riding_up' | 'deck' | 'riding_down',
       progress: 0,
@@ -2214,7 +2272,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       setIsSwimmingHud(true);
       soundFX.splash();
       showBubble(
-        'Bơi tự do ngoài biển! Chạm mặt nước để bơi hoặc bấm "Lên bờ".',
+        'Bơi tự do ngoài biển! Chạm mặt nước để bơi, bơi vào bãi cát hoặc chạm cầu cảng để lên bờ.',
         playerPos.x,
         1.5,
         playerPos.z,
@@ -2634,7 +2692,53 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           activeSeat = null;
         }
         playPetTimer = 4.5;
+        happyActionTimer = 0;
       }
+    };
+
+    triggerPlayerActionRef.current = (actionId: ActionId) => {
+      const def = PLAYER_ACTION_CATALOG[actionId];
+      if (!def) return;
+      const isRidingElev =
+        stateRef.current.zone === 'town' &&
+        (mallElev.state === 'riding_up' || mallElev.state === 'riding_down');
+      if (
+        stateRef.current.ownedMounts.activeMountId !== null ||
+        isRidingElev ||
+        mallState.ridingLane !== null ||
+        treehouseState.climbing ||
+        mallSlideCtrl.active ||
+        parachuteCtrl.active ||
+        boatState.active ||
+        swimState.active ||
+        fishCtrl.phase !== 'idle' ||
+        netSwingCtrl.active
+      ) {
+        showBubble(
+          stateRef.current.ownedMounts.activeMountId !== null
+            ? 'Hãy xuống thú cưỡi để dùng hành động nhé!'
+            : 'Hãy dừng hoạt động hiện tại để dùng hành động nhé!',
+        );
+        return;
+      }
+      activeTarget = null;
+      if (activeSeat) {
+        if (activeSeat.isBath) {
+          activeBathtubIdRef.current = null;
+          activeSubzone?.setActiveBathtub?.(null);
+        }
+        if (activeSeat.isBed) {
+          activeBedIdRef.current = null;
+          activeSubzone?.setActiveBed?.(null);
+        }
+        playerPos.x = activeSeat.standX;
+        playerPos.z = activeSeat.standZ;
+        activeSeat = null;
+      }
+      playPetTimer = 0;
+      happyActionTimer = def.durationSec;
+      playerPos.pose = 'happy_jump';
+      soundFX.sparkle();
     };
 
     const selectionRing = new THREE.Mesh(
@@ -2728,6 +2832,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           );
           setIsBoatingHud(false);
           playPetTimer = 0;
+          happyActionTimer = 0;
           activeTarget = null;
           activeSeat = null;
           jumpY = 0;
@@ -2809,7 +2914,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           treehouseState.cooldown = 0;
           treehouseState.postClimbAction = null;
         }
-        if (zoneChanged) playPetTimer = 0;
+        if (zoneChanged) {
+          playPetTimer = 0;
+          happyActionTimer = 0;
+        }
         controls.minDistance = z === 'garden' || z === 'home' ? 5.5 : z === 'mall' ? 3.6 : 4.5;
         controls.maxDistance =
           z === 'island'
@@ -2820,7 +2928,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 ? 26
                 : z === 'mall'
                   ? 16.5
-                  : z === 'petshop'
+                  : z === 'petshop' || z === 'arcade'
                     ? 22
                     : 18;
         controls.minPolarAngle = z === 'island' ? Math.PI * 0.12 : Math.PI * 0.16;
@@ -2911,6 +3019,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             playerPos.x = ISLAND_SPAWN.x;
             playerPos.z = ISLAND_SPAWN.z;
             playerPos.rotY = ISLAND_SPAWN.rotY;
+          } else if (z === 'arcade') {
+            playerPos.x = 0;
+            playerPos.z = 5.0;
+            playerPos.rotY = Math.PI;
           } else {
             playerPos.x = 0;
             playerPos.z = 2.6;
@@ -3571,7 +3683,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         showBubble('Đã lên bến gỗ Khu Sinh Thái!');
       }
     };
-    disembarkBoatActionRef.current = () => disembarkBoat(true);
 
     const climbTreehouseLadder = (direction: 'up' | 'down', postAction?: () => void) => {
       if (stateRef.current.zone !== 'island' || treehouseState.climbing) return;
@@ -3697,6 +3808,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     jumpActionRef.current = () => {
       if (
+        stateRef.current.ownedMounts.activeMountId !== null ||
         boatState.active ||
         parachuteCtrl.active ||
         swimState.active ||
@@ -4213,14 +4325,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           const kind = data.kind as string;
 
           if (kind === 'player') {
-            soundFX.sparkle();
-            const s = stateRef.current.stats;
-            showBubble(
-              `${s.coins} Xu · Năng lượng ${s.energy}% · Độ no ${Math.round(s.hunger ?? 100)}% · Vui vẻ ${s.mood}%`,
-              playerPos.x,
-              playerRig.root.position.y + 2.05,
-              playerPos.z,
-            );
+            soundFX.tap();
+            setActionsTrayOpen((prev) => !prev);
             return;
           }
 
@@ -4590,35 +4696,33 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'well') {
             soundFX.tap();
-            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              const res = callbacksRef.current.onCollectWellWater();
-              soundFX.splash();
-              if (res.gained > 0) {
-                showBubble(
-                  `Thu +${res.gained} nước từ giếng! (${res.waterCan}/${WELL_WATER_MAX})`,
-                  data.tx as number,
-                  2.0,
-                  data.tz as number,
-                );
-              } else if (res.waterCan >= WELL_WATER_MAX) {
-                showBubble(
-                  `Bình tưới đã đầy (${WELL_WATER_MAX}/${WELL_WATER_MAX})!`,
-                  data.tx as number,
-                  2.0,
-                  data.tz as number,
-                );
-              } else {
-                const m = Math.floor(res.nextDropSec / 60);
-                const s = res.nextDropSec % 60;
-                const waitStr = m > 0 ? `${m}p${s}s` : `${s}s`;
-                showBubble(
-                  `Giếng đang tích nước (còn ${waitStr} · Bình ${res.waterCan}/${WELL_WATER_MAX})`,
-                  data.tx as number,
-                  2.0,
-                  data.tz as number,
-                );
-              }
-            });
+            const res = callbacksRef.current.onCollectWellWater();
+            soundFX.splash();
+            if (res.gained > 0) {
+              showBubble(
+                `Thu +${res.gained} nước từ giếng! (${res.waterCan}/${WELL_WATER_MAX})`,
+                data.tx as number,
+                2.0,
+                data.tz as number,
+              );
+            } else if (res.waterCan >= WELL_WATER_MAX) {
+              showBubble(
+                `Bình tưới đã đầy (${WELL_WATER_MAX}/${WELL_WATER_MAX})!`,
+                data.tx as number,
+                2.0,
+                data.tz as number,
+              );
+            } else {
+              const m = Math.floor(res.nextDropSec / 60);
+              const s = res.nextDropSec % 60;
+              const waitStr = m > 0 ? `${m}p${s}s` : `${s}s`;
+              showBubble(
+                `Giếng đang tích nước (còn ${waitStr} · Bình ${res.waterCan}/${WELL_WATER_MAX})`,
+                data.tx as number,
+                2.0,
+                data.tz as number,
+              );
+            }
             return;
           }
 
@@ -4634,21 +4738,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             if (targetPlot && targetPlot.stage === 'ready' && !targetPlot.hasPest) {
               selectedPlotRef.current = null;
               setArcMenuPos(null);
-              const doHarvest = () => {
-                const harvested = callbacksRef.current.onHarvestPlot(plotId);
-                if (harvested) {
-                  soundFX.sparkle();
-                  showBubble('Thu hoạch +2 nông sản!', tx, 2.0, tz);
-                } else {
-                  soundFX.tap();
-                  showBubble('Nhà kho đã đầy! Bán bớt hoặc nâng cấp kho', tx, 2.0, tz);
-                }
-              };
-              const distNow = Math.hypot(playerPos.x - tx, playerPos.z - tz);
-              if (distNow < 0.85) {
-                doHarvest();
+              const harvested = callbacksRef.current.onHarvestPlot(plotId);
+              if (harvested) {
+                soundFX.sparkle();
+                showBubble('Thu hoạch +2 nông sản!', tx, 2.0, tz);
               } else {
-                startWalkTo(tx, tz, 'idle', undefined, doHarvest);
+                soundFX.tap();
+                showBubble('Nhà kho đã đầy! Bán bớt hoặc nâng cấp kho', tx, 2.0, tz);
               }
               return;
             }
@@ -4668,55 +4764,38 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 x: Math.max(padX, Math.min(cw - padX, rawX)),
                 y: Math.max(minY, Math.min(ch - 60, rawY)),
               });
-              // Auto-walk to plot in background without blocking the radial menu
-              startWalkTo(tx, tz, 'idle');
             }
             return;
           }
 
           if (kind === 'farm_mill') {
-            soundFX.tap();
-            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              soundFX.sparkle();
-              callbacksRef.current.onOpenWorkshop('mill');
-            });
+            soundFX.sparkle();
+            callbacksRef.current.onOpenWorkshop('mill');
             return;
           }
 
           if (kind === 'farm_kitchen') {
-            soundFX.tap();
-            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              soundFX.sparkle();
-              callbacksRef.current.onOpenWorkshop('kitchen');
-            });
+            soundFX.sparkle();
+            callbacksRef.current.onOpenWorkshop('kitchen');
             return;
           }
 
           if (kind === 'order_board') {
-            soundFX.tap();
-            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              soundFX.sparkle();
-              callbacksRef.current.onOpenOrders();
-            });
+            soundFX.sparkle();
+            callbacksRef.current.onOpenOrders();
             return;
           }
 
           if (kind === 'farm_storage') {
-            soundFX.tap();
-            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              soundFX.sparkle();
-              callbacksRef.current.onOpenStorage();
-            });
+            soundFX.sparkle();
+            callbacksRef.current.onOpenStorage();
             return;
           }
 
           if (kind === 'pasture_spot') {
-            soundFX.tap();
             const targetCoop = data.coop as CoopKind | undefined;
-            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              soundFX.sparkle();
-              callbacksRef.current.onOpenPasture(targetCoop);
-            });
+            soundFX.sparkle();
+            callbacksRef.current.onOpenPasture(targetCoop);
             return;
           }
 
@@ -4726,19 +4805,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               handleSpotFishing(15.2, 3.0, Math.PI / 2);
               return;
             }
-            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              soundFX.splash();
-              callbacksRef.current.onOpenPond();
-            });
+            soundFX.splash();
+            callbacksRef.current.onOpenPond();
             return;
           }
 
           if (kind === 'farm_shop') {
-            soundFX.tap();
-            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              soundFX.sparkle();
-              callbacksRef.current.onOpenFarmShop();
-            });
+            soundFX.sparkle();
+            callbacksRef.current.onOpenFarmShop();
             return;
           }
 
@@ -4865,6 +4939,38 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
+          if (kind === 'arcade_blindbox_hddoll') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenArcadeHub?.('blindbox');
+            });
+            return;
+          }
+
+          if (kind === 'arcade_exchange_kiosk') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenArcadeHub?.('exchange');
+            });
+            return;
+          }
+
+          if (
+            kind === 'arcade_pc_station' ||
+            kind === 'arcade_racing_pod' ||
+            kind === 'arcade_dance_pad'
+          ) {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onBoostMood();
+              callbacksRef.current.onOpenArcadeHub?.('games');
+            });
+            return;
+          }
+
           if (kind === 'house_door') {
             const doorId = data.doorId as string;
             const door = activeDoorsRef.current.find((d) => d.id === doorId);
@@ -4957,8 +5063,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (kind === 'npc_joyboy') {
             soundFX.tap();
             if (boatState.active) {
-              showBubble('Hãy bấm "Lên bờ" trước khi nhận việc từ Joyboy!');
-              return;
+              disembarkBoat(false);
             }
             if (stateRef.current.zone === 'town' && mallElev.state === 'deck') {
               showBubble('Hãy xuống khỏi sân thượng May Mall để gặp Joyboy!');
@@ -4987,11 +5092,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           }
 
           if (kind === 'open_farm_decor_shop') {
-            soundFX.tap();
-            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              soundFX.sparkle();
-              callbacksRef.current.onOpenFarmDecorShop();
-            });
+            soundFX.sparkle();
+            callbacksRef.current.onOpenFarmDecorShop();
             return;
           }
 
@@ -5071,8 +5173,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (kind === 'ship_shop') {
             soundFX.tap();
             if (boatState.active) {
-              showBubble('Hãy bấm "Lên bờ" trước khi ghé Sạp Thuyền của Ship!');
-              return;
+              disembarkBoat(false);
             }
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
@@ -5319,7 +5420,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (boatState.active) {
             const curBoatName = BOAT_CATALOG[stateRef.current.boats.activeBoatId]?.name ?? 'Thuyền';
             soundFX.tap();
-            showBubble(`Đang trên ${curBoatName}! Chạm mặt nước để chèo/câu hoặc bấm "Lên bờ".`);
+            showBubble(`Đang trên ${curBoatName}! Chạm bờ hoặc bến gỗ để lên bờ.`);
             return;
           }
 
@@ -5586,9 +5687,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
           if (kind === 'balloon_to_town') {
             soundFX.tap();
+            if (boatState.active) {
+              disembarkBoat(false);
+            }
             if (swimState.active) {
-              showBubble('Hãy lên bờ trước khi lên Khinh Khí Cầu Về Mây!');
-              return;
+              exitIslandSwim(false);
             }
             ensureOnIslandGroundThen(() =>
               startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
@@ -5867,16 +5970,29 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         }
       }
 
-      if (boatState.active) {
-        soundFX.tap();
-        showBubble('Đang chèo Thuyền Gỗ! Chạm mặt nước để di chuyển/câu hoặc bấm "Lên bờ".');
-        return;
-      }
-
       // 2. Tap on walkable ground or hill -> smart A* route around obstacles cleanly
       if (currentGrounds.length > 0) {
         const groundHits = raycaster.intersectObjects(currentGrounds, false);
         if (groundHits.length > 0) {
+          if (boatState.active) {
+            const hitPt = groundHits[0].point;
+            const curZoneBoat = stateRef.current.zone;
+            const onDryShore =
+              curZoneBoat === 'island'
+                ? getIslandGroundHeight(hitPt.x, hitPt.z) >= ISLAND_WATER_Y - 0.04
+                : getTownGroundHeight(hitPt.x, hitPt.z, currentPlazaRadius) >= RIVER_WATER_Y + 0.02;
+            if (!onDryShore) {
+              const dest =
+                curZoneBoat === 'island'
+                  ? clampIslandBoatPoint(hitPt.x, hitPt.z)
+                  : clampRiverBoatPoint(hitPt.x, hitPt.z);
+              boatState.targetX = dest.x;
+              boatState.targetZ = dest.z;
+              soundFX.tap();
+              return;
+            }
+            disembarkBoat(false);
+          }
           playPetTimer = 0;
           if (fishCtrl.phase !== 'idle') {
             resetFishing(true);
@@ -5916,7 +6032,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (!groundHit) return;
           const pt = groundHit.point;
           if (stateRef.current.zone === 'island' && swimState.active) {
-            // If player is swimming and taps near shallow beach/pier, swim toward shore to climb up
+            // Swim toward shore or beach point; touching shallow beach automatically exits swim
             const clampedSwim = clampSwimOceanPoint(pt.x, pt.z);
             swimState.targetX = clampedSwim.x;
             swimState.targetZ = clampedSwim.z;
@@ -6135,20 +6251,23 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const isIndoor =
         z === 'home' || z === 'boutique' || z === 'arcade' || z === 'petshop' || z === 'mall';
       const isHomeDark = z === 'home' && !houseLightsOnRef.current;
+      const isArcade = z === 'arcade';
       const targetBg = isHomeDark
         ? 0x0c1324
-        : tod === 'night'
-          ? isIndoor
-            ? 0x161c30
-            : 0x101e38
-          : 0xb2ddf2;
+        : isArcade
+          ? 0x0e1326
+          : tod === 'night'
+            ? isIndoor
+              ? 0x161c30
+              : 0x101e38
+            : 0xb2ddf2;
       _bgColorTarget.setHex(targetBg);
       (scene.background as THREE.Color).lerp(_bgColorTarget, 0.08);
       if (scene.fog instanceof THREE.FogExp2) {
         scene.fog.color.copy(scene.background as THREE.Color);
         scene.fog.density = THREE.MathUtils.damp(
           scene.fog.density,
-          (tod === 'night' && !isIndoor) || isHomeDark ? 0.0025 : 0.0021,
+          (tod === 'night' && !isIndoor) || isHomeDark ? 0.0025 : isArcade ? 0.0014 : 0.0021,
           5,
           delta,
         );
@@ -6157,17 +6276,19 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         scene.environmentIntensity,
         isHomeDark
           ? 0.08
-          : tod === 'night'
-            ? isIndoor
-              ? 0.28
-              : 0.16
-            : 0.42,
+          : isArcade
+            ? 0.36
+            : tod === 'night'
+              ? isIndoor
+                ? 0.28
+                : 0.16
+              : 0.42,
         5,
         delta,
       );
       renderer.toneMappingExposure = THREE.MathUtils.damp(
         renderer.toneMappingExposure,
-        isHomeDark ? 0.78 : tod === 'night' ? 0.88 : 0.96,
+        isHomeDark ? 0.78 : isArcade ? 0.94 : tod === 'night' ? 0.88 : 0.96,
         5,
         delta,
       );
@@ -6175,53 +6296,61 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         sunLight.intensity,
         isHomeDark
           ? 0.2
-          : tod === 'night'
-            ? isIndoor
-              ? 0.65
-              : 0.52
-            : 1.22,
+          : isArcade
+            ? 0.88
+            : tod === 'night'
+              ? isIndoor
+                ? 0.65
+                : 0.52
+              : 1.22,
         5,
         delta,
       );
       _sunColorTarget.set(
         isHomeDark
           ? '#7B96D4'
-          : tod === 'night'
-            ? isIndoor
-              ? '#CBD8F5'
-              : '#BFD6FF'
-            : '#FFF2D8',
+          : isArcade
+            ? '#E6F0FF'
+            : tod === 'night'
+              ? isIndoor
+                ? '#CBD8F5'
+                : '#BFD6FF'
+              : '#FFF2D8',
       );
       sunLight.color.lerp(_sunColorTarget, 0.08);
       hemiLight.intensity = THREE.MathUtils.damp(
         hemiLight.intensity,
-        isHomeDark ? 0.16 : tod === 'night' ? 0.38 : 0.58,
+        isHomeDark ? 0.16 : isArcade ? 0.52 : tod === 'night' ? 0.38 : 0.58,
         5,
         delta,
       );
       _hemiSkyTarget.set(
         isHomeDark
           ? '#3F568D'
-          : tod === 'night'
-            ? isIndoor
-              ? '#7A90BF'
-              : '#5478B8'
-            : '#DCEFFF',
+          : isArcade
+            ? '#9BC4FF'
+            : tod === 'night'
+              ? isIndoor
+                ? '#7A90BF'
+                : '#5478B8'
+              : '#DCEFFF',
       );
       _hemiGroundTarget.set(
         isHomeDark
           ? '#1E2334'
-          : tod === 'night'
-            ? isIndoor
-              ? '#3F3A36'
-              : '#223B3E'
-            : '#6A8C58',
+          : isArcade
+            ? '#232B4D'
+            : tod === 'night'
+              ? isIndoor
+                ? '#3F3A36'
+                : '#223B3E'
+              : '#6A8C58',
       );
       hemiLight.color.lerp(_hemiSkyTarget, 0.08);
       hemiLight.groundColor.lerp(_hemiGroundTarget, 0.08);
       rimLight.intensity = THREE.MathUtils.damp(
         rimLight.intensity,
-        isHomeDark ? 0.14 : tod === 'night' ? 0.26 : 0.42,
+        isHomeDark ? 0.14 : isArcade ? 0.44 : tod === 'night' ? 0.26 : 0.42,
         5,
         delta,
       );
@@ -7104,6 +7233,35 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               }
             }
           }
+        }
+
+        if (happyActionTimer > 0) {
+          if (
+            stateRef.current.ownedMounts.activeMountId !== null ||
+            isAirborne ||
+            isRidingMallElevator ||
+            isRidingEscalator ||
+            isClimbingLadder ||
+            isSlidingMall ||
+            parachuteCtrl.active ||
+            boatState.active ||
+            swimState.active ||
+            fishCtrl.phase !== 'idle' ||
+            netSwingCtrl.active ||
+            activeTarget ||
+            activeSeat ||
+            joyMag > 0.08
+          ) {
+            happyActionTimer = 0;
+            if (!isAirborne && !activeTarget && !activeSeat && playerPos.pose === 'happy_jump') {
+              playerPos.pose = 'idle';
+            }
+          } else {
+            happyActionTimer = Math.max(0, happyActionTimer - delta);
+            playerPos.pose = happyActionTimer > 0 ? 'happy_jump' : 'idle';
+          }
+        } else if (playerPos.pose === 'happy_jump' && !isAirborne && !activeTarget) {
+          playerPos.pose = 'idle';
         }
 
         if (playPetTimer > 0) {
@@ -8465,16 +8623,16 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 continue;
               }
             }
-            if (z === 'mall') {
-              // Strict close-proximity nameplate for NPC Tun, Barista Mây & Peppa ("lại thật gần mới hiện tên")
-              if (a.id === 'npc_tun' || a.id === 'npc_barista' || a.id === 'npc_peppa') {
-                if (
-                  mallState.floor !== 1 ||
-                  mallState.ridingLane !== null ||
-                  Math.hypot(playerPos.x - a.worldPos.x, playerPos.z - a.worldPos.z) > 3.1
-                ) {
-                  continue;
-                }
+            const isNpcAnchor = Boolean(
+              a.isNpc || a.id.startsWith('npc_') || a.id.endsWith('_npc'),
+            );
+            if (isNpcAnchor) {
+              const maxNpcDist = a.maxLabelDist ?? 3.6;
+              if (
+                (z === 'mall' && (mallState.floor !== 1 || mallState.ridingLane !== null)) ||
+                Math.hypot(playerPos.x - a.worldPos.x, playerPos.z - a.worldPos.z) > maxNpcDist
+              ) {
+                continue;
               }
             }
             _projVec.copy(a.worldPos).project(camera);
@@ -8553,6 +8711,68 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         } else if (nearbyLampKeyRef.current !== '') {
           nearbyLampKeyRef.current = '';
           setNearbyLamp(null);
+        }
+
+        if (z === 'home') {
+          let closestApp: {
+            id: string;
+            kind: 'microwave' | 'mini_oven' | 'kitchen_counter';
+            name: string;
+          } | null = null;
+          let bestAppD = 2.45;
+          for (const pf of stateRef.current.placedFurniture) {
+            const cat = FURNITURE_BY_ID[pf.catalogId];
+            if (!cat) continue;
+            if (cat.interactive === 'microwave' || cat.interactive === 'mini_oven') {
+              const d = Math.hypot(playerPos.x - pf.x, playerPos.z - pf.z);
+              if (d < bestAppD) {
+                bestAppD = d;
+                closestApp = {
+                  id: pf.instanceId,
+                  kind: cat.interactive,
+                  name: cat.kind === 'microwave' ? 'Lò Vi Sóng' : 'Lò Nướng Mini',
+                };
+              }
+            }
+          }
+          if (!closestApp) {
+            let bestCounterD = 1.65;
+            for (const pf of stateRef.current.placedFurniture) {
+              const cat = FURNITURE_BY_ID[pf.catalogId];
+              if (!cat || cat.kind !== 'kitchen_l_counter') continue;
+              const cos = Math.cos(pf.rotY);
+              const sin = Math.sin(pf.rotY);
+              const dx = playerPos.x - pf.x;
+              const dz = playerPos.z - pf.z;
+              const lx = dx * cos - dz * sin;
+              const lz = dx * sin + dz * cos;
+              const dBack = Math.hypot(
+                lx - THREE.MathUtils.clamp(lx, -1.85, 1.79),
+                lz - THREE.MathUtils.clamp(lz, -2.25, -1.13),
+              );
+              const dRight = Math.hypot(
+                lx - THREE.MathUtils.clamp(lx, 0.71, 1.83),
+                lz - THREE.MathUtils.clamp(lz, -1.27, 3.17),
+              );
+              const dCounter = Math.min(dBack, dRight);
+              if (dCounter < bestCounterD) {
+                bestCounterD = dCounter;
+                closestApp = {
+                  id: pf.instanceId,
+                  kind: 'kitchen_counter',
+                  name: 'Bếp Nấu',
+                };
+              }
+            }
+          }
+          const nextAppKey = closestApp ? `${closestApp.id}:${closestApp.kind}` : '';
+          if (nextAppKey !== nearbyApplianceKeyRef.current) {
+            nearbyApplianceKeyRef.current = nextAppKey;
+            setNearbyAppliance(closestApp);
+          }
+        } else if (nearbyApplianceKeyRef.current !== '') {
+          nearbyApplianceKeyRef.current = '';
+          setNearbyAppliance(null);
         }
 
         const isNearPondNow =
@@ -8673,7 +8893,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     if (next >= 5) {
       setMiniActive(false);
       onAddCoins(15);
-      showBubble('Phá đảo Bắt Sao! +15 Xu', -1.95, 2.1, -1.35);
+      showBubble('Phá đảo Bắt Sao! +15 Xu', 4.4, 2.1, 0.7);
     } else {
       setMiniScore(next);
       setStarPos({x: 20 + Math.random() * 60, y: 20 + Math.random() * 60});
@@ -8714,6 +8934,40 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     nearbyLampKeyRef.current = `${nearbyLamp.id}:${nextOn}`;
     setNearbyLamp({...nearbyLamp, isOn: nextOn});
     showBubble(nextOn ? `Đã bật ${nearbyLamp.name}!` : `Đã tắt ${nearbyLamp.name}.`);
+  };
+
+  const handleOpenNearbyAppliance = () => {
+    if (!nearbyAppliance) return;
+    if (nearbyAppliance.kind === 'microwave') {
+      soundFX.sparkle();
+      callbacksRef.current.onOpenMicrowave();
+      return;
+    }
+    if (nearbyAppliance.kind === 'mini_oven') {
+      soundFX.sparkle();
+      callbacksRef.current.onOpenMiniOven();
+      return;
+    }
+    const placedMicro = stateRef.current.placedFurniture.find(
+      (pf) => FURNITURE_BY_ID[pf.catalogId]?.interactive === 'microwave',
+    );
+    if (placedMicro) {
+      soundFX.sparkle();
+      callbacksRef.current.onOpenMicrowave();
+      return;
+    }
+    const placedOven = stateRef.current.placedFurniture.find(
+      (pf) => FURNITURE_BY_ID[pf.catalogId]?.interactive === 'mini_oven',
+    );
+    if (placedOven) {
+      soundFX.sparkle();
+      callbacksRef.current.onOpenMiniOven();
+      return;
+    }
+    soundFX.tap();
+    showBubble(
+      'Bếp chưa có Lò Vi Sóng / Lò Nướng Mini! Hãy mua tại Tiệm Nội Thất (Thị Trấn) rồi mở Tủ Nội Thất đặt lên bàn bếp để nấu nguyên liệu Peppa nhé.',
+    );
   };
 
   const selectedPlacedItem =
@@ -8892,22 +9146,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {/* Wooden Rowboat Disembark HUD while rowing on the West River or Island Sea */}
-      {(zone === 'town' || zone === 'island') && isBoatingHud && !miniActive && (
-        <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              disembarkBoatActionRef.current?.();
-            }}
-            className="anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 border-[#78421B] bg-[#FFF5E2]/95 px-4 py-2 text-xs font-extrabold text-[#4E2D12] shadow-lg transition-transform hover:scale-105 active:scale-95"
-          >
-            <Anchor className="h-4 w-4 text-[#2E82A8]" />
-            <span>Lên bờ</span>
-          </button>
-        </div>
-      )}
-
       {/* Parachute Glide Status HUD Banner */}
       {zone === 'town' && isParachutingHud && !miniActive && (
         <div className="phone-ui pointer-events-none absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
@@ -8950,26 +9188,18 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {/* Island Boat Pier Swim Toggle / Ocean Disembark HUD */}
-      {zone === 'island' && (isSwimmingHud || (nearIslandPier && !isBoatingHud)) && !miniActive && (
+      {/* Island Boat Pier Swim Entry HUD */}
+      {zone === 'island' && nearIslandPier && !isSwimmingHud && !isBoatingHud && !miniActive && (
         <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 justify-center">
           <button
             type="button"
             onClick={() => {
               toggleIslandSwimActionRef.current?.();
             }}
-            className={`anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 px-5 py-2 text-xs font-extrabold shadow-lg transition-transform hover:scale-105 active:scale-95 ${
-              isSwimmingHud
-                ? 'border-[#78421B] bg-[#FFF5E2]/95 text-[#4E2D12]'
-                : 'border-[#1E82A8] bg-[#E5F8FF]/95 text-[#124A63]'
-            }`}
+            className="anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 border-[#1E82A8] bg-[#E5F8FF]/95 px-5 py-2 text-xs font-extrabold text-[#124A63] shadow-lg transition-transform hover:scale-105 active:scale-95"
           >
-            {isSwimmingHud ? (
-              <Anchor className="h-4 w-4 text-[#2E82A8]" />
-            ) : (
-              <Waves className="h-4 w-4 text-[#1E82A8]" />
-            )}
-            <span>{isSwimmingHud ? 'Lên bờ' : 'Bơi Biển'}</span>
+            <Waves className="h-4 w-4 text-[#1E82A8]" />
+            <span>Bơi Biển</span>
           </button>
         </div>
       )}
@@ -9297,9 +9527,50 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {/* Proximity Door & Lamp Controls inside House */}
-      {zone === 'home' && !editFurnitureMode && (nearbyDoor || nearbyLamp) && (
-        <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
+      {/* Compact Top-Right CoinGame & HDDOLL Quick Hub inside Arcade */}
+      {zone === 'arcade' && !miniActive && (
+        <button
+          type="button"
+          onClick={() => {
+            soundFX.tap();
+            onOpenArcadeHub?.('overview');
+          }}
+          className="phone-ui absolute top-2.5 right-2.5 z-30 flex items-center gap-2.5 rounded-2xl border-2 border-[#38BDF8]/75 bg-[#0F172A]/95 px-3 py-1.5 text-xs font-black text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+        >
+          <span className="flex items-center gap-1 tabular-nums text-[#38BDF8]">
+            <Gamepad2 className="h-4 w-4" />
+            <span>{stats.coinGame ?? 0} CoinGame</span>
+          </span>
+          <span className="h-3.5 w-[1px] bg-white/20" />
+          <span className="flex items-center gap-1 tabular-nums text-[#FBBF24]">
+            <Coins className="h-3.5 w-3.5" />
+            <span>{stats.coins} Xu</span>
+          </span>
+        </button>
+      )}
+
+      {/* Proximity Door, Lamp & Kitchen Appliance Controls inside House */}
+      {zone === 'home' && !editFurnitureMode && (nearbyDoor || nearbyLamp || nearbyAppliance) && (
+        <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
+          {nearbyAppliance && (
+            <button
+              type="button"
+              onClick={handleOpenNearbyAppliance}
+              className="anim-pop flex min-h-[42px] items-center gap-2 rounded-2xl border-2 border-[#C8642E] bg-[#FFF2E5] px-4 py-2 text-xs font-extrabold text-[#6E2D12] shadow-lg transition-transform hover:scale-105 active:scale-95"
+            >
+              {nearbyAppliance.kind === 'mini_oven' ? (
+                <Flame className="h-4 w-4 text-[#D97736]" />
+              ) : (
+                <ChefHat className="h-4 w-4 text-[#3D8BAE]" />
+              )}
+              <span>
+                {nearbyAppliance.kind === 'kitchen_counter'
+                  ? 'Nấu ăn'
+                  : `Nấu ăn · ${nearbyAppliance.name}`}
+              </span>
+            </button>
+          )}
+
           {nearbyLamp && (
             <button
               type="button"
@@ -9930,6 +10201,76 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
+      {/* Self-Click 8-Slot Hành động Tray (bấm vào nhân vật để bật/tắt) */}
+      {actionsTrayOpen && !miniActive && !isEditingAny && !isParachutingHud && (
+        <div
+          className={`phone-ui anim-pop absolute left-1/2 z-30 w-[min(92vw,312px)] -translate-x-1/2 rounded-2xl border-2 border-[#3C3128] bg-[#FFF8EB] p-2.5 shadow-xl ${
+            isBoatingHud ||
+            isSwimmingHud ||
+            nearTownBalloon ||
+            nearIslandBalloon ||
+            nearIslandPier ||
+            mallElevatorHud !== 'none'
+              ? 'bottom-[74px]'
+              : 'bottom-5'
+          }`}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-xs font-black text-[#4A3525]">
+              <Smile className="h-4 w-4 text-[#DF7A20]" strokeWidth={2.3} />
+              <span>Hành động</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                soundFX.tap();
+                setActionsTrayOpen(false);
+              }}
+              aria-label="Đóng bảng hành động"
+              className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#EFE0C9] text-[#5B422E] hover:bg-[#E5CEAE] active:scale-95"
+            >
+              <X className="h-3.5 w-3.5" strokeWidth={2.6} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-4 gap-1.5">
+            {Array.from({length: PLAYER_ACTION_SLOT_COUNT}, (_, idx) => {
+              const slotActionId = equippedActionSlots[idx] ?? null;
+              const def = slotActionId ? PLAYER_ACTION_CATALOG[slotActionId] : null;
+              if (!def || !slotActionId) {
+                return (
+                  <div
+                    key={idx}
+                    className="flex min-h-[48px] flex-col items-center justify-center rounded-xl border border-dashed border-[#D8C3A8] bg-[#F7EEE0] px-1 py-1 text-center"
+                  >
+                    <span className="text-[9px] font-bold text-[#B39C84]">Ô {idx + 1}</span>
+                    <span className="text-[10px] font-bold text-[#B39C84]">Trống</span>
+                  </div>
+                );
+              }
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => triggerPlayerActionRef.current?.(slotActionId)}
+                  className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-xl border border-[#E5B87B] bg-[#FFF2DC] px-1 py-1 text-[#5A3210] shadow-xs transition-transform hover:scale-[1.03] active:scale-95"
+                >
+                  <Smile
+                    className="h-4 w-4 shrink-0"
+                    style={{color: def.accentColor}}
+                    strokeWidth={2.3}
+                  />
+                  <span className="line-clamp-1 text-[10px] font-black leading-tight">
+                    {def.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Fixed Dynamic Touch Joystick (Bottom-Left) — always enabled */}
       {!miniActive && !isEditingAny && (
         <div
@@ -10083,8 +10424,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           </button>
         )}
 
-      {/* Fixed Right-Side Jump Button — fades slightly after 5s idle while remaining clickable */}
-      {!miniActive && !isParachutingHud && !isEditingAny && (
+      {/* Fixed Right-Side Jump Button — hidden while riding mounts; fades slightly after 5s idle while remaining clickable */}
+      {!miniActive && !isParachutingHud && !isEditingAny && ownedMounts.activeMountId === null && (
         <button
           type="button"
           onPointerDown={(e) => {

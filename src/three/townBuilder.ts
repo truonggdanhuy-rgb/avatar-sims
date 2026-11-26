@@ -310,6 +310,8 @@ export interface TownAnchor {
   id: string;
   label: string;
   worldPos: THREE.Vector3;
+  isNpc?: boolean;
+  maxLabelDist?: number;
 }
 
 export type WorldCollider =
@@ -4342,6 +4344,13 @@ export function buildTownScene(): TownWorld {
 
     mergeStaticGroupByMaterial(stall, koiRig ? new Set([koiRig.root]) : undefined);
     group.add(stall);
+    labelAnchors.push({
+      id: 'npc_koi',
+      label: 'Koi',
+      worldPos: new THREE.Vector3(-16.8, 2.28, 37.3),
+      isNpc: true,
+      maxLabelDist: 3.6,
+    });
   }
 
   // ========== DISTRICT 6: TRẠM BƯU ĐIỆN & ĐỒNG HỒ (Enlarged Broad Belfry Clock Tower Aligned with Arcade) ==========
@@ -7239,6 +7248,13 @@ export function buildTownScene(): TownWorld {
 
       mergeStaticGroupByMaterial(stall, new Set([shipRig.root]));
       eco.add(stall);
+      labelAnchors.push({
+        id: 'npc_ship',
+        label: 'Ship',
+        worldPos: new THREE.Vector3(SHIP_STALL_POS.x + 0.05, 2.45, SHIP_STALL_POS.z - 0.28),
+        isNpc: true,
+        maxLabelDist: 4.6,
+      });
     }
 
     // 7. Static Fairy-Tale Instanced Eco-Decor (Mossy Rocks, River Grasses, Purple Water Hyacinths & Meadow Flora)
@@ -10904,6 +10920,8 @@ export function buildTownScene(): TownWorld {
     id: 'npc_joyboy',
     label: 'Joyboy · Giao Hàng',
     worldPos: new THREE.Vector3(joyboyState.x, 2.45, joyboyState.z),
+    isNpc: true,
+    maxLabelDist: 3.6,
   };
   labelAnchors.push(joyboyAnchor);
 

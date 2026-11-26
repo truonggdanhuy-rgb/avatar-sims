@@ -1100,9 +1100,17 @@ export function buildSubzoneScene(
             ? 0.22
             : cat.kind === 'armchair'
               ? 0.21
-              : cat.kind === 'tet_chair' || cat.kind === 'beanbag_chair' || cat.kind === 'terrace_swing_egg'
-                ? 0.08
-                : 0.11;
+              : cat.kind === 'beanbag_chair'
+                ? 0.12
+                : cat.kind === 'terrace_swing_egg'
+                  ? 0.1
+                  : cat.kind === 'vampire_coffin_sofa'
+                    ? 0.08
+                    : cat.kind === 'stool_pompompurin'
+                      ? 0.04
+                      : cat.kind === 'tet_chair'
+                        ? 0.08
+                        : 0.11;
         const seatPos = toWorld(0, seatLocalZ);
         const seatTopY = posY + (cat.surfaceHeight ?? 0.52);
         proxyData = {
@@ -1457,10 +1465,10 @@ export function buildSubzoneScene(
       const scale = 0.88 + (i % 3) * 0.14;
       stepStoneSpots.push([sx, pz, scale, (i * 0.55) % (Math.PI * 2)]);
     }
-    // East-west workshop cross-path stepping stones
-    for (let i = 0; i < 24; i++) {
+    // East-west workshop cross-path stepping stones extending cleanly to Bus Shop & Sạp Trang Trí
+    for (let i = 0; i < 29; i++) {
       const px = -12.6 + i * 1.22;
-      if (px > 15.2) break;
+      if (px > 20.6) break;
       if (Math.abs(px) < 1.15) continue;
       const sz = -4.8 + (i % 2 === 0 ? -0.36 : 0.36);
       const scale = 0.86 + ((i + 1) % 3) * 0.12;
@@ -3749,77 +3757,280 @@ export function buildSubzoneScene(
       });
     }
 
-    // === 9. SẠP TRANG TRÍ NÔNG TRẠI (13.4, 13.8) + ĐỒ TRANG TRÍ NÔNG TRẠI ĐÃ ĐẶT ===
+    // === 9. SẠP TRANG TRÍ NÔNG TRẠI (ĐẶT THẲNG HÀNG NGAY CẠNH XE BUS SHOP: 19.8, -8.4) ===
     {
-      const stallPos = {x: 13.4, z: 13.8};
+      const stallPos = {x: 19.8, z: -8.4};
       const stall = new THREE.Group();
       stall.position.set(stallPos.x, 0, stallPos.z);
-      stall.rotation.y = -0.32;
+      stall.rotation.y = 0;
 
-      const woodDark = clayMat('#7D4F2B', 0.78);
-      const woodWarm = clayMat('#C68D56', 0.7);
-      const mintMat = clayMat('#5CB689', 0.58);
-      const creamMat = clayMat('#FFF8EA', 0.65);
-
-      const deck = new THREE.Mesh(new RoundedBoxGeometry(3.4, 0.14, 2.2, 2, 0.04), woodWarm);
-      deck.position.y = 0.07;
-      const counter = new THREE.Mesh(new RoundedBoxGeometry(3.0, 0.92, 0.74, 2, 0.04), woodWarm);
-      counter.position.set(0, 0.54, 0.42);
-      const counterTop = new THREE.Mesh(new RoundedBoxGeometry(3.16, 0.1, 0.88, 2, 0.03), creamMat);
-      counterTop.position.set(0, 1.03, 0.42);
-      stall.add(deck, counter, counterTop);
-
-      [
-        [-1.38, -0.78],
-        [1.38, -0.78],
-        [-1.38, 0.76],
-        [1.38, 0.76],
-      ].forEach(([px, pz]) => {
-        const post = new THREE.Mesh(new RoundedBoxGeometry(0.14, 2.38, 0.14, 2, 0.03), woodDark);
-        post.position.set(px, 1.24, pz);
-        stall.add(post);
+      const woodDark = clayMat('#724626', 0.78);
+      const woodWarm = clayMat('#C68D56', 0.68);
+      const mintMat = clayMat('#52AF80', 0.54);
+      const mintDarkMat = clayMat('#3B8D63', 0.58);
+      const creamMat = clayMat('#FFF8EA', 0.62);
+      const stoneTrimMat = clayMat('#D8CEBC', 0.82);
+      const leafGreenMat = clayMat('#5AA85B', 0.68);
+      const terraMat = clayMat('#D67B52', 0.72);
+      const lanternGlowMat = new THREE.MeshStandardMaterial({
+        color: '#FFF1B8',
+        emissive: '#FFC95A',
+        emissiveIntensity: 0.62,
+        roughness: 0.35,
       });
 
+      // Stepped stone plinth & warm timber deck
+      const stoneBase = new THREE.Mesh(
+        new RoundedBoxGeometry(3.66, 0.12, 2.38, 2, 0.04),
+        stoneTrimMat,
+      );
+      stoneBase.position.y = 0.06;
+      const deck = new THREE.Mesh(
+        new RoundedBoxGeometry(3.46, 0.1, 2.18, 2, 0.03),
+        woodWarm,
+      );
+      deck.position.y = 0.16;
+
+      // Front boutique counter with slatted apron & cream stone counter top
+      const counter = new THREE.Mesh(
+        new RoundedBoxGeometry(2.96, 0.86, 0.72, 2, 0.04),
+        woodWarm,
+      );
+      counter.position.set(0, 0.64, 0.44);
+      for (let s = -4; s <= 4; s++) {
+        const slat = new THREE.Mesh(
+          new RoundedBoxGeometry(0.18, 0.66, 0.04, 1, 0.01),
+          s % 2 === 0 ? mintMat : creamMat,
+        );
+        slat.position.set(s * 0.3, 0.62, 0.8);
+        stall.add(slat);
+      }
+      const counterTop = new THREE.Mesh(
+        new RoundedBoxGeometry(3.16, 0.1, 0.88, 2, 0.03),
+        creamMat,
+      );
+      counterTop.position.set(0, 1.1, 0.44);
+
+      // Rear boutique display wall & dual wooden shelves
+      const backWall = new THREE.Mesh(
+        new RoundedBoxGeometry(2.94, 1.56, 0.12, 2, 0.03),
+        clayMat('#F5EAD4', 0.74),
+      );
+      backWall.position.set(0, 1.0, -0.78);
+      const shelfTop = new THREE.Mesh(
+        new RoundedBoxGeometry(2.62, 0.08, 0.34, 2, 0.02),
+        woodWarm,
+      );
+      shelfTop.position.set(0, 1.62, -0.58);
+      const shelfMid = new THREE.Mesh(
+        new RoundedBoxGeometry(2.62, 0.08, 0.34, 2, 0.02),
+        woodWarm,
+      );
+      shelfMid.position.set(0, 1.14, -0.58);
+      stall.add(stoneBase, deck, counter, counterTop, backWall, shelfTop, shelfMid);
+
+      // 4 carved corner timber posts + decorative diagonal eaves brackets
+      [
+        [-1.4, -0.78],
+        [1.4, -0.78],
+        [-1.4, 0.78],
+        [1.4, 0.78],
+      ].forEach(([px, pz]) => {
+        const post = new THREE.Mesh(
+          new RoundedBoxGeometry(0.15, 2.48, 0.15, 2, 0.03),
+          woodDark,
+        );
+        post.position.set(px, 1.38, pz);
+        const cap = new THREE.Mesh(
+          new RoundedBoxGeometry(0.21, 0.12, 0.21, 2, 0.02),
+          woodDark,
+        );
+        cap.position.set(px, 0.26, pz);
+        stall.add(post, cap);
+      });
+
+      // Striped pitched boutique canopy + scalloped front valance
       const roofGroup = new THREE.Group();
-      roofGroup.position.set(0, 2.48, 0);
+      roofGroup.position.set(0, 2.66, 0.04);
       roofGroup.rotation.x = 0.18;
-      for (let i = 0; i < 7; i++) {
-        const sw = 3.55 / 7;
+      for (let i = 0; i < 9; i++) {
+        const sw = 3.74 / 9;
         const stripe = new THREE.Mesh(
-          new RoundedBoxGeometry(sw - 0.015, 0.11, 2.15, 2, 0.03),
+          new RoundedBoxGeometry(sw - 0.015, 0.12, 2.34, 2, 0.03),
           i % 2 === 0 ? mintMat : creamMat,
         );
-        stripe.position.set(-3.55 / 2 + sw * (i + 0.5), 0, 0);
+        stripe.position.set(-3.74 / 2 + sw * (i + 0.5), 0, 0);
         roofGroup.add(stripe);
+      }
+      for (let i = 0; i < 9; i++) {
+        const sx = -1.66 + i * 0.415;
+        const scallop = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.21, 0.21, 0.08, 12),
+          i % 2 === 0 ? mintDarkMat : creamMat,
+        );
+        scallop.rotation.x = Math.PI / 2;
+        scallop.position.set(sx, 2.38, 1.15);
+        stall.add(scallop);
       }
       stall.add(roofGroup);
 
-      // Cute display flower pot & mini windmill crest on counter/roof
-      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.16, 0.24, 10), clayMat('#D67B52', 0.72));
-      pot.position.set(-0.85, 1.18, 0.44);
-      const blossom = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 7), glossyClayMat('#F7C53B', 0.35));
-      blossom.position.set(-0.85, 1.38, 0.44);
-      const signPlaque = new THREE.Mesh(new RoundedBoxGeometry(1.75, 0.42, 0.1, 2, 0.03), woodDark);
-      signPlaque.position.set(0, 2.86, 0.85);
-      const signFace = new THREE.Mesh(new RoundedBoxGeometry(1.56, 0.3, 0.12, 1, 0.02), creamMat);
-      signFace.position.set(0, 2.86, 0.86);
-      const miniBenchProp = new THREE.Mesh(new RoundedBoxGeometry(0.62, 0.24, 0.32, 2, 0.03), mintMat);
-      miniBenchProp.position.set(0.75, 1.18, 0.44);
-      stall.add(pot, blossom, signPlaque, signFace, miniBenchProp);
+      // Crisp Canvas-textured "SẠP TRANG TRÍ" wooden roof sign
+      const signCanvas = document.createElement('canvas');
+      signCanvas.width = 512;
+      signCanvas.height = 144;
+      const sCtx = signCanvas.getContext('2d');
+      if (sCtx) {
+        sCtx.fillStyle = '#FFF7E4';
+        sCtx.fillRect(0, 0, 512, 144);
+        sCtx.strokeStyle = '#52AF80';
+        sCtx.lineWidth = 10;
+        sCtx.strokeRect(10, 10, 492, 124);
+        sCtx.fillStyle = '#3B6E52';
+        sCtx.font = '800 48px "Quicksand", "Nunito", sans-serif';
+        sCtx.textAlign = 'center';
+        sCtx.textBaseline = 'middle';
+        sCtx.fillText('SẠP TRANG TRÍ', 256, 75);
+      }
+      const signTex = new THREE.CanvasTexture(signCanvas);
+      signTex.colorSpace = THREE.SRGBColorSpace;
+      signTex.anisotropy = 4;
+      signTex.userData = {sharedCache: true};
+      const signPlaque = new THREE.Mesh(
+        new RoundedBoxGeometry(2.14, 0.52, 0.12, 2, 0.03),
+        woodDark,
+      );
+      signPlaque.position.set(0, 2.98, 0.88);
+      const signFace = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.94, 0.4),
+        new THREE.MeshStandardMaterial({
+          map: signTex,
+          roughness: 0.48,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -1,
+        }),
+      );
+      signFace.position.set(0, 2.98, 0.944);
+      stall.add(signPlaque, signFace);
+
+      // Warm glowing fairy bulbs tucked cleanly under the front eaves
+      [-1.15, -0.58, 0, 0.58, 1.15].forEach((bx) => {
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), lanternGlowMat);
+        bulb.position.set(bx, 2.24, 1.05);
+        stall.add(bulb);
+      });
+
+      // Cute miniature garden decor displays on counter & shelves
+      // 1) Counter flower planter + blossoms
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.16, 0.24, 10), terraMat);
+      pot.position.set(-0.98, 1.27, 0.44);
+      const leaves = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), leafGreenMat);
+      leaves.scale.set(1.1, 0.65, 1.1);
+      leaves.position.set(-0.98, 1.41, 0.44);
+      [
+        [-0.98, 1.54, 0.44, '#F7C53B'],
+        [-1.08, 1.48, 0.5, '#F48FB1'],
+        [-0.88, 1.49, 0.48, '#FFFDF7'],
+      ].forEach(([fx, fy, fz, fcol]) => {
+        const flower = new THREE.Mesh(
+          new THREE.SphereGeometry(0.075, 8, 7),
+          glossyClayMat(fcol as string, 0.34),
+        );
+        flower.position.set(fx as number, fy as number, fz as number);
+        stall.add(flower);
+      });
+      // 2) Counter miniature bench & watering can
+      const miniBenchProp = new THREE.Mesh(
+        new RoundedBoxGeometry(0.64, 0.22, 0.34, 2, 0.03),
+        mintMat,
+      );
+      miniBenchProp.position.set(0.84, 1.26, 0.44);
+      const canBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.13, 0.22, 10),
+        glossyClayMat('#7EC8E3', 0.3),
+      );
+      canBody.position.set(-0.08, 1.26, 0.44);
+      const canSpout = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.032, 0.2, 8),
+        glossyClayMat('#7EC8E3', 0.3),
+      );
+      canSpout.position.set(0.06, 1.3, 0.44);
+      canSpout.rotation.z = -0.75;
+      stall.add(pot, leaves, miniBenchProp, canBody, canSpout);
+
+      // 3) Back shelf props (mini wooden birdhouse, windmill model, ceramic vases)
+      const birdHouse = new THREE.Mesh(
+        new RoundedBoxGeometry(0.34, 0.36, 0.24, 2, 0.03),
+        creamMat,
+      );
+      birdHouse.position.set(-0.82, 1.84, -0.56);
+      const birdRoof = new THREE.Mesh(
+        new THREE.ConeGeometry(0.28, 0.22, 4),
+        clayMat('#E87D64', 0.62),
+      );
+      birdRoof.rotation.y = Math.PI / 4;
+      birdRoof.position.set(-0.82, 2.08, -0.56);
+      const vase1 = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.09, 0.28, 10),
+        glossyClayMat('#F7B267', 0.36),
+      );
+      vase1.position.set(0, 1.8, -0.56);
+      const wreath = new THREE.Mesh(
+        new THREE.TorusGeometry(0.19, 0.055, 8, 18),
+        leafGreenMat,
+      );
+      wreath.position.set(0.76, 1.84, -0.52);
+      const lanternMid = new THREE.Mesh(
+        new RoundedBoxGeometry(0.22, 0.3, 0.22, 2, 0.03),
+        lanternGlowMat,
+      );
+      lanternMid.position.set(-0.55, 1.32, -0.56);
+      const pottedSucculent = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.1, 0.16, 10),
+        terraMat,
+      );
+      pottedSucculent.position.set(0.55, 1.26, -0.56);
+      const succTop = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.13, 0),
+        leafGreenMat,
+      );
+      succTop.position.set(0.55, 1.4, -0.56);
+      stall.add(birdHouse, birdRoof, vase1, wreath, lanternMid, pottedSucculent, succTop);
+
+      // Flanking front floral planter boxes
+      [-1.56, 1.56].forEach((px, pIdx) => {
+        const planterBox = new THREE.Mesh(
+          new RoundedBoxGeometry(0.46, 0.36, 0.66, 2, 0.03),
+          woodDark,
+        );
+        planterBox.position.set(px, 0.24, 0.72);
+        const bush = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), leafGreenMat);
+        bush.scale.set(1.0, 0.75, 1.35);
+        bush.position.set(px, 0.45, 0.72);
+        stall.add(planterBox, bush);
+        [-0.14, 0.14].forEach((fz, fIdx) => {
+          const bloom = new THREE.Mesh(
+            new THREE.SphereGeometry(0.085, 8, 7),
+            glossyClayMat((pIdx + fIdx) % 2 === 0 ? '#FF9EB5' : '#FFD166', 0.36),
+          );
+          bloom.position.set(px, 0.58, 0.72 + fz);
+          stall.add(bloom);
+        });
+      });
 
       staticGardenGroup.add(stall);
-      colliders.push({type: 'box', x: stallPos.x, z: stallPos.z, hw: 1.75, hd: 1.15, rotY: -0.32});
+      colliders.push({type: 'box', x: stallPos.x, z: stallPos.z, hw: 1.88, hd: 1.25});
       addBoxProxy(
         group,
-        [3.6, 2.8, 2.5],
-        [stallPos.x, 1.4, stallPos.z],
-        {kind: 'open_farm_decor_shop', tx: 12.2, tz: 16.1},
+        [3.9, 3.1, 2.6],
+        [stallPos.x, 1.5, stallPos.z],
+        {kind: 'open_farm_decor_shop', tx: 19.8, tz: -5.4},
         clickTargets,
       );
       labelAnchors.push({
         id: 'farm_decor_stall',
         label: 'Sạp Trang Trí',
-        worldPos: new THREE.Vector3(stallPos.x, 3.25, stallPos.z),
+        worldPos: new THREE.Vector3(stallPos.x, 3.45, stallPos.z),
       });
     }
 
@@ -4120,80 +4331,786 @@ export function buildSubzoneScene(
 
     group.add(createExitDoorway('Lối Về Phố', [0, 0, 4.45], '#E2C9A3', clickTargets, labelAnchors));
   } else if (zone === 'arcade') {
-    const checkerTex = createCheckerFloorTexture();
-    disposables.push(checkerTex);
+    const makeArcadeCanvasTex = (
+      width: number,
+      height: number,
+      draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void,
+    ) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) draw(ctx, width, height);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      disposables.push(tex);
+      return tex;
+    };
+
+    const floorTex = makeArcadeCanvasTex(512, 512, (ctx, w, h) => {
+      ctx.fillStyle = '#12172A';
+      ctx.fillRect(0, 0, w, h);
+      const cell = 64;
+      for (let gx = 0; gx < 8; gx++) {
+        for (let gy = 0; gy < 8; gy++) {
+          ctx.fillStyle = (gx + gy) % 2 === 0 ? '#161D33' : '#12172A';
+          ctx.fillRect(gx * cell + 2, gy * cell + 2, cell - 4, cell - 4);
+        }
+      }
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.22)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i <= 8; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * cell, 0);
+        ctx.lineTo(i * cell, h);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * cell);
+        ctx.lineTo(w, i * cell);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(167, 139, 250, 0.35)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(18, 18, w - 36, h - 36);
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, 110, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(46, 230, 214, 0.32)';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    });
+
+    const cyberBannerTex = makeArcadeCanvasTex(512, 128, (ctx, w, h) => {
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, '#0F172A');
+      grad.addColorStop(0.5, '#1E1B4B');
+      grad.addColorStop(1, '#0F172A');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#38BDF8';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(8, 8, w - 16, h - 16);
+      ctx.fillStyle = '#38BDF8';
+      ctx.font = '900 42px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('CYBER GAME ARENA', w / 2, h / 2 - 12);
+      ctx.fillStyle = '#FDE68A';
+      ctx.font = '800 20px system-ui, sans-serif';
+      ctx.fillText('COINGAME  ·  HDDOLL  ·  ESPORTS', w / 2, h / 2 + 28);
+    });
+
+    const blindboxBannerTex = makeArcadeCanvasTex(512, 160, (ctx, w, h) => {
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, '#311B4E');
+      grad.addColorStop(1, '#1A1B3A');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#FBBF24';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(8, 8, w - 16, h - 16);
+      ctx.fillStyle = '#FDE68A';
+      ctx.font = '900 44px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('HDDOLL BLINDBOX', w / 2, 58);
+      ctx.fillStyle = '#F9A8D4';
+      ctx.font = '900 26px system-ui, sans-serif';
+      ctx.fillText('COMING SOON', w / 2, 114);
+    });
+
+    const exchangeScreenTex = makeArcadeCanvasTex(512, 320, (ctx, w, h) => {
+      ctx.fillStyle = '#0B1328';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#38BDF8';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(10, 10, w - 20, h - 20);
+      ctx.fillStyle = '#7DD3FC';
+      ctx.font = '900 32px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('ĐỔI COINGAME ⇄ XU', w / 2, 66);
+      ctx.fillStyle = '#142347';
+      ctx.fillRect(42, 104, w - 84, 96);
+      ctx.strokeStyle = '#FBBF24';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(42, 104, w - 84, 96);
+      ctx.fillStyle = '#FDE68A';
+      ctx.font = '900 38px system-ui, sans-serif';
+      ctx.fillText('1 CoinGame = 10 Xu', w / 2, 165);
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '800 24px system-ui, sans-serif';
+      ctx.fillText('COMING SOON', w / 2, 258);
+    });
+
+    const pcScreenTex = makeArcadeCanvasTex(256, 144, (ctx, w, h) => {
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, '#0D1B3E');
+      grad.addColorStop(0.5, '#1B1142');
+      grad.addColorStop(1, '#0F2942');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#38BDF8';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, 34, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#F472B6';
+      ctx.beginPath();
+      ctx.moveTo(20, h - 24);
+      ctx.lineTo(74, 86);
+      ctx.lineTo(126, 102);
+      ctx.lineTo(188, 42);
+      ctx.lineTo(238, 62);
+      ctx.stroke();
+      ctx.fillStyle = '#38BDF8';
+      ctx.fillRect(14, 14, 58, 12);
+      ctx.fillStyle = '#FBBF24';
+      ctx.fillRect(w - 64, 14, 48, 12);
+    });
+
+    const racingScreenTex = makeArcadeCanvasTex(256, 160, (ctx, w, h) => {
+      ctx.fillStyle = '#130D2E';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#F472B6';
+      ctx.beginPath();
+      ctx.arc(w / 2, 54, 28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1B2244';
+      ctx.beginPath();
+      ctx.moveTo(22, h);
+      ctx.lineTo(w / 2 - 22, 68);
+      ctx.lineTo(w / 2 + 22, 68);
+      ctx.lineTo(w - 22, h);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#38BDF8';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(w / 2, 74);
+      ctx.lineTo(w / 2, h);
+      ctx.stroke();
+    });
+
+    const dancePadTex = makeArcadeCanvasTex(256, 256, (ctx, w, h) => {
+      ctx.fillStyle = '#12162B';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#38BDF8';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(8, 8, w - 16, h - 16);
+      const pads: [number, number, string][] = [
+        [w / 2, 52, '#38BDF8'],
+        [w / 2, h - 52, '#F472B6'],
+        [52, h / 2, '#A78BFA'],
+        [w - 52, h / 2, '#FBBF24'],
+      ];
+      for (const [px, py, col] of pads) {
+        ctx.fillStyle = '#1C2547';
+        ctx.fillRect(px - 32, py - 32, 64, 64);
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 4;
+        ctx.strokeRect(px - 30, py - 30, 60, 60);
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(px, py, 14, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(8.2, 10.6),
-      new THREE.MeshStandardMaterial({map: checkerTex, roughness: 0.6}),
+      new THREE.PlaneGeometry(16.8, 15.2),
+      new THREE.MeshStandardMaterial({map: floorTex, roughness: 0.42, metalness: 0.14}),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.userData = {kind: 'ground'};
     groundMesh = floor;
     group.add(floor);
 
-    const wall = new THREE.Mesh(
-      new RoundedBoxGeometry(8.4, 1.35, 0.32, 2, 0.06),
-      clayMat('#382E57', 0.68),
-    );
-    wall.position.set(0, 0.68, -5.18);
-    group.add(wall);
+    // Architectural surround walls & glowing LED trims (open front toward camera)
+    const wallMat = clayMat('#1B213C', 0.62);
+    const trimMat = clayMat('#2B355B', 0.48);
+    const cyanLedMat = new THREE.MeshStandardMaterial({
+      color: '#67E8F9',
+      emissive: '#22D3EE',
+      emissiveIntensity: 0.85,
+      roughness: 0.25,
+    });
+    const violetLedMat = new THREE.MeshStandardMaterial({
+      color: '#C4B5FD',
+      emissive: '#8B5CF6',
+      emissiveIntensity: 0.8,
+      roughness: 0.25,
+    });
+    const goldLedMat = new THREE.MeshStandardMaterial({
+      color: '#FDE68A',
+      emissive: '#F59E0B',
+      emissiveIntensity: 0.82,
+      roughness: 0.25,
+    });
+    const pinkLedMat = new THREE.MeshStandardMaterial({
+      color: '#FBCFE8',
+      emissive: '#EC4899',
+      emissiveIntensity: 0.8,
+      roughness: 0.25,
+    });
 
-    const cab = new THREE.Group();
-    cab.position.set(-1.95, 0, -2.8);
-    const cabBody = new THREE.Mesh(
-      new RoundedBoxGeometry(1.7, 2.6, 1.35, 3, 0.1),
-      clayMat('#E86F74', 0.45),
-    );
-    cabBody.position.y = 1.3;
-    const screen = new THREE.Mesh(
-      new RoundedBoxGeometry(1.25, 0.95, 0.12, 2, 0.04),
-      new THREE.MeshStandardMaterial({
-        color: '#22325C',
-        emissive: '#3D63B8',
-        emissiveIntensity: 0.55,
-      }),
-    );
-    screen.position.set(0, 1.65, 0.65);
-    cab.add(cabBody, screen);
-    mergeStaticGroupByMaterial(cab);
-    addBoxProxy(cab, [1.9, 2.7, 1.6], [0, 1.3, 0], {kind: 'arcade_star', tx: -1.95, tz: -1.35}, clickTargets);
-    colliders.push({type: 'box', x: -1.95, z: -2.8, hw: 0.9, hd: 0.72});
-    labelAnchors.push({id: 'arcade_star', label: 'Máy Bắt Sao', worldPos: new THREE.Vector3(-1.95, 2.85, -2.8)});
-    group.add(cab);
+    const archGroup = new THREE.Group();
+    const backWall = new THREE.Mesh(new RoundedBoxGeometry(17.1, 3.35, 0.36, 2, 0.06), wallMat);
+    backWall.position.set(0, 1.675, -7.65);
+    const leftWall = new THREE.Mesh(new RoundedBoxGeometry(0.36, 3.2, 15.4, 2, 0.06), wallMat);
+    leftWall.position.set(-8.45, 1.6, 0);
+    const rightWall = new THREE.Mesh(new RoundedBoxGeometry(0.36, 3.2, 15.4, 2, 0.06), wallMat);
+    rightWall.position.set(8.45, 1.6, 0);
 
-    const claw = new THREE.Group();
-    claw.position.set(1.95, 0, -2.8);
-    const clawBase = new THREE.Mesh(
-      new RoundedBoxGeometry(1.7, 1.15, 1.35, 3, 0.08),
-      clayMat('#6DB2E6', 0.48),
+    const backTrimTop = new THREE.Mesh(new RoundedBoxGeometry(17.2, 0.2, 0.44, 2, 0.04), trimMat);
+    backTrimTop.position.set(0, 3.32, -7.64);
+    const backLedStrip = new THREE.Mesh(new THREE.BoxGeometry(15.8, 0.09, 0.08), cyanLedMat);
+    backLedStrip.position.set(0, 3.05, -7.43);
+    const leftLedStrip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.09, 14.2), violetLedMat);
+    leftLedStrip.position.set(-8.23, 2.95, 0);
+    const rightLedStrip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.09, 14.2), pinkLedMat);
+    rightLedStrip.position.set(8.23, 2.95, 0);
+
+    // Vertical acoustic LED fins along the back wall
+    for (let i = -3; i <= 3; i++) {
+      if (i === 0) continue;
+      const fin = new THREE.Mesh(
+        new RoundedBoxGeometry(0.16, 2.55, 0.12, 2, 0.03),
+        i % 2 === 0 ? cyanLedMat : violetLedMat,
+      );
+      fin.position.set(i * 2.35, 1.48, -7.42);
+      archGroup.add(fin);
+    }
+
+    // Main overhead glowing Cyber Game Arena sign
+    const mainSignBacking = new THREE.Mesh(
+      new RoundedBoxGeometry(5.6, 1.12, 0.22, 2, 0.06),
+      trimMat,
     );
-    clawBase.position.y = 0.58;
-    const clawGlass = new THREE.Mesh(
-      new RoundedBoxGeometry(1.55, 1.3, 1.2, 2, 0.06),
+    mainSignBacking.position.set(0, 2.75, -7.36);
+    const mainSignFace = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.25, 0.92),
+      new THREE.MeshBasicMaterial({map: cyberBannerTex}),
+    );
+    mainSignFace.position.set(0, 2.75, -7.24);
+
+    // Front low perimeter curb
+    const frontCurbL = new THREE.Mesh(new RoundedBoxGeometry(6.6, 0.26, 0.28, 2, 0.05), trimMat);
+    frontCurbL.position.set(-5.1, 0.13, 7.45);
+    const frontCurbR = frontCurbL.clone();
+    frontCurbR.position.x = 5.1;
+
+    archGroup.add(
+      backWall,
+      leftWall,
+      rightWall,
+      backTrimTop,
+      backLedStrip,
+      leftLedStrip,
+      rightLedStrip,
+      mainSignBacking,
+      mainSignFace,
+      frontCurbL,
+      frontCurbR,
+    );
+    mergeStaticGroupByMaterial(archGroup);
+    group.add(archGroup);
+
+    // 1. Hero HDDOLL Blindbox Showcase Tower (Back-Left Center)
+    const blindboxTower = new THREE.Group();
+    blindboxTower.position.set(-1.95, 0, -5.55);
+    const bbBase = new THREE.Mesh(
+      new RoundedBoxGeometry(2.35, 1.05, 1.45, 3, 0.08),
+      clayMat('#27224E', 0.42),
+    );
+    bbBase.position.y = 0.525;
+    const bbTrim = new THREE.Mesh(new RoundedBoxGeometry(2.42, 0.1, 1.52, 2, 0.03), goldLedMat);
+    bbTrim.position.y = 1.05;
+    const bbBack = new THREE.Mesh(
+      new RoundedBoxGeometry(2.2, 1.65, 0.2, 2, 0.04),
+      clayMat('#1E1B3A', 0.5),
+    );
+    bbBack.position.set(0, 1.85, -0.58);
+    const bbCanopy = new THREE.Mesh(
+      new RoundedBoxGeometry(2.42, 0.65, 1.48, 3, 0.08),
+      clayMat('#31255C', 0.42),
+    );
+    bbCanopy.position.set(0, 2.86, 0);
+    const bbBanner = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.12, 0.54),
+      new THREE.MeshBasicMaterial({map: blindboxBannerTex}),
+    );
+    bbBanner.position.set(0, 2.86, 0.75);
+    const bbGlass = new THREE.Mesh(
+      new RoundedBoxGeometry(2.16, 1.42, 1.24, 2, 0.06),
       new THREE.MeshStandardMaterial({
-        color: '#DDF3FF',
+        color: '#E0F7FF',
         transparent: true,
-        opacity: 0.45,
-        roughness: 0.12,
+        opacity: 0.28,
+        roughness: 0.1,
         metalness: 0.1,
-        envMapIntensity: 0.9,
         depthWrite: false,
       }),
     );
-    clawGlass.position.y = 1.75;
+    bbGlass.position.set(0, 1.82, 0.04);
+    bbGlass.renderOrder = 6;
+
+    // 3 miniature HDDOLL collectible dolls floating softly on lit pedestals inside vitrine
+    const dollColors = ['#F472B6', '#38BDF8', '#FBBF24'];
+    const animatedDolls: THREE.Group[] = [];
+    dollColors.forEach((col, idx) => {
+      const xOff = (idx - 1) * 0.64;
+      const ped = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22, 0.25, 0.14, 14),
+        clayMat('#38BDF8', 0.35),
+      );
+      ped.position.set(xOff, 1.18, 0.05);
+      blindboxTower.add(ped);
+
+      const doll = new THREE.Group();
+      doll.position.set(xOff, 1.48, 0.05);
+      const dBody = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.3, 12), clayMat(col, 0.5));
+      dBody.position.y = -0.02;
+      const dHead = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 12), clayMat('#FFE8D6', 0.55));
+      dHead.position.y = 0.22;
+      const dHair = new THREE.Mesh(
+        new THREE.SphereGeometry(0.175, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.62),
+        clayMat(col, 0.45),
+      );
+      dHair.position.y = 0.24;
+      const earL = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), clayMat(col, 0.45));
+      earL.position.set(-0.12, 0.37, 0);
+      const earR = earL.clone();
+      earR.position.x = 0.12;
+      doll.add(dBody, dHead, dHair, earL, earR);
+      blindboxTower.add(doll);
+      animatedDolls.push(doll);
+    });
+
+    blindboxTower.add(bbBase, bbTrim, bbBack, bbCanopy, bbBanner, bbGlass);
+    mergeStaticGroupByMaterial(blindboxTower, new Set(animatedDolls));
+    addBoxProxy(
+      blindboxTower,
+      [2.5, 3.3, 1.7],
+      [0, 1.65, 0],
+      {kind: 'arcade_blindbox_hddoll', tx: -1.95, tz: -3.25},
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: -1.95, z: -5.55, hw: 1.25, hd: 0.85});
+    labelAnchors.push({
+      id: 'arcade_blindbox_hddoll',
+      label: 'Blindbox HDDOLL (Soon)',
+      worldPos: new THREE.Vector3(-1.95, 3.45, -5.55),
+    });
+    group.add(blindboxTower);
+
+    // 2. Hero CoinGame Exchange Kiosk (Back-Right Center)
+    const exchangeKiosk = new THREE.Group();
+    exchangeKiosk.position.set(1.95, 0, -5.55);
+    const exBase = new THREE.Mesh(
+      new RoundedBoxGeometry(2.1, 1.12, 1.32, 3, 0.08),
+      clayMat('#162344', 0.4),
+    );
+    exBase.position.y = 0.56;
+    const exTrim = new THREE.Mesh(new RoundedBoxGeometry(2.16, 0.09, 1.38, 2, 0.03), cyanLedMat);
+    exTrim.position.y = 1.12;
+    const exTower = new THREE.Mesh(
+      new RoundedBoxGeometry(1.95, 1.55, 0.42, 3, 0.06),
+      clayMat('#1F305C', 0.38),
+    );
+    exTower.position.set(0, 1.9, -0.32);
+    const exScreen = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.72, 1.08),
+      new THREE.MeshBasicMaterial({map: exchangeScreenTex}),
+    );
+    exScreen.position.set(0, 1.95, -0.1);
+    const exCounterPad = new THREE.Mesh(
+      new RoundedBoxGeometry(1.6, 0.06, 0.65, 2, 0.02),
+      clayMat('#0E172E', 0.4),
+    );
+    exCounterPad.position.set(0, 1.18, 0.25);
+
+    const holoCoinGem = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.24, 0),
+      new THREE.MeshStandardMaterial({
+        color: '#FDE68A',
+        emissive: '#F59E0B',
+        emissiveIntensity: 0.72,
+        roughness: 0.18,
+        metalness: 0.35,
+      }),
+    );
+    holoCoinGem.position.set(0, 2.98, -0.15);
+
+    exchangeKiosk.add(exBase, exTrim, exTower, exScreen, exCounterPad, holoCoinGem);
+    mergeStaticGroupByMaterial(exchangeKiosk, new Set([holoCoinGem]));
+    addBoxProxy(
+      exchangeKiosk,
+      [2.25, 3.25, 1.55],
+      [0, 1.62, 0],
+      {kind: 'arcade_exchange_kiosk', tx: 1.95, tz: -3.25},
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: 1.95, z: -5.55, hw: 1.15, hd: 0.78});
+    labelAnchors.push({
+      id: 'arcade_exchange_kiosk',
+      label: 'Đổi CoinGame ⇄ Xu (Soon)',
+      worldPos: new THREE.Vector3(1.95, 3.4, -5.55),
+    });
+    group.add(exchangeKiosk);
+
+    // 3. Left Wing: 3 Modern RGB Gaming PC Arena Stations
+    const pcZs = [-3.4, -0.3, 2.8];
+    const pcAccentMats = [cyanLedMat, pinkLedMat, violetLedMat];
+    pcZs.forEach((pz, idx) => {
+      const rig = new THREE.Group();
+      rig.position.set(-6.05, 0, pz);
+
+      const deskTop = new THREE.Mesh(
+        new RoundedBoxGeometry(1.38, 0.09, 2.32, 2, 0.03),
+        clayMat('#19213D', 0.38),
+      );
+      deskTop.position.set(0, 0.76, 0);
+      const deskLed = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.04, 2.26),
+        pcAccentMats[idx % pcAccentMats.length],
+      );
+      deskLed.position.set(0.69, 0.74, 0);
+      const legL = new THREE.Mesh(new RoundedBoxGeometry(1.15, 0.74, 0.1, 2, 0.02), trimMat);
+      legL.position.set(0, 0.37, -1.04);
+      const legR = legL.clone();
+      legR.position.z = 1.04;
+
+      // Curved Ultrawide Gaming Monitor + Side Vertical Monitor
+      const monStand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.28, 0.14), trimMat);
+      monStand.position.set(-0.28, 0.94, 0);
+      const monFrame = new THREE.Mesh(
+        new RoundedBoxGeometry(0.08, 0.58, 1.06, 2, 0.02),
+        clayMat('#0B1020', 0.35),
+      );
+      monFrame.position.set(-0.24, 1.24, -0.08);
+      const monScreen = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.98, 0.5),
+        new THREE.MeshBasicMaterial({map: pcScreenTex}),
+      );
+      monScreen.position.set(-0.19, 1.24, -0.08);
+      monScreen.rotation.y = Math.PI / 2;
+
+      // Tempered Glass RGB PC Case on desk
+      const pcCase = new THREE.Mesh(
+        new RoundedBoxGeometry(0.46, 0.54, 0.28, 2, 0.03),
+        clayMat('#101628', 0.35),
+      );
+      pcCase.position.set(-0.2, 1.08, 0.76);
+      const pcGlowStrip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.42, 0.22),
+        pcAccentMats[idx % pcAccentMats.length],
+      );
+      pcGlowStrip.position.set(0.04, 1.08, 0.76);
+
+      // Keyboard & Mouse Pad
+      const deskPad = new THREE.Mesh(
+        new RoundedBoxGeometry(0.55, 0.02, 1.15, 1, 0.01),
+        clayMat('#232D52', 0.6),
+      );
+      deskPad.position.set(0.24, 0.815, -0.06);
+      const kb = new THREE.Mesh(
+        new RoundedBoxGeometry(0.18, 0.03, 0.5, 1, 0.01),
+        pcAccentMats[idx % pcAccentMats.length],
+      );
+      kb.position.set(0.24, 0.84, -0.14);
+
+      // Ergonomic Gaming Chair tucked in front of desk
+      const chair = new THREE.Group();
+      chair.position.set(1.06, 0, 0);
+      const cBase = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.08, 10), trimMat);
+      cBase.position.y = 0.06;
+      const cPost = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.38, 8), trimMat);
+      cPost.position.y = 0.26;
+      const cSeat = new THREE.Mesh(
+        new RoundedBoxGeometry(0.56, 0.12, 0.58, 2, 0.04),
+        clayMat('#202A4B', 0.55),
+      );
+      cSeat.position.y = 0.46;
+      const cBack = new THREE.Mesh(
+        new RoundedBoxGeometry(0.13, 0.86, 0.54, 2, 0.04),
+        clayMat('#202A4B', 0.55),
+      );
+      cBack.position.set(0.24, 0.92, 0);
+      const cAccent = new THREE.Mesh(
+        new RoundedBoxGeometry(0.05, 0.7, 0.18, 2, 0.02),
+        pcAccentMats[idx % pcAccentMats.length],
+      );
+      cAccent.position.set(0.19, 0.94, 0);
+      chair.add(cBase, cPost, cSeat, cBack, cAccent);
+
+      rig.add(deskTop, deskLed, legL, legR, monStand, monFrame, monScreen, pcCase, pcGlowStrip, deskPad, kb, chair);
+      mergeStaticGroupByMaterial(rig);
+      addBoxProxy(
+        rig,
+        [1.95, 1.85, 2.45],
+        [0.2, 0.92, 0],
+        {kind: 'arcade_pc_station', tx: -4.15, tz: pz},
+        clickTargets,
+      );
+      colliders.push({type: 'box', x: -5.75, z: pz, hw: 1.05, hd: 1.2});
+      if (idx === 1) {
+        labelAnchors.push({
+          id: 'arcade_pc_arena',
+          label: 'Dàn PC Esports (Soon)',
+          worldPos: new THREE.Vector3(-5.95, 1.95, pz),
+        });
+      }
+      group.add(rig);
+    });
+
+    // 4. Right Wing: Sim Racing Pod + Upgraded Arcade Cabinets
+    const racingPod = new THREE.Group();
+    racingPod.position.set(5.65, 0, -3.0);
+    const raceDeck = new THREE.Mesh(
+      new RoundedBoxGeometry(2.1, 0.16, 2.4, 2, 0.05),
+      clayMat('#1A213C', 0.45),
+    );
+    raceDeck.position.y = 0.08;
+    const raceRim = new THREE.Mesh(new RoundedBoxGeometry(2.18, 0.06, 2.48, 2, 0.02), pinkLedMat);
+    raceRim.position.y = 0.14;
+    const rSeat = new THREE.Mesh(
+      new RoundedBoxGeometry(0.68, 0.2, 0.72, 2, 0.05),
+      clayMat('#E11D48', 0.55),
+    );
+    rSeat.position.set(0.25, 0.34, 0.45);
+    const rBack = new THREE.Mesh(
+      new RoundedBoxGeometry(0.64, 0.92, 0.18, 2, 0.05),
+      clayMat('#E11D48', 0.55),
+    );
+    rBack.position.set(0.25, 0.8, 0.78);
+    rBack.rotation.x = -0.18;
+    const rWheelPost = new THREE.Mesh(
+      new RoundedBoxGeometry(0.18, 0.65, 0.18, 2, 0.03),
+      trimMat,
+    );
+    rWheelPost.position.set(0.25, 0.55, -0.35);
+    const rWheel = new THREE.Mesh(
+      new THREE.TorusGeometry(0.16, 0.035, 8, 18),
+      clayMat('#0F172A', 0.4),
+    );
+    rWheel.position.set(0.25, 0.88, -0.2);
+    rWheel.rotation.x = 0.42;
+    const rScreenFrame = new THREE.Mesh(
+      new RoundedBoxGeometry(1.55, 0.86, 0.1, 2, 0.03),
+      clayMat('#0B1020', 0.35),
+    );
+    rScreenFrame.position.set(0.15, 1.25, -0.82);
+    const rScreen = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.42, 0.76),
+      new THREE.MeshBasicMaterial({map: racingScreenTex}),
+    );
+    rScreen.position.set(0.15, 1.25, -0.76);
+    racingPod.add(raceDeck, raceRim, rSeat, rBack, rWheelPost, rWheel, rScreenFrame, rScreen);
+    mergeStaticGroupByMaterial(racingPod);
+    addBoxProxy(
+      racingPod,
+      [2.2, 2.0, 2.5],
+      [0, 1.0, 0],
+      {kind: 'arcade_racing_pod', tx: 3.7, tz: -2.6},
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: 5.65, z: -3.0, hw: 1.15, hd: 1.28});
+    labelAnchors.push({
+      id: 'arcade_racing_pod',
+      label: 'Đua Xe Sim Racing (Soon)',
+      worldPos: new THREE.Vector3(5.65, 2.1, -3.0),
+    });
+    group.add(racingPod);
+
+    // Upgraded Classic Star Cabinet (Xu)
+    const cab = new THREE.Group();
+    cab.position.set(6.05, 0, 0.7);
+    cab.rotation.y = -Math.PI / 2;
+    const cabBody = new THREE.Mesh(
+      new RoundedBoxGeometry(1.68, 2.55, 1.32, 3, 0.09),
+      clayMat('#E0566B', 0.42),
+    );
+    cabBody.position.y = 1.275;
+    const cabTrim = new THREE.Mesh(new RoundedBoxGeometry(1.72, 0.08, 1.36, 2, 0.02), goldLedMat);
+    cabTrim.position.y = 2.48;
+    const screen = new THREE.Mesh(
+      new RoundedBoxGeometry(1.26, 0.92, 0.1, 2, 0.04),
+      new THREE.MeshStandardMaterial({
+        color: '#1E293B',
+        emissive: '#38BDF8',
+        emissiveIntensity: 0.65,
+      }),
+    );
+    screen.position.set(0, 1.65, 0.64);
+    const joyStick = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.16, 8), goldLedMat);
+    joyStick.position.set(-0.25, 1.08, 0.72);
+    cab.add(cabBody, cabTrim, screen, joyStick);
+    mergeStaticGroupByMaterial(cab);
+    addBoxProxy(cab, [1.85, 2.7, 1.55], [0, 1.35, 0], {kind: 'arcade_star', tx: 4.4, tz: 0.7}, clickTargets);
+    colliders.push({type: 'box', x: 6.05, z: 0.7, hw: 0.85, hd: 0.95});
+    labelAnchors.push({id: 'arcade_star', label: 'Máy Bắt Sao', worldPos: new THREE.Vector3(6.05, 2.85, 0.7)});
+    group.add(cab);
+
+    // Upgraded Pastel Claw Cabinet (Xu)
+    const claw = new THREE.Group();
+    claw.position.set(6.05, 0, 3.45);
+    claw.rotation.y = -Math.PI / 2;
+    const clawBase = new THREE.Mesh(
+      new RoundedBoxGeometry(1.68, 1.15, 1.32, 3, 0.08),
+      clayMat('#3B82F6', 0.42),
+    );
+    clawBase.position.y = 0.575;
+    const clawHeader = new THREE.Mesh(
+      new RoundedBoxGeometry(1.7, 0.34, 1.34, 2, 0.06),
+      clayMat('#60A5FA', 0.4),
+    );
+    clawHeader.position.y = 2.52;
+    const clawGlass = new THREE.Mesh(
+      new RoundedBoxGeometry(1.52, 1.24, 1.16, 2, 0.06),
+      new THREE.MeshStandardMaterial({
+        color: '#DDF3FF',
+        transparent: true,
+        opacity: 0.38,
+        roughness: 0.1,
+        metalness: 0.1,
+        depthWrite: false,
+      }),
+    );
+    clawGlass.position.y = 1.76;
     clawGlass.renderOrder = 6;
-    const plush = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 10), clayMat('#F4A261', 0.72));
-    plush.position.set(-0.25, 1.35, 0);
-    const plush2 = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10), clayMat('#F7A8B8', 0.72));
-    plush2.position.set(0.3, 1.32, 0.15);
-    claw.add(clawBase, clawGlass, plush, plush2);
+    const plush = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 10), clayMat('#F4A261', 0.72));
+    plush.position.set(-0.24, 1.36, 0);
+    const plush2 = new THREE.Mesh(new THREE.SphereGeometry(0.27, 10, 10), clayMat('#F7A8B8', 0.72));
+    plush2.position.set(0.28, 1.34, 0.14);
+    claw.add(clawBase, clawHeader, clawGlass, plush, plush2);
     mergeStaticGroupByMaterial(claw);
-    addBoxProxy(claw, [1.9, 2.7, 1.6], [0, 1.3, 0], {kind: 'arcade_claw', tx: 1.95, tz: -1.35}, clickTargets);
-    colliders.push({type: 'box', x: 1.95, z: -2.8, hw: 0.9, hd: 0.72});
-    labelAnchors.push({id: 'arcade_claw', label: 'Gắp Thú Bông', worldPos: new THREE.Vector3(1.95, 2.85, -2.8)});
+    addBoxProxy(claw, [1.85, 2.8, 1.55], [0, 1.4, 0], {kind: 'arcade_claw', tx: 4.4, tz: 3.45}, clickTargets);
+    colliders.push({type: 'box', x: 6.05, z: 3.45, hw: 0.85, hd: 0.95});
+    labelAnchors.push({id: 'arcade_claw', label: 'Gắp Thú Bông', worldPos: new THREE.Vector3(6.05, 2.9, 3.45)});
     group.add(claw);
 
-    group.add(createExitDoorway('Ra Thị Trấn', [0, 0, 4.45], '#E86F74', clickTargets, labelAnchors));
+    // 5. Center Rhythm Dance Pad Stage
+    const danceStage = new THREE.Group();
+    danceStage.position.set(0, 0, -0.35);
+    const padDeck = new THREE.Mesh(
+      new RoundedBoxGeometry(2.55, 0.08, 2.25, 2, 0.03),
+      clayMat('#1A2242', 0.45),
+    );
+    padDeck.position.y = 0.04;
+    const padSurface = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.26, 1.98),
+      new THREE.MeshBasicMaterial({
+        map: dancePadTex,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      }),
+    );
+    padSurface.rotation.x = -Math.PI / 2;
+    padSurface.position.y = 0.085;
+    const spkL = new THREE.Mesh(new RoundedBoxGeometry(0.38, 1.85, 0.42, 2, 0.04), clayMat('#131932', 0.45));
+    spkL.position.set(-1.12, 0.925, -1.25);
+    const spkR = spkL.clone();
+    spkR.position.x = 1.12;
+    const danceBar = new THREE.Mesh(
+      new RoundedBoxGeometry(2.58, 0.16, 0.2, 2, 0.04),
+      violetLedMat,
+    );
+    danceBar.position.set(0, 1.85, -1.25);
+    const danceMonitor = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.56, 0.92),
+      new THREE.MeshBasicMaterial({map: pcScreenTex}),
+    );
+    danceMonitor.position.set(0, 1.24, -1.16);
+    danceStage.add(padDeck, padSurface, spkL, spkR, danceBar, danceMonitor);
+    mergeStaticGroupByMaterial(danceStage);
+    addBoxProxy(
+      danceStage,
+      [2.6, 1.95, 2.5],
+      [0, 0.98, -0.1],
+      {kind: 'arcade_dance_pad', tx: 0, tz: -0.25},
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: 0, z: -1.6, hw: 1.38, hd: 0.28});
+    labelAnchors.push({
+      id: 'arcade_dance_pad',
+      label: 'Sàn Nhảy Rhythm (Soon)',
+      worldPos: new THREE.Vector3(0, 2.15, -1.6),
+    });
+    group.add(danceStage);
+
+    // 6. Center-Left Cyber Chill Lounge Sofa & Neon Coffee Table (Sittable!)
+    const loungeGroup = new THREE.Group();
+    loungeGroup.position.set(-2.35, 0, 3.35);
+    const sofaBase = new THREE.Mesh(
+      new RoundedBoxGeometry(2.35, 0.34, 0.95, 3, 0.06),
+      clayMat('#272E58', 0.62),
+    );
+    sofaBase.position.y = 0.22;
+    const sofaBack = new THREE.Mesh(
+      new RoundedBoxGeometry(2.35, 0.56, 0.24, 3, 0.06),
+      clayMat('#1F254A', 0.62),
+    );
+    sofaBack.position.set(0, 0.56, 0.36);
+    const sofaArmL = new THREE.Mesh(
+      new RoundedBoxGeometry(0.22, 0.46, 0.95, 2, 0.05),
+      clayMat('#1F254A', 0.62),
+    );
+    sofaArmL.position.set(-1.12, 0.38, 0);
+    const sofaArmR = sofaArmL.clone();
+    sofaArmR.position.x = 1.12;
+    const neonTable = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.56, 0.48, 0.38, 18),
+      clayMat('#151C36', 0.38),
+    );
+    neonTable.position.set(0, 0.19, -1.05);
+    const neonTableRim = new THREE.Mesh(new THREE.TorusGeometry(0.54, 0.03, 8, 24), cyanLedMat);
+    neonTableRim.rotation.x = Math.PI / 2;
+    neonTableRim.position.set(0, 0.39, -1.05);
+
+    loungeGroup.add(sofaBase, sofaBack, sofaArmL, sofaArmR, neonTable, neonTableRim);
+    mergeStaticGroupByMaterial(loungeGroup);
+    addBoxProxy(
+      loungeGroup,
+      [2.45, 0.95, 1.1],
+      [0, 0.48, 0],
+      {
+        kind: 'bench',
+        sitMessage: 'Thư giãn tại Cyber Lounge Mây! (+Vui vẻ)',
+        seatSlots: [
+          {seatX: -2.9, seatZ: 3.25, seatY: 0.48, sitRotY: Math.PI, tx: -2.9, tz: 2.35},
+          {seatX: -1.8, seatZ: 3.25, seatY: 0.48, sitRotY: Math.PI, tx: -1.8, tz: 2.35},
+        ],
+      },
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: -2.35, z: 3.35, hw: 1.25, hd: 0.56});
+    colliders.push({type: 'circle', x: -2.35, z: 2.3, r: 0.58});
+    group.add(loungeGroup);
+
+    // Sleek Corner Planters for Warmth & Contrast
+    for (const px of [-7.35, 7.35]) {
+      const potGroup = new THREE.Group();
+      potGroup.position.set(px, 0, 5.75);
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.28, 0.56, 12), clayMat('#1E2647', 0.45));
+      pot.position.y = 0.28;
+      const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(0.46, 1), clayMat('#38A169', 0.72));
+      leaves.position.y = 0.82;
+      potGroup.add(pot, leaves);
+      mergeStaticGroupByMaterial(potGroup);
+      colliders.push({type: 'circle', x: px, z: 5.75, r: 0.42});
+      group.add(potGroup);
+    }
+
+    updateFn = (elapsed) => {
+      holoCoinGem.rotation.y = elapsed * 1.45;
+      holoCoinGem.position.y = 2.98 + Math.sin(elapsed * 2.4) * 0.06;
+      animatedDolls.forEach((doll, idx) => {
+        doll.position.y = 1.48 + Math.sin(elapsed * 2.3 + idx * 1.1) * 0.045;
+        doll.rotation.y = Math.sin(elapsed * 1.1 + idx * 0.9) * 0.35;
+      });
+    };
+
+    group.add(createExitDoorway('Ra Thị Trấn', [0, 0, 6.75], '#38BDF8', clickTargets, labelAnchors));
   } else if (zone === 'boutique') {
     // Expanded boutique floor (12.8 x 11.6) housing Tina (Thời Trang) & Bob (Nội Thất)
     const floor = new THREE.Mesh(
@@ -4280,6 +5197,8 @@ export function buildSubzoneScene(
       id: 'tina_npc',
       label: 'Tina',
       worldPos: new THREE.Vector3(-2.7, 2.15, -2.95),
+      isNpc: true,
+      maxLabelDist: 3.5,
     });
 
     // === RIGHT COUNTER: BOB (FURNITURE) ===
@@ -4339,6 +5258,8 @@ export function buildSubzoneScene(
       id: 'bob_npc',
       label: 'Bob',
       worldPos: new THREE.Vector3(2.7, 2.15, -2.95),
+      isNpc: true,
+      maxLabelDist: 3.5,
     });
 
     group.add(createExitDoorway('Cửa Ra Phố', [0, 0, 4.95], '#E58E9A', clickTargets, labelAnchors));
@@ -4838,6 +5759,8 @@ export function buildSubzoneScene(
       id: 'ivan_npc',
       label: 'Ivan',
       worldPos: new THREE.Vector3(0, 2.22, -4.85),
+      isNpc: true,
+      maxLabelDist: 3.6,
     });
 
     group.add(createExitDoorway('Cửa Ra Phố', [0, 0, 6.25], '#E57F5E', clickTargets, labelAnchors));

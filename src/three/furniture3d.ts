@@ -6078,30 +6078,47 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
     }
 
     case 'beanbag_chair': {
-      // Cozy Tear-Drop Pastel Beanbag Lounger with Piping Seam & Mini Accent Pillow
+      // Cute Low Pastel Cloud-Tuft Beanbag Pouf with Soft Curved Lumbar Bolster (zero head clipping)
       const bagMat = clayMat(item.color || '#F59CA9', 0.78);
       const seamMat = clayMat(item.accentColor || '#FFF4E6', 0.68);
+      const earInnerMat = clayMat('#FFD6DF', 0.72);
 
-      const basePuff = new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 14), bagMat);
-      basePuff.scale.set(1.04, 0.66, 1.06);
-      basePuff.position.set(0, 0.25, 0.02);
+      // Wide plush seat pouf base (clean flat top at y = 0.34 for natural sitting)
+      const basePouf = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.47, 0.24, 24), bagMat);
+      basePouf.position.set(0, 0.12, 0.02);
 
-      const backRest = new THREE.Mesh(new THREE.SphereGeometry(0.31, 16, 12), bagMat);
-      backRest.scale.set(1.06, 1.12, 0.72);
-      backRest.position.set(0, 0.44, -0.2);
+      const seatTopRim = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.065, 10, 24), bagMat);
+      seatTopRim.rotation.x = Math.PI / 2;
+      seatTopRim.position.set(0, 0.24, 0.02);
 
-      const seatDip = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.31, 0.06, 16), seamMat);
-      seatDip.position.set(0, 0.38, 0.08);
+      const seatCushionPad = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.37, 0.09, 22), seamMat);
+      seatCushionPad.position.set(0, 0.295, 0.04);
 
-      const piping = new THREE.Mesh(new THREE.TorusGeometry(0.41, 0.015, 8, 24), seamMat);
+      const piping = new THREE.Mesh(new THREE.TorusGeometry(0.455, 0.015, 8, 24), seamMat);
       piping.rotation.x = Math.PI / 2;
-      piping.position.set(0, 0.16, 0.02);
+      piping.position.set(0, 0.08, 0.02);
 
-      const miniPillow = new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.19, 0.09, 3, 0.035), seamMat);
-      miniPillow.position.set(0.04, 0.48, -0.06);
-      miniPillow.rotation.set(-0.35, -0.18, 0.1);
+      // Gentle wraparound waist-level U-bolster behind torso (reaches only y = 0.49, never behind head)
+      const lumbarArc = new THREE.Mesh(
+        new THREE.TorusGeometry(0.33, 0.095, 12, 22, Math.PI * 1.04),
+        bagMat,
+      );
+      lumbarArc.rotation.x = Math.PI / 2;
+      lumbarArc.rotation.z = -Math.PI * 0.02;
+      lumbarArc.position.set(0, 0.36, -0.06);
 
-      g.add(basePuff, backRest, seatDip, piping, miniPillow);
+      // Cute subtle pastel plush bear/bunny ear accents tucked neatly on the back bolster
+      [-0.14, 0.14].forEach((ex) => {
+        const earOuter = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.036, 14), bagMat);
+        earOuter.rotation.x = Math.PI / 2 - 0.18;
+        earOuter.position.set(ex, 0.48, -0.36);
+        const earInner = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.04, 12), earInnerMat);
+        earInner.rotation.x = Math.PI / 2 - 0.18;
+        earInner.position.set(ex, 0.48, -0.355);
+        g.add(earOuter, earInner);
+      });
+
+      g.add(basePouf, seatTopRim, seatCushionPad, piping, lumbarArc);
       break;
     }
 
@@ -6506,60 +6523,95 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
     }
 
     case 'terrace_swing_egg': {
-      // Boho Rattan Egg Swing Chair on Curved Metal Stand with Plush Pink Cushion
+      // Tall Open-Front Boho Rattan Cocoon Chair on Graceful C-Stand (ample headroom, zero neck-level ring)
       const rattanMat = clayMat(item.color || '#E2C397', 0.72);
+      const rattanFrameMat = clayMat('#C89E68', 0.66);
       const cushionMat = clayMat(item.accentColor || '#F7A8B8', 0.78);
-      const standMat = glossyClayMat('#4A4540', 0.38);
+      const creamPillowMat = clayMat('#FFF8EE', 0.72);
+      const standMat = glossyClayMat('#F4EFE6', 0.36);
+      const brassHookMat = glossyClayMat('#E3BE6F', 0.28);
 
-      // Circular base ring + curved C-arm stand
-      const baseRing = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.026, 10, 28), standMat);
+      // Sturdy floor ring & tall swept-back C-arm stand (top peak ~2.12m, plenty clear of avatar head)
+      const baseRing = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.026, 10, 28), standMat);
       baseRing.rotation.x = Math.PI / 2;
       baseRing.position.y = 0.026;
 
-      const rearPole = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.028, 1.38, 10), standMat);
-      rearPole.position.set(0, 0.72, -0.36);
-      rearPole.rotation.x = 0.08;
+      const rearPole = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.03, 1.72, 10), standMat);
+      rearPole.position.set(0, 0.88, -0.44);
+      rearPole.rotation.x = 0.04;
 
-      const archArm = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.022, 8, 18, Math.PI * 0.62), standMat);
+      const archArm = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.023, 8, 22, Math.PI * 0.66), standMat);
       archArm.rotation.y = Math.PI / 2;
-      archArm.position.set(0, 1.36, -0.02);
+      archArm.position.set(0, 1.7, -0.04);
 
-      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.22, 6), glossyClayMat('#D6DEE5', 0.2));
-      chain.position.set(0, 1.5, 0.02);
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.24, 6), brassHookMat);
+      chain.position.set(0, 1.94, 0.02);
 
-      // Woven rattan egg shell basket (back dome + front rim + ribs)
-      const basketBack = new THREE.Mesh(
-        new THREE.SphereGeometry(0.44, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.62),
+      // Open-front rattan basket bowl (wide seat cup below + curved open back + tall overhead arch at y=1.82)
+      const basketSeatBowl = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.46, 0.34, 0.14, 22),
         rattanMat,
       );
-      basketBack.rotation.x = -Math.PI * 0.5;
-      basketBack.scale.set(0.95, 1.0, 1.18);
-      basketBack.position.set(0, 0.84, 0.04);
+      basketSeatBowl.position.set(0, 0.34, 0.04);
 
-      const basketRim = new THREE.Mesh(new THREE.TorusGeometry(0.39, 0.032, 10, 24), rattanMat);
-      basketRim.scale.set(0.96, 1.18, 1);
-      basketRim.position.set(0, 0.84, 0.16);
+      // Open back rattan shell curved ONLY around the rear (-Z), completely open in front (+Z)
+      const backRattanMat = rattanMat.clone();
+      backRattanMat.userData = {pooled: false};
+      backRattanMat.side = THREE.DoubleSide;
+      const backShell = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.48, 0.45, 0.86, 22, 1, true, Math.PI * 0.56, Math.PI * 0.88),
+        backRattanMat,
+      );
+      backShell.position.set(0, 0.82, 0.04);
 
-      // Thick plush cushion inside egg seat (surfaceHeight = 0.56)
-      const seatCushion = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 12), cushionMat);
-      seatCushion.scale.set(1.05, 0.45, 0.95);
-      seatCushion.position.set(0, 0.56, 0.06);
+      // Tall overhead woven canopy arch reaching y = 1.82 (well above seated character's head/hat)
+      const canopyArch = new THREE.Mesh(
+        new THREE.TorusGeometry(0.46, 0.028, 10, 24, Math.PI * 1.15),
+        rattanFrameMat,
+      );
+      canopyArch.rotation.z = -Math.PI * 0.075;
+      canopyArch.position.set(0, 1.26, 0.12);
 
-      const backCushion = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 12), cushionMat);
-      backCushion.scale.set(1.0, 1.08, 0.45);
-      backCushion.position.set(0, 0.82, -0.11);
+      const canopyDome = new THREE.Mesh(
+        new THREE.SphereGeometry(0.47, 18, 10, Math.PI * 0.52, Math.PI * 0.96, 0, Math.PI * 0.44),
+        rattanMat,
+      );
+      canopyDome.material = backShell.material;
+      canopyDome.scale.set(1.0, 0.88, 0.96);
+      canopyDome.position.set(0, 1.38, 0.04);
 
-      const throwPillow = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.18, 0.08, 2, 0.03), clayMat('#FFF8EE', 0.72));
-      throwPillow.position.set(-0.08, 0.68, 0);
-      throwPillow.rotation.set(-0.35, 0.25, 0.12);
+      // Side woven ribs connecting seat bowl cleanly up to tall canopy arch (zero front bar across neck!)
+      [-1, 1].forEach((side) => {
+        const rib = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.018, 0.02, 0.96, 8),
+          rattanFrameMat,
+        );
+        rib.position.set(side * 0.44, 0.84, 0.12);
+        rib.rotation.z = side * -0.06;
+        g.add(rib);
+      });
+
+      // Plump pink seat cushion (top clean at y = 0.46) + soft lumbar cushion + cream throw pillow
+      const seatCushion = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.36, 0.1, 20), cushionMat);
+      seatCushion.position.set(0, 0.41, 0.07);
+
+      const backCushion = new THREE.Mesh(new RoundedBoxGeometry(0.56, 0.44, 0.14, 3, 0.05), cushionMat);
+      backCushion.position.set(0, 0.65, -0.22);
+      backCushion.rotation.x = -0.14;
+
+      const throwPillow = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.17, 0.08, 2, 0.03), creamPillowMat);
+      throwPillow.position.set(-0.2, 0.56, -0.06);
+      throwPillow.rotation.set(-0.25, 0.35, 0.12);
 
       g.add(
         baseRing,
         rearPole,
         archArm,
         chain,
-        basketBack,
-        basketRim,
+        basketSeatBowl,
+        backShell,
+        canopyArch,
+        canopyDome,
         seatCushion,
         backCushion,
         throwPillow,
@@ -6612,6 +6664,471 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
       }
       brushHead.position.set(0.14, 0.68, -0.02);
       g.add(can, band, paintTop, swatch, handle, stick, brushHead);
+      break;
+    }
+
+    case 'bed_pompompurin': {
+      const butterMat = clayMat('#FCE076', 0.66);
+      const caramelMat = clayMat('#6A3B22', 0.68);
+      const sheetMat = clayMat('#FFFDF8', 0.78);
+      const skyPillowMat = clayMat('#8AD0F4', 0.74);
+      const faceInkMat = clayMat('#3B2216', 0.35);
+
+      // Striped butter-yellow & warm gold blanket texture
+      const bCanvas = document.createElement('canvas');
+      bCanvas.width = 128;
+      bCanvas.height = 128;
+      const bCtx = bCanvas.getContext('2d')!;
+      bCtx.fillStyle = '#FFD94A';
+      bCtx.fillRect(0, 0, 128, 128);
+      bCtx.fillStyle = '#F2B824';
+      for (let x = 0; x < 128; x += 24) bCtx.fillRect(x, 0, 10, 128);
+      const bTex = new THREE.CanvasTexture(bCanvas);
+      bTex.colorSpace = THREE.SRGBColorSpace;
+      bTex.wrapS = THREE.RepeatWrapping;
+      bTex.wrapT = THREE.RepeatWrapping;
+      bTex.repeat.set(3, 2);
+      const duvetMat = new THREE.MeshStandardMaterial({
+        color: '#FFFFFF',
+        map: bTex,
+        roughness: 0.72,
+      });
+
+      const baseFrame = new THREE.Mesh(
+        new RoundedBoxGeometry(2.08, 0.28, 2.34, 3, 0.06),
+        caramelMat,
+      );
+      baseFrame.position.set(0, 0.14, 0);
+      const mattress = new THREE.Mesh(
+        new RoundedBoxGeometry(1.98, 0.36, 2.24, 3, 0.08),
+        sheetMat,
+      );
+      mattress.position.set(0, 0.42, 0);
+
+      // Giant rounded Pompompurin Headboard with floppy ears, beret & cute face
+      const hbHead = new THREE.Mesh(
+        new THREE.SphereGeometry(0.95, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.62),
+        butterMat,
+      );
+      hbHead.scale.set(1.16, 0.92, 0.24);
+      hbHead.position.set(0, 0.66, -1.12);
+      const hbBeret = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.34, 0.14, 18),
+        caramelMat,
+      );
+      hbBeret.scale.set(1.1, 1, 0.52);
+      hbBeret.position.set(0, 1.5, -1.11);
+      const hbStem = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.07, 6, 8), caramelMat);
+      hbStem.position.set(0, 1.6, -1.11);
+      g.add(hbHead, hbBeret, hbStem);
+
+      [-1, 1].forEach((side) => {
+        const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.14, 0.48, 8, 12), butterMat);
+        ear.scale.set(1, 1, 0.45);
+        ear.position.set(side * 1.02, 0.96, -1.1);
+        ear.rotation.z = side * 0.42;
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.042, 10, 8), faceInkMat);
+        eye.position.set(side * 0.22, 1.12, -0.92);
+        const mouthLoop = new THREE.Mesh(
+          new THREE.TorusGeometry(0.036, 0.011, 6, 12, Math.PI),
+          faceInkMat,
+        );
+        mouthLoop.rotation.z = Math.PI;
+        mouthLoop.position.set(side * 0.036, 1.04, -0.91);
+        g.add(ear, eye, mouthLoop);
+      });
+
+      const idleBlanket = new THREE.Group();
+      const blanket = new THREE.Mesh(
+        new RoundedBoxGeometry(2.06, 0.42, 1.48, 3, 0.1),
+        duvetMat,
+      );
+      blanket.position.set(0, 0.44, 0.42);
+      idleBlanket.add(blanket);
+      const sleepBlanket = createSolidBedSleepBlanket(duvetMat, sheetMat);
+      sleepBlanket.visible = false;
+      g.userData.bedIdleBlanket = idleBlanket;
+      g.userData.bedSleepBlanket = sleepBlanket;
+
+      const pillowL = new THREE.Mesh(
+        new RoundedBoxGeometry(0.76, 0.2, 0.46, 2, 0.07),
+        skyPillowMat,
+      );
+      pillowL.position.set(-0.44, 0.68, -0.74);
+      const pillowR = new THREE.Mesh(
+        new RoundedBoxGeometry(0.76, 0.2, 0.46, 2, 0.07),
+        sheetMat,
+      );
+      pillowR.position.set(0.44, 0.68, -0.74);
+
+      g.add(baseFrame, mattress, idleBlanket, sleepBlanket, pillowL, pillowR);
+      break;
+    }
+
+    case 'shelf_pompompurin': {
+      const butterMat = clayMat('#FCE076', 0.65);
+      const caramelMat = clayMat('#6A3B22', 0.68);
+      const interiorMat = clayMat('#FFF6D6', 0.74);
+      const goldMat = glossyClayMat('#F4C44E', 0.26);
+      const inkMat = clayMat('#3B2216', 0.35);
+
+      const frame = new THREE.Mesh(
+        new RoundedBoxGeometry(1.42, 1.38, 0.48, 3, 0.05),
+        butterMat,
+      );
+      frame.position.set(0, 0.69, 0);
+      const topTrim = new THREE.Mesh(
+        new RoundedBoxGeometry(1.5, 0.12, 0.52, 3, 0.04),
+        caramelMat,
+      );
+      topTrim.position.set(0, 1.38, 0);
+      const lowerCab = new THREE.Mesh(
+        new RoundedBoxGeometry(1.3, 0.46, 0.44, 2, 0.03),
+        caramelMat,
+      );
+      lowerCab.position.set(0, 0.28, 0.04);
+      const recess = new THREE.Mesh(
+        new RoundedBoxGeometry(1.24, 0.58, 0.38, 2, 0.02),
+        interiorMat,
+      );
+      recess.position.set(0, 0.96, 0.07);
+      g.add(frame, topTrim, lowerCab, recess);
+
+      [-0.24, 0.24].forEach((kx) => {
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8), goldMat);
+        knob.position.set(kx, 0.34, 0.27);
+        g.add(knob);
+      });
+
+      const bookCols = ['#E85D68', '#5BA4DC', '#68B872', '#F4C152', '#9C7EDB', '#5BA4DC'];
+      for (let b = 0; b < 6; b++) {
+        const book = new THREE.Mesh(
+          new RoundedBoxGeometry(0.11, 0.42 + (b % 3) * 0.05, 0.3, 2, 0.015),
+          clayMat(bookCols[b], 0.58),
+        );
+        book.position.set(-0.46 + b * 0.15, 0.92, 0.09);
+        g.add(book);
+      }
+
+      // Pompompurin head peeking over the top of the bookshelf
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 18, 14), butterMat);
+      head.scale.set(1.22, 0.92, 0.72);
+      head.position.set(0, 1.56, 0.02);
+      const beret = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.06, 14), caramelMat);
+      beret.position.set(0, 1.84, 0.02);
+      g.add(head, beret);
+      [-1, 1].forEach((s) => {
+        const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.18, 6, 10), butterMat);
+        ear.scale.set(1, 1, 0.55);
+        ear.position.set(s * 0.38, 1.52, 0.03);
+        ear.rotation.z = s * 0.45;
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.024, 8, 8), inkMat);
+        eye.position.set(s * 0.11, 1.61, 0.23);
+        g.add(ear, eye);
+      });
+      break;
+    }
+
+    case 'stool_pompompurin': {
+      const butterMat = clayMat('#FCE076', 0.64);
+      const caramelMat = glossyClayMat('#633116', 0.26);
+      const inkMat = clayMat('#3B2216', 0.35);
+
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.35, 0.41, 0.36, 22),
+        butterMat,
+      );
+      body.position.y = 0.18;
+      const glazeCap = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.36, 0.36, 0.1, 22),
+        caramelMat,
+      );
+      glazeCap.position.y = 0.39;
+      g.add(body, glazeCap);
+      [-1, 1].forEach((s) => {
+        const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.13, 6, 10), butterMat);
+        ear.scale.set(1, 1, 0.55);
+        ear.position.set(s * 0.39, 0.24, 0.02);
+        ear.rotation.z = s * 0.36;
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), inkMat);
+        eye.position.set(s * 0.1, 0.24, 0.365);
+        g.add(ear, eye);
+      });
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), inkMat);
+      nose.position.set(0, 0.2, 0.375);
+      g.add(nose);
+      break;
+    }
+
+    case 'pudding_flan_plate': {
+      const plateMat = glossyClayMat('#FFFDF9', 0.22);
+      const custardMat = glossyClayMat('#FCE068', 0.28);
+      const caramelMat = glossyClayMat('#5E2C14', 0.18);
+      const creamMat = clayMat('#FFF9EE', 0.58);
+      const cherryMat = glossyClayMat('#E02E3D', 0.2);
+
+      const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.036, 20), plateMat);
+      plate.position.y = 0.018;
+      const flan = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.15, 0.13, 18), custardMat);
+      flan.position.y = 0.095;
+      const glaze = new THREE.Mesh(new THREE.CylinderGeometry(0.114, 0.118, 0.04, 18), caramelMat);
+      glaze.position.y = 0.148;
+      const cream = new THREE.Mesh(new THREE.SphereGeometry(0.042, 10, 8), creamMat);
+      cream.scale.set(1.2, 0.72, 1.2);
+      cream.position.y = 0.175;
+      const cherry = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), cherryMat);
+      cherry.position.set(0, 0.205, 0);
+      g.add(plate, flan, glaze, cream, cherry);
+      break;
+    }
+
+    case 'wall_lamp_pompompurin': {
+      const cy = item.mountHeight ?? 2.02;
+      const caramelMat = clayMat('#6A3B22', 0.65);
+      const inkMat = clayMat('#3B2216', 0.35);
+      const shadeMat = new THREE.MeshStandardMaterial({
+        color: '#FCE076',
+        emissive: '#FFD166',
+        emissiveIntensity: 0.72,
+        roughness: 0.42,
+      });
+
+      const backMount = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.04, 14), caramelMat);
+      backMount.rotation.x = Math.PI / 2;
+      backMount.position.set(0, cy, 0.02);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 14), shadeMat);
+      head.scale.set(1.22, 0.94, 0.74);
+      head.position.set(0, cy, 0.18);
+      const beret = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.085, 0.048, 14), caramelMat);
+      beret.position.set(0, cy + 0.22, 0.18);
+      g.add(backMount, head, beret);
+
+      [-1, 1].forEach((s) => {
+        const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.14, 6, 10), shadeMat);
+        ear.scale.set(1, 1, 0.55);
+        ear.position.set(s * 0.29, cy - 0.02, 0.17);
+        ear.rotation.z = s * 0.45;
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), inkMat);
+        eye.position.set(s * 0.082, cy + 0.028, 0.352);
+        g.add(ear, eye);
+      });
+      g.userData.lampShadeMat = shadeMat;
+      g.userData.lampLightLocalPos = [0, cy + 0.02, 0.28];
+      break;
+    }
+
+    case 'vampire_coffin_sofa': {
+      const woodBlackMat = clayMat('#1E1B22', 0.58);
+      const trimBlackMat = clayMat('#2B2732', 0.5);
+      const velvetRedMat = clayMat('#9E1928', 0.78);
+      const creamCrossMat = clayMat('#F7EFE2', 0.58);
+      const roseMat = glossyClayMat('#D62839', 0.38);
+
+      // Upright coffin shell sofa body (backrest + deep crimson seat cushion)
+      const outerShape = new THREE.Shape();
+      outerShape.moveTo(-0.34, -0.78);
+      outerShape.lineTo(0.34, -0.78);
+      outerShape.lineTo(0.56, 0.25);
+      outerShape.lineTo(0.34, 0.92);
+      outerShape.lineTo(-0.34, 0.92);
+      outerShape.lineTo(-0.56, 0.25);
+      outerShape.closePath();
+
+      const coffinShellGeo = new THREE.ExtrudeGeometry(outerShape, {
+        depth: 0.52,
+        bevelEnabled: true,
+        bevelThickness: 0.03,
+        bevelSize: 0.025,
+        bevelSegments: 2,
+      });
+      const coffinShell = new THREE.Mesh(coffinShellGeo, woodBlackMat);
+      coffinShell.position.set(-0.2, 0.84, -0.34);
+
+      const velvetBack = new THREE.Mesh(
+        new RoundedBoxGeometry(0.86, 1.38, 0.14, 3, 0.04),
+        velvetRedMat,
+      );
+      velvetBack.position.set(-0.2, 0.88, -0.06);
+
+      const seatCushion = new THREE.Mesh(
+        new RoundedBoxGeometry(0.84, 0.26, 0.64, 3, 0.07),
+        velvetRedMat,
+      );
+      seatCushion.position.set(-0.2, 0.32, 0.08);
+      const sofaBase = new THREE.Mesh(
+        new RoundedBoxGeometry(0.92, 0.2, 0.66, 2, 0.03),
+        woodBlackMat,
+      );
+      sofaBase.position.set(-0.2, 0.1, 0.06);
+
+      // Leaning open coffin lid beside the sofa with cream cross & crimson roses
+      const lidGrp = new THREE.Group();
+      lidGrp.position.set(0.68, 0.88, -0.06);
+      lidGrp.rotation.y = -0.26;
+      const lidGeo = new THREE.ExtrudeGeometry(outerShape, {
+        depth: 0.1,
+        bevelEnabled: true,
+        bevelThickness: 0.02,
+        bevelSize: 0.02,
+        bevelSegments: 2,
+      });
+      const lidMesh = new THREE.Mesh(lidGeo, trimBlackMat);
+      const crossV = new THREE.Mesh(
+        new RoundedBoxGeometry(0.11, 0.72, 0.03, 2, 0.008),
+        creamCrossMat,
+      );
+      crossV.position.set(0, 0.18, 0.12);
+      const crossH = new THREE.Mesh(
+        new RoundedBoxGeometry(0.42, 0.11, 0.03, 2, 0.008),
+        creamCrossMat,
+      );
+      crossH.position.set(0, 0.34, 0.12);
+      lidGrp.add(lidMesh, crossV, crossH);
+
+      [
+        [-0.22, 0.56],
+        [0.18, 0.04],
+        [-0.08, -0.34],
+      ].forEach(([rx, ry]) => {
+        const rose = new THREE.Mesh(new THREE.SphereGeometry(0.088, 10, 8), roseMat);
+        rose.scale.set(1, 1, 0.55);
+        rose.position.set(rx, ry, 0.135);
+        lidGrp.add(rose);
+      });
+
+      g.add(coffinShell, velvetBack, seatCushion, sofaBase, lidGrp);
+      break;
+    }
+
+    case 'candelabra_gothic': {
+      const ironMat = clayMat('#2B2226', 0.46, 0.45);
+      const waxMat = clayMat('#FBF6EE', 0.65);
+      const roseMat = glossyClayMat('#C92232', 0.36);
+      const flameMat = new THREE.MeshStandardMaterial({
+        color: '#FFE066',
+        emissive: '#FF922B',
+        emissiveIntensity: 0.85,
+        roughness: 0.3,
+      });
+
+      const baseFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.28, 0.12, 12), ironMat);
+      baseFoot.position.y = 0.06;
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.042, 1.28, 10), ironMat);
+      stem.position.y = 0.72;
+      g.add(baseFoot, stem);
+
+      // 5 curved iron candle arms + wax candles + glowing flames
+      const armOffsets = [-0.28, -0.14, 0, 0.14, 0.28];
+      armOffsets.forEach((ax, idx) => {
+        const cy = idx === 2 ? 1.38 : Math.abs(idx - 2) === 1 ? 1.34 : 1.3;
+        if (ax !== 0) {
+          const arm = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.014, 0.016, Math.abs(ax) + 0.06, 8),
+            ironMat,
+          );
+          arm.rotation.z = ax < 0 ? 1.15 : -1.15;
+          arm.position.set(ax * 0.5, cy - 0.06, 0);
+          g.add(arm);
+        }
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.022, 0.036, 10), ironMat);
+        cup.position.set(ax, cy, 0);
+        const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.026, 0.2, 10), waxMat);
+        candle.position.set(ax, cy + 0.11, 0);
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.065, 8), flameMat);
+        flame.position.set(ax, cy + 0.24, 0);
+        g.add(cup, candle, flame);
+      });
+
+      const roseAccent = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), roseMat);
+      roseAccent.position.set(0, 1.12, 0.04);
+      g.add(roseAccent);
+      g.userData.lampShadeMat = flameMat;
+      g.userData.lampLightLocalPos = [0, 1.56, 0];
+      break;
+    }
+
+    case 'picnic_gingham_set': {
+      // Crisp red-white gingham canvas blanket + woven wicker picnic basket with bow & daisies
+      const pCanvas = document.createElement('canvas');
+      pCanvas.width = 128;
+      pCanvas.height = 128;
+      const pCtx = pCanvas.getContext('2d')!;
+      pCtx.fillStyle = '#FFFDF9';
+      pCtx.fillRect(0, 0, 128, 128);
+      pCtx.fillStyle = '#E04646';
+      pCtx.globalAlpha = 0.5;
+      pCtx.fillRect(0, 0, 64, 128);
+      pCtx.fillRect(0, 0, 128, 64);
+      pCtx.globalAlpha = 0.25;
+      pCtx.fillRect(0, 0, 64, 64);
+      pCtx.globalAlpha = 1;
+      const pTex = new THREE.CanvasTexture(pCanvas);
+      pTex.colorSpace = THREE.SRGBColorSpace;
+      pTex.wrapS = THREE.RepeatWrapping;
+      pTex.wrapT = THREE.RepeatWrapping;
+      pTex.repeat.set(9, 7);
+      const blanketMat = new THREE.MeshStandardMaterial({
+        color: '#FFFFFF',
+        map: pTex,
+        roughness: 0.8,
+      });
+
+      const blanket = new THREE.Mesh(
+        new RoundedBoxGeometry(2.55, 0.036, 2.05, 2, 0.015),
+        blanketMat,
+      );
+      blanket.position.y = 0.018;
+      g.add(blanket);
+
+      // Woven wicker picnic basket on rear corner
+      const wickerMat = clayMat('#CFA066', 0.78);
+      const wickerDarkMat = clayMat('#AC7B42', 0.8);
+      const ribbonMat = clayMat('#FFF8F2', 0.55);
+      const basketGrp = new THREE.Group();
+      basketGrp.position.set(-0.78, 0.036, -0.56);
+      basketGrp.rotation.y = 0.34;
+      const basketBox = new THREE.Mesh(
+        new RoundedBoxGeometry(0.66, 0.34, 0.48, 3, 0.04),
+        wickerMat,
+      );
+      basketBox.position.y = 0.17;
+      const lidRim = new THREE.Mesh(
+        new RoundedBoxGeometry(0.7, 0.055, 0.52, 2, 0.02),
+        wickerDarkMat,
+      );
+      lidRim.position.y = 0.34;
+      const clothFlap = new THREE.Mesh(
+        new RoundedBoxGeometry(0.62, 0.12, 0.44, 2, 0.02),
+        blanketMat,
+      );
+      clothFlap.position.y = 0.35;
+      const handle = new THREE.Mesh(
+        new THREE.TorusGeometry(0.24, 0.026, 8, 22, Math.PI),
+        wickerDarkMat,
+      );
+      handle.position.y = 0.35;
+      const bowCenter = new THREE.Mesh(new THREE.SphereGeometry(0.036, 8, 8), ribbonMat);
+      bowCenter.position.set(0, 0.24, 0.255);
+      basketGrp.add(basketBox, lidRim, clothFlap, handle, bowCenter);
+      [-1, 1].forEach((s) => {
+        const wing = new THREE.Mesh(new RoundedBoxGeometry(0.08, 0.048, 0.024, 2, 0.01), ribbonMat);
+        wing.position.set(s * 0.05, 0.24, 0.25);
+        wing.rotation.z = s * 0.25;
+        basketGrp.add(wing);
+      });
+      g.add(basketGrp);
+
+      // Two cute mini daisies on the blanket corner
+      [
+        [0.72, 0.48],
+        [0.48, 0.62],
+      ].forEach(([dx, dz]) => {
+        const flower = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.015, 10), ribbonMat);
+        flower.position.set(dx, 0.044, dz);
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), clayMat('#F6C844', 0.5));
+        core.position.set(dx, 0.052, dz);
+        g.add(flower, core);
+      });
       break;
     }
   }
