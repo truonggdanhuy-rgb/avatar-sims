@@ -1,11 +1,12 @@
-import React, {useMemo, useState} from 'react';
-import {Check, Sparkles, UserCheck} from 'lucide-react';
+import React, {useEffect, useMemo, useState} from 'react';
+import {Check, KeyRound, RefreshCw, Sparkles, UserCheck} from 'lucide-react';
 import {
   SHOP_ITEMS,
   STARTER_CHARACTER_OPTIONS,
   StarterCharacterOption,
 } from '../../data/avatarCatalog';
 import {AvatarConfig} from '../../types/game';
+import {AccountSavePreview, decodeAccountTransferCode} from '../../utils/accountSave';
 import {finalizePlayerName, sanitizePlayerNameInput} from '../../utils/playerName';
 import {soundFX} from '../../utils/sound';
 import {AvatarPreview3D} from '../AvatarPreview3D';
@@ -15,14 +16,37 @@ interface StarterCharacterModalProps {
     avatar: AvatarConfig;
     unlockItemIds: string[];
   }) => void;
+  onRestoreAccountCode?: (code: string) => Promise<{ok: boolean; message: string}>;
 }
 
 export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
   onConfirm,
+  onRestoreAccountCode,
 }) => {
+  const [mode, setMode] = useState<'create' | 'restore'>('create');
   const [selectedId, setSelectedId] = useState<'girl' | 'boy'>('girl');
   const [customName, setCustomName] = useState<string>('');
   const [hasTypedName, setHasTypedName] = useState(false);
+  const [restoreCodeInput, setRestoreCodeInput] = useState('');
+  const [restorePreview, setRestorePreview] = useState<AccountSavePreview | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState<{ok: boolean; text: string} | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  useEffect(() => {
+    const trimmed = restoreCodeInput.trim();
+    if (!trimmed) {
+      setRestorePreview(null);
+      return;
+    }
+    let cancelled = false;
+    decodeAccountTransferCode(trimmed).then((res) => {
+      if (cancelled) return;
+      setRestorePreview(res.ok ? res.preview : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [restoreCodeInput]);
 
   const selectedOption: StarterCharacterOption = useMemo(
     () =>
@@ -72,14 +96,11 @@ export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-stone-950/75 p-2 sm:p-4">
-      <form
-        onSubmit={handleSubmit}
-        className="anim-pop flex max-h-[95dvh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border-4 border-[#9C734B] bg-[#FAF3E8] shadow-2xl"
-      >
+      <div className="anim-pop flex max-h-[95dvh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border-4 border-[#9C734B] bg-[#FAF3E8] shadow-2xl">
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#E5D5BE] bg-[#F2E5D2] px-4 py-3 sm:px-6">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#E5D5BE] bg-[#F2E5D2] px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#6BA383] text-white shadow-xs">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#6BA383] text-white shadow-xs">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
@@ -87,14 +108,108 @@ export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
                 Chào Mừng Đến Thị Trấn Mây
               </h1>
               <p className="text-xs font-medium text-[#7A6048]">
-                Chọn nhân vật Nam hoặc Nữ &amp; đặt tên để bắt đầu hành trình (bộ đồ mặc sẵn sẽ lưu trong Tủ Đồ!)
+                {mode === 'create'
+                  ? 'Chọn nhân vật Nam hoặc Nữ & đặt tên để bắt đầu hành trình'
+                  : 'Dán mã lưu tài khoản từ máy cũ để tiếp tục hành trình của bạn'}
               </p>
             </div>
           </div>
+
+          {onRestoreAccountCode && (
+            <button
+              type="button"
+              onClick={() => {
+                soundFX.tap();
+                setRestoreMessage(null);
+                setMode((prev) => (prev === 'create' ? 'restore' : 'create'));
+              }}
+              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold transition-all active:scale-95 ${
+                mode === 'restore'
+                  ? 'border border-[#D8C2A6] bg-white text-[#5B422E]'
+                  : 'bg-[#2F6296] text-white shadow-xs hover:bg-[#275380]'
+              }`}
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              <span>
+                {mode === 'restore' ? 'Quay lại tạo mới' : 'Đã có mã? Khôi phục'}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Body */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
+        {mode === 'restore' ? (
+          <div className="custom-scroll flex-1 overflow-y-auto p-5 sm:p-6">
+            <div className="mx-auto max-w-lg space-y-4 rounded-2xl border border-[#DFCCB0] bg-white p-5 shadow-xs">
+              <div className="flex items-center gap-2 text-sm font-black text-[#4A3525]">
+                <KeyRound className="h-5 w-5 text-[#2F6296]" />
+                <span>Khôi Phục Tài Khoản Bằng Mã</span>
+              </div>
+              <p className="text-xs font-medium leading-relaxed text-[#7A6048]">
+                Mở game trên máy cũ, vào <b>Điện thoại → Tài khoản → Sao chép mã tài khoản</b>, sau đó dán mã vào ô dưới đây để chuyển toàn bộ dữ liệu sang máy này.
+              </p>
+              <textarea
+                rows={4}
+                value={restoreCodeInput}
+                onChange={(e) => {
+                  setRestoreCodeInput(e.target.value);
+                  if (restoreMessage) setRestoreMessage(null);
+                }}
+                placeholder="Dán mã TTM1-... vào đây"
+                className="w-full resize-none rounded-2xl border-2 border-[#DFCCB0] bg-[#FAF4EA] px-3.5 py-2.5 font-mono text-xs font-semibold text-[#3B2A1A] placeholder:font-sans placeholder:text-[#9D856B] focus:border-[#2F6296] focus:outline-none"
+              />
+
+              {restorePreview && (
+                <div className="rounded-2xl border border-[#C6E4D1] bg-[#F1FAF4] p-3 text-xs font-bold text-[#246341]">
+                  <div className="text-sm font-black">
+                    Nhân vật: {restorePreview.playerName}
+                  </div>
+                  <div className="mt-1 text-[11px] text-[#3B7353] tabular-nums">
+                    ID: {restorePreview.accountId} · {restorePreview.coins.toLocaleString('vi-VN')} Xu ·{' '}
+                    {restorePreview.coinGame} CG · {restorePreview.ownedItemCount} món đồ ·{' '}
+                    {restorePreview.petCount} thú cưng
+                  </div>
+                </div>
+              )}
+
+              {restoreMessage && (
+                <p
+                  className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+                    restoreMessage.ok
+                      ? 'bg-[#EAF8EE] text-[#2A6E40]'
+                      : 'bg-[#FDF0ED] text-[#A8382B]'
+                  }`}
+                >
+                  {restoreMessage.text}
+                </p>
+              )}
+
+              <button
+                type="button"
+                disabled={isRestoring}
+                onClick={async () => {
+                  if (!onRestoreAccountCode) return;
+                  soundFX.tap();
+                  setIsRestoring(true);
+                  const res = await onRestoreAccountCode(restoreCodeInput);
+                  setIsRestoring(false);
+                  setRestoreMessage({ok: res.ok, text: res.message});
+                  if (res.ok) soundFX.sparkle();
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#2F6296] px-5 py-3.5 font-display text-sm font-bold text-white shadow-md transition-transform hover:bg-[#275380] active:scale-[0.98] disabled:opacity-60"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRestoring ? 'animate-spin' : ''}`} />
+                <span>
+                  {isRestoring ? 'Đang khôi phục...' : 'Khôi Phục & Vào Thị Trấn Mây'}
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : (
+        <form
+          onSubmit={handleSubmit}
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden"
+        >
           {/* Left: Live 3D Stage */}
           <div className="relative flex h-64 shrink-0 flex-col items-center justify-center border-b border-[#E5D5BE] bg-gradient-to-b from-[#FFFDF8] to-[#EFE1CC] md:h-auto md:w-[340px] md:border-r md:border-b-0">
             <AvatarPreview3D avatar={previewAvatar} className="h-full w-full" />
@@ -203,8 +318,9 @@ export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
               <span>Bắt Đầu Vào Thị Trấn · {previewAvatar.name}</span>
             </button>
           </div>
-        </div>
-      </form>
+        </form>
+        )}
+      </div>
     </div>
   );
 };

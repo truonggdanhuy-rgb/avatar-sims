@@ -224,7 +224,8 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
         currentRig,
         'idle',
         elapsed,
-        avatarRef.current.eyeStyle === 'happy_arc',
+        avatarRef.current.eyeStyle === 'happy_arc' ||
+          avatarRef.current.eyeStyle === 'box_sleepy',
       );
       renderer.render(scene, camera);
     }
@@ -284,7 +285,7 @@ export const AvatarPreview3D: React.FC<AvatarPreview3DProps> = ({
                 : 'border-[#DFC7A5] bg-[#FFF8EB]/95 text-[#6F4E37] hover:bg-[#EFE0C9]'
             }`}
           >
-            {headZoom ? 'Toàn thân' : 'Soi tóc'}
+            {headZoom ? 'Toàn thân' : 'Soi đầu'}
           </button>
         </div>
       )}

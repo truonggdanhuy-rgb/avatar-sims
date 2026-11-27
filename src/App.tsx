@@ -205,10 +205,15 @@ import {
   WellWaterState,
   ZoneId,
 } from './types/game';
+import {
+  STORAGE_KEY,
+  decodeAccountTransferCode,
+  encodeAccountTransferCode,
+  encodeAccountTransferCodeSync,
+} from './utils/accountSave';
 import {finalizePlayerName, sanitizePlayerNameInput} from './utils/playerName';
 import {soundFX} from './utils/sound';
 
-const STORAGE_KEY = 'thi_tran_may_save_v1';
 const HOUSE_LAYOUT_VERSION = 5;
 const TELEPORT_COOLDOWN_MS = 15000;
 
@@ -448,8 +453,65 @@ export default function App() {
   const [farmPondFishPulse, setFarmPondFishPulse] = useState(0);
   const [editFurnitureMode, setEditFurnitureMode] = useState(false);
   const [selectedFurnitureId, setSelectedFurnitureId] = useState<string | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('morning');
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.soundEnabled === 'boolean') {
+          soundFX.enabled = parsed.soundEnabled;
+          return parsed.soundEnabled;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return true;
+  });
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.timeOfDay === 'morning' || parsed.timeOfDay === 'night') {
+          return parsed.timeOfDay;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return 'morning';
+  });
+  const [lastSavedAt, setLastSavedAt] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.savedAt === 'number' && parsed.savedAt > 0) {
+          return parsed.savedAt;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return Date.now();
+  });
+  const [accountTransferCode, setAccountTransferCode] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return encodeAccountTransferCodeSync(parsed as Record<string, unknown>);
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return '';
+  });
+  const isRestoringSaveRef = useRef(false);
+  const hasGeneratedCodeOnceRef = useRef(false);
 
   const homeSpotRef = useRef<{x: number; z: number}>({x: -1.8, z: 4.5});
 
@@ -482,6 +544,39 @@ export default function App() {
       cool_line: 'confident',
       pout_puff: 'pout',
     };
+    const LEGACY_HAIR_TO_BOX_SKIN: Record<string, AvatarConfig['boxHeadSkin']> = {
+      witch_bob: 'witch_rune',
+      midautumn_buns: 'midautumn_lantern',
+      midautumn_spiky: 'midautumn_lantern',
+      student_braids: 'student_milk',
+      boy_1: 'classic_carton',
+      boy_2: 'classic_carton',
+      boy_3: 'tv_screen',
+      boy_4: 'classic_carton',
+      short_crop: 'classic_carton',
+      hero_wave: 'hero_visor',
+      twin_buns: 'bunny_box',
+      twin_tails: 'parcel_love',
+      bob_cut: 'cream_cube',
+      ponytail: 'cat_box',
+      long_wave: 'cream_cube',
+    };
+    const BOX_SKIN_DEFAULT_COLORS: Record<AvatarConfig['boxHeadSkin'], string> = {
+      classic_carton: '#D4A373',
+      cream_cube: '#F7D7BC',
+      parcel_love: '#FCE2E8',
+      tv_screen: '#333E52',
+      cat_box: '#FDE6C4',
+      bunny_box: '#FADADD',
+      frog_box: '#8FD09B',
+      panda_box: '#F8F6F2',
+      student_milk: '#F7B7C8',
+      witch_rune: '#2B2438',
+      pompom_box: '#FFE588',
+      hero_visor: '#2B364B',
+      midautumn_lantern: '#D42E34',
+    };
+    const VALID_BOX_SKINS = new Set<string>(Object.keys(BOX_SKIN_DEFAULT_COLORS));
     const VALID_EYES = new Set<string>([
       'bright',
       'gentle',
@@ -491,6 +586,10 @@ export default function App() {
       'happy_arc',
       'joy_xd',
       'wink',
+      'box_dot',
+      'box_pixel',
+      'box_heart',
+      'box_sleepy',
     ]);
     const VALID_EXPRS = new Set<string>([
       'sweet_smile',
@@ -499,6 +598,9 @@ export default function App() {
       'gentle_o',
       'confident',
       'pout',
+      'box_zigzag',
+      'box_blep',
+      'box_triangle',
     ]);
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -506,6 +608,21 @@ export default function App() {
         const parsed = JSON.parse(saved);
         if (parsed.avatar) {
           const merged = {...DEFAULT_AVATAR, ...parsed.avatar} as AvatarConfig & Record<string, unknown>;
+          const rawSkin = String(parsed.avatar.boxHeadSkin ?? '');
+          if (VALID_BOX_SKINS.has(rawSkin)) {
+            merged.boxHeadSkin = rawSkin as AvatarConfig['boxHeadSkin'];
+            merged.boxHeadColor = String(
+              parsed.avatar.boxHeadColor ||
+                BOX_SKIN_DEFAULT_COLORS[merged.boxHeadSkin] ||
+                DEFAULT_AVATAR.boxHeadColor,
+            );
+          } else {
+            const legacyHairBack = String(parsed.avatar.hairBack ?? '');
+            const mappedSkin =
+              LEGACY_HAIR_TO_BOX_SKIN[legacyHairBack] ?? DEFAULT_AVATAR.boxHeadSkin;
+            merged.boxHeadSkin = mappedSkin;
+            merged.boxHeadColor = BOX_SKIN_DEFAULT_COLORS[mappedSkin];
+          }
           const rawEye = String(merged.eyeStyle ?? '');
           if (!VALID_EYES.has(rawEye)) {
             merged.eyeStyle = LEGACY_EYE_MAP[rawEye] ?? DEFAULT_AVATAR.eyeStyle;
@@ -513,6 +630,13 @@ export default function App() {
           const rawExpr = String(merged.expression ?? '');
           if (!VALID_EXPRS.has(rawExpr)) {
             merged.expression = LEGACY_EXPR_MAP[rawExpr] ?? DEFAULT_AVATAR.expression;
+          }
+          const rawHeadItem = String(merged.headItem ?? '');
+          if (rawHeadItem === 'hair_clip' || rawHeadItem === 'flower_pin') {
+            merged.headItem = 'none';
+          }
+          if (String(merged.accessory ?? '') === 'gingham_neckerchief') {
+            merged.accessory = 'none';
           }
           merged.name = finalizePlayerName(String(merged.name ?? ''), DEFAULT_AVATAR.name);
           return merged;
@@ -847,12 +971,34 @@ export default function App() {
   });
 
   const [ownedIds, setOwnedIds] = useState<string[]>(() => {
+    const LEGACY_HAIR_TO_BOX_ITEM: Record<string, string> = {
+      hair_long_chestnut: 'box_cream_warm',
+      hair_hero_wave: 'box_hero_visor',
+      hair_ponytail_caramel: 'box_cat_cream',
+      hair_crop_ink: 'box_classic_carton',
+      hair_buns_lavender: 'box_bunny_sakura',
+      hair_twintails_sakura: 'box_parcel_love',
+      hair_bob_mint: 'box_frog_mint',
+      hair_boy_1: 'box_classic_carton',
+      hair_boy_2: 'box_classic_carton',
+      hair_boy_3: 'box_tv_retro',
+      hair_boy_4: 'box_classic_carton',
+      hair_witch_bob: 'box_witch_rune',
+      hair_midautumn_buns: 'box_midautumn_lantern',
+      hair_midautumn_spiky: 'box_midautumn_lantern',
+      hair_student_braids: 'box_student_milk_pink',
+      hair_student_boy_brown: 'box_student_milk_blue',
+      hair_bob_brown: 'box_pompom_pudding',
+    };
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed.ownedIds)) {
-          const validSaved = parsed.ownedIds.filter((id: string) =>
+          const migratedIds = parsed.ownedIds.map(
+            (id: string) => LEGACY_HAIR_TO_BOX_ITEM[id] ?? id,
+          );
+          const validSaved = migratedIds.filter((id: string) =>
             SHOP_ITEMS.some((item) => item.id === id),
           );
           return Array.from(new Set([...STARTER_OWNED_IDS, ...validSaved]));
@@ -1794,82 +1940,114 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const persistState = () => {
+    let cancelled = false;
+
+    const buildSavePayload = (savedAt: number): Record<string, unknown> => ({
+      houseVersion: HOUSE_LAYOUT_VERSION,
+      characterCreated: hasCreatedCharacter,
+      avatar,
+      stats,
+      plots,
+      farmInventory: {
+        seeds: pruneZeroCounts(farmInventory.seeds),
+        crops: pruneZeroCounts(farmInventory.crops),
+        animalProducts: pruneZeroCounts(farmInventory.animalProducts),
+        processed: pruneZeroCounts(farmInventory.processed),
+        dishes: pruneZeroCounts(farmInventory.dishes),
+        supplies: farmInventory.supplies,
+      },
+      kitchenLevel,
+      warehouseLevel,
+      millQueue,
+      cookingQueue,
+      livestock,
+      troughs,
+      pondFish,
+      waterCan,
+      wellWater,
+      farmOrders,
+      ownedIds,
+      dailyQuests,
+      checkIn,
+      placedFurniture,
+      furnitureInventory: pruneZeroCounts(furnitureInventory),
+      placedFarmDecor,
+      farmDecorInventory: pruneZeroCounts(farmDecorInventory),
+      joyboyDelivery,
+      playerActions,
+      fishingRod,
+      boats,
+      woodenBoat: {
+        owned: boats.ownedIds.includes('wooden_boat'),
+        purchasedAt: boats.purchasedAt.wooden_boat ?? null,
+      },
+      fishBasket,
+      fishDex,
+      bugNet,
+      insectBasket,
+      insectDex,
+      accountCreatedAt,
+      accountId,
+      ownedMounts,
+      redeemedCodes,
+      ownedPets,
+      activePetId,
+      carriedPetId,
+      petSupplies,
+      bbqFoods: pruneZeroCounts(bbqFoods),
+      equippedFoodId,
+      peppaIngredients: pruneZeroCounts(peppaIngredients),
+      unlockedPeppaRecipes,
+      peppaDishes: pruneZeroCounts(peppaDishes),
+      lastFreeClawDate,
+      soundEnabled,
+      timeOfDay,
+      savedAt,
+    });
+
+    const persistState = (refreshTransferCode = true) => {
+      if (isRestoringSaveRef.current) return;
+      const now = Date.now();
+      const payload = buildSavePayload(now);
       try {
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({
-            houseVersion: HOUSE_LAYOUT_VERSION,
-            characterCreated: hasCreatedCharacter,
-            avatar,
-            stats,
-            plots,
-            farmInventory: {
-              seeds: pruneZeroCounts(farmInventory.seeds),
-              crops: pruneZeroCounts(farmInventory.crops),
-              animalProducts: pruneZeroCounts(farmInventory.animalProducts),
-              processed: pruneZeroCounts(farmInventory.processed),
-              dishes: pruneZeroCounts(farmInventory.dishes),
-              supplies: farmInventory.supplies,
-            },
-            kitchenLevel,
-            warehouseLevel,
-            millQueue,
-            cookingQueue,
-            livestock,
-            troughs,
-            pondFish,
-            waterCan,
-            wellWater,
-            farmOrders,
-            ownedIds,
-            dailyQuests,
-            checkIn,
-            placedFurniture,
-            furnitureInventory: pruneZeroCounts(furnitureInventory),
-            placedFarmDecor,
-            farmDecorInventory: pruneZeroCounts(farmDecorInventory),
-            joyboyDelivery,
-            playerActions,
-            fishingRod,
-            boats,
-            woodenBoat: {
-              owned: boats.ownedIds.includes('wooden_boat'),
-              purchasedAt: boats.purchasedAt.wooden_boat ?? null,
-            },
-            fishBasket,
-            fishDex,
-            bugNet,
-            insectBasket,
-            insectDex,
-            accountCreatedAt,
-            accountId,
-            ownedMounts,
-            redeemedCodes,
-            ownedPets,
-            activePetId,
-            carriedPetId,
-            petSupplies,
-            bbqFoods: pruneZeroCounts(bbqFoods),
-            equippedFoodId,
-            peppaIngredients: pruneZeroCounts(peppaIngredients),
-            unlockedPeppaRecipes,
-            peppaDishes: pruneZeroCounts(peppaDishes),
-            lastFreeClawDate,
-          }),
-        );
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        if (!cancelled) {
+          setLastSavedAt(now);
+        }
       } catch {
         // ignore storage quota errors
       }
+      if (refreshTransferCode) {
+        if (!hasGeneratedCodeOnceRef.current) {
+          hasGeneratedCodeOnceRef.current = true;
+          setAccountTransferCode((prev) => prev || encodeAccountTransferCodeSync(payload));
+        }
+        encodeAccountTransferCode(payload).then((code) => {
+          if (!cancelled && !isRestoringSaveRef.current) {
+            setAccountTransferCode(code);
+          }
+        });
+      }
     };
 
-    const timer = window.setTimeout(persistState, 800);
-    window.addEventListener('pagehide', persistState);
-    window.addEventListener('beforeunload', persistState);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        persistState(false);
+      }
+    };
+    const handleUnloadSave = () => persistState(false);
+
+    const delayMs = hasGeneratedCodeOnceRef.current ? 350 : 0;
+    const timer = window.setTimeout(() => persistState(true), delayMs);
+    window.addEventListener('pagehide', handleUnloadSave);
+    window.addEventListener('beforeunload', handleUnloadSave);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
+      cancelled = true;
       window.clearTimeout(timer);
-      window.removeEventListener('pagehide', persistState);
-      window.removeEventListener('beforeunload', persistState);
+      window.removeEventListener('pagehide', handleUnloadSave);
+      window.removeEventListener('beforeunload', handleUnloadSave);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [
     hasCreatedCharacter,
@@ -1917,6 +2095,8 @@ export default function App() {
     unlockedPeppaRecipes,
     peppaDishes,
     lastFreeClawDate,
+    soundEnabled,
+    timeOfDay,
   ]);
 
   // Gentle passive hunger decay (-1 every 130 seconds for relaxed pacing)
@@ -2004,6 +2184,39 @@ export default function App() {
       ok: false,
       message: `Mã "${code}" không hợp lệ hoặc đã hết hạn.`,
     };
+  };
+
+  const handleRestoreAccountCode = async (
+    rawCode: string,
+  ): Promise<{ok: boolean; message: string}> => {
+    const decoded = await decodeAccountTransferCode(rawCode);
+    if (!decoded.ok) {
+      return {ok: false, message: decoded.message};
+    }
+    try {
+      isRestoringSaveRef.current = true;
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          ...decoded.payload,
+          characterCreated: true,
+          savedAt: Date.now(),
+        }),
+      );
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 450);
+      return {
+        ok: true,
+        message: `Đã khôi phục tài khoản "${decoded.preview.playerName}"! Đang mở Thị Trấn Mây...`,
+      };
+    } catch {
+      isRestoringSaveRef.current = false;
+      return {
+        ok: false,
+        message: 'Không thể ghi dữ liệu vào trình duyệt này. Vui lòng kiểm tra bộ nhớ trình duyệt.',
+      };
+    }
   };
 
   const markQuestDone = (key: DailyQuestKey) => {
@@ -4433,6 +4646,7 @@ export default function App() {
       {zone === 'arcade' && activeArcadeGame && (
         <ArcadeMiniGameModal
           gameId={activeArcadeGame}
+          avatar={avatar}
           coins={stats.coins}
           coinGame={stats.coinGame ?? 0}
           hasFreeClawToday={lastFreeClawDate !== getTodayDateKey()}
@@ -4559,6 +4773,8 @@ export default function App() {
           playerActions={playerActions}
           accountCreatedAt={accountCreatedAt}
           accountId={accountId}
+          lastSavedAt={lastSavedAt}
+          accountTransferCode={accountTransferCode}
           teleportCooldownSec={teleportCooldownSec}
           initialTab={phoneInitialTab}
           onTeleportToPlaza={handleTeleportToPlaza}
@@ -4587,6 +4803,7 @@ export default function App() {
           onChangeTimeOfDay={setTimeOfDay}
           onToggleSound={handleToggleSound}
           onRedeemGiftCode={handleRedeemGiftCode}
+          onRestoreAccountCode={handleRestoreAccountCode}
           onClose={() => setPhoneOpen(false)}
         />
       )}
@@ -4627,7 +4844,10 @@ export default function App() {
       )}
 
       {!hasCreatedCharacter && (
-        <StarterCharacterModal onConfirm={handleConfirmStarterCharacter} />
+        <StarterCharacterModal
+          onConfirm={handleConfirmStarterCharacter}
+          onRestoreAccountCode={handleRestoreAccountCode}
+        />
       )}
     </main>
   );

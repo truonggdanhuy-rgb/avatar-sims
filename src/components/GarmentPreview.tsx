@@ -958,102 +958,178 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
         );
       })()}
 
-      {/* 3. TÓC */}
+      {/* 3. ĐẦU HỘP */}
       {category === 'hair' && (() => {
-        const col = patch.hairColor || '#5B3A29';
-        const light = shade(col, 28);
-        const back = patch.hairBack || 'long_wave';
-        const front = patch.hairFront || 'air_bangs';
+        const skin = patch.boxHeadSkin || 'cream_cube';
+        const col = patch.boxHeadColor || '#F7D7BC';
+        const dark = shade(col, -28);
+        const light = shade(col, 24);
+        const isDark =
+          skin === 'tv_screen' || skin === 'hero_visor' || skin === 'witch_rune';
+        const faceFill =
+          skin === 'tv_screen'
+            ? '#152236'
+            : skin === 'hero_visor'
+              ? '#111A2C'
+              : skin === 'witch_rune'
+                ? '#221C30'
+                : skin === 'panda_box'
+                  ? '#FFFFFF'
+                  : skin === 'pompom_box'
+                    ? '#FFF7D4'
+                    : skin === 'student_milk'
+                      ? '#FFFFFF'
+                      : skin === 'classic_carton'
+                        ? '#E8C59B'
+                        : '#FFFDF8';
 
         return (
           <g>
-            {back === 'long_wave' && (
-              <path d="M21 32 C15 44, 15 60, 21 68 H59 C65 60, 65 44, 59 32 C55 18, 48 14, 40 14 C32 14, 25 18, 21 32 Z" fill={col} stroke={outline} strokeWidth="2.1" />
-            )}
-            {(back === 'bob_cut' || back === 'witch_bob') && (
-              <path d="M21 32 C17 43, 19 53, 26 58 H54 C61 53, 63 43, 59 32 C55 18, 48 14, 40 14 C32 14, 25 18, 21 32 Z" fill={col} stroke={outline} strokeWidth="2.1" />
-            )}
-            {back === 'twin_tails' && (
+            {/* Top 3D skin accessories behind/above box */}
+            {skin === 'tv_screen' && (
               <g>
-                <path d="M23 30 C11 33, 8 49, 13 64 C16 68, 22 65, 24 56 Z" fill={col} stroke={outline} strokeWidth="2" />
-                <path d="M57 30 C69 33, 72 49, 67 64 C64 68, 58 65, 56 56 Z" fill={col} stroke={outline} strokeWidth="2" />
+                <path d="M32 22 L24 10" stroke={outline} strokeWidth="2.4" strokeLinecap="round" />
+                <path d="M48 22 L56 10" stroke={outline} strokeWidth="2.4" strokeLinecap="round" />
+                <circle cx="24" cy="10" r="2.6" fill="#38BDF8" stroke={outline} strokeWidth="1.4" />
+                <circle cx="56" cy="10" r="2.6" fill="#38BDF8" stroke={outline} strokeWidth="1.4" />
               </g>
             )}
-            {back === 'student_braids' && (
+            {skin === 'cat_box' && (
               <g>
-                {/* Twin braided pigtails draping forward with crimson bows */}
-                <circle cx="21" cy="48" r="4.5" fill={col} stroke={outline} strokeWidth="1.7" />
-                <circle cx="20" cy="54" r="4.2" fill={col} stroke={outline} strokeWidth="1.7" />
-                <circle cx="21" cy="60" r="3.6" fill={col} stroke={outline} strokeWidth="1.7" />
-                <circle cx="59" cy="48" r="4.5" fill={col} stroke={outline} strokeWidth="1.7" />
-                <circle cx="60" cy="54" r="4.2" fill={col} stroke={outline} strokeWidth="1.7" />
-                <circle cx="59" cy="60" r="3.6" fill={col} stroke={outline} strokeWidth="1.7" />
-                <path d="M17 59 L25 59 L21 63 Z M55 59 L63 59 L59 63 Z" fill="#DF3038" stroke={outline} strokeWidth="1.1" />
-                <path d="M19 63 L21 69 L23 63 Z M57 63 L59 69 L61 63 Z" fill={col} stroke={outline} strokeWidth="1.4" />
+                <path d="M21 24 L20 11 L32 20 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+                <path d="M59 24 L60 11 L48 20 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+                <path d="M23 21 L22.5 14.5 L29 19.5 Z" fill="#F497AC" />
+                <path d="M57 21 L57.5 14.5 L51 19.5 Z" fill="#F497AC" />
               </g>
             )}
-            {back === 'ponytail' && (
-              <path d="M54 25 C67 27, 72 41, 66 59 C63 63, 57 60, 56 52 Z" fill={col} stroke={outline} strokeWidth="2" />
-            )}
-            {back === 'twin_buns' && (
+            {skin === 'bunny_box' && (
               <g>
-                <circle cx="23" cy="20" r="9" fill={col} stroke={outline} strokeWidth="2" />
-                <circle cx="57" cy="20" r="9" fill={col} stroke={outline} strokeWidth="2" />
+                <rect x="24" y="6" width="8.5" height="18" rx="4.2" fill={col} stroke={outline} strokeWidth="2" />
+                <rect x="47.5" y="6" width="8.5" height="18" rx="4.2" fill={col} stroke={outline} strokeWidth="2" />
+                <rect x="26.5" y="9" width="3.5" height="11" rx="1.7" fill="#F48FB1" />
+                <rect x="50" y="9" width="3.5" height="11" rx="1.7" fill="#F48FB1" />
               </g>
             )}
-            {back === 'midautumn_buns' && (
+            {skin === 'frog_box' && (
               <g>
-                <path d="M21 24 C16 14, 27 8, 35 16 M59 24 C64 14, 53 8, 45 16" stroke={col} strokeWidth="5.5" strokeLinecap="round" fill="none" />
-                <circle cx="20" cy="40" r="7.5" fill={col} stroke={outline} strokeWidth="1.9" />
-                <circle cx="60" cy="40" r="7.5" fill={col} stroke={outline} strokeWidth="1.9" />
-                <path d="M17 44 L15 53 M63 44 L65 53" stroke="#DA2A2E" strokeWidth="3" strokeLinecap="round" />
-                <circle cx="15" cy="54" r="2.2" fill="#46B966" />
-                <circle cx="65" cy="54" r="2.2" fill="#46B966" />
+                <circle cx="26" cy="20" r="6.2" fill={col} stroke={outline} strokeWidth="2" />
+                <circle cx="54" cy="20" r="6.2" fill={col} stroke={outline} strokeWidth="2" />
+                <circle cx="26" cy="19.5" r="3.2" fill="#FFFFFF" />
+                <circle cx="54" cy="19.5" r="3.2" fill="#FFFFFF" />
+                <circle cx="26" cy="19.5" r="1.6" fill="#1F2937" />
+                <circle cx="54" cy="19.5" r="1.6" fill="#1F2937" />
               </g>
             )}
-            {back === 'midautumn_spiky' && (
+            {skin === 'panda_box' && (
               <g>
-                <path d="M24 38 C20 48, 20 55, 22 60 M56 38 C60 48, 60 55, 58 60" stroke={col} strokeWidth="3.5" strokeLinecap="round" />
-                <path d="M24 53 L21 62 M56 53 L59 62" stroke="#DA2A2E" strokeWidth="2.5" strokeLinecap="round" />
+                <circle cx="22" cy="21" r="6" fill="#232226" stroke={outline} strokeWidth="1.8" />
+                <circle cx="58" cy="21" r="6" fill="#232226" stroke={outline} strokeWidth="1.8" />
               </g>
             )}
-            {/* Sculpted Fluffy Hairline Base Cap + Chibi Face */}
-            <ellipse cx="40" cy="34" rx="20.5" ry="20" fill={col} stroke={outline} strokeWidth="2.1" />
-            <path d="M25 38 C25 27, 32 24, 40 24 C48 24, 55 27, 55 38 C55 49, 47 55, 40 55 C33 55, 25 49, 25 38 Z" fill="#FDE2CC" stroke={outline} strokeWidth="1.7" />
-            {/* Bangs */}
-            {back === 'hero_wave' ? (
-              <path
-                d="M21 38 C20 19, 30 13, 41 13 C52 13, 59 20, 58 38 C55 31, 51 25, 45 23 C41 22, 37 24, 34 28 C33 32, 37 33, 39 30 C41 33, 36 37, 32 34 C29 31, 25 32, 21 38 Z"
-                fill={col}
-                stroke={outline}
-                strokeWidth="1.9"
-                strokeLinejoin="round"
-              />
-            ) : back === 'boy_1' ? (
-              <path d="M21 39 C21 19, 31 13, 41 13 C51 13, 59 20, 58 39 C54 34, 50 30, 46 25 C41 33, 33 38, 21 39 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
-            ) : back === 'boy_2' ? (
-              <path d="M21 39 C21 19, 30 13, 40 14 C50 13, 59 19, 59 39 C52 38, 48 33, 44 26 C42 29, 41 31, 40 25 C37 33, 31 38, 21 39 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
-            ) : back === 'boy_3' ? (
-              <path d="M40 9 L43 14 C52 15, 59 22, 59 38 L53 34 L49 39 L45 31 L40 39 L35 31 L31 39 L27 34 L21 38 C21 22, 28 15, 37 14 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
-            ) : back === 'boy_4' ? (
-              <path d="M42 10 L44 14 C53 15, 60 22, 59 39 L54 33 L50 38 L46 31 L42 38 L38 30 L34 38 L30 31 L25 38 L21 33 L15 32 L20 27 C20 18, 29 14, 39 14 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
-            ) : back === 'short_crop' ? (
-              <path d="M22 36 C22 18, 31 14, 40 14 C49 14, 58 18, 58 36 C53 33, 49 34, 46 31 C42 35, 38 35, 34 31 C31 34, 27 33, 22 36 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
-            ) : back === 'midautumn_spiky' ? (
-              <path d="M36 9 L42 14 C52 15, 60 22, 59 39 L53 34 L48 39 L44 29 L40 37 L35 28 L31 38 L27 33 L21 39 C20 22, 27 15, 35 14 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
-            ) : front === 'curtain' ? (
-              <path d="M22 38 C23 20, 32 15, 40 15 C48 15, 57 20, 58 38 C50 35, 45 31, 40 26 C35 31, 30 35, 22 38 Z" fill={col} stroke={outline} strokeWidth="1.8" />
-            ) : front === 'side_sweep' ? (
-              <path d="M22 37 C22 20, 32 15, 40 15 C49 15, 57 21, 58 35 C48 33, 38 30, 22 37 Z" fill={col} stroke={outline} strokeWidth="1.8" />
+            {skin === 'student_milk' && (
+              <g>
+                <path d="M22 22 L28 13 H52 L58 22 Z" fill={light} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+                <path d="M47 15 L52 7 L58 8" stroke="#FFFFFF" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </g>
+            )}
+            {skin === 'parcel_love' && (
+              <g>
+                <ellipse cx="34" cy="16" rx="6" ry="3.5" transform="rotate(-18 34 16)" fill="#EE5A78" stroke={outline} strokeWidth="1.6" />
+                <ellipse cx="46" cy="16" rx="6" ry="3.5" transform="rotate(18 46 16)" fill="#EE5A78" stroke={outline} strokeWidth="1.6" />
+                <circle cx="40" cy="17.5" r="2.8" fill="#D93B5B" stroke={outline} strokeWidth="1.5" />
+              </g>
+            )}
+            {skin === 'midautumn_lantern' && (
+              <g>
+                <rect x="33" y="13" width="14" height="7" rx="2" fill="#F2B840" stroke={outline} strokeWidth="1.8" />
+                <circle cx="40" cy="11" r="2.4" fill="#F2B840" stroke={outline} strokeWidth="1.4" />
+              </g>
+            )}
+
+            {/* Main Box Shell */}
+            <rect
+              x="16"
+              y="20"
+              width="48"
+              height="44"
+              rx="10"
+              fill={col}
+              stroke={outline}
+              strokeWidth="2.3"
+            />
+            {/* Top rim highlight */}
+            <path d="M23 23.5 H57" stroke={light} strokeWidth="2.5" strokeLinecap="round" opacity="0.7" />
+            {/* Bottom shadow lip */}
+            <path d="M21 60.5 H59" stroke={dark} strokeWidth="2.5" strokeLinecap="round" opacity="0.45" />
+
+            {/* Skin-specific shell decorations */}
+            {skin === 'classic_carton' && (
+              <g>
+                <rect x="35.5" y="20" width="9" height="8" fill="#E8C794" stroke={outline} strokeWidth="1.3" />
+                <rect x="19" y="54" width="9" height="6" rx="1" fill="#F7EFE1" stroke={outline} strokeWidth="1.1" />
+              </g>
+            )}
+            {skin === 'parcel_love' && (
+              <rect x="37" y="20" width="6" height="44" fill="#EE5A78" opacity="0.9" />
+            )}
+            {skin === 'pompom_box' && (
+              <g>
+                <path
+                  d="M17 28 C17 20, 63 20, 63 28 C58 32, 53 28, 49 32 C45 29, 39 33, 33 29 C27 33, 21 29, 17 28 Z"
+                  fill="#6E3B26"
+                  stroke={outline}
+                  strokeWidth="1.6"
+                />
+                <ellipse cx="40" cy="18" rx="9" ry="3.6" fill="#6E3B26" stroke={outline} strokeWidth="1.8" />
+                <circle cx="40" cy="14" r="2" fill="#6E3B26" />
+              </g>
+            )}
+            {skin === 'hero_visor' && (
+              <path d="M40 12 L44 21 H36 Z" fill="#38BDF8" stroke={outline} strokeWidth="1.6" strokeLinejoin="round" />
+            )}
+
+            {/* Front Recessed / Framed Face Screen Plate */}
+            <rect
+              x="22"
+              y="28"
+              width="36"
+              height="28"
+              rx="6.5"
+              fill={faceFill}
+              stroke={skin === 'hero_visor' ? '#38BDF8' : dark}
+              strokeWidth="1.8"
+            />
+            {skin === 'panda_box' && (
+              <g>
+                <ellipse cx="31" cy="40" rx="5.5" ry="4.5" transform="rotate(-14 31 40)" fill="#232226" />
+                <ellipse cx="49" cy="40" rx="5.5" ry="4.5" transform="rotate(14 49 40)" fill="#232226" />
+              </g>
+            )}
+            {skin === 'witch_rune' && (
+              <path d="M40 24 L41.5 26.8 L44.5 27 L42 28.8 L42.8 31.6 L40 29.8 L37.2 31.6 L38 28.8 L35.5 27 L38.5 26.8 Z" fill="#F8CB46" />
+            )}
+
+            {/* Mini signature expression on Box preview */}
+            {isDark ? (
+              <g>
+                <rect x="29" y="38" width="5" height="6" rx="1.4" fill="#38BDF8" />
+                <rect x="46" y="38" width="5" height="6" rx="1.4" fill="#38BDF8" />
+                <path d="M36 49 Q40 52 44 49" stroke="#38BDF8" strokeWidth="2" strokeLinecap="round" fill="none" />
+              </g>
             ) : (
-              <path d="M22 35 C23 19, 32 15, 40 15 C48 15, 57 19, 58 35 C51 31, 46 31, 44 35 C41 30, 38 30, 36 35 C33 31, 29 31, 22 35 Z" fill={col} stroke={outline} strokeWidth="1.8" />
+              <g>
+                <circle cx="32" cy="40.5" r="2.6" fill={skin === 'panda_box' ? '#FFFFFF' : '#261C18'} />
+                <circle cx="48" cy="40.5" r="2.6" fill={skin === 'panda_box' ? '#FFFFFF' : '#261C18'} />
+                <ellipse cx="27.5" cy="45" rx="3" ry="1.6" fill="#F48B96" opacity="0.7" />
+                <ellipse cx="52.5" cy="45" rx="3" ry="1.6" fill="#F48B96" opacity="0.7" />
+                <path d="M36 47.5 Q40 50.8 44 47.5" stroke="#2D1E19" strokeWidth="2" strokeLinecap="round" fill="none" />
+              </g>
             )}
-            <path d="M30 20 Q40 17 50 20" stroke={light} strokeWidth="2.2" strokeLinecap="round" opacity="0.7" />
           </g>
         );
       })()}
 
-      {/* 4. MẶT */}
+      {/* 4. MẶT HỘP */}
       {category === 'face' && (() => {
         const eyeCol = patch.eyeColor || '#5B341E';
         const eyeStyle = patch.eyeStyle || 'bright';
@@ -1061,64 +1137,117 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
         const hasBlush = Boolean(patch.blush);
         const isPout = expr === 'pout';
         const isCool = eyeStyle === 'cool';
+        const isPixelDark = eyeStyle === 'box_pixel';
+        const plateFill = isPixelDark ? '#152236' : '#FFFDF8';
+        const strokeMain = isPixelDark ? '#38BDF8' : '#231612';
 
         return (
           <g>
-            {/* Ears + Sculpted Chibi head oval */}
-            <circle cx="15" cy="42" r="4.5" fill="#FDE2CC" stroke={outline} strokeWidth="1.9" />
-            <circle cx="65" cy="42" r="4.5" fill="#FDE2CC" stroke={outline} strokeWidth="1.9" />
-            <path
-              d="M17 39 C17 22, 27 16, 40 16 C53 16, 63 22, 63 39 C63 53, 52 63, 40 63 C28 63, 17 53, 17 39 Z"
-              fill="#FDE2CC"
+            {/* Outer Rounded Box Head Frame */}
+            <rect
+              x="14"
+              y="16"
+              width="52"
+              height="48"
+              rx="10.5"
+              fill={isPixelDark ? '#333E52' : '#F2D5B8'}
               stroke={outline}
-              strokeWidth="2.1"
+              strokeWidth="2.2"
             />
-            {/* Sculpted Eyebrows */}
-            <path
-              d={
-                isPout
-                  ? 'M23.5 29 L34 32.5'
-                  : isCool
-                    ? 'M23 32.5 Q29 31.5 34.5 33'
-                    : 'M23.5 30.5 Q29 28 34.5 30.8'
-              }
-              stroke="#241916"
-              strokeWidth="2.1"
-              strokeLinecap="round"
-              fill="none"
+            {/* Inner Box Screen Plate */}
+            <rect
+              x="18.5"
+              y="21"
+              width="43"
+              height="38"
+              rx="7.5"
+              fill={plateFill}
+              stroke={isPixelDark ? '#38BDF8' : '#D5B290'}
+              strokeWidth="1.6"
             />
-            <path
-              d={
-                isPout
-                  ? 'M46 32.5 L56.5 29'
-                  : isCool
-                    ? 'M45.5 33 Q51 31.5 57 32.5'
-                    : 'M45.5 30.8 Q51 28 56.5 30.5'
-              }
-              stroke="#241916"
-              strokeWidth="2.1"
-              strokeLinecap="round"
-              fill="none"
-            />
-            {/* Soft Rosy Cheeks & cute nose button */}
+
+            {/* Eyebrows (hidden on minimalist dot/pixel/sleepy/heart unless pout) */}
+            {eyeStyle !== 'box_dot' &&
+              eyeStyle !== 'box_pixel' &&
+              eyeStyle !== 'box_sleepy' &&
+              eyeStyle !== 'box_heart' && (
+                <g>
+                  <path
+                    d={
+                      isPout
+                        ? 'M23.5 29 L34 32.5'
+                        : isCool
+                          ? 'M23 32.5 Q29 31.5 34.5 33'
+                          : 'M23.5 30.5 Q29 28 34.5 30.8'
+                    }
+                    stroke="#241916"
+                    strokeWidth="2.1"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  <path
+                    d={
+                      isPout
+                        ? 'M46 32.5 L56.5 29'
+                        : isCool
+                          ? 'M45.5 33 Q51 31.5 57 32.5'
+                          : 'M45.5 30.8 Q51 28 56.5 30.5'
+                    }
+                    stroke="#241916"
+                    strokeWidth="2.1"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </g>
+              )}
+
+            {/* Soft Rosy Cheeks */}
             {hasBlush && (
-              <g opacity="0.7">
-                <ellipse cx="23.5" cy="48.5" rx="5" ry="2.8" fill="#F28B92" />
-                <ellipse cx="56.5" cy="48.5" rx="5" ry="2.8" fill="#F28B92" />
+              <g opacity="0.72">
+                <ellipse cx="24" cy="46.5" rx="4.5" ry="2.5" fill="#F28B92" />
+                <ellipse cx="56" cy="46.5" rx="4.5" ry="2.5" fill="#F28B92" />
               </g>
             )}
-            <circle cx="40" cy="46.2" r={expr === 'joy_open' ? '1.3' : '1.05'} fill={expr === 'joy_open' ? '#CE5D66' : '#C2795E'} />
 
-            {/* Big Expressive Chibi Eyes */}
-            {eyeStyle === 'happy_arc' ? (
+            {/* Box Head Eyes */}
+            {eyeStyle === 'box_dot' ? (
               <g>
-                <path d="M23 41 Q29 34.5 35 41" stroke="#241814" strokeWidth="2.8" strokeLinecap="round" fill="none" />
-                <path d="M45 41 Q51 34.5 57 41" stroke="#241814" strokeWidth="2.8" strokeLinecap="round" fill="none" />
+                <circle cx="29.5" cy="39" r="4" fill={eyeCol} />
+                <circle cx="50.5" cy="39" r="4" fill={eyeCol} />
+                <circle cx="28" cy="37.4" r="1.3" fill="#FFFFFF" />
+                <circle cx="49" cy="37.4" r="1.3" fill="#FFFFFF" />
+              </g>
+            ) : eyeStyle === 'box_pixel' ? (
+              <g>
+                <rect x="25" y="33.5" width="8.5" height="10" rx="1.8" fill={eyeCol} />
+                <rect x="46.5" y="33.5" width="8.5" height="10" rx="1.8" fill={eyeCol} />
+                <rect x="26.5" y="35" width="3" height="3" fill="#FFFFFF" />
+                <rect x="48" y="35" width="3" height="3" fill="#FFFFFF" />
+              </g>
+            ) : eyeStyle === 'box_heart' ? (
+              <g>
+                {[29.5, 50.5].map((cx) => (
+                  <path
+                    key={cx}
+                    d={`M${cx} 44.5 C${cx - 6.5} 40.5, ${cx - 6.5} 34, ${cx - 2.5} 34 C${cx - 0.8} 34, ${cx} 35.4, ${cx} 36.2 C${cx} 35.4, ${cx + 0.8} 34, ${cx + 2.5} 34 C${cx + 6.5} 34, ${cx + 6.5} 40.5, ${cx} 44.5 Z`}
+                    fill={eyeCol}
+                  />
+                ))}
+              </g>
+            ) : eyeStyle === 'box_sleepy' ? (
+              <g>
+                <path d="M23.5 39 Q29.5 43.5 35.5 39" stroke={eyeCol} strokeWidth="2.8" strokeLinecap="round" fill="none" />
+                <path d="M44.5 39 Q50.5 43.5 56.5 39" stroke={eyeCol} strokeWidth="2.8" strokeLinecap="round" fill="none" />
+              </g>
+            ) : eyeStyle === 'happy_arc' ? (
+              <g>
+                <path d="M23.5 40 Q29.5 33.8 35.5 40" stroke="#241814" strokeWidth="2.8" strokeLinecap="round" fill="none" />
+                <path d="M44.5 40 Q50.5 33.8 56.5 40" stroke="#241814" strokeWidth="2.8" strokeLinecap="round" fill="none" />
               </g>
             ) : eyeStyle === 'joy_xd' ? (
               <g>
                 <path
-                  d="M24 36.5 L34.5 41 L24 45.5"
+                  d="M24.5 35.5 L34.5 39.8 L24.5 44"
                   stroke="#1E1512"
                   strokeWidth="2.9"
                   strokeLinecap="round"
@@ -1126,7 +1255,7 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
                   fill="none"
                 />
                 <path
-                  d="M56 36.5 L45.5 41 L56 45.5"
+                  d="M55.5 35.5 L45.5 39.8 L55.5 44"
                   stroke="#1E1512"
                   strokeWidth="2.9"
                   strokeLinecap="round"
@@ -1136,25 +1265,25 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               </g>
             ) : eyeStyle === 'cool' ? (
               <g>
-                {[29, 51].map((ex) => (
+                {[29.5, 50.5].map((ex) => (
                   <g key={ex}>
-                    <path d={`M${ex - 6} 37.5 H${ex + 6} C${ex + 6} 45.5, ${ex - 6} 45.5, ${ex - 6} 37.5 Z`} fill="#FFFFFF" stroke="#1E1818" strokeWidth="1.2" />
-                    <circle cx={ex} cy="40.6" r="3.4" fill={eyeCol} />
-                    <circle cx={ex} cy="40.8" r="1.7" fill="#18141A" />
-                    <circle cx={ex - 1.3} cy="39.4" r="1.15" fill="#FFFFFF" />
-                    <path d={`M${ex - 6.6} 37.4 Q${ex} 36.4 ${ex + 6.6} 37.4`} stroke="#1E1818" strokeWidth="2.6" strokeLinecap="round" fill="none" />
+                    <path d={`M${ex - 5.5} 36.5 H${ex + 5.5} C${ex + 5.5} 44, ${ex - 5.5} 44, ${ex - 5.5} 36.5 Z`} fill="#FFFFFF" stroke="#1E1818" strokeWidth="1.2" />
+                    <circle cx={ex} cy="39.5" r="3.2" fill={eyeCol} />
+                    <circle cx={ex} cy="39.7" r="1.6" fill="#18141A" />
+                    <circle cx={ex - 1.2} cy="38.4" r="1.1" fill="#FFFFFF" />
+                    <path d={`M${ex - 6.2} 36.4 Q${ex} 35.4 ${ex + 6.2} 36.4`} stroke="#1E1818" strokeWidth="2.5" strokeLinecap="round" fill="none" />
                   </g>
                 ))}
               </g>
             ) : (
               <g>
-                {[29, 51].map((ex, idx) => {
+                {[29.5, 50.5].map((ex, idx) => {
                   const isWinkClosed = eyeStyle === 'wink' && idx === 1;
                   if (isWinkClosed) {
                     return (
                       <g key={ex}>
-                        <path d={`M${ex - 6} 41.2 Q${ex} 34.5 ${ex + 6} 41.2`} stroke="#231612" strokeWidth="2.7" strokeLinecap="round" fill="none" />
-                        <path d={`M${ex + 4.8} 39.6 L${ex + 7.2} 37.5`} stroke="#231612" strokeWidth="2" strokeLinecap="round" />
+                        <path d={`M${ex - 5.5} 40.2 Q${ex} 34 ${ex + 5.5} 40.2`} stroke="#231612" strokeWidth="2.6" strokeLinecap="round" fill="none" />
+                        <path d={`M${ex + 4.4} 38.6 L${ex + 6.6} 36.6`} stroke="#231612" strokeWidth="1.9" strokeLinecap="round" />
                       </g>
                     );
                   }
@@ -1162,36 +1291,31 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
                     <g key={ex}>
                       <ellipse
                         cx={ex}
-                        cy="40.2"
-                        rx={eyeStyle === 'heroic' ? 6.0 : 5.8}
-                        ry={eyeStyle === 'sparkle' ? 6.4 : eyeStyle === 'heroic' ? 5.2 : 6.0}
+                        cy="39.2"
+                        rx={eyeStyle === 'heroic' ? 5.6 : 5.4}
+                        ry={eyeStyle === 'sparkle' ? 6.0 : eyeStyle === 'heroic' ? 5.0 : 5.6}
                         fill="#FFFFFF"
                         stroke={eyeStyle === 'gentle' ? '#382117' : '#231612'}
                         strokeWidth="1.2"
                       />
-                      <circle
-                        cx={ex}
-                        cy="40.6"
-                        r={eyeStyle === 'heroic' ? 4.1 : 4.5}
-                        fill={eyeCol}
-                      />
-                      <circle cx={ex} cy="40.6" r="2.2" fill="#171318" />
-                      <circle cx={ex - 1.6} cy="38.5" r="1.6" fill="#FFFFFF" />
-                      <circle cx={ex + 1.6} cy="42.6" r="0.95" fill="#FFFFFF" />
+                      <circle cx={ex} cy="39.6" r={eyeStyle === 'heroic' ? 3.8 : 4.2} fill={eyeCol} />
+                      <circle cx={ex} cy="39.6" r="2.0" fill="#171318" />
+                      <circle cx={ex - 1.5} cy="37.6" r="1.5" fill="#FFFFFF" />
+                      <circle cx={ex + 1.4} cy="41.4" r="0.9" fill="#FFFFFF" />
                       {eyeStyle === 'sparkle' && (
                         <path
-                          d={`M${ex + 1.6} 37.5 L${ex + 2.0} 38.6 L${ex + 3.1} 39.0 L${ex + 2.0} 39.4 L${ex + 1.6} 40.5 L${ex + 1.2} 39.4 L${ex + 0.1} 39.0 L${ex + 1.2} 38.6 Z`}
+                          d={`M${ex + 1.5} 36.6 L${ex + 1.9} 37.6 L${ex + 2.9} 38.0 L${ex + 1.9} 38.4 L${ex + 1.5} 39.4 L${ex + 1.1} 38.4 L${ex + 0.1} 38.0 L${ex + 1.1} 37.6 Z`}
                           fill="#FFFFFF"
                         />
                       )}
                       <path
                         d={
                           idx === 0
-                            ? `M${ex - 6.8} 37.2 Q${ex} 32.8 ${ex + 5.6} 36.8`
-                            : `M${ex - 5.6} 36.8 Q${ex} 32.8 ${ex + 6.8} 37.2`
+                            ? `M${ex - 6.2} 36.2 Q${ex} 32.2 ${ex + 5.2} 36.0`
+                            : `M${ex - 5.2} 36.0 Q${ex} 32.2 ${ex + 6.2} 36.2`
                         }
                         stroke={eyeStyle === 'gentle' ? '#382117' : '#231612'}
-                        strokeWidth="2.5"
+                        strokeWidth="2.4"
                         strokeLinecap="round"
                         fill="none"
                       />
@@ -1201,23 +1325,23 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               </g>
             )}
 
-            {/* Expressive Chibi Mouths */}
+            {/* Expressive Box Head Mouths */}
             {expr === 'joy_open' && (
               <g>
-                <path d="M34.5 51 Q40 51.8 45.5 51 C45.5 57.6, 34.5 57.6, 34.5 51 Z" fill="#C84B59" stroke="#4E2225" strokeWidth="1.1" />
-                <ellipse cx="40" cy="54.8" rx="3.4" ry="1.6" fill="#F796A0" />
+                <path d="M34.5 49.5 Q40 50.3 45.5 49.5 C45.5 55.8, 34.5 55.8, 34.5 49.5 Z" fill="#C84B59" stroke="#4E2225" strokeWidth="1.1" />
+                <ellipse cx="40" cy="53.1" rx="3.2" ry="1.5" fill="#F796A0" />
               </g>
             )}
             {expr === 'gentle_o' && (
               <g>
-                <ellipse cx="40" cy="53.4" rx="2.7" ry="3.1" fill="#C44C5A" stroke="#4E2225" strokeWidth="1.0" />
-                <ellipse cx="40" cy="54.9" rx="1.7" ry="1.2" fill="#F796A0" />
+                <ellipse cx="40" cy="51.6" rx="2.6" ry="3.0" fill="#C44C5A" stroke="#4E2225" strokeWidth="1.0" />
+                <ellipse cx="40" cy="53.0" rx="1.6" ry="1.1" fill="#F796A0" />
               </g>
             )}
             {expr === 'cat_w' && (
               <path
-                d="M34.2 52.5 Q37.1 56 40 52.5 Q42.9 56 45.8 52.5"
-                stroke="#4A261E"
+                d="M34.2 50.8 Q37.1 54.2 40 50.8 Q42.9 54.2 45.8 50.8"
+                stroke={strokeMain}
                 strokeWidth="2.1"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -1225,16 +1349,41 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               />
             )}
             {expr === 'confident' && (
-              <path d="M35.5 53.5 Q40.5 54.8 45 52.2" stroke="#4B2922" strokeWidth="2.1" strokeLinecap="round" fill="none" />
+              <path d="M35.5 51.8 Q40.5 53 45 50.5" stroke={strokeMain} strokeWidth="2.1" strokeLinecap="round" fill="none" />
             )}
             {expr === 'pout' && (
               <g>
-                <path d="M35.8 54.4 Q40 50.8 44.2 54.2" stroke="#45231C" strokeWidth="2.1" strokeLinecap="round" fill="none" />
-                <path d="M43.2 51.4 Q45.2 53.2 43.4 55.2" stroke="#45231C" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                <path d="M35.8 52.6 Q40 49.2 44.2 52.4" stroke={strokeMain} strokeWidth="2.1" strokeLinecap="round" fill="none" />
+                <path d="M43.2 49.8 Q45.2 51.4 43.4 53.4" stroke={strokeMain} strokeWidth="1.5" strokeLinecap="round" fill="none" />
               </g>
             )}
+            {expr === 'box_zigzag' && (
+              <path
+                d="M33 51.5 L35.8 49.2 L38.6 52.5 L41.4 49.2 L44.2 52.5 L47 50.2"
+                stroke={strokeMain}
+                strokeWidth="2.1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            )}
+            {expr === 'box_blep' && (
+              <g>
+                <path d="M34.8 49.8 Q40 52.2 45.2 49.8" stroke={strokeMain} strokeWidth="2.1" strokeLinecap="round" fill="none" />
+                <path d="M37.8 51 H42.2 V54.5 C42.2 56.2, 37.8 56.2, 37.8 54.5 Z" fill="#F4728A" stroke="#7A2E3B" strokeWidth="1.1" />
+              </g>
+            )}
+            {expr === 'box_triangle' && (
+              <path
+                d="M35 49.5 H45 L40 55.2 Z"
+                fill={isPixelDark ? '#38BDF8' : '#E05B69'}
+                stroke={isPixelDark ? '#7DD3FC' : '#4E2225'}
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+              />
+            )}
             {expr === 'sweet_smile' && (
-              <path d="M34.8 52 Q40 56.5 45.2 52" stroke="#5C2E24" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+              <path d="M34.8 50.2 Q40 54.6 45.2 50.2" stroke={strokeMain} strokeWidth="2.2" strokeLinecap="round" fill="none" />
             )}
           </g>
         );
@@ -1319,35 +1468,6 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <path d="M12 52 C14 43, 66 43, 68 52 C56 58, 24 58, 12 52 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
               <path d="M22 44 L25 25 C31 22, 49 22, 55 25 L58 44 Z" fill={shade(col, 10)} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
               <path d="M22 42 Q40 45 58 42" stroke={shade(col, -26)} strokeWidth="4" fill="none" />
-            </g>
-          );
-        }
-        if (style === 'hair_clip') {
-          return (
-            <g>
-              <rect x="18" y="31" width="44" height="7" rx="3.5" transform="rotate(-6 40 34)" fill={col} stroke={outline} strokeWidth="2" />
-              <rect x="18" y="43" width="44" height="7" rx="3.5" transform="rotate(6 40 46)" fill="#FDF2D6" stroke={outline} strokeWidth="2" />
-              <circle cx="54" cy="33" r="3" fill="#FFFDF8" stroke={outline} strokeWidth="1.5" />
-            </g>
-          );
-        }
-        if (style === 'flower_pin') {
-          return (
-            <g transform="translate(40,40)">
-              {[0, 72, 144, 216, 288].map((deg) => (
-                <ellipse
-                  key={deg}
-                  cx="0"
-                  cy="-12"
-                  rx="7"
-                  ry="9"
-                  transform={`rotate(${deg})`}
-                  fill={col}
-                  stroke={outline}
-                  strokeWidth="1.8"
-                />
-              ))}
-              <circle cx="0" cy="0" r="6.5" fill="#F4B942" stroke={outline} strokeWidth="1.8" />
             </g>
           );
         }
@@ -1627,15 +1747,6 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             </g>
           );
         }
-        if (style === 'gingham_neckerchief') {
-          return (
-            <g>
-              <path d="M18 28 Q40 22 62 28 L40 58 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
-              <path d="M25 36 H55 M31 44 H49 M34 28 V48 M46 28 V48" stroke="#FFFFFF" strokeWidth="2.4" opacity="0.88" />
-              <circle cx="40" cy="29" r="4" fill={shade(col, -18)} stroke={outline} strokeWidth="1.5" />
-            </g>
-          );
-        }
         // pearl_necklace
         return (
           <g>
@@ -1796,12 +1907,13 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
         if (style === 'goose_cross_bag') {
           return (
             <g>
-              <path d="M20 20 L60 56" stroke="#E88A38" strokeWidth="4.2" strokeLinecap="round" />
-              <ellipse cx="40" cy="47" rx="16" ry="12" fill={col} stroke={outline} strokeWidth="2.2" />
-              <path d="M35 38 C34 25, 44 23, 45 34" fill={col} stroke={outline} strokeWidth="2" />
-              <ellipse cx="48" cy="29" rx="5.2" ry="2.6" fill="#F28B30" stroke={outline} strokeWidth="1.3" />
-              <circle cx="42" cy="28" r="1.5" fill="#1B1D24" />
-              <path d="M39 36 L34 33 L35 39 Z M39 36 L44 33 L43 39 Z" fill="#E65A5A" stroke={outline} strokeWidth="1" />
+              <rect x="25" y="34" width="30" height="27" rx="12" fill={col} stroke={outline} strokeWidth="2.2" />
+              <ellipse cx="40" cy="50" rx="10" ry="7" fill="#F1F5FA" />
+              <path d="M36 35 C36 22, 44 20, 45 31" fill={col} stroke={outline} strokeWidth="2" />
+              <ellipse cx="47" cy="25" rx="5.5" ry="2.6" fill="#F28B30" stroke={outline} strokeWidth="1.3" />
+              <circle cx="41.5" cy="24.5" r="1.5" fill="#1B1D24" />
+              <path d="M40 32 L35 29 L36 35 Z M40 32 L45 29 L44 35 Z" fill="#E65A5A" stroke={outline} strokeWidth="1" />
+              <path d="M33 61 V66 M47 61 V66" stroke="#F28B30" strokeWidth="3.5" strokeLinecap="round" />
             </g>
           );
         }

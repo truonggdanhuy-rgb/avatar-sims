@@ -3,17 +3,21 @@ import {
   ArrowLeft,
   BookOpen,
   CalendarCheck2,
+  Check,
   ClipboardList,
   CloudSun,
   Coins,
-  Database,
+  Copy,
   Gamepad2,
   Gift,
   Heart,
   Home,
+  KeyRound,
   Moon,
+  RefreshCw,
   Send,
   Settings,
+  ShieldCheck,
   Shirt,
   Smile,
   Sun,
@@ -49,6 +53,11 @@ import {
   PLAYER_ACTION_CATALOG,
   PLAYER_ACTION_SLOT_COUNT,
 } from '../../data/progressionCatalog';
+import {
+  AccountSavePreview,
+  copyTextToClipboard,
+  decodeAccountTransferCode,
+} from '../../utils/accountSave';
 import {soundFX} from '../../utils/sound';
 import {AvatarPreview3D} from '../AvatarPreview3D';
 import {FishIllustration} from '../FishingIcons';
@@ -69,6 +78,8 @@ interface PhoneMenuModalProps {
   playerActions: PlayerActionsState;
   accountCreatedAt: number;
   accountId: string;
+  lastSavedAt: number;
+  accountTransferCode: string;
   teleportCooldownSec: number;
   initialTab?: 'menu' | 'account' | 'guide' | 'fishdex' | 'actions';
   onTeleportToPlaza: () => void;
@@ -82,6 +93,7 @@ interface PhoneMenuModalProps {
   onChangeTimeOfDay: (time: TimeOfDay) => void;
   onToggleSound: () => void;
   onRedeemGiftCode: (code: string) => {ok: boolean; message: string};
+  onRestoreAccountCode: (code: string) => Promise<{ok: boolean; message: string}>;
   onClose: () => void;
 }
 
@@ -114,6 +126,14 @@ function formatJoinDate(ts: number): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
+function formatSavedClock(ts: number): string {
+  const d = new Date(ts || Date.now());
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
 export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   zone,
   avatar,
@@ -129,6 +149,8 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   playerActions,
   accountCreatedAt,
   accountId,
+  lastSavedAt,
+  accountTransferCode,
   teleportCooldownSec,
   initialTab = 'menu',
   onTeleportToPlaza,
@@ -142,6 +164,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   onChangeTimeOfDay,
   onToggleSound,
   onRedeemGiftCode,
+  onRestoreAccountCode,
   onClose,
 }) => {
   const [tab, setTab] = useState<PhoneTab>(initialTab);
@@ -151,6 +174,11 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   const [deviceTime, setDeviceTime] = useState<string>(() => formatDeviceTime());
   const [giftCodeInput, setGiftCodeInput] = useState('');
   const [giftCodeMessage, setGiftCodeMessage] = useState<{ok: boolean; text: string} | null>(null);
+  const [copiedAccountCode, setCopiedAccountCode] = useState(false);
+  const [restoreCodeInput, setRestoreCodeInput] = useState('');
+  const [restorePreview, setRestorePreview] = useState<AccountSavePreview | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState<{ok: boolean; text: string} | null>(null);
+  const [isRestoringCode, setIsRestoringCode] = useState(false);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -158,6 +186,26 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
     }, 10000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    const trimmed = restoreCodeInput.trim();
+    if (!trimmed) {
+      setRestorePreview(null);
+      return;
+    }
+    let cancelled = false;
+    decodeAccountTransferCode(trimmed).then((res) => {
+      if (cancelled) return;
+      if (res.ok) {
+        setRestorePreview(res.preview);
+      } else {
+        setRestorePreview(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [restoreCodeInput]);
 
   const readyQuestCount = DAILY_QUEST_DEFS.filter(
     (q) => dailyQuests.tasks[q.key] && !dailyQuests.claimed[q.key],
@@ -326,6 +374,8 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   onClick={() => {
                     soundFX.tap();
                     setGiftCodeMessage(null);
+                    setRestoreMessage(null);
+                    setCopiedAccountCode(false);
                     setTab('account');
                   }}
                   className="group flex flex-col items-center gap-1.5 transition-transform active:scale-95"
@@ -576,20 +626,142 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-[#D4E2F5] bg-[#F2F7FF] p-2.5">
+                <div className="rounded-xl border border-[#C6E4D1] bg-[#F1FAF4] p-2.5 space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 text-[11px] font-extrabold text-[#2B538C]">
-                      <Database className="h-3.5 w-3.5" />
-                      <span>Đồng bộ Supabase</span>
+                    <span className="flex items-center gap-1.5 text-[11px] font-extrabold text-[#226843]">
+                      <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                      <span>Lưu Tự Động Đang Bật</span>
                     </span>
-                    <span className="rounded-md bg-[#DCE9FC] px-2 py-0.5 text-[9px] font-black text-[#2F5B9E]">
-                      Sắp ra mắt
+                    <span className="rounded-md bg-[#D6F0DF] px-2 py-0.5 text-[9px] font-black text-[#1E623D] tabular-nums">
+                      Đã lưu {formatSavedClock(lastSavedAt)}
                     </span>
                   </div>
-                  <p className="mt-1 text-[10px] font-semibold leading-relaxed text-[#526D94]">
-                    Tài khoản hiện đang lưu trên thiết bị. Tính năng liên kết Supabase để sao lưu đám mây sẽ sớm được mở khóa.
+                  <p className="text-[10px] font-semibold leading-relaxed text-[#3E6E54]">
+                    Mọi tiến trình tự động lưu liên tục. Khi đổi máy hoặc đổi trình duyệt, hãy sao chép mã bên dưới để mang toàn bộ tài khoản sang máy mới.
                   </p>
+                  <div className="rounded-lg border border-[#BFE0CB] bg-white px-2.5 py-1.5">
+                    <div className="mb-1 text-[9px] font-extrabold tracking-wide text-[#5B7C68] uppercase">
+                      Mã Lưu Tài Khoản (Tự Cập Nhật)
+                    </div>
+                    <input
+                      type="text"
+                      readOnly
+                      value={accountTransferCode || 'Đang tạo mã lưu tài khoản...'}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onClick={(e) => e.currentTarget.select()}
+                      aria-label="Mã lưu tài khoản"
+                      className="w-full bg-transparent font-mono text-[10px] font-bold text-[#3B2A1A] focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!accountTransferCode}
+                    onClick={async () => {
+                      if (!accountTransferCode) return;
+                      soundFX.tap();
+                      const ok = await copyTextToClipboard(accountTransferCode);
+                      if (ok) {
+                        soundFX.sparkle();
+                        setCopiedAccountCode(true);
+                        window.setTimeout(() => setCopiedAccountCode(false), 2500);
+                      }
+                    }}
+                    className={`flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition-all active:scale-95 disabled:opacity-50 ${
+                      copiedAccountCode
+                        ? 'bg-[#2E8555] text-white'
+                        : 'bg-[#3A9462] text-white shadow-xs hover:bg-[#318155]'
+                    }`}
+                  >
+                    {copiedAccountCode ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        <span>Đã sao chép mã tài khoản!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Sao chép mã tài khoản</span>
+                      </>
+                    )}
+                  </button>
                 </div>
+              </div>
+
+              {/* Khôi phục tài khoản từ mã (Đổi máy) */}
+              <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3.5 shadow-xs space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-black text-[#4A3525]">
+                  <KeyRound className="h-4 w-4 text-[#2F6296]" />
+                  <span>Đổi Máy · Khôi Phục Tài Khoản</span>
+                </div>
+                <p className="text-[10px] font-semibold leading-relaxed text-[#7A6048]">
+                  Dán mã tài khoản từ máy cũ vào đây để khôi phục lại toàn bộ nhân vật, xu, tủ đồ, nông trại và thú cưng.
+                </p>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    soundFX.tap();
+                    if (!restoreCodeInput.trim()) {
+                      setRestoreMessage({
+                        ok: false,
+                        text: 'Vui lòng dán mã tài khoản trước khi khôi phục.',
+                      });
+                      return;
+                    }
+                    setIsRestoringCode(true);
+                    const res = await onRestoreAccountCode(restoreCodeInput);
+                    setIsRestoringCode(false);
+                    setRestoreMessage({ok: res.ok, text: res.message});
+                    if (res.ok) {
+                      soundFX.sparkle();
+                    }
+                  }}
+                  className="space-y-2"
+                >
+                  <textarea
+                    rows={2}
+                    value={restoreCodeInput}
+                    onChange={(e) => {
+                      setRestoreCodeInput(e.target.value);
+                      if (restoreMessage) setRestoreMessage(null);
+                    }}
+                    placeholder="Dán mã TTM1-... vào đây"
+                    className="w-full resize-none rounded-xl border border-[#DECBB0] bg-[#FAF4EA] px-3 py-2 font-mono text-[10px] font-semibold text-[#3B2A1A] placeholder:font-sans placeholder:text-[#9D856B] focus:border-[#2F6296] focus:outline-none"
+                  />
+
+                  {restorePreview && (
+                    <div className="rounded-xl border border-[#C6E4D1] bg-[#F1FAF4] px-2.5 py-2 text-[10px] font-bold text-[#246341]">
+                      <div>
+                        Tìm thấy: <span className="font-black">{restorePreview.playerName}</span> ({restorePreview.accountId})
+                      </div>
+                      <div className="mt-0.5 text-[#3B7353] tabular-nums">
+                        {restorePreview.coins.toLocaleString('vi-VN')} Xu · {restorePreview.coinGame} CG ·{' '}
+                        {restorePreview.ownedItemCount} món đồ · {restorePreview.petCount} thú cưng
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isRestoringCode}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#2F6296] px-3 py-2 text-xs font-black text-white shadow-xs transition-transform active:scale-95 disabled:opacity-60"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isRestoringCode ? 'animate-spin' : ''}`} />
+                    <span>
+                      {isRestoringCode ? 'Đang khôi phục...' : 'Khôi phục tài khoản từ mã'}
+                    </span>
+                  </button>
+                </form>
+                {restoreMessage && (
+                  <p
+                    className={`rounded-xl px-2.5 py-2 text-[11px] font-semibold leading-relaxed ${
+                      restoreMessage.ok
+                        ? 'bg-[#EAF8EE] text-[#2A6E40]'
+                        : 'bg-[#FDF0ED] text-[#A8382B]'
+                    }`}
+                  >
+                    {restoreMessage.text}
+                  </p>
+                )}
               </div>
 
               <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3.5 shadow-xs space-y-2">

@@ -11,6 +11,21 @@ export type ZoneId =
 
 export type TimeOfDay = 'morning' | 'night';
 
+export type BoxHeadSkinId =
+  | 'classic_carton'
+  | 'cream_cube'
+  | 'parcel_love'
+  | 'tv_screen'
+  | 'cat_box'
+  | 'bunny_box'
+  | 'frog_box'
+  | 'panda_box'
+  | 'student_milk'
+  | 'witch_rune'
+  | 'pompom_box'
+  | 'hero_visor'
+  | 'midautumn_lantern';
+
 export type HairBackStyle =
   | 'long_wave'
   | 'twin_tails'
@@ -38,7 +53,11 @@ export type EyeStyle =
   | 'cool'
   | 'happy_arc'
   | 'joy_xd'
-  | 'wink';
+  | 'wink'
+  | 'box_dot'
+  | 'box_pixel'
+  | 'box_heart'
+  | 'box_sleepy';
 
 export type ExpressionStyle =
   | 'sweet_smile'
@@ -46,7 +65,10 @@ export type ExpressionStyle =
   | 'cat_w'
   | 'gentle_o'
   | 'confident'
-  | 'pout';
+  | 'pout'
+  | 'box_zigzag'
+  | 'box_blep'
+  | 'box_triangle';
 
 export type TopStyle =
   | 'sailor_blouse'
@@ -158,8 +180,6 @@ export type HeadItemStyle =
   | 'cat_ears'
   | 'flower_crown'
   | 'ribbon_bow'
-  | 'hair_clip'
-  | 'flower_pin'
   | 'non_la'
   | 'khan_dong'
   | 'bunny_beanie'
@@ -181,8 +201,7 @@ export type AccessoryStyle =
   | 'star_glasses'
   | 'pearl_ribbon_choker'
   | 'camera_strap'
-  | 'vampire_cross_earring'
-  | 'gingham_neckerchief';
+  | 'vampire_cross_earring';
 
 export type BackpackStyle =
   | 'none'
@@ -249,9 +268,11 @@ export type AvatarPose =
 export interface AvatarConfig {
   name: string;
   skinTone: string;
-  hairBack: HairBackStyle;
-  hairFront: HairFrontStyle;
-  hairColor: string;
+  boxHeadSkin: BoxHeadSkinId;
+  boxHeadColor: string;
+  hairBack?: HairBackStyle;
+  hairFront?: HairFrontStyle;
+  hairColor?: string;
   eyeStyle: EyeStyle;
   eyeColor: string;
   expression: ExpressionStyle;
@@ -495,7 +516,9 @@ export type ArcadeGameId =
   | 'catch_stars'
   | 'claw_ball'
   | 'rhythm_dance'
-  | 'pc_games';
+  | 'pc_games'
+  | 'parkour_climb'
+  | 'obstacle_rush';
 
 export interface GameStats {
   coins: number;

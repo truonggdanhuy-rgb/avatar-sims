@@ -5,9 +5,11 @@ import {
   ArrowRight,
   ArrowUp,
   Coins,
+  Flag,
   Gift,
   Hammer,
   Monitor,
+  Mountain,
   Music,
   Play,
   RotateCcw,
@@ -16,11 +18,13 @@ import {
   Trophy,
   X,
 } from 'lucide-react';
-import {ArcadeGameId, COINGAME_TO_XU_RATE} from '../../types/game';
+import {ArcadeGameId, AvatarConfig, COINGAME_TO_XU_RATE} from '../../types/game';
 import {soundFX} from '../../utils/sound';
+import {ObstacleRushGame, ParkourClimbGame} from './ArcadeActionGames';
 
 interface ArcadeMiniGameModalProps {
   gameId: ArcadeGameId;
+  avatar?: AvatarConfig;
   coins: number;
   coinGame: number;
   hasFreeClawToday: boolean;
@@ -65,6 +69,18 @@ const GAME_META: Record<
     badge: '+1 đến +9 Xu',
     headerBg: 'bg-gradient-to-r from-[#10B981] to-[#34D399]',
     accentBorder: 'border-[#34D399]',
+  },
+  parkour_climb: {
+    title: 'Parkour Leo Trèo (3 Map)',
+    badge: '+2 đến +7 CG · N Mạng',
+    headerBg: 'bg-gradient-to-r from-[#0284C7] to-[#38BDF8]',
+    accentBorder: 'border-[#38BDF8]',
+  },
+  obstacle_rush: {
+    title: 'Về Đích Vượt Chướng Ngại Vật',
+    badge: '+1 đến +6 CG · Đua Giây · 5 Mạng',
+    headerBg: 'bg-gradient-to-r from-[#EA580C] to-[#FB923C]',
+    accentBorder: 'border-[#FB923C]',
   },
 };
 
@@ -1881,6 +1897,7 @@ const PcHtmlGames: React.FC<{onEarnCoins: (amt: number) => void}> = ({onEarnCoin
 // ============================================================================
 export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
   gameId,
+  avatar,
   coins,
   coinGame,
   hasFreeClawToday,
@@ -1891,12 +1908,15 @@ export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
   onClose,
 }) => {
   const meta = GAME_META[gameId];
+  const isWideActionGame = gameId === 'parkour_climb' || gameId === 'obstacle_rush';
 
   const renderIcon = () => {
     if (gameId === 'whack_mole') return <Hammer className="h-4 w-4" />;
     if (gameId === 'catch_stars') return <Star className="h-4 w-4" />;
     if (gameId === 'claw_ball') return <Gift className="h-4 w-4" />;
     if (gameId === 'rhythm_dance') return <Music className="h-4 w-4" />;
+    if (gameId === 'parkour_climb') return <Mountain className="h-4 w-4" />;
+    if (gameId === 'obstacle_rush') return <Flag className="h-4 w-4" />;
     return <Monitor className="h-4 w-4" />;
   };
 
@@ -1907,7 +1927,9 @@ export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`anim-pop flex max-h-[94dvh] w-full max-w-[490px] flex-col overflow-hidden rounded-3xl border-4 ${meta.accentBorder} bg-white text-[#0F172A] shadow-2xl`}
+        className={`anim-pop flex max-h-[94dvh] w-full ${
+          isWideActionGame ? 'max-w-[680px]' : 'max-w-[490px]'
+        } flex-col overflow-hidden rounded-3xl border-4 ${meta.accentBorder} bg-white text-[#0F172A] shadow-2xl`}
       >
         {/* Slim Dedicated Game Cabinet Top Bar */}
         <div className={`flex shrink-0 items-center justify-between gap-2 px-3.5 py-2.5 text-white ${meta.headerBg}`}>
@@ -1959,6 +1981,12 @@ export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
           )}
           {gameId === 'rhythm_dance' && <RhythmDanceGame onEarnCoinGame={onEarnCoinGame} />}
           {gameId === 'pc_games' && <PcHtmlGames onEarnCoins={onEarnCoins} />}
+          {gameId === 'parkour_climb' && (
+            <ParkourClimbGame avatar={avatar} onEarnCoinGame={onEarnCoinGame} />
+          )}
+          {gameId === 'obstacle_rush' && (
+            <ObstacleRushGame avatar={avatar} onEarnCoinGame={onEarnCoinGame} />
+          )}
         </div>
 
         <div className="border-t border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-1.5 text-center text-[10px] font-bold text-[#64748B]">

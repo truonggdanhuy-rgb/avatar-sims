@@ -109,7 +109,7 @@ export const WardrobeModal: React.FC<WardrobeModalProps> = ({
               {tab === 'face' && (
                 <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#E5D5BE] bg-[#FBF4EA] px-3 py-2">
                   <span className="text-xs font-bold text-[#5B422E]">
-                    Má hồng trên gương mặt
+                    Má hồng trên mặt hộp
                   </span>
                   <button
                     type="button"

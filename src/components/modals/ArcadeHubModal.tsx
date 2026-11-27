@@ -3,10 +3,12 @@ import {
   ArrowLeftRight,
   Box,
   Coins,
+  Flag,
   Gamepad2,
   Gift,
   Hammer,
   Monitor,
+  Mountain,
   Music,
   Play,
   ShoppingBag,
@@ -39,6 +41,24 @@ interface MachineItem {
 }
 
 const ARCADE_MACHINES: MachineItem[] = [
+  {
+    id: 'parkour_climb',
+    name: 'Parkour Leo Trèo (3 Map)',
+    reward: '+2 đến +7 CoinGame / ván (Tự chọn Map)',
+    note: 'Leo thang dây, cây cối cao qua 3 map khác nhau. Té hết N mạng sẽ thua!',
+    accent: 'border-[#38BDF8]/65 bg-[#0F273B]',
+    playable: true,
+    gameId: 'parkour_climb',
+  },
+  {
+    id: 'obstacle_rush',
+    name: 'Về Đích Vượt Chướng Ngại Vật',
+    reward: '+1 đến +6 CoinGame (Về càng nhanh càng nhiều)',
+    note: 'Map lớn: Đá lăn, thanh quạt té, hố sụp, gai, mưa độc đi chậm. 5 mạng!',
+    accent: 'border-[#FB923C]/65 bg-[#2F1A12]',
+    playable: true,
+    gameId: 'obstacle_rush',
+  },
   {
     id: 'whack_mole',
     name: 'Đập Chuột Vui Nhộn',
@@ -134,6 +154,8 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
   ];
 
   const renderMachineIcon = (id: MachineItem['id']) => {
+    if (id === 'parkour_climb') return <Mountain className="h-4 w-4 text-[#38BDF8]" />;
+    if (id === 'obstacle_rush') return <Flag className="h-4 w-4 text-[#FB923C]" />;
     if (id === 'whack_mole') return <Hammer className="h-4 w-4 text-[#F472B6]" />;
     if (id === 'catch_stars') return <Star className="h-4 w-4 text-[#FDE047]" />;
     if (id === 'claw_ball') return <Gift className="h-4 w-4 text-[#38BDF8]" />;
@@ -268,9 +290,9 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                     <Monitor className="h-4 w-4 text-[#C4B5FD]" />
                     <span className="text-[10px] font-black text-[#34D399]">Đang mở</span>
                   </div>
-                  <div className="mt-2 text-xs font-black text-white">5 Trò Chơi Đã Mở</div>
+                  <div className="mt-2 text-xs font-black text-white">7 Trò Chơi Đã Mở</div>
                   <div className="mt-0.5 text-[11px] font-bold text-[#DDD6FE]">
-                    Đập chuột · Hứng sao · Bóng ? · Nhảy · PC
+                    Parkour · Vượt chướng ngại vật · Đập chuột · Nhảy
                   </div>
                 </button>
 
@@ -295,8 +317,8 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
 
               <div className="rounded-2xl border border-white/10 bg-[#0D1324] px-3.5 py-2.5 text-[11px] font-semibold leading-relaxed text-[#CBD5E1]">
                 Chạm trực tiếp từng máy trong Khu Game hoặc chọn tab{' '}
-                <strong className="text-white">Máy Game</strong> để chơi ngay Đập Chuột, Hứng
-                Sao, Gắp Bóng ?, Sàn Nhảy và Dàn PC HTML!
+                <strong className="text-white">Máy Game</strong> để chơi ngay Parkour (3 Map),
+                Về Đích Vượt Chướng Ngại Vật, Đập Chuột, Hứng Sao, Gắp Bóng ?, Sàn Nhảy và PC!
               </div>
             </>
           )}
@@ -308,7 +330,7 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                   <Trophy className="h-4 w-4 text-[#FBBF24]" />
                   <span>Chọn Trò Chơi Trong Khu Game</span>
                 </div>
-                <span className="text-[10px] font-black text-[#34D399]">5 máy hoạt động</span>
+                <span className="text-[10px] font-black text-[#34D399]">7 máy hoạt động</span>
               </div>
 
               {ARCADE_MACHINES.map((m) => (
