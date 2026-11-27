@@ -47,6 +47,7 @@ import {getMountDefinition} from '../data/mountCatalog';
 import {PLAYER_ACTION_CATALOG, PLAYER_ACTION_SLOT_COUNT} from '../data/progressionCatalog';
 import {
   BicycleMountIcon,
+  DongThapLotusMountIcon,
   FishIllustration,
   LotusUmbrellaMountIcon,
   SkateboardMountIcon,
@@ -8127,7 +8128,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               idleBlend: skateIdleBlend,
             });
           }
-        } else if (curMountDef.kind === 'lotus_umbrella') {
+        } else if (curMountDef.kind === 'lotus_umbrella' || curMountDef.kind === 'dong_thap_lotus') {
           mountRig.root.position.lerp(_mountZeroVec, Math.min(1, delta * 18));
           const isLotusMoving = moveHorizSpeed > 0.22 && !isAirborne;
           playerPos.pose = isLotusMoving ? 'lotus_ride' : 'lotus_idle';
@@ -8225,7 +8226,12 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         mountAnimParams,
       );
 
-      if (ridingMountActive && curMountDef?.kind === 'lotus_umbrella' && mountRig?.lotusPivot && playerRig.rightHand) {
+      if (
+        ridingMountActive &&
+        (curMountDef?.kind === 'lotus_umbrella' || curMountDef?.kind === 'dong_thap_lotus') &&
+        mountRig?.lotusPivot &&
+        playerRig.rightHand
+      ) {
         playerRig.root.updateMatrixWorld(true);
         playerRig.rightHand.getWorldPosition(_lotusHandWorldVec);
         playerRig.root.worldToLocal(_lotusHandWorldVec);
@@ -9391,6 +9397,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 <SkateboardMountIcon className="h-6 w-6 shrink-0" />
               ) : quickDef.kind === 'lotus_umbrella' ? (
                 <LotusUmbrellaMountIcon className="h-6 w-6 shrink-0" />
+              ) : quickDef.kind === 'dong_thap_lotus' ? (
+                <DongThapLotusMountIcon className="h-6 w-6 shrink-0" />
               ) : quickDef.kind === 'witch_broom' ? (
                 <WitchBroomMountIcon className="h-6 w-6 shrink-0" />
               ) : (

@@ -979,6 +979,19 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
                 <path d="M57 30 C69 33, 72 49, 67 64 C64 68, 58 65, 56 56 Z" fill={col} stroke={outline} strokeWidth="2" />
               </g>
             )}
+            {back === 'student_braids' && (
+              <g>
+                {/* Twin braided pigtails draping forward with crimson bows */}
+                <circle cx="21" cy="48" r="4.5" fill={col} stroke={outline} strokeWidth="1.7" />
+                <circle cx="20" cy="54" r="4.2" fill={col} stroke={outline} strokeWidth="1.7" />
+                <circle cx="21" cy="60" r="3.6" fill={col} stroke={outline} strokeWidth="1.7" />
+                <circle cx="59" cy="48" r="4.5" fill={col} stroke={outline} strokeWidth="1.7" />
+                <circle cx="60" cy="54" r="4.2" fill={col} stroke={outline} strokeWidth="1.7" />
+                <circle cx="59" cy="60" r="3.6" fill={col} stroke={outline} strokeWidth="1.7" />
+                <path d="M17 59 L25 59 L21 63 Z M55 59 L63 59 L59 63 Z" fill="#DF3038" stroke={outline} strokeWidth="1.1" />
+                <path d="M19 63 L21 69 L23 63 Z M57 63 L59 69 L61 63 Z" fill={col} stroke={outline} strokeWidth="1.4" />
+              </g>
+            )}
             {back === 'ponytail' && (
               <path d="M54 25 C67 27, 72 41, 66 59 C63 63, 57 60, 56 52 Z" fill={col} stroke={outline} strokeWidth="2" />
             )}
@@ -1792,6 +1805,44 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             </g>
           );
         }
+        if (style === 'student_bag_gingham') {
+          return (
+            <g>
+              <path d="M28 32 C28 14, 52 14, 52 32" stroke={col} strokeWidth="5.2" strokeLinecap="round" fill="none" />
+              <path d="M28 32 C28 14, 52 14, 52 32" stroke="#FFFFFF" strokeWidth="2.2" strokeDasharray="3.5 3.5" fill="none" />
+              <rect x="22" y="31" width="36" height="31" rx="6" fill="#FFFFFF" stroke={outline} strokeWidth="2.2" />
+              <rect x="24" y="33" width="32" height="27" rx="4" fill={col} opacity="0.88" />
+              <path d="M30 33 V60 M40 33 V60 M50 33 V60 M24 41 H56 M24 50 H56" stroke="#FFFFFF" strokeWidth="3" opacity="0.82" />
+              <rect x="22" y="31" width="36" height="31" rx="6" fill="none" stroke={outline} strokeWidth="2.2" />
+            </g>
+          );
+        }
+        if (style === 'student_bag_brown' || style === 'student_bag_navy') {
+          const trim = style === 'student_bag_navy' ? '#F4EFE6' : '#E9C259';
+          return (
+            <g>
+              <path d="M27 32 C27 14, 53 14, 53 32" stroke={shade(col, -16)} strokeWidth="4.5" strokeLinecap="round" fill="none" />
+              <rect x="20" y="31" width="40" height="30" rx="7" fill={col} stroke={outline} strokeWidth="2.2" />
+              <path d="M20 35 C20 31, 60 31, 60 35 V47 H20 Z" fill={shade(col, -12)} stroke={outline} strokeWidth="2" />
+              <rect x="36" y="44" width="8" height="7" rx="2" fill={trim} stroke={outline} strokeWidth="1.4" />
+            </g>
+          );
+        }
+        if (style === 'witch_moon_bag') {
+          return (
+            <g>
+              <path d="M18 19 L58 51" stroke="#E09B1D" strokeWidth="4" strokeLinecap="round" />
+              <path
+                d="M20 41 C20 56, 41 64, 57 52 C46 53, 36 45, 36 33 C28 34, 22 37, 20 41 Z"
+                fill={col}
+                stroke={outline}
+                strokeWidth="2.2"
+                strokeLinejoin="round"
+              />
+              <circle cx="29" cy="40" r="2.6" fill="#FFF6B8" stroke={outline} strokeWidth="1.2" />
+            </g>
+          );
+        }
         // angel_wings
         return (
           <g>
@@ -2013,6 +2064,26 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <path d="M23 24 H41 L43 44 H58 C63 46, 63 57, 57 57 H21 Z" fill={col} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
               <path d="M21 53 H60 V57 H21 Z" fill="#C92228" stroke={outline} strokeWidth="1.4" />
               <path d="M27 32 Q32 28 37 32 M27 38 Q32 34 37 38" stroke="#E8E1D3" strokeWidth="1.5" fill="none" />
+            </g>
+          );
+        }
+        if (style === 'student_mary_socks') {
+          return (
+            <g>
+              <path d="M24 16 H40 V45 H24 Z" fill="#FFFFFF" stroke={outline} strokeWidth="1.8" />
+              <path d="M23 16 H41" stroke="#E2E8F0" strokeWidth="3" strokeLinecap="round" />
+              <path d="M18 42 C22 50, 38 50, 44 42 L59 46 C64 48, 64 56, 59 57 H19 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M29 44 Q33 36 39 42" stroke={col} strokeWidth="3.2" fill="none" />
+              <path d="M29 44 Q33 36 39 42" stroke={outline} strokeWidth="1.4" fill="none" />
+            </g>
+          );
+        }
+        if (style === 'student_loafers') {
+          return (
+            <g>
+              <path d="M25 31 H39 V44 H25 Z" fill="#FFFFFF" stroke={outline} strokeWidth="1.7" />
+              <path d="M18 41 C22 49, 39 49, 45 41 L60 45 C64 47, 64 56, 59 57 H19 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <rect x="33" y="42" width="12" height="5" rx="2" fill="#3B3544" stroke={outline} strokeWidth="1.2" />
             </g>
           );
         }

@@ -238,6 +238,36 @@ const BlackCatIcon: React.FC<{className?: string}> = ({className = 'h-10 w-10'})
   </svg>
 );
 
+const MoonlightCatIcon: React.FC<{className?: string}> = ({className = 'h-10 w-10'}) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none">
+    {/* Sparkling golden stars */}
+    <path d="M8 12 L9.5 15 L12.5 16.5 L9.5 18 L8 21 L6.5 18 L3.5 16.5 L6.5 15 Z" fill="#FDE047" />
+    <circle cx="40" cy="11" r="1.8" fill="#FEF08A" />
+    {/* Glowing golden crescent moon cradle */}
+    <path
+      d="M7 28 C10 42, 34 45, 42 30 C35 36, 17 34, 13 24 C10.5 25, 8 26.5, 7 28 Z"
+      fill="#F8CE48"
+      stroke="#B57B14"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    {/* Cute black kitten peeking from crescent */}
+    <path d="M16 19 L14.5 8 L22.5 13 Z" fill="#282233" stroke="#14101B" strokeWidth="1.4" strokeLinejoin="round" />
+    <path d="M34 19 L35.5 8 L27.5 13 Z" fill="#282233" stroke="#14101B" strokeWidth="1.4" strokeLinejoin="round" />
+    <path d="M16.8 16.8 L16 10.6 L21 13.8 Z" fill="#EF8FA6" />
+    <path d="M33.2 16.8 L34 10.6 L29 13.8 Z" fill="#EF8FA6" />
+    <ellipse cx="25" cy="22" rx="11.5" ry="10" fill="#282233" stroke="#14101B" strokeWidth="1.5" />
+    <ellipse cx="20.4" cy="21" rx="3.1" ry="3.4" fill="#F59E0B" stroke="#14101B" strokeWidth="1" />
+    <ellipse cx="29.6" cy="21" rx="3.1" ry="3.4" fill="#F59E0B" stroke="#14101B" strokeWidth="1" />
+    <ellipse cx="20.4" cy="21.1" rx="1.2" ry="2.5" fill="#120E17" />
+    <ellipse cx="29.6" cy="21.1" rx="1.2" ry="2.5" fill="#120E17" />
+    <circle cx="21.4" cy="19.8" r="0.95" fill="#FFFFFF" />
+    <circle cx="30.6" cy="19.8" r="0.95" fill="#FFFFFF" />
+    <path d="M23.8 25 H26.2 L25 26.4 Z" fill="#F295AC" />
+    <path d="M22.8 27.5 Q23.9 28.8 25 27.4 Q26.1 28.8 27.2 27.5" stroke="#8E81A4" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+  </svg>
+);
+
 export const PetSpeciesIcon: React.FC<{
   speciesId: PetSpeciesId;
   className?: string;
@@ -247,6 +277,7 @@ export const PetSpeciesIcon: React.FC<{
   if (speciesId === 'chinese_cat') return <ChineseCatIcon className={className} />;
   if (speciesId === 'mischievous_parrot') return <MischievousParrotIcon className={className} />;
   if (speciesId === 'black_cat') return <BlackCatIcon className={className} />;
+  if (speciesId === 'moonlight_cat') return <MoonlightCatIcon className={className} />;
   return <BrownPuppyIcon className={className} />;
 };
 

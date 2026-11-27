@@ -352,6 +352,63 @@ export function LotusUmbrellaMountIcon({className = 'w-11 h-11'}: {className?: s
 }
 
 /**
+ * Giant Radiant Dong Thap Pink Lotus Mount Icon with sparkles & falling petals
+ */
+export function DongThapLotusMountIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Golden & rose sparkles */}
+      <path d="M12 14 L13.5 17 L16.5 18.5 L13.5 20 L12 23 L10.5 20 L7.5 18.5 L10.5 17 Z" fill="#FDE047" />
+      <circle cx="52" cy="14" r="2.2" fill="#FDE047" />
+      <circle cx="15" cy="46" r="1.8" fill="#F9A8D4" />
+      <circle cx="50" cy="44" r="1.8" fill="#F9A8D4" />
+      {/* Graceful green stem & calyx cup */}
+      <path d="M32 34 C32 42, 29 50, 27 57" stroke="#54B956" strokeWidth="3.8" strokeLinecap="round" />
+      <path d="M25 33 H39 L35 39 H29 Z" fill="#479E32" stroke="#166534" strokeWidth="1.4" strokeLinejoin="round" />
+      {/* Outer luminous pink-white lotus petals */}
+      <path
+        d="M32 35 C20 36, 9 29, 10 19 C17 19, 25 23, 32 35 Z"
+        fill="#FFB8D9"
+        stroke="#DB2777"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M32 35 C44 36, 55 29, 54 19 C47 19, 39 23, 32 35 Z"
+        fill="#FFB8D9"
+        stroke="#DB2777"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M32 35 C22 30, 17 18, 22 10 C27 14, 30 22, 32 35 Z"
+        fill="#FF98C8"
+        stroke="#DB2777"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M32 35 C42 30, 47 18, 42 10 C37 14, 34 22, 32 35 Z"
+        fill="#FF98C8"
+        stroke="#DB2777"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      {/* Central radiant pearl-pink petal */}
+      <path
+        d="M32 36 C25 27, 25 14, 32 7 C39 14, 39 27, 32 36 Z"
+        fill="#FFF5FA"
+        stroke="#DB2777"
+        strokeWidth="1.9"
+        strokeLinejoin="round"
+      />
+      {/* Golden stamen glow */}
+      <circle cx="32" cy="30" r="2.8" fill="#FDE047" />
+    </svg>
+  );
+}
+
+/**
  * Flying Witch Broomstick Icon with red bow, crescent moon pouch & cute Black Cat
  */
 export function WitchBroomMountIcon({className = 'w-11 h-11'}: {className?: string}) {

@@ -1,9 +1,19 @@
 import React from 'react';
-import {Backpack, CheckCircle2, Coins, Sparkles, Store, X, Zap} from 'lucide-react';
-import {MOUNT_RANK_META, SKATEBOARD_CLASSIC_PRICE, TUN_SHOP_MOUNTS} from '../../data/mountCatalog';
+import {Backpack, Cat, CheckCircle2, Coins, Sparkles, Store, X, Zap} from 'lucide-react';
+import {
+  MOUNT_RANK_META,
+  SKATEBOARD_CLASSIC_PRICE,
+  TUN_SHOP_MOUNTS,
+  WITCH_BROOM_PRICE,
+} from '../../data/mountCatalog';
 import {MountId, OwnedMountsState} from '../../types/game';
 import {soundFX} from '../../utils/sound';
-import {BicycleMountIcon, MountCarIcon, SkateboardMountIcon} from '../FishingIcons';
+import {
+  BicycleMountIcon,
+  MountCarIcon,
+  SkateboardMountIcon,
+  WitchBroomMountIcon,
+} from '../FishingIcons';
 
 interface TunShopModalProps {
   coins: number;
@@ -40,7 +50,7 @@ export function TunShopModal({
                 Kumo Motors · Cửa Hàng Xe Tun
               </h2>
               <div className="text-[10px] font-bold text-white/85">
-                Tầng 1 May Mall · Ván Trượt &amp; Xe Đạp chính thức
+                Tầng 1 May Mall · Ván Trượt, Xe Đạp &amp; Chổi Bay chính thức
               </div>
             </div>
           </div>
@@ -68,9 +78,9 @@ export function TunShopModal({
           <div className="flex items-start gap-2.5 rounded-2xl border border-[#F2C9B8] bg-[#FFF2EB] px-3.5 py-2.5 text-xs font-bold text-[#6E2C1B]">
             <Zap className="mt-0.5 h-4 w-4 shrink-0 text-[#D95338]" />
             <span>
-              Tun chào bạn! Các phương tiện <b>Hạng B</b> chạy nhanh hơn đi bộ rõ rệt (Ván trượt giá
-              chỉ <b>{SKATEBOARD_CLASSIC_PRICE} Xu</b>, Xe đạp giá <b>360 Xu</b>). Hạng <b>S</b> siêu
-              tốc sẽ sớm cập bến.
+              Tun chào bạn! Các phương tiện <b>Hạng B</b> chạy nhanh (Ván trượt{' '}
+              <b>{SKATEBOARD_CLASSIC_PRICE} Xu</b>, Xe đạp <b>360 Xu</b>) và <b>Chổi Phù Thủy Mèo
+              Đen (Hạng A · {WITCH_BROOM_PRICE} Xu)</b> bay lướt cực êm đã mở bán!
             </span>
           </div>
 
@@ -95,11 +105,15 @@ export function TunShopModal({
                       className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border ${
                         def.kind === 'skateboard'
                           ? 'border-[#F3C8B8] bg-[#FFF2EB]'
-                          : 'border-[#BFE3EB] bg-[#EBF9FC]'
+                          : def.kind === 'witch_broom'
+                            ? 'border-[#D4BEF5] bg-[#F5EEFF]'
+                            : 'border-[#BFE3EB] bg-[#EBF9FC]'
                       }`}
                     >
                       {def.kind === 'skateboard' ? (
                         <SkateboardMountIcon className="h-12 w-12" />
+                      ) : def.kind === 'witch_broom' ? (
+                        <WitchBroomMountIcon className="h-12 w-12" />
                       ) : (
                         <BicycleMountIcon className="h-12 w-12" />
                       )}
@@ -128,6 +142,12 @@ export function TunShopModal({
                             Ngang giá Thuyền Gỗ
                           </span>
                         )}
+                        {def.kind === 'witch_broom' && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-[#F3E8FF] px-2 py-0.5 text-[10px] font-extrabold text-[#6B21A8]">
+                            <Cat className="h-3 w-3" />
+                            Bay lướt + Mèo Đen
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -153,7 +173,13 @@ export function TunShopModal({
                       className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#D95338] py-2.5 text-sm font-black text-white transition hover:bg-[#BE432B] active:scale-98 disabled:opacity-45"
                     >
                       <Coins className="h-4 w-4" />
-                      Mua {def.kind === 'skateboard' ? 'Ván Trượt' : 'Xe Đạp'} ({def.price} Xu)
+                      Mua{' '}
+                      {def.kind === 'skateboard'
+                        ? 'Ván Trượt'
+                        : def.kind === 'witch_broom'
+                          ? 'Chổi Bay'
+                          : 'Xe Đạp'}{' '}
+                      ({def.price} Xu)
                     </button>
                   </div>
                 ) : (

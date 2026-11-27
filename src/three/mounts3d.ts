@@ -42,6 +42,15 @@ export interface LotusRainDrop {
   speed: number;
 }
 
+export interface LotusFallingPetal {
+  mesh: THREE.Mesh;
+  angle: number;
+  radius: number;
+  phase: number;
+  speed: number;
+  spinOffset: number;
+}
+
 export interface MountRig {
   mountId: MountId;
   kind: MountKind;
@@ -57,6 +66,10 @@ export interface MountRig {
   lotusFrogGroup?: THREE.Group | null;
   lotusCloudGroup?: THREE.Group | null;
   lotusRainDrops?: LotusRainDrop[];
+  dongThapBlossomGroup?: THREE.Group | null;
+  dongThapAuraRings?: THREE.Mesh[];
+  dongThapFallingPetals?: LotusFallingPetal[];
+  dongThapSparkles?: LotusFallingPetal[];
   broomPivot?: THREE.Group | null;
   broomCatGroup?: THREE.Group | null;
   broomCatTail?: THREE.Group | null;
@@ -1070,6 +1083,328 @@ function buildLotusUmbrellaRig(def: MountDefinition): MountRig {
   };
 }
 
+function createDongThapPetalGeometry(
+  length: number,
+  maxWidth: number,
+  cupDepth: number,
+  outwardCurl: number,
+  baseColorHex: string,
+  tipColorHex: string,
+): THREE.BufferGeometry {
+  const segU = 8;
+  const segV = 12;
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const indices: number[] = [];
+  const baseC = new THREE.Color(baseColorHex);
+  const tipC = new THREE.Color(tipColorHex);
+  const tmpC = new THREE.Color();
+
+  for (let iv = 0; iv <= segV; iv++) {
+    const v = iv / segV; // 0 = base at receptacle, 1 = pointed lotus tip
+    // Graceful pointed lotus boat-petal width profile
+    const widthProfile = Math.sin(Math.pow(v, 0.72) * Math.PI) * (1 - 0.12 * v);
+    const halfW = maxWidth * 0.5 * Math.max(0.06, widthProfile);
+    // Outward curve arching gently upward into cupped bowl
+    const y = v * length;
+    const zCurve = Math.sin(v * Math.PI * 0.78) * outwardCurl - Math.pow(v, 2.2) * outwardCurl * 0.35;
+
+    // Color blend: creamy pearl white lower base -> luminous sakura pink -> deeper rose tip
+    const colorBlend = Math.pow(v, 0.85);
+    tmpC.copy(baseC).lerp(tipC, colorBlend);
+
+    for (let iu = 0; iu <= segU; iu++) {
+      const u = (iu / segU) * 2 - 1; // -1..1 across petal width
+      const x = u * halfW;
+      // Cupped cross-section (concave inside toward flower center)
+      const bowlZ = (1 - u * u) * cupDepth * Math.sin(v * Math.PI);
+      positions.push(x, y, zCurve + bowlZ);
+      colors.push(tmpC.r, tmpC.g, tmpC.b);
+    }
+  }
+
+  for (let iv = 0; iv < segV; iv++) {
+    for (let iu = 0; iu < segU; iu++) {
+      const a = iv * (segU + 1) + iu;
+      const b = a + 1;
+      const c = a + (segU + 1);
+      const d = c + 1;
+      indices.push(a, b, d, a, d, c);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function buildDongThapLotusRig(def: MountDefinition): MountRig {
+  const root = new THREE.Group();
+  const geometries: THREE.BufferGeometry[] = [];
+  const materials: THREE.Material[] = [];
+
+  const trackGeo = <T extends THREE.BufferGeometry>(g: T): T => {
+    geometries.push(g);
+    return g;
+  };
+  const trackMat = <T extends THREE.Material>(m: T): T => {
+    materials.push(m);
+    return m;
+  };
+
+  const lotusPivot = new THREE.Group();
+  root.add(lotusPivot);
+
+  const stemMat = trackMat(makeStandard('#6BC84A', 0.42, 0.04));
+  const stemDarkMat = trackMat(makeStandard('#479E32', 0.46, 0.04));
+  const podGoldMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      color: '#FDE047',
+      emissive: '#F59E0B',
+      emissiveIntensity: 0.42,
+      roughness: 0.28,
+      metalness: 0.14,
+    }),
+  );
+  const stamenMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      color: '#FFFBEB',
+      emissive: '#FBBF24',
+      emissiveIntensity: 0.55,
+      roughness: 0.25,
+    }),
+  );
+
+  // Sculpted slightly arched green lotus stem held cleanly in right hand (0,0,0) rising to giant flower
+  const stemCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.015, -0.26, 0.018),
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0.018, 0.48, -0.025),
+    new THREE.Vector3(0.025, 0.96, -0.035),
+  ]);
+  const stemMesh = new THREE.Mesh(
+    trackGeo(new THREE.TubeGeometry(stemCurve, 22, 0.021, 10, false)),
+    stemMat,
+  );
+  const stemTipCap = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.021, 8, 8)), stemDarkMat);
+  stemTipCap.position.set(0.015, -0.26, 0.018);
+  lotusPivot.add(stemMesh, stemTipCap);
+
+  // Giant Luminous Sen Dong Thap Blossom Group
+  const blossomGroup = new THREE.Group();
+  blossomGroup.position.set(0.025, 0.98, -0.035);
+  lotusPivot.add(blossomGroup);
+
+  // Sculpted green lotus receptacle cup & 6 calyx sepals
+  const cupMesh = new THREE.Mesh(
+    trackGeo(new THREE.CylinderGeometry(0.115, 0.028, 0.125, 16)),
+    stemMat,
+  );
+  cupMesh.position.y = 0.04;
+  blossomGroup.add(cupMesh);
+
+  const sepalGeo = trackGeo(
+    createDongThapPetalGeometry(0.19, 0.085, 0.018, 0.02, '#5EC643', '#3E9A2F'),
+  );
+  const sepalMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.45,
+      side: THREE.DoubleSide,
+    }),
+  );
+  for (let i = 0; i < 6; i++) {
+    const ang = (i / 6) * Math.PI * 2;
+    const sepal = new THREE.Mesh(sepalGeo, sepalMat);
+    sepal.position.set(Math.sin(ang) * 0.08, 0.075, Math.cos(ang) * 0.08);
+    sepal.rotation.y = ang;
+    sepal.rotation.x = 1.08;
+    blossomGroup.add(sepal);
+  }
+
+  // Luminous vertex-colored sakura-pink-to-pearl-white lotus petals!
+  const petalOuterMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      emissive: '#FF8FC4',
+      emissiveIntensity: 0.24,
+      roughness: 0.3,
+      metalness: 0.02,
+      side: THREE.DoubleSide,
+    }),
+  );
+  const petalInnerMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      emissive: '#FFD0E6',
+      emissiveIntensity: 0.28,
+      roughness: 0.26,
+      metalness: 0.02,
+      side: THREE.DoubleSide,
+    }),
+  );
+
+  // Outer Tier (8 sweeping large petals spanning ~1.28m)
+  const outerGeo = trackGeo(
+    createDongThapPetalGeometry(0.66, 0.34, 0.075, 0.085, '#FFF6FA', '#FF78B4'),
+  );
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    const petal = new THREE.Mesh(outerGeo, petalOuterMat);
+    petal.position.set(Math.sin(ang) * 0.095, 0.085, Math.cos(ang) * 0.095);
+    petal.rotation.y = ang;
+    petal.rotation.x = 0.88 + (i % 2) * 0.08;
+    blossomGroup.add(petal);
+  }
+
+  // Middle Tier (7 luminous cupped petals)
+  const midGeo = trackGeo(
+    createDongThapPetalGeometry(0.56, 0.29, 0.07, 0.065, '#FFF9FC', '#FF97C6'),
+  );
+  for (let i = 0; i < 7; i++) {
+    const ang = (i / 7) * Math.PI * 2 + 0.28;
+    const petal = new THREE.Mesh(midGeo, petalOuterMat);
+    petal.position.set(Math.sin(ang) * 0.078, 0.1, Math.cos(ang) * 0.078);
+    petal.rotation.y = ang;
+    petal.rotation.x = 0.56;
+    blossomGroup.add(petal);
+  }
+
+  // Inner Tier (6 glowing pearl-pink upright cradling petals)
+  const innerGeo = trackGeo(
+    createDongThapPetalGeometry(0.42, 0.23, 0.062, 0.045, '#FFFFFF', '#FFB4D7'),
+  );
+  for (let i = 0; i < 6; i++) {
+    const ang = (i / 6) * Math.PI * 2 + 0.52;
+    const petal = new THREE.Mesh(innerGeo, petalInnerMat);
+    petal.position.set(Math.sin(ang) * 0.058, 0.115, Math.cos(ang) * 0.058);
+    petal.rotation.y = ang;
+    petal.rotation.x = 0.28;
+    blossomGroup.add(petal);
+  }
+
+  // Glowing Golden Lotus Seedpod (Gương Sen) & Stamen Crown
+  const seedpod = new THREE.Mesh(
+    trackGeo(new THREE.CylinderGeometry(0.088, 0.052, 0.078, 16)),
+    podGoldMat,
+  );
+  seedpod.position.y = 0.155;
+  blossomGroup.add(seedpod);
+
+  const stamenGeo = trackGeo(new THREE.SphereGeometry(0.015, 8, 6));
+  for (let s = 0; s < 16; s++) {
+    const ang = (s / 16) * Math.PI * 2;
+    const dot = new THREE.Mesh(stamenGeo, stamenMat);
+    dot.position.set(Math.sin(ang) * 0.095, 0.195 + (s % 2) * 0.02, Math.cos(ang) * 0.095);
+    blossomGroup.add(dot);
+  }
+
+  // Glowing pink-gold lotus aura rings slowly swirling around blossom
+  const auraRings: THREE.Mesh[] = [];
+  const ringMatPink = trackMat(
+    new THREE.MeshBasicMaterial({
+      color: '#FF9CD0',
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+    }),
+  );
+  const ringMatGold = trackMat(
+    new THREE.MeshBasicMaterial({
+      color: '#FDE68A',
+      transparent: true,
+      opacity: 0.48,
+      depthWrite: false,
+    }),
+  );
+  const aura1 = new THREE.Mesh(trackGeo(new THREE.TorusGeometry(0.68, 0.014, 8, 42)), ringMatPink);
+  aura1.position.y = 0.22;
+  aura1.rotation.set(Math.PI / 2 - 0.18, 0.12, 0);
+  const aura2 = new THREE.Mesh(trackGeo(new THREE.TorusGeometry(0.54, 0.01, 8, 36)), ringMatGold);
+  aura2.position.y = 0.26;
+  aura2.rotation.set(Math.PI / 2 + 0.22, -0.15, 0);
+  blossomGroup.add(aura1, aura2);
+  auraRings.push(aura1, aura2);
+
+  // 12 Drifting Falling Pink Lotus Petals swirling gracefully around the character!
+  const miniPetalGeo = trackGeo(
+    createDongThapPetalGeometry(0.095, 0.056, 0.016, 0.012, '#FFF2F8', '#FF78B4'),
+  );
+  const fallingPetals: LotusFallingPetal[] = [];
+  for (let i = 0; i < 12; i++) {
+    const mesh = new THREE.Mesh(miniPetalGeo, petalOuterMat);
+    mesh.renderOrder = 5;
+    blossomGroup.add(mesh);
+    fallingPetals.push({
+      mesh,
+      angle: (i / 12) * Math.PI * 2,
+      radius: 0.42 + (i % 3) * 0.19,
+      phase: (i * 0.19) % 1,
+      speed: 0.34 + (i % 4) * 0.07,
+      spinOffset: i * 1.1,
+    });
+  }
+
+  // 14 Twinkling Golden & Rose Sparkle Motes rising softly around the lotus
+  const sparkleMatGold = trackMat(
+    new THREE.MeshBasicMaterial({
+      color: '#FEF08A',
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+    }),
+  );
+  const sparkleMatRose = trackMat(
+    new THREE.MeshBasicMaterial({
+      color: '#FBCFE8',
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+    }),
+  );
+  const sparkleGeo = trackGeo(new THREE.OctahedronGeometry(0.022, 0));
+  const sparkles: LotusFallingPetal[] = [];
+  for (let i = 0; i < 14; i++) {
+    const mesh = new THREE.Mesh(sparkleGeo, i % 2 === 0 ? sparkleMatGold : sparkleMatRose);
+    mesh.renderOrder = 6;
+    blossomGroup.add(mesh);
+    sparkles.push({
+      mesh,
+      angle: (i / 14) * Math.PI * 2 + 0.2,
+      radius: 0.36 + (i % 4) * 0.14,
+      phase: (i * 0.23) % 1,
+      speed: 0.42 + (i % 3) * 0.12,
+      spinOffset: i * 0.9,
+    });
+  }
+
+  return {
+    mountId: def.id,
+    kind: def.kind,
+    root,
+    boardCenterPivot: null,
+    rearPivot: null,
+    crankGroup: null,
+    leftPedalPivot: null,
+    rightPedalPivot: null,
+    steerGroup: null,
+    kickstandPivot: null,
+    lotusPivot,
+    dongThapBlossomGroup: blossomGroup,
+    dongThapAuraRings: auraRings,
+    dongThapFallingPetals: fallingPetals,
+    dongThapSparkles: sparkles,
+    wheels: [],
+    dispose: () => {
+      geometries.forEach((g) => g.dispose());
+      materials.forEach((m) => m.dispose());
+    },
+  };
+}
+
 function buildWitchBroomRig(def: MountDefinition): MountRig {
   const root = new THREE.Group();
   const geometries: THREE.BufferGeometry[] = [];
@@ -1277,6 +1612,9 @@ export function buildMountRig(mountId: MountId): MountRig {
   if (def.kind === 'lotus_umbrella') {
     return buildLotusUmbrellaRig(def);
   }
+  if (def.kind === 'dong_thap_lotus') {
+    return buildDongThapLotusRig(def);
+  }
   if (def.kind === 'witch_broom') {
     return buildWitchBroomRig(def);
   }
@@ -1307,6 +1645,66 @@ export function updateMountAnimation(rig: MountRig, state: MountAnimationState):
     }
     if (rig.broomPouchGroup) {
       rig.broomPouchGroup.rotation.z = Math.sin(state.elapsed * 3.2) * 0.08 + (isMoving ? 0.16 : 0);
+    }
+    return;
+  }
+
+  if (rig.kind === 'dong_thap_lotus') {
+    rig.root.rotation.z = 0;
+    const isMoving = state.pose === 'lotus_ride';
+    if (rig.lotusPivot) {
+      rig.lotusPivot.rotation.x = isMoving ? 0.14 : 0.02 + Math.sin(state.elapsed * 2.1) * 0.025;
+      rig.lotusPivot.rotation.z = Math.sin(state.elapsed * 1.8) * 0.038;
+    }
+    if (rig.dongThapBlossomGroup) {
+      rig.dongThapBlossomGroup.rotation.y = Math.sin(state.elapsed * 0.7) * 0.18;
+    }
+    if (rig.dongThapAuraRings) {
+      const [ring1, ring2] = rig.dongThapAuraRings;
+      if (ring1) {
+        ring1.rotation.z = state.elapsed * 0.65;
+        const s1 = 1 + Math.sin(state.elapsed * 2.4) * 0.045;
+        ring1.scale.set(s1, s1, 1);
+      }
+      if (ring2) {
+        ring2.rotation.z = -state.elapsed * 0.9;
+        const s2 = 1 + Math.cos(state.elapsed * 2.8) * 0.05;
+        ring2.scale.set(s2, s2, 1);
+      }
+    }
+    if (rig.dongThapFallingPetals) {
+      for (const petal of rig.dongThapFallingPetals) {
+        const u = (state.elapsed * petal.speed + petal.phase) % 1;
+        const ang = petal.angle + state.elapsed * 0.85;
+        const rad = petal.radius + Math.sin(u * Math.PI * 2 + petal.spinOffset) * 0.14;
+        petal.mesh.position.set(
+          Math.sin(ang) * rad,
+          0.32 - u * 1.38,
+          Math.cos(ang) * rad,
+        );
+        petal.mesh.rotation.set(
+          Math.sin(state.elapsed * 2.2 + petal.spinOffset) * 0.9,
+          ang + state.elapsed * 1.6,
+          Math.cos(state.elapsed * 2.6 + petal.spinOffset) * 0.75,
+        );
+        const fadeScale = Math.sin(u * Math.PI);
+        petal.mesh.scale.setScalar(0.55 + fadeScale * 0.55);
+      }
+    }
+    if (rig.dongThapSparkles) {
+      for (const sp of rig.dongThapSparkles) {
+        const u = (state.elapsed * sp.speed + sp.phase) % 1;
+        const ang = sp.angle - state.elapsed * 0.55;
+        const rad = sp.radius + Math.cos(u * Math.PI * 2) * 0.08;
+        sp.mesh.position.set(
+          Math.sin(ang) * rad,
+          -0.25 + u * 0.92,
+          Math.cos(ang) * rad,
+        );
+        const pulse = Math.sin(u * Math.PI) * (0.65 + 0.45 * Math.sin(state.elapsed * 6.5 + sp.spinOffset));
+        sp.mesh.scale.setScalar(Math.max(0.08, pulse));
+        sp.mesh.rotation.y = state.elapsed * 2.8 + sp.spinOffset;
+      }
     }
     return;
   }

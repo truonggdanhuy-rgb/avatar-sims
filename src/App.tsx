@@ -200,6 +200,7 @@ import {
   ProcessedId,
   RecipeId,
   ShopItem,
+  ShopSet,
   TimeOfDay,
   WellWaterState,
   ZoneId,
@@ -3356,6 +3357,24 @@ export default function App() {
     markQuestDone('delivery');
   };
 
+  const handleBuyShopSet = (set: ShopSet, finalPrice: number) => {
+    const missingIds = set.itemIds.filter((id) => !ownedIds.includes(id));
+    if (missingIds.length === 0 || stats.coins < finalPrice) return;
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - finalPrice,
+      mood: Math.min(100, prev.mood + 14),
+    }));
+    setOwnedIds((prev) => Array.from(new Set([...prev, ...missingIds])));
+    setAvatar((prev) => ({...prev, ...set.patch}));
+    if (set.patch.handheld && set.patch.handheld !== 'none') {
+      setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+      setEquippedFoodId(null);
+    }
+    markQuestDone('delivery');
+  };
+
   const handleBuyFurnitureItem = (item: FurnitureCatalogItem) => {
     if (stats.coins < item.price) return;
     setStats((prev) => ({
@@ -4464,6 +4483,7 @@ export default function App() {
           coins={stats.coins}
           ownedIds={ownedIds}
           onBuyItem={handleBuyShopItem}
+          onBuySet={handleBuyShopSet}
           onEquipAvatar={handleEquipAvatar}
           onClose={() => setBoutiqueOpen(false)}
         />

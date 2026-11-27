@@ -3,7 +3,11 @@ import {Backpack, Cat, Check, CloudRain, Coins, Gamepad2, Sparkles, Wind, X} fro
 import {COINGAME_SHOP_MOUNTS, MOUNT_RANK_META} from '../../data/mountCatalog';
 import {COINGAME_TO_XU_RATE, MountId, OwnedMountsState} from '../../types/game';
 import {soundFX} from '../../utils/sound';
-import {LotusUmbrellaMountIcon, WitchBroomMountIcon} from '../FishingIcons';
+import {
+  DongThapLotusMountIcon,
+  LotusUmbrellaMountIcon,
+  WitchBroomMountIcon,
+} from '../FishingIcons';
 
 interface CoinGameShopModalProps {
   coinGame: number;
@@ -99,6 +103,8 @@ export const CoinGameShopModal: React.FC<CoinGameShopModalProps> = ({
                   <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-[#34D399]/50 bg-[#081F22] p-2">
                     {mount.kind === 'witch_broom' ? (
                       <WitchBroomMountIcon className="h-16 w-16" />
+                    ) : mount.kind === 'dong_thap_lotus' ? (
+                      <DongThapLotusMountIcon className="h-16 w-16" />
                     ) : (
                       <LotusUmbrellaMountIcon className="h-16 w-16" />
                     )}
@@ -128,6 +134,11 @@ export const CoinGameShopModal: React.FC<CoinGameShopModalProps> = ({
                           <>
                             <Cat className="h-3.5 w-3.5 shrink-0" />
                             <span>Chổi bay + Mèo Đen</span>
+                          </>
+                        ) : mount.kind === 'dong_thap_lotus' ? (
+                          <>
+                            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#F9A8D4]" />
+                            <span>Hào quang + Cánh sen</span>
                           </>
                         ) : (
                           <>

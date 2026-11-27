@@ -2,8 +2,9 @@ import {MountDefinition, MountId, MountRank, OwnedMountsState} from '../types/ga
 
 export const SKATEBOARD_CLASSIC_PRICE = 240;
 export const BICYCLE_CLASSIC_PRICE = 360;
+export const WITCH_BROOM_PRICE = 680;
 export const LOTUS_UMBRELLA_COINGAME_PRICE = 60;
-export const WITCH_BROOM_COINGAME_PRICE = 90;
+export const DONG_THAP_LOTUS_COINGAME_PRICE = 180;
 
 export const MOUNT_RANK_META: Record<
   MountRank,
@@ -91,14 +92,32 @@ export const MOUNT_CATALOG: Record<MountId, MountDefinition> = {
       wheelOrTire: '#60C5F1',
     },
   },
+  dong_thap_lotus: {
+    id: 'dong_thap_lotus',
+    kind: 'dong_thap_lotus',
+    rank: 'A',
+    name: 'Sen Đồng Tháp',
+    price: 0,
+    currency: 'coinGame',
+    coinGamePrice: DONG_THAP_LOTUS_COINGAME_PRICE,
+    speedMultiplier: 2.15,
+    description:
+      'Đóa hoa sen hồng Đồng Tháp khổng lồ tỏa sáng rực rỡ, cầm lên bay lượn nhẹ nhàng bậc A cùng vầng hào quang và cánh sen bay lả tả.',
+    palette: {
+      primary: '#FF8AB8',
+      secondary: '#FFF5F9',
+      accent: '#54B956',
+      trim: '#FFD55E',
+      wheelOrTire: '#FFB4D2',
+    },
+  },
   witch_broom: {
     id: 'witch_broom',
     kind: 'witch_broom',
     rank: 'A',
     name: 'Chổi Phù Thủy Mèo Đen',
-    price: 0,
-    currency: 'coinGame',
-    coinGamePrice: WITCH_BROOM_COINGAME_PRICE,
+    price: WITCH_BROOM_PRICE,
+    currency: 'coins',
     speedMultiplier: 1.98,
     description:
       'Chổi phù thủy bay lơ lửng tốc độ bậc A thắt nơ đỏ rực, treo túi trăng khuyết vàng kèm bé Mèo Đen đồng hành.',

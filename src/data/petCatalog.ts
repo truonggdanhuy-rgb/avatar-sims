@@ -77,6 +77,18 @@ export const PET_CATALOG: Record<PetSpeciesId, PetSpeciesDefinition> = {
     primaryColor: '#282233',
     accentColor: '#F59E0B',
   },
+  moonlight_cat: {
+    id: 'moonlight_cat',
+    name: 'Mèo Ánh Trăng',
+    moveType: 'fly',
+    price: 780,
+    canHold: true,
+    holdMode: 'fly_orbit',
+    description:
+      'Chú mèo đen huyền bí mắt hổ phách ngồi trên vầng trăng khuyết vàng óng ánh, bay lượn êm đềm bên cạnh bạn.',
+    primaryColor: '#282233',
+    accentColor: '#F8CE48',
+  },
   mischievous_parrot: {
     id: 'mischievous_parrot',
     name: 'Vẹt Tinh Nghịch',

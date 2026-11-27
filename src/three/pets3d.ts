@@ -23,6 +23,7 @@ export interface PetRig {
   ears?: [THREE.Group, THREE.Group];
   leftWing?: THREE.Group;
   rightWing?: THREE.Group;
+  moonStars?: THREE.Mesh[];
   shadowDisc?: THREE.Mesh;
   sickGroup?: THREE.Group;
   dispose: () => void;
@@ -171,6 +172,7 @@ export function buildPetModel(
   let ears: [THREE.Group, THREE.Group] | undefined;
   let leftWing: THREE.Group | undefined;
   let rightWing: THREE.Group | undefined;
+  let moonStars: THREE.Mesh[] | undefined;
 
   if (withShadow) {
     const shMat = trackMat(
@@ -727,8 +729,8 @@ export function buildPetModel(
     });
     ears = [earL, earR];
     bodyPivot.add(headPivot);
-  } else if (speciesId === 'black_cat') {
-    // Mèo Đen: sleek dark charcoal-plum kitten with oversized golden-amber eyes, pink inner ears & upright tail
+  } else if (speciesId === 'black_cat' || speciesId === 'moonlight_cat') {
+    // Mèo Đen / Mèo Ánh Trăng: sleek dark charcoal-plum kitten with oversized golden-amber eyes, pink inner ears & upright tail
     const blackFurMat = trackMat(makeClay('#282233', 0.66));
     const darkFurMat = trackMat(makeClay('#1C1724', 0.72));
     const earPinkMat = trackMat(makeClay('#EF8FA6', 0.7));
@@ -867,6 +869,57 @@ export function buildPetModel(
     });
     ears = [earL, earR];
     bodyPivot.add(headPivot);
+
+    if (speciesId === 'moonlight_cat') {
+      // Sculpted glowing golden crescent-moon cradle beneath paws + twinkling star charms (matches Image 2!)
+      const moonGoldMat = trackMat(
+        new THREE.MeshStandardMaterial({
+          color: '#F8CE48',
+          emissive: '#F59E0B',
+          emissiveIntensity: 0.28,
+          roughness: 0.28,
+          metalness: 0.14,
+        }),
+      );
+      const starGlowMat = trackMat(
+        new THREE.MeshStandardMaterial({
+          color: '#FEF08A',
+          emissive: '#FBBF24',
+          emissiveIntensity: 0.65,
+          roughness: 0.22,
+        }),
+      );
+
+      const moonShape = new THREE.Shape();
+      moonShape.moveTo(-0.24, 0.15);
+      moonShape.bezierCurveTo(-0.23, -0.14, 0.23, -0.14, 0.24, 0.15);
+      moonShape.bezierCurveTo(0.14, -0.02, -0.14, -0.02, -0.24, 0.15);
+
+      const moonGeo = trackGeo(
+        new THREE.ExtrudeGeometry(moonShape, {
+          depth: 0.088,
+          bevelEnabled: true,
+          bevelThickness: 0.032,
+          bevelSize: 0.024,
+          bevelSegments: 4,
+          curveSegments: 18,
+        }),
+      );
+      moonGeo.center();
+
+      const moonCradle = new THREE.Mesh(moonGeo, moonGoldMat);
+      moonCradle.position.set(0, -0.015, -0.01);
+      moonCradle.rotation.y = 0.34;
+      moonCradle.rotation.z = -0.14;
+      bodyPivot.add(moonCradle);
+
+      const star1 = new THREE.Mesh(trackGeo(new THREE.OctahedronGeometry(0.026, 0)), starGlowMat);
+      star1.position.set(-0.26, 0.14, 0.09);
+      const star2 = new THREE.Mesh(trackGeo(new THREE.OctahedronGeometry(0.02, 0)), starGlowMat);
+      star2.position.set(0.25, 0.17, -0.07);
+      bodyPivot.add(star1, star2);
+      moonStars = [star1, star2];
+    }
   } else if (speciesId === 'mischievous_parrot') {
     // Vẹt Tinh Nghịch - colorful scarlet/gold/emerald/cobalt macaw-style parrot with hooked beak & mischievous crest!
     const crimsonMat = trackMat(makeClay('#E8473F', 0.56));
@@ -1152,6 +1205,7 @@ export function buildPetModel(
     ears,
     leftWing,
     rightWing,
+    moonStars,
     shadowDisc,
     sickGroup,
     dispose: () => {
@@ -1265,6 +1319,70 @@ export function updatePetAnimation(
       }
       if (rig.shadowDisc) rig.shadowDisc.scale.setScalar(1);
     }
+    rig.bodyPivot.scale.setScalar(baseScale);
+  } else if (rig.speciesId === 'moonlight_cat') {
+    // Mèo Ánh Trăng floating gracefully atop its glowing golden crescent moon
+    const isOrbitHeld = mode === 'held_orbit';
+    const isPlayJump = mode === 'play_jump';
+    const isPlayCircle = mode === 'play_circle';
+    const isShopPlay = mode === 'shop_play';
+
+    rig.tailPivot.rotation.y = Math.sin(elapsed * 4.2) * 0.28;
+    rig.tailPivot.rotation.z = Math.cos(elapsed * 3.1) * 0.14;
+    if (rig.ears) {
+      const twitch = Math.sin(elapsed * 3.2) * 0.04;
+      rig.ears[0].rotation.z = 0.02 + twitch;
+      rig.ears[1].rotation.z = -0.02 - twitch;
+    }
+    if (rig.moonStars) {
+      rig.moonStars.forEach((st, idx) => {
+        const s = 0.8 + 0.35 * Math.sin(elapsed * 4.5 + idx * 1.9);
+        st.scale.setScalar(s);
+        st.rotation.y = elapsed * (2.2 + idx * 0.6);
+      });
+    }
+
+    if (isPlayJump) {
+      const p = extra?.playProgress ?? 0;
+      const hop = Math.abs(Math.sin(p * Math.PI * 6));
+      rig.bodyPivot.position.y = 0.06 + hop * 0.28;
+      rig.bodyPivot.rotation.x = -hop * 0.12;
+      rig.bodyPivot.rotation.z = Math.sin(elapsed * 5) * 0.08;
+      rig.headPivot.rotation.z = Math.sin(elapsed * 7) * 0.09;
+      if (rig.shadowDisc) {
+        rig.shadowDisc.position.y = 0.01;
+        rig.shadowDisc.scale.setScalar(Math.max(0.55, 1 - hop * 0.3));
+      }
+    } else if (isOrbitHeld) {
+      rig.bodyPivot.position.y = Math.sin(elapsed * 3.0) * 0.045;
+      rig.bodyPivot.rotation.x = 0.06;
+      rig.bodyPivot.rotation.z = Math.sin(elapsed * 2.1) * 0.09;
+      rig.headPivot.rotation.y = Math.sin(elapsed * 2.2) * 0.18;
+      rig.headPivot.rotation.z = Math.sin(elapsed * 2.6) * 0.06;
+    } else if (isShopPlay) {
+      const bob = Math.sin(elapsed * 3.4) * 0.065;
+      rig.bodyPivot.position.y = 0.08 + bob;
+      rig.bodyPivot.rotation.x = 0.04;
+      rig.bodyPivot.rotation.z = Math.sin(elapsed * 2.2) * 0.08;
+      rig.headPivot.rotation.y = Math.sin(elapsed * 2.4) * 0.22;
+      if (rig.shadowDisc) {
+        rig.shadowDisc.scale.setScalar(0.8 - bob * 0.8);
+      }
+    } else {
+      const bob = Math.sin(elapsed * 2.8) * 0.06;
+      rig.bodyPivot.position.y = hoverH + 0.06 + bob;
+      rig.bodyPivot.rotation.x = isPlayCircle ? 0.1 : 0.04;
+      rig.bodyPivot.rotation.z = Math.sin(elapsed * 2.0) * 0.07;
+      rig.headPivot.rotation.y = Math.sin(elapsed * 2.1) * 0.16;
+      rig.headPivot.rotation.z = Math.sin(elapsed * 2.4) * 0.06;
+      if (rig.shadowDisc) {
+        rig.shadowDisc.position.y = 0.01;
+        rig.shadowDisc.scale.setScalar(0.76 + Math.sin(elapsed * 2.8) * 0.05);
+      }
+    }
+    rig.legs.forEach((leg) => {
+      leg.rotation.x = 0.12;
+    });
     rig.bodyPivot.scale.setScalar(baseScale);
   } else {
     // Flying companions: Blue Bird & Mischievous Parrot

@@ -56,6 +56,7 @@ import {soundFX} from '../../utils/sound';
 import {
   BicycleMountIcon,
   BoatSkinIcon,
+  DongThapLotusMountIcon,
   LotusUmbrellaMountIcon,
   MountCarIcon,
   PetCatFaceIcon,
@@ -1345,6 +1346,8 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                               <SkateboardMountIcon className="h-11 w-11" />
                             ) : def.kind === 'lotus_umbrella' ? (
                               <LotusUmbrellaMountIcon className="h-11 w-11" />
+                            ) : def.kind === 'dong_thap_lotus' ? (
+                              <DongThapLotusMountIcon className="h-11 w-11" />
                             ) : def.kind === 'witch_broom' ? (
                               <WitchBroomMountIcon className="h-11 w-11" />
                             ) : (

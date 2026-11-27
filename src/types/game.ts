@@ -25,7 +25,8 @@ export type HairBackStyle =
   | 'hero_wave'
   | 'witch_bob'
   | 'midautumn_buns'
-  | 'midautumn_spiky';
+  | 'midautumn_spiky'
+  | 'student_braids';
 
 export type HairFrontStyle = 'air_bangs' | 'side_sweep' | 'curtain' | 'neat_fringe';
 
@@ -137,7 +138,9 @@ export type ShoeStyle =
   | 'pompom_slippers'
   | 'witch_mary_janes'
   | 'midautumn_girl_boots'
-  | 'midautumn_boy_boots';
+  | 'midautumn_boy_boots'
+  | 'student_mary_socks'
+  | 'student_loafers';
 
 export type HeadItemStyle =
   | 'none'
@@ -194,7 +197,11 @@ export type BackpackStyle =
   | 'strawberry_bear'
   | 'astro_pack'
   | 'crystal_wings'
-  | 'goose_cross_bag';
+  | 'goose_cross_bag'
+  | 'student_bag_gingham'
+  | 'student_bag_brown'
+  | 'student_bag_navy'
+  | 'witch_moon_bag';
 
 export type HandheldStyle =
   | 'none'
@@ -288,6 +295,15 @@ export interface ShopItem {
   category: ShopCategory;
   name: string;
   price: number;
+  patch: Partial<AvatarConfig>;
+}
+
+export interface ShopSet {
+  id: string;
+  name: string;
+  subtitle: string;
+  price: number;
+  itemIds: string[];
   patch: Partial<AvatarConfig>;
 }
 
@@ -854,6 +870,7 @@ export type PetSpeciesId =
   | 'shiba_puppy'
   | 'chinese_cat'
   | 'black_cat'
+  | 'moonlight_cat'
   | 'mischievous_parrot';
 
 export interface PetSpeciesDefinition {
@@ -891,12 +908,18 @@ export interface PetSupplies {
 
 export type MountRank = 'B' | 'A' | 'S';
 
-export type MountKind = 'skateboard' | 'bicycle' | 'lotus_umbrella' | 'witch_broom';
+export type MountKind =
+  | 'skateboard'
+  | 'bicycle'
+  | 'lotus_umbrella'
+  | 'dong_thap_lotus'
+  | 'witch_broom';
 
 export type MountId =
   | 'skateboard_classic'
   | 'bicycle_classic'
   | 'lotus_umbrella'
+  | 'dong_thap_lotus'
   | 'witch_broom';
 
 export interface MountSkinPalette {
