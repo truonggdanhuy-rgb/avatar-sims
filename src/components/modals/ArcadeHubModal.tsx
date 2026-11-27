@@ -5,13 +5,17 @@ import {
   Coins,
   Gamepad2,
   Gift,
+  Hammer,
   Monitor,
   Music,
+  Play,
+  ShoppingBag,
   Sparkles,
+  Star,
   Trophy,
   X,
 } from 'lucide-react';
-import {ArcadeHubSection, COINGAME_TO_XU_RATE} from '../../types/game';
+import {ArcadeGameId, ArcadeHubSection, COINGAME_TO_XU_RATE} from '../../types/game';
 import {soundFX} from '../../utils/sound';
 
 interface ArcadeHubModalProps {
@@ -19,37 +23,74 @@ interface ArcadeHubModalProps {
   coins: number;
   coinGame: number;
   onSelectSection: (next: ArcadeHubSection) => void;
+  onOpenArcadeGame: (gameId: ArcadeGameId) => void;
+  onOpenCoinGameShop: () => void;
   onClose: () => void;
 }
 
-const UPCOMING_MACHINES = [
+interface MachineItem {
+  id: ArcadeGameId | 'racing_sim';
+  name: string;
+  reward: string;
+  note: string;
+  accent: string;
+  playable: boolean;
+  gameId?: ArcadeGameId;
+}
+
+const ARCADE_MACHINES: MachineItem[] = [
   {
-    id: 'pc_arena',
-    name: 'Dàn PC Esports Cyber',
-    reward: '+2 đến +6 CoinGame / ván',
-    note: 'Đấu phản xạ & combo bàn phím tốc độ cao',
-    accent: 'border-[#38BDF8]/50 bg-[#0F1E33]',
+    id: 'whack_mole',
+    name: 'Đập Chuột Vui Nhộn',
+    reward: '+1 đến +3 CoinGame / ván (30s)',
+    note: 'Đập Chuột Lam & Chuột Vàng, tránh Bom Đỏ, giữ Combo!',
+    accent: 'border-[#F472B6]/55 bg-[#2A1438]',
+    playable: true,
+    gameId: 'whack_mole',
+  },
+  {
+    id: 'catch_stars',
+    name: 'Hứng Sao Bầu Trời',
+    reward: '+1 đến +3 CoinGame / ván (30s)',
+    note: 'Di chuyển giỏ mây hứng Sao Lam/Vàng & né Thiên Thạch',
+    accent: 'border-[#FBBF24]/55 bg-[#281F12]',
+    playable: true,
+    gameId: 'catch_stars',
+  },
+  {
+    id: 'claw_ball',
+    name: 'Máy Gắp Bóng ?',
+    reward: '0 đến +5 CoinGame (15 Xu/lượt · Free 1/ngày)',
+    note: 'Gạt cần điều khiển càng gắp bóng ? thả vào cửa nhận quà!',
+    accent: 'border-[#38BDF8]/55 bg-[#0F233A]',
+    playable: true,
+    gameId: 'claw_ball',
+  },
+  {
+    id: 'rhythm_dance',
+    name: 'Sàn Nhảy Rhythm Beat',
+    reward: '+1 đến +3 CoinGame / bài (30s)',
+    note: 'Bấm đúng nhịp 4 mũi tên ← ↓ ↑ → theo nhạc',
+    accent: 'border-[#A78BFA]/55 bg-[#1D1635]',
+    playable: true,
+    gameId: 'rhythm_dance',
+  },
+  {
+    id: 'pc_games',
+    name: 'Dàn PC Esports (Game HTML)',
+    reward: '+1 đến +9 Xu / ván',
+    note: '3 game HTML nhẹ: Rắn Săn Mồi, Cờ XO, Đoán Nhịp Đèn',
+    accent: 'border-[#34D399]/55 bg-[#0E2623]',
+    playable: true,
+    gameId: 'pc_games',
   },
   {
     id: 'racing_sim',
     name: 'Khoang Đua Xe Sim Racing',
-    reward: '+3 đến +7 CoinGame / chặng',
-    note: 'Lách chướng ngại & giữ tốc độ đường đua Neon',
-    accent: 'border-[#FB7185]/50 bg-[#271525]',
-  },
-  {
-    id: 'rhythm_pad',
-    name: 'Sàn Nhảy Rhythm Beat',
-    reward: '+2 đến +5 CoinGame / bài',
-    note: 'Bấm đúng nhịp mũi tên theo giai điệu',
-    accent: 'border-[#A78BFA]/50 bg-[#1D1635]',
-  },
-  {
-    id: 'hddoll_claw',
-    name: 'Máy Gắp Hộp HDDOLL',
-    reward: 'Quay mở hộp sưu tầm HDDOLL',
-    note: 'Dùng CoinGame để săn búp bê hiếm giới hạn',
-    accent: 'border-[#FBBF24]/50 bg-[#281F12]',
+    reward: 'Coming Soon',
+    note: 'Đang lắp đặt đường đua Neon tốc độ cao',
+    accent: 'border-white/15 bg-[#151A30]',
+    playable: false,
   },
 ];
 
@@ -79,16 +120,27 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
   coins,
   coinGame,
   onSelectSection,
+  onOpenArcadeGame,
+  onOpenCoinGameShop,
   onClose,
 }) => {
   const [previewCoinGame, setPreviewCoinGame] = useState(10);
 
   const tabs: {id: ArcadeHubSection; label: string}[] = [
     {id: 'overview', label: 'Tổng quan'},
+    {id: 'games', label: 'Máy Game'},
     {id: 'blindbox', label: 'Blindbox HDDOLL'},
     {id: 'exchange', label: 'Đổi CoinGame'},
-    {id: 'games', label: 'Máy Game'},
   ];
+
+  const renderMachineIcon = (id: MachineItem['id']) => {
+    if (id === 'whack_mole') return <Hammer className="h-4 w-4 text-[#F472B6]" />;
+    if (id === 'catch_stars') return <Star className="h-4 w-4 text-[#FDE047]" />;
+    if (id === 'claw_ball') return <Gift className="h-4 w-4 text-[#38BDF8]" />;
+    if (id === 'rhythm_dance') return <Music className="h-4 w-4 text-[#C4B5FD]" />;
+    if (id === 'pc_games') return <Monitor className="h-4 w-4 text-[#34D399]" />;
+    return <Gamepad2 className="h-4 w-4 text-[#94A3B8]" />;
+  };
 
   return (
     <div
@@ -101,7 +153,7 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-[#18203D] px-4 py-3">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex min-w-0 items-center gap-2.5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#38BDF8]/60 bg-[#0F172A] text-[#38BDF8]">
               <Gamepad2 className="h-5 w-5" />
             </div>
@@ -110,7 +162,7 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                 Khu Game Cyber Mây
               </div>
               <div className="text-[11px] font-bold text-[#94A3B8]">
-                Đơn vị thưởng mới: CoinGame · Tỷ giá 1 CoinGame = {COINGAME_TO_XU_RATE} Xu
+                1 CoinGame = {COINGAME_TO_XU_RATE} Xu · Cân bằng tương đương Câu cá / Bắt bọ
               </div>
             </div>
           </div>
@@ -175,33 +227,31 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {section === 'overview' && (
             <>
-              <div className="rounded-2xl border border-[#FBBF24]/45 bg-gradient-to-br from-[#231B38] to-[#141A33] p-3.5">
+              <div className="rounded-2xl border border-[#34D399]/55 bg-[#0B2A2B] p-3.5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="flex items-center gap-1.5 text-sm font-black text-[#FDE68A]">
-                      <Gift className="h-4 w-4 text-[#FBBF24]" />
-                      <span>Quay Blindbox HDDOLL</span>
+                    <div className="flex items-center gap-1.5 text-sm font-black text-[#6EE7B7]">
+                      <ShoppingBag className="h-4 w-4 text-[#34D399]" />
+                      <span>Shop CoinGame Premium Đã Mở!</span>
                     </div>
-                    <p className="mt-1 text-xs font-semibold leading-relaxed text-[#CBD5E1]">
-                      Dùng <strong className="text-[#38BDF8]">CoinGame</strong> kiếm từ máy game để
-                      mở hộp sưu tầm búp bê <strong className="text-white">HDDOLL</strong> giới hạn.
+                    <p className="mt-1 text-xs font-semibold leading-relaxed text-[#CCFBF1]">
+                      Ra mắt vật phẩm Premium đầu tiên:{' '}
+                      <strong className="text-white">Lá Sen Che Mưa (Hạng A)</strong> bay lơ lửng
+                      với chú ếch xanh &amp; hiệu ứng mây đổ mưa.
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-lg border border-[#FBBF24]/50 bg-[#FBBF24]/15 px-2 py-0.5 text-[10px] font-black uppercase text-[#FDE68A]">
-                    Coming Soon
-                  </span>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => {
                     soundFX.tap();
-                    onSelectSection('blindbox');
+                    onOpenCoinGameShop();
                   }}
-                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#FBBF24] py-2 text-xs font-black text-[#1E1405] transition active:scale-95"
+                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#34D399] py-2 text-xs font-black text-[#04241C] transition active:scale-95"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-                  <span>Xem Tủ Blindbox HDDOLL</span>
+                  <span>Mở Shop CoinGame Premium</span>
                 </button>
               </div>
 
@@ -210,17 +260,17 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                   type="button"
                   onClick={() => {
                     soundFX.tap();
-                    onSelectSection('exchange');
+                    onSelectSection('games');
                   }}
-                  className="rounded-2xl border border-[#38BDF8]/40 bg-[#16203E] p-3 text-left transition active:scale-95"
+                  className="rounded-2xl border border-[#A78BFA]/45 bg-[#1B1838] p-3 text-left transition active:scale-95"
                 >
                   <div className="flex items-center justify-between">
-                    <ArrowLeftRight className="h-4 w-4 text-[#38BDF8]" />
-                    <span className="text-[10px] font-black text-[#94A3B8]">Sắp mở</span>
+                    <Monitor className="h-4 w-4 text-[#C4B5FD]" />
+                    <span className="text-[10px] font-black text-[#34D399]">Đang mở</span>
                   </div>
-                  <div className="mt-2 text-xs font-black text-white">Quy đổi 2 chiều</div>
-                  <div className="mt-0.5 text-[11px] font-bold tabular-nums text-[#7DD3FC]">
-                    1 CoinGame = {COINGAME_TO_XU_RATE} Xu
+                  <div className="mt-2 text-xs font-black text-white">5 Trò Chơi Đã Mở</div>
+                  <div className="mt-0.5 text-[11px] font-bold text-[#DDD6FE]">
+                    Đập chuột · Hứng sao · Bóng ? · Nhảy · PC
                   </div>
                 </button>
 
@@ -228,27 +278,72 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                   type="button"
                   onClick={() => {
                     soundFX.tap();
-                    onSelectSection('games');
+                    onSelectSection('blindbox');
                   }}
-                  className="rounded-2xl border border-[#A78BFA]/40 bg-[#1B1838] p-3 text-left transition active:scale-95"
+                  className="rounded-2xl border border-[#FBBF24]/40 bg-[#231B38] p-3 text-left transition active:scale-95"
                 >
                   <div className="flex items-center justify-between">
-                    <Monitor className="h-4 w-4 text-[#C4B5FD]" />
-                    <span className="text-[10px] font-black text-[#94A3B8]">Sắp mở</span>
+                    <Gift className="h-4 w-4 text-[#FBBF24]" />
+                    <span className="text-[10px] font-black text-[#FDE68A]">Sắp mở</span>
                   </div>
-                  <div className="mt-2 text-xs font-black text-white">Trò chơi CoinGame</div>
-                  <div className="mt-0.5 text-[11px] font-bold text-[#DDD6FE]">
-                    4 máy gaming hiện đại
+                  <div className="mt-2 text-xs font-black text-white">Blindbox HDDOLL</div>
+                  <div className="mt-0.5 text-[11px] font-bold text-[#FDE68A]">
+                    Quay mở hộp búp bê hiếm
                   </div>
                 </button>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-[#0D1324] px-3.5 py-2.5 text-[11px] font-semibold leading-relaxed text-[#CBD5E1]">
-                Hai máy cổ điển <strong className="text-white">Máy Bắt Sao</strong> và{' '}
-                <strong className="text-white">Gắp Thú Bông</strong> ở cánh phải vẫn hoạt động
-                ngay bây giờ để nhận Xu giải trí!
+                Chạm trực tiếp từng máy trong Khu Game hoặc chọn tab{' '}
+                <strong className="text-white">Máy Game</strong> để chơi ngay Đập Chuột, Hứng
+                Sao, Gắp Bóng ?, Sàn Nhảy và Dàn PC HTML!
               </div>
             </>
+          )}
+
+          {section === 'games' && (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-0.5">
+                <div className="flex items-center gap-1.5 text-xs font-black text-[#E2E8F0]">
+                  <Trophy className="h-4 w-4 text-[#FBBF24]" />
+                  <span>Chọn Trò Chơi Trong Khu Game</span>
+                </div>
+                <span className="text-[10px] font-black text-[#34D399]">5 máy hoạt động</span>
+              </div>
+
+              {ARCADE_MACHINES.map((m) => (
+                <div
+                  key={m.id}
+                  className={`flex items-center justify-between gap-3 rounded-2xl border p-3 ${m.accent}`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-white">
+                      {renderMachineIcon(m.id)}
+                      <span className="truncate">{m.name}</span>
+                    </div>
+                    <div className="mt-0.5 text-[11px] font-semibold text-[#CBD5E1]">{m.note}</div>
+                    <div className="mt-1 text-[11px] font-black text-[#7DD3FC]">{m.reward}</div>
+                  </div>
+                  {m.playable && m.gameId ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFX.tap();
+                        onOpenArcadeGame(m.gameId!);
+                      }}
+                      className="flex shrink-0 items-center gap-1 rounded-xl bg-[#38BDF8] px-3 py-1.5 text-[11px] font-black text-[#081226] transition active:scale-95"
+                    >
+                      <Play className="h-3.5 w-3.5 fill-current" />
+                      <span>Chơi</span>
+                    </button>
+                  ) : (
+                    <span className="shrink-0 rounded-xl border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-black text-[#CBD5E1]">
+                      Sắp mở
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
 
           {section === 'blindbox' && (
@@ -287,8 +382,7 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
               <div className="rounded-2xl border border-white/10 bg-[#0D1324] p-3 text-xs font-semibold leading-relaxed text-[#CBD5E1]">
                 Mỗi hộp <strong className="text-[#FDE68A]">HDDOLL</strong> mở ra ngẫu nhiên mô hình
                 sưu tầm trưng bày tại Nhà Của Tôi hoặc phụ kiện đặc biệt. Giá mỗi lượt quay sẽ cân
-                bằng với tỷ giá <strong className="text-[#38BDF8]">1 CoinGame = 10 Xu</strong> để
-                người chơi cày mini-game hoặc đổi Xu đều công bằng.
+                bằng với tỷ giá <strong className="text-[#38BDF8]">1 CoinGame = 10 Xu</strong>.
               </div>
 
               <button
@@ -357,9 +451,9 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                   ))}
                 </div>
                 <p className="mt-2.5 text-[11px] font-semibold leading-relaxed text-[#94A3B8]">
-                  Tỷ giá 1:10 giúp 1 ván game (~3–5 CoinGame = 30–50 Xu) ngang bằng thời gian câu
-                  cá, giao hàng Joyboy hay nấu ăn, không gây lạm phát Xu khi mở khóa tính năng đổi
-                  2 chiều ở bản cập nhật sau.
+                  Tỷ giá 1:10 giúp 1 ván game (~1–3 CoinGame = 10–30 Xu) ngang bằng thời gian câu
+                  cá, bắt bọ, giao hàng Joyboy hay nấu ăn, không gây lạm phát Xu khi mở khóa tính
+                  năng đổi 2 chiều ở bản cập nhật sau.
                 </p>
               </div>
 
@@ -372,45 +466,9 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
               </button>
             </div>
           )}
-
-          {section === 'games' && (
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between px-0.5">
-                <div className="flex items-center gap-1.5 text-xs font-black text-[#E2E8F0]">
-                  <Trophy className="h-4 w-4 text-[#FBBF24]" />
-                  <span>Các Máy Trò Chơi Đang Lắp Đặt</span>
-                </div>
-                <span className="text-[10px] font-black uppercase text-[#7DD3FC]">
-                  Coming Soon
-                </span>
-              </div>
-
-              {UPCOMING_MACHINES.map((m) => (
-                <div
-                  key={m.id}
-                  className={`flex items-center justify-between gap-3 rounded-2xl border p-3 ${m.accent}`}
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 text-xs font-black text-white">
-                      {m.id === 'rhythm_pad' ? (
-                        <Music className="h-3.5 w-3.5 text-[#C4B5FD]" />
-                      ) : (
-                        <Gamepad2 className="h-3.5 w-3.5 text-[#38BDF8]" />
-                      )}
-                      <span className="truncate">{m.name}</span>
-                    </div>
-                    <div className="mt-0.5 text-[11px] font-semibold text-[#CBD5E1]">{m.note}</div>
-                    <div className="mt-1 text-[11px] font-black text-[#7DD3FC]">{m.reward}</div>
-                  </div>
-                  <span className="shrink-0 rounded-xl border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-black text-[#CBD5E1]">
-                    Sắp ra mắt
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
 };
+

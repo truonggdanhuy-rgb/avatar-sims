@@ -65,6 +65,18 @@ export const PET_CATALOG: Record<PetSpeciesId, PetSpeciesDefinition> = {
     primaryColor: '#FFFFFF',
     accentColor: '#D94343',
   },
+  black_cat: {
+    id: 'black_cat',
+    name: 'Mèo Đen',
+    moveType: 'walk',
+    price: 540,
+    canHold: true,
+    holdMode: 'walk_orbit',
+    description:
+      'Chú mèo đen phù thủy lông nhung huyền bí với đôi mắt hổ phách to tròn long lanh, lanh lợi bám gót bạn khắp thị trấn.',
+    primaryColor: '#282233',
+    accentColor: '#F59E0B',
+  },
   mischievous_parrot: {
     id: 'mischievous_parrot',
     name: 'Vẹt Tinh Nghịch',

@@ -695,6 +695,28 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 365,
     patch: {top: 'pompom_sleep_dress', topColor: '#9A4834'},
   },
+  // === BST MÈO ĐEN & TRUNG THU ĐOÀN VIÊN ===
+  {
+    id: 'top_witch_cat_dress',
+    category: 'tops',
+    name: 'Đầm Phù Thủy Mèo Đen',
+    price: 390,
+    patch: {top: 'witch_cat_dress', topColor: '#232028'},
+  },
+  {
+    id: 'top_midautumn_girl',
+    category: 'tops',
+    name: 'Áo Đầm Trung Thu Đoàn Viên',
+    price: 410,
+    patch: {top: 'midautumn_girl_top', topColor: '#E0282C'},
+  },
+  {
+    id: 'top_midautumn_boy',
+    category: 'tops',
+    name: 'Áo Gấm Trung Thu Nam',
+    price: 385,
+    patch: {top: 'midautumn_boy_top', topColor: '#DF262A'},
+  },
 
   // ========== 2. QUẦN ==========
   {
@@ -921,6 +943,27 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 195,
     patch: {bottom: 'pompom_pajama_pants', bottomColor: '#9A4834'},
   },
+  {
+    id: 'bot_witch_cat_skirt',
+    category: 'bottoms',
+    name: 'Váy Xòe Mèo Đen',
+    price: 240,
+    patch: {bottom: 'witch_cat_skirt', bottomColor: '#232028'},
+  },
+  {
+    id: 'bot_midautumn_bloomers',
+    category: 'bottoms',
+    name: 'Quần Bí Trung Thu Nữ',
+    price: 220,
+    patch: {bottom: 'midautumn_bloomers', bottomColor: '#FFFDFB'},
+  },
+  {
+    id: 'bot_midautumn_boy_pants',
+    category: 'bottoms',
+    name: 'Quần Mây Bạc Trung Thu Nam',
+    price: 265,
+    patch: {bottom: 'midautumn_boy_pants', bottomColor: '#1C1A20'},
+  },
 
   // ========== 3. TÓC ==========
   {
@@ -999,6 +1042,27 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Tóc Nam 4',
     price: 150,
     patch: {hairBack: 'boy_4', hairFront: 'neat_fringe', hairColor: '#3D2A20'},
+  },
+  {
+    id: 'hair_witch_bob',
+    category: 'hair',
+    name: 'Tóc Bob Mèo Đen',
+    price: 210,
+    patch: {hairBack: 'witch_bob', hairFront: 'neat_fringe', hairColor: '#1E1B24'},
+  },
+  {
+    id: 'hair_midautumn_buns',
+    category: 'hair',
+    name: 'Tóc Búi Tết Trung Thu Nữ',
+    price: 285,
+    patch: {hairBack: 'midautumn_buns', hairFront: 'neat_fringe', hairColor: '#261E1D'},
+  },
+  {
+    id: 'hair_midautumn_spiky',
+    category: 'hair',
+    name: 'Tóc Tỉa Trung Thu Nam',
+    price: 250,
+    patch: {hairBack: 'midautumn_spiky', hairFront: 'side_sweep', hairColor: '#1D1B22'},
   },
 
   // ========== 4. MẶT ==========
@@ -1262,6 +1326,13 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Mũ Trùm Tai Dài Pompompurin',
     price: 255,
     patch: {headItem: 'pompom_ear_hood', headItemColor: '#FFE885'},
+  },
+  {
+    id: 'head_witch_giant_bow',
+    category: 'head',
+    name: 'Nơ Đỏ Mèo Đen',
+    price: 220,
+    patch: {headItem: 'witch_giant_bow', headItemColor: '#DF2B32'},
   },
 
   // ========== 5. PHỤ KIỆN ==========
@@ -1612,6 +1683,27 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 180,
     patch: {shoes: 'pompom_slippers', shoeColor: '#F8D45C'},
   },
+  {
+    id: 'shoe_witch_mary_janes',
+    category: 'shoes',
+    name: 'Giày Búp Bê Mèo Đen',
+    price: 195,
+    patch: {shoes: 'witch_mary_janes', shoeColor: '#242026'},
+  },
+  {
+    id: 'shoe_midautumn_girl_boots',
+    category: 'shoes',
+    name: 'Bốt Đỏ Trung Thu Nữ',
+    price: 245,
+    patch: {shoes: 'midautumn_girl_boots', shoeColor: '#E0282C'},
+  },
+  {
+    id: 'shoe_midautumn_boy_boots',
+    category: 'shoes',
+    name: 'Bốt Mây Trung Thu Nam',
+    price: 235,
+    patch: {shoes: 'midautumn_boy_boots', shoeColor: '#1E1B24'},
+  },
 
   // ========== 7. CẦM TAY ==========
   {
@@ -1690,6 +1782,20 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Cành Hoa Cúc Trắng Xinh',
     price: 135,
     patch: {handheld: 'daisy_flower', handheldColor: '#FFFFFF'},
+  },
+  {
+    id: 'hand_star_lantern',
+    category: 'handheld',
+    name: 'Lồng Đèn Ngôi Sao Trung Thu',
+    price: 255,
+    patch: {handheld: 'star_lantern', handheldColor: '#E23030'},
+  },
+  {
+    id: 'hand_rooster_lantern',
+    category: 'handheld',
+    name: 'Lồng Đèn Gà Trống Trung Thu',
+    price: 275,
+    patch: {handheld: 'rooster_lantern', handheldColor: '#56C44E'},
   },
 ];
 

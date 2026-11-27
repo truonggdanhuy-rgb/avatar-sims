@@ -45,7 +45,13 @@ import {getNetRepairCost} from '../data/insectCatalog';
 import {MAX_PET_INTIMACY, PET_CATALOG} from '../data/petCatalog';
 import {getMountDefinition} from '../data/mountCatalog';
 import {PLAYER_ACTION_CATALOG, PLAYER_ACTION_SLOT_COUNT} from '../data/progressionCatalog';
-import {BicycleMountIcon, FishIllustration, SkateboardMountIcon} from './FishingIcons';
+import {
+  BicycleMountIcon,
+  FishIllustration,
+  LotusUmbrellaMountIcon,
+  SkateboardMountIcon,
+  WitchBroomMountIcon,
+} from './FishingIcons';
 import {InsectIllustration} from './InsectIcons';
 import {BlingBlingBadge, PetSpeciesIcon} from './PetIcons';
 import {
@@ -137,6 +143,7 @@ import {
 } from '../three/islandBuilder';
 import {
   ActionId,
+  ArcadeGameId,
   ArcadeHubSection,
   AvatarConfig,
   AvatarPose,
@@ -314,6 +321,8 @@ interface WorldCanvasProps {
   onPondProximityChange: (near: boolean) => void;
   onAddCoins: (amount: number) => void;
   onOpenArcadeHub?: (section?: ArcadeHubSection) => void;
+  onOpenArcadeGame: (gameId: ArcadeGameId) => void;
+  onOpenCoinGameShop: () => void;
   activePet: OwnedPetState | null;
   carriedPetId: string | null;
   petSupplies: PetSupplies;
@@ -1389,6 +1398,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onPondProximityChange,
   onAddCoins,
   onOpenArcadeHub,
+  onOpenArcadeGame,
+  onOpenCoinGameShop,
   onOpenPhone,
   onOpenBag,
   activePet,
@@ -1463,9 +1474,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     maxDurability: number;
   } | null>(null);
   const [catchCelebration, setCatchCelebration] = useState<CatchCelebrationData | null>(null);
-  const [miniActive, setMiniActive] = useState(false);
-  const [miniScore, setMiniScore] = useState(0);
-  const [starPos, setStarPos] = useState({x: 50, y: 50});
   const [nearbyDoor, setNearbyDoor] = useState<{id: string; label: string; isOpen: boolean} | null>(
     null,
   );
@@ -1497,7 +1505,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
   useEffect(() => {
     setActionsTrayOpen(false);
-  }, [zone, miniActive, editFurnitureMode, editFarmDecorMode, isParachutingHud]);
+  }, [zone, editFurnitureMode, editFarmDecorMode, isParachutingHud]);
 
   useEffect(() => {
     bumpJumpButtonVisibility();
@@ -1506,7 +1514,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         clearTimeout(jumpDimTimerRef.current);
       }
     };
-  }, [zone, miniActive, editFurnitureMode, editFarmDecorMode, isParachutingHud]);
+  }, [zone, editFurnitureMode, editFarmDecorMode, isParachutingHud]);
 
   const stateRef = useRef({
     zone,
@@ -1612,6 +1620,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onPondProximityChange,
     onAddCoins,
     onOpenArcadeHub,
+    onOpenArcadeGame,
+    onOpenCoinGameShop,
     onOpenPetSupplyShop,
     onOpenPetAdopt,
     onOpenBbqGrill,
@@ -1666,6 +1676,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onPondProximityChange,
     onAddCoins,
     onOpenArcadeHub,
+    onOpenArcadeGame,
+    onOpenCoinGameShop,
     onOpenPetSupplyShop,
     onOpenPetAdopt,
     onOpenBbqGrill,
@@ -2051,6 +2063,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     let bikeLeanAngle = 0;
     let prevPlayerRotForSteer = playerPos.rotY;
     const _mountZeroVec = new THREE.Vector3(0, 0, 0);
+    const _lotusHandWorldVec = new THREE.Vector3();
 
     const syncMountRig = (mountId: MountId | null) => {
       if (!mountId) {
@@ -4921,10 +4934,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (kind === 'arcade_star') {
             soundFX.tap();
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
-              setMiniScore(0);
-              setMiniActive(true);
-              setStarPos({x: 30 + Math.random() * 45, y: 25 + Math.random() * 50});
               soundFX.sparkle();
+              callbacksRef.current.onOpenArcadeGame('catch_stars');
             });
             return;
           }
@@ -4933,8 +4944,25 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             soundFX.tap();
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
-              callbacksRef.current.onAddCoins(8);
-              showBubble('Gắp trúng Gấu Bông! +8 Xu', playerPos.x, 2.1, playerPos.z);
+              callbacksRef.current.onOpenArcadeGame('claw_ball');
+            });
+            return;
+          }
+
+          if (kind === 'arcade_whack_mole') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenArcadeGame('whack_mole');
+            });
+            return;
+          }
+
+          if (kind === 'arcade_coingame_shop') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onOpenCoinGameShop();
             });
             return;
           }
@@ -4957,11 +4985,39 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
-          if (
-            kind === 'arcade_pc_station' ||
-            kind === 'arcade_racing_pod' ||
-            kind === 'arcade_dance_pad'
-          ) {
+          if (kind === 'arcade_pc_station') {
+            soundFX.tap();
+            startWalkTo(
+              data.tx as number,
+              data.tz as number,
+              'sit',
+              {
+                seatX: data.seatX as number,
+                seatZ: data.seatZ as number,
+                seatY: data.seatY as number,
+                rotY: data.sitRotY as number,
+                standX: data.tx as number,
+                standZ: data.tz as number,
+              },
+              () => {
+                soundFX.sparkle();
+                callbacksRef.current.onOpenArcadeGame('pc_games');
+              },
+            );
+            return;
+          }
+
+          if (kind === 'arcade_dance_pad') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onBoostMood();
+              callbacksRef.current.onOpenArcadeGame('rhythm_dance');
+            });
+            return;
+          }
+
+          if (kind === 'arcade_racing_pod') {
             soundFX.tap();
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
@@ -8071,6 +8127,38 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               idleBlend: skateIdleBlend,
             });
           }
+        } else if (curMountDef.kind === 'lotus_umbrella') {
+          mountRig.root.position.lerp(_mountZeroVec, Math.min(1, delta * 18));
+          const isLotusMoving = moveHorizSpeed > 0.22 && !isAirborne;
+          playerPos.pose = isLotusMoving ? 'lotus_ride' : 'lotus_idle';
+          const lotusIdleB = isLotusMoving ? 0 : 1;
+          mountAnimParams = {idleBlend: lotusIdleB};
+          updateMountAnimation(mountRig, {
+            pose: playerPos.pose,
+            elapsed,
+            speed: moveHorizSpeed,
+            wheelAngle: 0,
+            crankAngle: 0,
+            steerAngle: 0,
+            wheelRadius: 0.3,
+            idleBlend: lotusIdleB,
+          });
+        } else if (curMountDef.kind === 'witch_broom') {
+          mountRig.root.position.lerp(_mountZeroVec, Math.min(1, delta * 18));
+          const isBroomMoving = moveHorizSpeed > 0.22;
+          playerPos.pose = isBroomMoving ? 'broom_ride' : 'broom_idle';
+          const broomIdleB = isBroomMoving ? 0 : 1;
+          mountAnimParams = {idleBlend: broomIdleB};
+          updateMountAnimation(mountRig, {
+            pose: playerPos.pose,
+            elapsed,
+            speed: moveHorizSpeed,
+            wheelAngle: 0,
+            crankAngle: 0,
+            steerAngle: 0,
+            wheelRadius: 0.3,
+            idleBlend: broomIdleB,
+          });
         } else {
           const wheelRadius = 0.355;
           mountRig.root.position.lerp(_mountZeroVec, Math.min(1, delta * 18));
@@ -8136,6 +8224,13 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         avatarPoseProgress,
         mountAnimParams,
       );
+
+      if (ridingMountActive && curMountDef?.kind === 'lotus_umbrella' && mountRig?.lotusPivot && playerRig.rightHand) {
+        playerRig.root.updateMatrixWorld(true);
+        playerRig.rightHand.getWorldPosition(_lotusHandWorldVec);
+        playerRig.root.worldToLocal(_lotusHandWorldVec);
+        mountRig.lotusPivot.position.copy(_lotusHandWorldVec);
+      }
 
       // Keep walking orbit pet cleanly grounded on hills, plaza, Skydeck, or elevator floor
       if (playerRig.heldPetRig && PET_CATALOG[playerRig.heldPetRig.speciesId].moveType === 'walk') {
@@ -8887,19 +8982,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     };
   }, []);
 
-  const hitStar = () => {
-    const next = miniScore + 1;
-    soundFX.sparkle();
-    if (next >= 5) {
-      setMiniActive(false);
-      onAddCoins(15);
-      showBubble('Phá đảo Bắt Sao! +15 Xu', 4.4, 2.1, 0.7);
-    } else {
-      setMiniScore(next);
-      setStarPos({x: 20 + Math.random() * 60, y: 20 + Math.random() * 60});
-    }
-  };
-
   const handleToggleNearbyDoor = () => {
     if (!nearbyDoor) return;
     const door = activeDoorsRef.current.find((d) => d.id === nearbyDoor.id);
@@ -9123,7 +9205,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         )}
 
       {/* May Mall Panoramic Glass Elevator Action HUD */}
-      {zone === 'town' && mallElevatorHud !== 'none' && !miniActive && (
+      {zone === 'town' && mallElevatorHud !== 'none' && (
         <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 justify-center">
           <button
             type="button"
@@ -9147,7 +9229,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Parachute Glide Status HUD Banner */}
-      {zone === 'town' && isParachutingHud && !miniActive && (
+      {zone === 'town' && isParachutingHud && (
         <div className="phone-ui pointer-events-none absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
           <div className="anim-pop flex items-center gap-2 rounded-2xl border-2 border-[#E86C5D] bg-[#FFF8F2]/95 px-4 py-2 text-xs font-extrabold text-[#5E281B] shadow-lg whitespace-nowrap">
             <ArrowDown className="h-4 w-4 shrink-0 text-[#E86C5D]" />
@@ -9157,7 +9239,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Hot Air Balloon Departure Button ("Qua Đảo") when close to Town Balloon Station */}
-      {zone === 'town' && nearTownBalloon && !isParachutingHud && !miniActive && (
+      {zone === 'town' && nearTownBalloon && !isParachutingHud && (
         <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 justify-center">
           <button
             type="button"
@@ -9173,7 +9255,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Hot Air Balloon Return Button ("Về Mây") when close to Island Balloon Station */}
-      {zone === 'island' && nearIslandBalloon && !isSwimmingHud && !isBoatingHud && !miniActive && (
+      {zone === 'island' && nearIslandBalloon && !isSwimmingHud && !isBoatingHud && (
         <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 justify-center">
           <button
             type="button"
@@ -9189,7 +9271,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Island Boat Pier Swim Entry HUD */}
-      {zone === 'island' && nearIslandPier && !isSwimmingHud && !isBoatingHud && !miniActive && (
+      {zone === 'island' && nearIslandPier && !isSwimmingHud && !isBoatingHud && (
         <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 justify-center">
           <button
             type="button"
@@ -9205,7 +9287,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Top-Left Compact Smartphone Icon Button */}
-      {!miniActive && !isEditingAny && (
+      {!isEditingAny && (
         <button
           type="button"
           onClick={() => {
@@ -9232,7 +9314,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Top-Left Standalone Backpack ('Túi Đồ') Button beside Phone */}
-      {!miniActive && !isEditingAny && (
+      {!isEditingAny && (
         <button
           type="button"
           onClick={() => {
@@ -9253,7 +9335,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Top-Left Release Pet ('X') Button beside Backpack when hugging / shoulder-perching a pet */}
-      {carriedPetId && activePet && !miniActive && !isEditingAny && (
+      {carriedPetId && activePet && !isEditingAny && (
         <button
           type="button"
           onClick={() => {
@@ -9281,7 +9363,6 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
       {/* Top-Left Quick Mount / Dismount Button when player owns any mount */}
       {ownedMounts.ownedIds.length > 0 &&
-        !miniActive &&
         !isEditingAny &&
         (() => {
           const quickId =
@@ -9308,6 +9389,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             >
               {quickDef.kind === 'skateboard' ? (
                 <SkateboardMountIcon className="h-6 w-6 shrink-0" />
+              ) : quickDef.kind === 'lotus_umbrella' ? (
+                <LotusUmbrellaMountIcon className="h-6 w-6 shrink-0" />
+              ) : quickDef.kind === 'witch_broom' ? (
+                <WitchBroomMountIcon className="h-6 w-6 shrink-0" />
               ) : (
                 <BicycleMountIcon className="h-6 w-6 shrink-0" />
               )}
@@ -9319,8 +9404,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         })()}
 
       {/* Compact Top-Left Held Food/Drink Quick-Eat Pill & Low-Hunger (<5%) Speed Warning */}
-      {!miniActive &&
-        !isEditingAny &&
+      {!isEditingAny &&
         ((equippedFoodId && (bbqFoods[equippedFoodId] ?? 0) > 0) ||
           (stats.hunger ?? 100) < HUNGER_HUNGRY_THRESHOLD) && (
           <div className="phone-ui absolute top-[62px] left-2.5 z-30 flex max-w-[calc(100vw-20px)] flex-col items-start gap-1.5">
@@ -9376,7 +9460,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         )}
 
       {/* Active Joyboy Delivery Reminder Badge */}
-      {joyboyDelivery.activeOrder && !miniActive && !isEditingAny && (
+      {joyboyDelivery.activeOrder && !isEditingAny && (
         <button
           type="button"
           onClick={() => {
@@ -9528,7 +9612,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Compact Top-Right CoinGame & HDDOLL Quick Hub inside Arcade */}
-      {zone === 'arcade' && !miniActive && (
+      {zone === 'arcade' && (
         <button
           type="button"
           onClick={() => {
@@ -10166,43 +10250,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         </div>
       )}
 
-      {miniActive && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-stone-950/70 p-4">
-          <div className="anim-pop relative flex h-80 w-full max-w-md flex-col overflow-hidden rounded-3xl border-4 border-amber-300 bg-[#182342] p-4 text-white shadow-2xl">
-            <div className="flex items-center justify-between text-xs font-bold text-amber-200">
-              <span>Chạm 5 Ngôi Sao ({miniScore}/5)</span>
-              <button
-                type="button"
-                onClick={() => setMiniActive(false)}
-                className="rounded-lg bg-white/15 px-2.5 py-1 text-[11px]"
-              >
-                Nghỉ Chơi
-              </button>
-            </div>
-            <div className="relative mt-2 flex-1 rounded-2xl bg-[#10182E]">
-              <button
-                type="button"
-                onClick={hitStar}
-                style={{left: `${starPos.x}%`, top: `${starPos.y}%`}}
-                className="absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-amber-300/25 transition-transform active:scale-90"
-                aria-label="Ngôi sao"
-              >
-                <svg width="30" height="30" viewBox="0 0 32 32">
-                  <polygon
-                    points="16,2 20,11 30,12 22,19 24,29 16,24 8,29 10,19 2,12 12,11"
-                    fill="#FFD166"
-                    stroke="#FFF"
-                    strokeWidth="1.5"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Self-Click 8-Slot Hành động Tray (bấm vào nhân vật để bật/tắt) */}
-      {actionsTrayOpen && !miniActive && !isEditingAny && !isParachutingHud && (
+      {actionsTrayOpen && !isEditingAny && !isParachutingHud && (
         <div
           className={`phone-ui anim-pop absolute left-1/2 z-30 w-[min(92vw,312px)] -translate-x-1/2 rounded-2xl border-2 border-[#3C3128] bg-[#FFF8EB] p-2.5 shadow-xl ${
             isBoatingHud ||
@@ -10272,7 +10321,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* Fixed Dynamic Touch Joystick (Bottom-Left) — always enabled */}
-      {!miniActive && !isEditingAny && (
+      {!isEditingAny && (
         <div
           className="phone-ui absolute bottom-2 left-2 z-30 h-44 w-44 touch-none select-none"
           onPointerDown={(e) => {
@@ -10355,7 +10404,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       )}
 
       {/* FPS-Style Catch Bug Button (Right Beside Jump Button when holding Bug Net) */}
-      {(zone === 'town' || zone === 'island') && bugNet.equipped && !isSwimmingHud && !miniActive && (
+      {(zone === 'town' || zone === 'island') && bugNet.equipped && !isSwimmingHud && (
         <button
           type="button"
           onPointerDown={(e) => {
@@ -10394,8 +10443,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         fishingRod.equipped &&
         !bugNet.equipped &&
         !isSwimmingHud &&
-        !isParachutingHud &&
-        !miniActive && (
+        !isParachutingHud && (
           <button
             type="button"
             onPointerDown={(e) => {
@@ -10425,7 +10473,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         )}
 
       {/* Fixed Right-Side Jump Button — hidden while riding mounts; fades slightly after 5s idle while remaining clickable */}
-      {!miniActive && !isParachutingHud && !isEditingAny && ownedMounts.activeMountId === null && (
+      {!isParachutingHud && !isEditingAny && ownedMounts.activeMountId === null && (
         <button
           type="button"
           onPointerDown={(e) => {

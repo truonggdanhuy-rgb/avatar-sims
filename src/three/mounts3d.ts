@@ -13,7 +13,16 @@ export const BICYCLE_GRIP_Y = 0.87;
 export const BICYCLE_GRIP_Z = 0.19;
 
 export interface MountAnimationState {
-  pose: 'skate_idle' | 'skate_ride' | 'skate_push' | 'bike_idle' | 'bike_ride';
+  pose:
+    | 'skate_idle'
+    | 'skate_ride'
+    | 'skate_push'
+    | 'bike_idle'
+    | 'bike_ride'
+    | 'lotus_idle'
+    | 'lotus_ride'
+    | 'broom_idle'
+    | 'broom_ride';
   elapsed: number;
   speed: number;
   wheelAngle: number;
@@ -23,6 +32,14 @@ export interface MountAnimationState {
   idlePop?: number;
   idleBlend?: number;
   leanAngle?: number;
+}
+
+export interface LotusRainDrop {
+  mesh: THREE.Mesh;
+  baseX: number;
+  baseZ: number;
+  phase: number;
+  speed: number;
 }
 
 export interface MountRig {
@@ -36,6 +53,14 @@ export interface MountRig {
   rightPedalPivot: THREE.Group | null;
   steerGroup: THREE.Group | null;
   kickstandPivot?: THREE.Group | null;
+  lotusPivot?: THREE.Group | null;
+  lotusFrogGroup?: THREE.Group | null;
+  lotusCloudGroup?: THREE.Group | null;
+  lotusRainDrops?: LotusRainDrop[];
+  broomPivot?: THREE.Group | null;
+  broomCatGroup?: THREE.Group | null;
+  broomCatTail?: THREE.Group | null;
+  broomPouchGroup?: THREE.Group | null;
   wheels: THREE.Object3D[];
   dispose: () => void;
 }
@@ -824,10 +849,436 @@ function buildBicycleRig(def: MountDefinition): MountRig {
   };
 }
 
+function buildLotusUmbrellaRig(def: MountDefinition): MountRig {
+  const root = new THREE.Group();
+  const geometries: THREE.BufferGeometry[] = [];
+  const materials: THREE.Material[] = [];
+
+  const trackGeo = <T extends THREE.BufferGeometry>(g: T): T => {
+    geometries.push(g);
+    return g;
+  };
+  const trackMat = <T extends THREE.Material>(m: T): T => {
+    materials.push(m);
+    return m;
+  };
+
+  const lotusPivot = new THREE.Group();
+  root.add(lotusPivot);
+
+  const stemMat = trackMat(makeStandard('#1F7A47', 0.45, 0.05));
+  const stemHookMat = trackMat(makeStandard('#8A5A32', 0.42, 0.08));
+  const leafTopMat = trackMat(makeStandard('#30AE62', 0.48, 0.04));
+  const leafEdgeMat = trackMat(makeStandard('#218C4D', 0.52, 0.04));
+  const leafVeinMat = trackMat(makeStandard('#A7F3D0', 0.42, 0.02));
+  const dewGoldMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      color: '#FDE68A',
+      emissive: '#F59E0B',
+      emissiveIntensity: 0.25,
+      roughness: 0.2,
+      metalness: 0.2,
+    }),
+  );
+
+  // Curved umbrella stem held in hand at origin (0,0,0) rising to canopy at y = 1.05
+  const shaft = new THREE.Mesh(
+    trackGeo(new THREE.CylinderGeometry(0.02, 0.024, 1.12, 12)),
+    stemMat,
+  );
+  shaft.position.set(0, 0.48, 0);
+  lotusPivot.add(shaft);
+
+  const handleGrip = new THREE.Mesh(
+    trackGeo(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 12)),
+    stemHookMat,
+  );
+  handleGrip.position.set(0, -0.02, 0);
+  const handleCurve = new THREE.Mesh(
+    trackGeo(new THREE.TorusGeometry(0.055, 0.022, 8, 14, Math.PI)),
+    stemHookMat,
+  );
+  handleCurve.rotation.z = Math.PI;
+  handleCurve.position.set(0.055, -0.09, 0);
+  lotusPivot.add(handleGrip, handleCurve);
+
+  // Giant scalloped lotus leaf canopy (diameter ~1.58m, as big as a real umbrella!)
+  const canopy = new THREE.Group();
+  canopy.position.set(0, 1.05, 0);
+  lotusPivot.add(canopy);
+
+  const leafDome = new THREE.Mesh(
+    trackGeo(new THREE.CylinderGeometry(0.14, 0.78, 0.2, 24)),
+    leafTopMat,
+  );
+  leafDome.position.y = 0.02;
+  canopy.add(leafDome);
+
+  const lobeCount = 12;
+  const lobeGeo = trackGeo(new THREE.SphereGeometry(0.22, 10, 8));
+  lobeGeo.scale(1.0, 0.18, 1.15);
+  const veinGeo = trackGeo(new THREE.BoxGeometry(0.018, 0.014, 0.68));
+  for (let i = 0; i < lobeCount; i++) {
+    const ang = (i / lobeCount) * Math.PI * 2;
+    const lobe = new THREE.Mesh(lobeGeo, i % 2 === 0 ? leafTopMat : leafEdgeMat);
+    lobe.position.set(Math.sin(ang) * 0.64, -0.065, Math.cos(ang) * 0.64);
+    lobe.rotation.y = ang;
+    lobe.rotation.x = 0.16;
+    canopy.add(lobe);
+
+    if (i % 2 === 0) {
+      const vein = new THREE.Mesh(veinGeo, leafVeinMat);
+      vein.position.set(Math.sin(ang) * 0.37, 0.045, Math.cos(ang) * 0.37);
+      vein.rotation.y = ang;
+      vein.rotation.x = 0.24;
+      canopy.add(vein);
+    }
+  }
+
+  const centerBud = new THREE.Mesh(
+    trackGeo(new THREE.SphereGeometry(0.075, 12, 10)),
+    dewGoldMat,
+  );
+  centerBud.scale.set(1.2, 0.75, 1.2);
+  centerBud.position.y = 0.125;
+  canopy.add(centerBud);
+
+  // Cute Frog perched cheerfully on top of the lotus leaf!
+  const frogGroup = new THREE.Group();
+  frogGroup.position.set(0.22, 0.11, 0.18);
+  frogGroup.rotation.y = -0.35;
+  const frogGreenMat = trackMat(makeStandard('#65DF4A', 0.45, 0.04));
+  const frogBellyMat = trackMat(makeStandard('#E9FCD1', 0.55, 0.02));
+  const frogWhiteMat = trackMat(makeStandard('#FFFFFF', 0.25, 0.02));
+  const frogDarkMat = trackMat(makeStandard('#111827', 0.2, 0.1));
+  const frogBlushMat = trackMat(makeStandard('#FDA4AF', 0.5, 0.02));
+
+  const fBody = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.115, 14, 12)), frogGreenMat);
+  fBody.scale.set(1.08, 0.84, 1.0);
+  fBody.position.y = 0.085;
+  const fBelly = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.088, 12, 10)), frogBellyMat);
+  fBelly.scale.set(1.0, 0.72, 0.75);
+  fBelly.position.set(0, 0.07, 0.042);
+
+  for (const s of [-1, 1]) {
+    const eyeBump = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.046, 12, 10)), frogGreenMat);
+    eyeBump.position.set(s * 0.062, 0.168, 0.048);
+    const sclera = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.036, 10, 10)), frogWhiteMat);
+    sclera.position.set(s * 0.064, 0.172, 0.064);
+    const pupil = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.02, 8, 8)), frogDarkMat);
+    pupil.position.set(s * 0.065, 0.174, 0.089);
+    const blush = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.022, 8, 8)), frogBlushMat);
+    blush.scale.set(1.2, 0.75, 0.6);
+    blush.position.set(s * 0.082, 0.115, 0.076);
+    const paw = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.03, 8, 8)), frogGreenMat);
+    paw.scale.set(0.95, 0.6, 1.3);
+    paw.position.set(s * 0.068, 0.022, 0.095);
+    const thigh = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.048, 10, 8)), frogGreenMat);
+    thigh.scale.set(0.8, 0.85, 1.25);
+    thigh.position.set(s * 0.105, 0.045, -0.025);
+    frogGroup.add(eyeBump, sclera, pupil, blush, paw, thigh);
+  }
+  frogGroup.add(fBody, fBelly);
+  canopy.add(frogGroup);
+
+  // Fluffy Miniature Raincloud floating above the lotus leaf & frog
+  const cloudGroup = new THREE.Group();
+  cloudGroup.position.set(0.02, 0.62, 0.02);
+  const cloudMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      color: '#DDF0FC',
+      emissive: '#60A5FA',
+      emissiveIntensity: 0.12,
+      roughness: 0.72,
+    }),
+  );
+  const cloudShadeMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      color: '#B5D5EC',
+      emissive: '#3B82F6',
+      emissiveIntensity: 0.1,
+      roughness: 0.76,
+    }),
+  );
+  const cloudSpecs: [number, number, number, number, boolean][] = [
+    [0, 0.07, 0, 0.2, false],
+    [-0.17, 0.01, 0.03, 0.16, true],
+    [0.18, 0.02, -0.02, 0.155, false],
+    [-0.07, -0.01, 0.12, 0.145, true],
+    [0.09, -0.01, -0.11, 0.14, true],
+  ];
+  for (const [cx, cy, cz, cr, shade] of cloudSpecs) {
+    const puff = new THREE.Mesh(
+      trackGeo(new THREE.SphereGeometry(cr, 12, 10)),
+      shade ? cloudShadeMat : cloudMat,
+    );
+    puff.scale.set(1.15, 0.85, 1.05);
+    puff.position.set(cx, cy, cz);
+    cloudGroup.add(puff);
+  }
+  canopy.add(cloudGroup);
+
+  // Animated falling translucent cyan raindrops around the giant lotus rim
+  const rainMat = trackMat(
+    new THREE.MeshBasicMaterial({
+      color: '#7DD3FC',
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false,
+    }),
+  );
+  const rainGeo = trackGeo(new THREE.CylinderGeometry(0.008, 0.014, 0.11, 6));
+  const rainDrops: LotusRainDrop[] = [];
+  for (let i = 0; i < 18; i++) {
+    const ang = (i / 18) * Math.PI * 2 + (i % 3) * 0.25;
+    const rad = i % 2 === 0 ? 0.82 : 0.62;
+    const mesh = new THREE.Mesh(rainGeo, rainMat);
+    mesh.renderOrder = 5;
+    const bx = Math.sin(ang) * rad;
+    const bz = Math.cos(ang) * rad;
+    mesh.position.set(bx, 0.3, bz);
+    canopy.add(mesh);
+    rainDrops.push({
+      mesh,
+      baseX: bx,
+      baseZ: bz,
+      phase: (i * 0.17) % 1,
+      speed: 0.85 + (i % 4) * 0.18,
+    });
+  }
+
+  return {
+    mountId: def.id,
+    kind: def.kind,
+    root,
+    boardCenterPivot: null,
+    rearPivot: null,
+    crankGroup: null,
+    leftPedalPivot: null,
+    rightPedalPivot: null,
+    steerGroup: null,
+    kickstandPivot: null,
+    lotusPivot,
+    lotusFrogGroup: frogGroup,
+    lotusCloudGroup: cloudGroup,
+    lotusRainDrops: rainDrops,
+    wheels: [],
+    dispose: () => {
+      geometries.forEach((g) => g.dispose());
+      materials.forEach((m) => m.dispose());
+    },
+  };
+}
+
+function buildWitchBroomRig(def: MountDefinition): MountRig {
+  const root = new THREE.Group();
+  const geometries: THREE.BufferGeometry[] = [];
+  const materials: THREE.Material[] = [];
+
+  const trackGeo = <T extends THREE.BufferGeometry>(g: T): T => {
+    geometries.push(g);
+    return g;
+  };
+  const trackMat = <T extends THREE.Material>(m: T): T => {
+    materials.push(m);
+    return m;
+  };
+
+  const broomPivot = new THREE.Group();
+  broomPivot.position.set(0, 0.92, 0);
+  root.add(broomPivot);
+
+  const woodMat = trackMat(makeStandard('#633C22', 0.52, 0.06));
+  const woodDarkMat = trackMat(makeStandard('#472915', 0.58, 0.04));
+  const strawMat = trackMat(makeStandard('#C88D48', 0.72, 0.02));
+  const strawLightMat = trackMat(makeStandard('#E3AD62', 0.68, 0.02));
+  const redRibbonMat = trackMat(makeStandard('#DF2B32', 0.44, 0.04));
+  const goldMat = trackMat(makeStandard('#F8CE48', 0.34, 0.16));
+  const goldShadeMat = trackMat(makeStandard('#D99A22', 0.42, 0.12));
+
+  // Long sculpted slightly arched wooden broomstick extending forward (+Z) & rear (-Z)
+  const stickPts = [
+    new THREE.Vector3(0, 0.02, 0.74),
+    new THREE.Vector3(0, 0.015, 0.36),
+    new THREE.Vector3(0, 0.0, 0.0),
+    new THREE.Vector3(0, -0.01, -0.44),
+  ];
+  const stickCurve = new THREE.CatmullRomCurve3(stickPts);
+  const stickMesh = new THREE.Mesh(
+    trackGeo(new THREE.TubeGeometry(stickCurve, 22, 0.032, 12, false)),
+    woodMat,
+  );
+  broomPivot.add(stickMesh);
+
+  const frontCap = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.034, 12, 10)), woodDarkMat);
+  frontCap.position.set(0, 0.02, 0.74);
+  const frontGoldBand = new THREE.Mesh(
+    trackGeo(new THREE.TorusGeometry(0.033, 0.008, 8, 16)),
+    goldMat,
+  );
+  frontGoldBand.position.set(0, 0.019, 0.67);
+  broomPivot.add(frontCap, frontGoldBand);
+
+  // Flared sculpted broom bristles at rear (-Z)
+  const bristlePts = [
+    new THREE.Vector2(0.042, 0.0),
+    new THREE.Vector2(0.095, -0.14),
+    new THREE.Vector2(0.155, -0.34),
+    new THREE.Vector2(0.172, -0.5),
+    new THREE.Vector2(0.13, -0.55),
+    new THREE.Vector2(0.0, -0.52),
+  ];
+  const bristleGeo = trackGeo(new THREE.LatheGeometry(bristlePts, 24));
+  bristleGeo.rotateX(Math.PI / 2);
+  const bristles = new THREE.Mesh(bristleGeo, strawMat);
+  bristles.scale.set(1.06, 0.86, 1.0);
+  bristles.position.set(0, -0.015, -0.41);
+  broomPivot.add(bristles);
+
+  // Subtle ribbed straw ridges around tail for rich clay craftsmanship
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const rib = new THREE.Mesh(
+      trackGeo(new THREE.CapsuleGeometry(0.024, 0.36, 4, 8)),
+      i % 2 === 0 ? strawLightMat : strawMat,
+    );
+    rib.position.set(Math.cos(a) * 0.115, -0.018 + Math.sin(a) * 0.095, -0.71);
+    rib.rotation.x = Math.PI / 2 + Math.sin(a) * 0.2;
+    rib.rotation.z = -Math.cos(a) * 0.2;
+    broomPivot.add(rib);
+  }
+
+  // Crimson ribbon collar + double sculpted ribbon bow tying the bristles
+  const tieBand = new THREE.Mesh(
+    trackGeo(new THREE.CylinderGeometry(0.056, 0.062, 0.072, 18)),
+    redRibbonMat,
+  );
+  tieBand.rotation.x = Math.PI / 2;
+  tieBand.position.set(0, -0.012, -0.42);
+  const bowKnot = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.036, 10, 8)), redRibbonMat);
+  bowKnot.position.set(0, 0.05, -0.42);
+  broomPivot.add(tieBand, bowKnot);
+  [-1, 1].forEach((s) => {
+    const loop = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.048, 10, 8)), redRibbonMat);
+    loop.scale.set(1.5, 0.72, 0.5);
+    loop.position.set(s * 0.064, 0.062, -0.42);
+    loop.rotation.z = s * 0.32;
+    broomPivot.add(loop);
+  });
+
+  // Crescent-moon golden pouch hanging from side of broomstick (matches Image 1)
+  const broomPouchGroup = new THREE.Group();
+  broomPouchGroup.position.set(-0.15, 0.04, -0.24);
+  const strapCord = new THREE.Mesh(
+    trackGeo(new THREE.TorusGeometry(0.07, 0.008, 6, 16)),
+    goldShadeMat,
+  );
+  strapCord.position.set(0.07, 0.04, 0);
+  strapCord.rotation.y = Math.PI / 2;
+  const crescentMoon = new THREE.Mesh(
+    trackGeo(new THREE.TorusGeometry(0.115, 0.045, 10, 20, Math.PI * 1.15)),
+    goldMat,
+  );
+  crescentMoon.rotation.z = -Math.PI * 0.72;
+  crescentMoon.rotation.y = -0.3;
+  crescentMoon.position.set(-0.02, -0.03, 0);
+  broomPouchGroup.add(strapCord, crescentMoon);
+  broomPivot.add(broomPouchGroup);
+
+  // Cute perched miniature Black Cat (Mèo Đen) riding along behind the player!
+  const broomCatGroup = new THREE.Group();
+  broomCatGroup.position.set(-0.08, 0.09, -0.38);
+  broomCatGroup.rotation.y = 0.22;
+
+  const catFurMat = trackMat(makeStandard('#282233', 0.65, 0.02));
+  const catPinkMat = trackMat(makeStandard('#EF8FA6', 0.68, 0.02));
+  const catEyeMat = trackMat(makeStandard('#F59E0B', 0.16, 0.05));
+  const catPupilMat = trackMat(makeStandard('#120E17', 0.08, 0.05));
+  const catGlintMat = trackMat(new THREE.MeshBasicMaterial({color: '#FFFFFF'}));
+
+  const cBody = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.075, 14, 12)), catFurMat);
+  cBody.scale.set(0.86, 0.88, 1.24);
+  cBody.position.set(0, 0.035, -0.02);
+
+  const cHead = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.082, 16, 14)), catFurMat);
+  cHead.scale.set(1.06, 0.94, 0.96);
+  cHead.position.set(0, 0.135, 0.065);
+  broomCatGroup.add(cBody, cHead);
+
+  [-1, 1].forEach((side) => {
+    const ear = new THREE.Mesh(trackGeo(new THREE.ConeGeometry(0.032, 0.068, 8)), catFurMat);
+    ear.scale.set(0.95, 1, 0.56);
+    ear.position.set(side * 0.058, 0.21, 0.062);
+    ear.rotation.z = side * -0.34;
+    const inner = new THREE.Mesh(trackGeo(new THREE.ConeGeometry(0.018, 0.044, 6)), catPinkMat);
+    inner.scale.set(0.85, 1, 0.42);
+    inner.position.set(side * 0.058, 0.205, 0.071);
+    inner.rotation.z = side * -0.34;
+
+    const iris = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.024, 12, 10)), catEyeMat);
+    iris.scale.set(1.02, 1.06, 0.7);
+    iris.position.set(side * 0.035, 0.145, 0.13);
+    const pupil = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.015, 10, 8)), catPupilMat);
+    pupil.scale.set(0.68, 1.04, 0.7);
+    pupil.position.set(side * 0.035, 0.145, 0.138);
+    const glint = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.006, 6, 6)), catGlintMat);
+    glint.position.set(side * 0.04, 0.153, 0.149);
+
+    const paw = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.024, 8, 8)), catFurMat);
+    paw.scale.set(0.9, 0.7, 1.2);
+    paw.position.set(side * 0.042, -0.02, 0.058);
+    broomCatGroup.add(ear, inner, iris, pupil, glint, paw);
+  });
+
+  const broomCatTail = new THREE.Group();
+  broomCatTail.position.set(0, 0.06, -0.11);
+  const cTailCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0.05, -0.06),
+    new THREE.Vector3(0, 0.14, -0.065),
+    new THREE.Vector3(0, 0.19, -0.02),
+  ]);
+  const cTailMesh = new THREE.Mesh(
+    trackGeo(new THREE.TubeGeometry(cTailCurve, 12, 0.014, 8, false)),
+    catFurMat,
+  );
+  broomCatTail.add(cTailMesh);
+  broomCatGroup.add(broomCatTail);
+  broomPivot.add(broomCatGroup);
+
+  return {
+    mountId: def.id,
+    kind: def.kind,
+    root,
+    boardCenterPivot: null,
+    rearPivot: null,
+    crankGroup: null,
+    leftPedalPivot: null,
+    rightPedalPivot: null,
+    steerGroup: null,
+    kickstandPivot: null,
+    broomPivot,
+    broomCatGroup,
+    broomCatTail,
+    broomPouchGroup,
+    wheels: [],
+    dispose: () => {
+      geometries.forEach((g) => g.dispose());
+      materials.forEach((m) => m.dispose());
+    },
+  };
+}
+
 export function buildMountRig(mountId: MountId): MountRig {
   const def = MOUNT_CATALOG[mountId] ?? MOUNT_CATALOG.skateboard_classic;
   if (def.kind === 'bicycle') {
     return buildBicycleRig(def);
+  }
+  if (def.kind === 'lotus_umbrella') {
+    return buildLotusUmbrellaRig(def);
+  }
+  if (def.kind === 'witch_broom') {
+    return buildWitchBroomRig(def);
   }
   return buildSkateboardRig(def);
 }
@@ -835,6 +1286,54 @@ export function buildMountRig(mountId: MountId): MountRig {
 export function updateMountAnimation(rig: MountRig, state: MountAnimationState): void {
   for (let i = 0; i < rig.wheels.length; i++) {
     rig.wheels[i].rotation.x = state.wheelAngle;
+  }
+
+  if (rig.kind === 'witch_broom') {
+    rig.root.rotation.z = 0;
+    const isMoving = state.pose === 'broom_ride';
+    const floatBob = Math.sin(state.elapsed * 2.5) * 0.075;
+    if (rig.broomPivot) {
+      rig.broomPivot.position.y = 0.94 + floatBob;
+      rig.broomPivot.rotation.x = isMoving ? 0.14 : 0.03 + Math.sin(state.elapsed * 2.0) * 0.025;
+      rig.broomPivot.rotation.z = Math.sin(state.elapsed * 1.9) * 0.045;
+    }
+    if (rig.broomCatGroup) {
+      rig.broomCatGroup.rotation.z = Math.sin(state.elapsed * 2.2) * 0.05;
+      rig.broomCatGroup.rotation.y = 0.22 + Math.sin(state.elapsed * 1.4) * 0.12;
+    }
+    if (rig.broomCatTail) {
+      rig.broomCatTail.rotation.y = Math.sin(state.elapsed * 4.5) * 0.28;
+      rig.broomCatTail.rotation.z = Math.cos(state.elapsed * 3.4) * 0.14;
+    }
+    if (rig.broomPouchGroup) {
+      rig.broomPouchGroup.rotation.z = Math.sin(state.elapsed * 3.2) * 0.08 + (isMoving ? 0.16 : 0);
+    }
+    return;
+  }
+
+  if (rig.kind === 'lotus_umbrella') {
+    rig.root.rotation.z = 0;
+    const isMoving = state.pose === 'lotus_ride';
+    if (rig.lotusPivot) {
+      rig.lotusPivot.rotation.x = isMoving ? 0.12 : 0.02 + Math.sin(state.elapsed * 2.1) * 0.025;
+      rig.lotusPivot.rotation.z = Math.sin(state.elapsed * 1.8) * 0.035;
+    }
+    if (rig.lotusFrogGroup) {
+      const fHop = Math.abs(Math.sin(state.elapsed * 2.6));
+      rig.lotusFrogGroup.position.y = 0.11 + (fHop > 0.85 ? (fHop - 0.85) * 0.18 : 0);
+      rig.lotusFrogGroup.rotation.y = -0.35 + Math.sin(state.elapsed * 1.3) * 0.14;
+    }
+    if (rig.lotusCloudGroup) {
+      rig.lotusCloudGroup.position.y = 0.62 + Math.sin(state.elapsed * 2.3) * 0.035;
+      rig.lotusCloudGroup.rotation.y = Math.sin(state.elapsed * 0.9) * 0.12;
+    }
+    if (rig.lotusRainDrops) {
+      for (const drop of rig.lotusRainDrops) {
+        const u = (state.elapsed * drop.speed + drop.phase) % 1;
+        drop.mesh.position.set(drop.baseX, 0.52 - u * 1.38, drop.baseZ);
+      }
+    }
+    return;
   }
 
   if (rig.kind === 'skateboard') {

@@ -314,6 +314,94 @@ export function BicycleMountIcon({className = 'w-11 h-11'}: {className?: string}
 }
 
 /**
+ * Giant Floating Lotus Umbrella Icon with cute frog & raincloud aura
+ */
+export function LotusUmbrellaMountIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Fluffy raincloud above */}
+      <path
+        d="M21 15 C17 15 15 12 18 9 C20 6 25 6 27 8 C29 5 35 5 38 8 C42 7 46 10 45 13 C47 15 45 17 42 17 H21 Z"
+        fill="#DCEFFB"
+        stroke="#5FA2CE"
+        strokeWidth="1.8"
+      />
+      {/* Raindrops */}
+      <path d="M22 19 L20.5 23 M32 19 L30.5 23 M41 19 L39.5 23" stroke="#38BDF8" strokeWidth="1.8" strokeLinecap="round" />
+      {/* Curved emerald stem & J-handle */}
+      <path d="M32 34 V51 C32 55 37 56 38.5 52.5" stroke="#1E7D48" strokeWidth="3.2" strokeLinecap="round" />
+      {/* Scalloped giant lotus leaf umbrella canopy */}
+      <path
+        d="M10 35 C12 24 22 21 32 21 C42 21 52 24 54 35 Q47 38 40 35 Q32 38 24 35 Q17 38 10 35 Z"
+        fill="#34B86B"
+        stroke="#166534"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      {/* Radiating leaf veins */}
+      <path d="M32 22 L21 34 M32 22 L32 35 M32 22 L43 34" stroke="#A7F3D0" strokeWidth="1.5" strokeLinecap="round" />
+      {/* Cute frog perched on top */}
+      <ellipse cx="32" cy="21" rx="5.5" ry="4" fill="#6BE04C" stroke="#1E6B29" strokeWidth="1.6" />
+      <circle cx="29.5" cy="17.5" r="2.1" fill="#6BE04C" stroke="#1E6B29" strokeWidth="1.3" />
+      <circle cx="34.5" cy="17.5" r="2.1" fill="#6BE04C" stroke="#1E6B29" strokeWidth="1.3" />
+      <circle cx="29.5" cy="17.4" r="0.9" fill="#0F172A" />
+      <circle cx="34.5" cy="17.4" r="0.9" fill="#0F172A" />
+      <ellipse cx="32" cy="21.6" rx="2.8" ry="1.4" fill="#D9F99D" />
+    </svg>
+  );
+}
+
+/**
+ * Flying Witch Broomstick Icon with red bow, crescent moon pouch & cute Black Cat
+ */
+export function WitchBroomMountIcon({className = 'w-11 h-11'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Golden crescent moon pouch dangling under handle */}
+      <path d="M27 33 C25 38, 25 41, 27 44" stroke="#D99A22" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M21 43 C21 49.5, 29 52.5, 34 47.5 C30 48, 26.5 45, 26.5 41 C24 41.5, 21.8 42, 21 43 Z"
+        fill="#F8CE48"
+        stroke="#B57B14"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      {/* Flared golden-brown broom bristles */}
+      <path
+        d="M39 27 L55 12 C58 16, 59 23, 55 28 L43 32 Z"
+        fill="#C88D48"
+        stroke="#73491E"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M44 27 L55 16 M46 29 L56 21 M42 25 L52 14" stroke="#E3AD62" strokeWidth="1.4" strokeLinecap="round" />
+      {/* Sculpted diagonal wooden broomstick */}
+      <path d="M8 52 L42 28" stroke="#633C22" strokeWidth="4.4" strokeLinecap="round" />
+      <circle cx="11.5" cy="49.5" r="1.8" fill="#F8CE48" />
+      {/* Crimson ribbon band + bow */}
+      <path
+        d="M36 27 L42 33 L45 30 L39 24 Z"
+        fill="#DF2B32"
+        stroke="#8B151B"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M38 26 L32 22 L35 29 Z M40 28 L44 35 L37 32 Z" fill="#DF2B32" stroke="#8B151B" strokeWidth="1.3" strokeLinejoin="round" />
+      {/* Cute Black Cat peeking above broom */}
+      <path d="M26 24 L25 14 L31 19 Z M39 24 L40 14 L34 19 Z" fill="#282233" stroke="#14101B" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M26.6 22 L26 16.4 L30 19.4 Z M38.4 22 L39 16.4 L35 19.4 Z" fill="#EF8FA6" />
+      <ellipse cx="32.5" cy="25" rx="8.5" ry="7.2" fill="#282233" stroke="#14101B" strokeWidth="1.5" />
+      <circle cx="29.3" cy="24.5" r="2.2" fill="#F59E0B" />
+      <circle cx="35.7" cy="24.5" r="2.2" fill="#F59E0B" />
+      <ellipse cx="29.3" cy="24.6" rx="0.85" ry="1.6" fill="#120E17" />
+      <ellipse cx="35.7" cy="24.6" rx="0.85" ry="1.6" fill="#120E17" />
+      <circle cx="30" cy="23.8" r="0.65" fill="#FFFFFF" />
+      <circle cx="36.4" cy="23.8" r="0.65" fill="#FFFFFF" />
+    </svg>
+  );
+}
+
+/**
  * Handcrafted Wooden Rowboat icon for Ship's shop & Bag Thuyền tab
  */
 export function WoodenBoatIcon({className = 'w-11 h-11'}: {className?: string}) {

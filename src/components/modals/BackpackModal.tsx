@@ -56,10 +56,12 @@ import {soundFX} from '../../utils/sound';
 import {
   BicycleMountIcon,
   BoatSkinIcon,
+  LotusUmbrellaMountIcon,
   MountCarIcon,
   PetCatFaceIcon,
   RodAndNetIcon,
   SkateboardMountIcon,
+  WitchBroomMountIcon,
   WoodenRodIcon,
 } from '../FishingIcons';
 import {WoodenNetIcon} from '../InsectIcons';
@@ -1341,6 +1343,10 @@ export const BackpackModal: React.FC<BackpackModalProps> = ({
                           <div className="flex h-13 w-13 shrink-0 items-center justify-center rounded-xl border border-[#DCEBF5] bg-[#F4F9FD]">
                             {def.kind === 'skateboard' ? (
                               <SkateboardMountIcon className="h-11 w-11" />
+                            ) : def.kind === 'lotus_umbrella' ? (
+                              <LotusUmbrellaMountIcon className="h-11 w-11" />
+                            ) : def.kind === 'witch_broom' ? (
+                              <WitchBroomMountIcon className="h-11 w-11" />
                             ) : (
                               <BicycleMountIcon className="h-11 w-11" />
                             )}

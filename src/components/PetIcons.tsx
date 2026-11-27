@@ -181,6 +181,63 @@ export const MischievousParrotIcon: React.FC<{className?: string}> = ({
   </svg>
 );
 
+const BlackCatIcon: React.FC<{className?: string}> = ({className = 'h-10 w-10'}) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none">
+    {/* Pointy witch-cat ears with soft pink interiors */}
+    <path
+      d="M11 22 L9 7 L21 14 Z"
+      fill="#282233"
+      stroke="#14101B"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M37 22 L39 7 L27 14 Z"
+      fill="#282233"
+      stroke="#14101B"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+    <path d="M12.2 19 L11.4 10.6 L19 15 Z" fill="#EF8FA6" />
+    <path d="M35.8 19 L36.6 10.6 L29 15 Z" fill="#EF8FA6" />
+    {/* Sleek rounded dark indigo-black head */}
+    <ellipse
+      cx="24"
+      cy="26"
+      rx="15"
+      ry="13"
+      fill="#282233"
+      stroke="#14101B"
+      strokeWidth="1.6"
+    />
+    {/* Fluffy cheek tufts */}
+    <path d="M9.5 27.5 L7 25.5 M9.8 30.5 L6.5 30.5 M38.5 27.5 L41 25.5 M38.2 30.5 L41.5 30.5" stroke="#3E354E" strokeWidth="1.3" strokeLinecap="round" />
+    {/* Luminous golden amber eyes with vertical feline pupils */}
+    <ellipse cx="18" cy="24.8" rx="4.1" ry="4.4" fill="#F59E0B" stroke="#14101B" strokeWidth="1.1" />
+    <ellipse cx="30" cy="24.8" rx="4.1" ry="4.4" fill="#F59E0B" stroke="#14101B" strokeWidth="1.1" />
+    <ellipse cx="18" cy="24.9" rx="1.65" ry="3.3" fill="#120E17" />
+    <ellipse cx="30" cy="24.9" rx="1.65" ry="3.3" fill="#120E17" />
+    <circle cx="19.3" cy="23.2" r="1.2" fill="#FFFFFF" />
+    <circle cx="31.3" cy="23.2" r="1.2" fill="#FFFFFF" />
+    {/* Tiny pink nose & cute 'w' smile */}
+    <path d="M22.5 29.8 H25.5 L24 31.6 Z" fill="#F295AC" />
+    <path
+      d="M21 32.8 Q22.5 34.4 24 32.6 Q25.5 34.4 27 32.8"
+      stroke="#8E81A4"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      fill="none"
+    />
+    {/* Delicate whiskers */}
+    <path
+      d="M14 29 L6.5 28 M14 31.5 L6.5 33 M34 29 L41.5 28 M34 31.5 L41.5 33"
+      stroke="#6C6082"
+      strokeWidth="1.1"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 export const PetSpeciesIcon: React.FC<{
   speciesId: PetSpeciesId;
   className?: string;
@@ -189,6 +246,7 @@ export const PetSpeciesIcon: React.FC<{
   if (speciesId === 'shiba_puppy') return <ShibaPuppyIcon className={className} />;
   if (speciesId === 'chinese_cat') return <ChineseCatIcon className={className} />;
   if (speciesId === 'mischievous_parrot') return <MischievousParrotIcon className={className} />;
+  if (speciesId === 'black_cat') return <BlackCatIcon className={className} />;
   return <BrownPuppyIcon className={className} />;
 };
 

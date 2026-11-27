@@ -727,6 +727,146 @@ export function buildPetModel(
     });
     ears = [earL, earR];
     bodyPivot.add(headPivot);
+  } else if (speciesId === 'black_cat') {
+    // Mèo Đen: sleek dark charcoal-plum kitten with oversized golden-amber eyes, pink inner ears & upright tail
+    const blackFurMat = trackMat(makeClay('#282233', 0.66));
+    const darkFurMat = trackMat(makeClay('#1C1724', 0.72));
+    const earPinkMat = trackMat(makeClay('#EF8FA6', 0.7));
+    const amberEyeMat = trackMat(makeGlossy('#F59E0B', 0.14));
+    const pupilMat = trackMat(makeGlossy('#110E16', 0.06));
+    const glintMat = trackMat(new THREE.MeshBasicMaterial({color: '#FFFFFF'}));
+    const noseMat = trackMat(makeGlossy('#4C4058', 0.35));
+    const whiskerMat = trackMat(makeClay('#5A5168', 0.55));
+    const blushMat = trackMat(makeClay('#DF7892', 0.74));
+
+    // Sleek kitten torso
+    const catBodyPts = [
+      new THREE.Vector2(0.001, -0.174),
+      new THREE.Vector2(0.074, -0.158),
+      new THREE.Vector2(0.112, -0.09),
+      new THREE.Vector2(0.108, 0.01),
+      new THREE.Vector2(0.114, 0.092),
+      new THREE.Vector2(0.092, 0.146),
+      new THREE.Vector2(0.001, 0.164),
+    ];
+    const torsoGeo = trackGeo(new THREE.LatheGeometry(catBodyPts, 24));
+    torsoGeo.rotateX(Math.PI / 2);
+    const torso = new THREE.Mesh(torsoGeo, blackFurMat);
+    torso.scale.set(0.92, 0.92, 1.04);
+    torso.position.set(0, 0.224, -0.015);
+    bodyPivot.add(torso);
+
+    const neckBridge = new THREE.Mesh(
+      trackGeo(new THREE.CylinderGeometry(0.07, 0.088, 0.105, 18)),
+      blackFurMat,
+    );
+    neckBridge.position.set(0, 0.3, 0.096);
+    neckBridge.rotation.x = 0.22;
+    bodyPivot.add(neckBridge);
+
+    // Dainty feline legs & dark paws
+    const legSpecs: [number, number, number, boolean][] = [
+      [-0.066, 0.168, 0.09, false],
+      [0.066, 0.168, 0.09, false],
+      [-0.07, 0.168, -0.102, true],
+      [0.07, 0.168, -0.102, true],
+    ];
+    for (const [lx, ly, lz, isHind] of legSpecs) {
+      const legGroup = new THREE.Group();
+      legGroup.position.set(lx, ly, lz);
+      if (isHind) {
+        const haunch = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.046, 12, 10)), blackFurMat);
+        haunch.scale.set(0.8, 1.08, 1.14);
+        haunch.position.set(0, -0.015, -0.01);
+        legGroup.add(haunch);
+      }
+      const legLimb = new THREE.Mesh(
+        trackGeo(new THREE.CylinderGeometry(0.031, 0.025, 0.124, 14)),
+        blackFurMat,
+      );
+      legLimb.position.y = -0.078;
+      const paw = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.034, 14, 10)), darkFurMat);
+      paw.scale.set(0.9, 0.65, 1.16);
+      paw.position.set(0, -0.144, 0.012);
+      legGroup.add(legLimb, paw);
+      bodyPivot.add(legGroup);
+      legs.push(legGroup);
+    }
+
+    // Playful upright curved tail
+    tailPivot.position.set(0, 0.264, -0.172);
+    const catTailCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0.065, -0.08),
+      new THREE.Vector3(0, 0.19, -0.098),
+      new THREE.Vector3(0, 0.28, -0.038),
+      new THREE.Vector3(0, 0.305, -0.09),
+    ]);
+    const tailMesh = new THREE.Mesh(
+      trackGeo(new THREE.TubeGeometry(catTailCurve, 18, 0.021, 10, false)),
+      blackFurMat,
+    );
+    const tailTip = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.023, 10, 8)), blackFurMat);
+    tailTip.position.set(0, 0.305, -0.09);
+    tailPivot.add(tailMesh, tailTip);
+    bodyPivot.add(tailPivot);
+
+    // Expressive big-eyed dark kitten head
+    headPivot.position.set(0, 0.388, 0.118);
+    const head = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.142, 24, 18)), blackFurMat);
+    head.scale.set(1.06, 0.94, 0.98);
+    headPivot.add(head);
+
+    const nose = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.014, 10, 8)), noseMat);
+    nose.scale.set(1.2, 0.78, 0.9);
+    nose.position.set(0, -0.014, 0.144);
+    headPivot.add(nose);
+
+    const earL = new THREE.Group();
+    const earR = new THREE.Group();
+    [-1, 1].forEach((side) => {
+      // Big expressive glowing amber eyes
+      const iris = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.039, 16, 12)), amberEyeMat);
+      iris.scale.set(1.04, 1.08, 0.72);
+      iris.position.set(side * 0.058, 0.022, 0.112);
+      const pupil = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.025, 14, 10)), pupilMat);
+      pupil.scale.set(0.68, 1.04, 0.72);
+      pupil.position.set(side * 0.058, 0.022, 0.124);
+      const glintMain = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.011, 8, 8)), glintMat);
+      glintMain.position.set(side * 0.066, 0.034, 0.14);
+      const glintMini = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.005, 6, 6)), glintMat);
+      glintMini.position.set(side * 0.05, 0.014, 0.138);
+
+      const blush = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.022, 10, 8)), blushMat);
+      blush.scale.set(1.2, 0.65, 0.42);
+      blush.position.set(side * 0.092, -0.022, 0.098);
+
+      for (const wy of [-0.018, -0.032]) {
+        const whisker = new THREE.Mesh(
+          trackGeo(new THREE.CylinderGeometry(0.0025, 0.0025, 0.065, 4)),
+          whiskerMat,
+        );
+        whisker.rotation.z = Math.PI / 2 + side * (wy < -0.025 ? -0.14 : 0.08);
+        whisker.position.set(side * 0.132, wy, 0.088);
+        headPivot.add(whisker);
+      }
+
+      const earGroup = side === -1 ? earL : earR;
+      earGroup.position.set(side * 0.096, 0.098, 0.006);
+      const outerEar = new THREE.Mesh(trackGeo(new THREE.ConeGeometry(0.054, 0.118, 10)), blackFurMat);
+      outerEar.scale.set(0.96, 1.0, 0.56);
+      outerEar.position.set(side * 0.012, 0.045, 0);
+      outerEar.rotation.z = side * -0.34;
+      const innerEar = new THREE.Mesh(trackGeo(new THREE.ConeGeometry(0.032, 0.08, 8)), earPinkMat);
+      innerEar.scale.set(0.88, 1.0, 0.42);
+      innerEar.position.set(side * 0.013, 0.038, 0.015);
+      innerEar.rotation.z = side * -0.34;
+      earGroup.add(outerEar, innerEar);
+
+      headPivot.add(iris, pupil, glintMain, glintMini, blush, earGroup);
+    });
+    ears = [earL, earR];
+    bodyPivot.add(headPivot);
   } else if (speciesId === 'mischievous_parrot') {
     // Vẹt Tinh Nghịch - colorful scarlet/gold/emerald/cobalt macaw-style parrot with hooked beak & mischievous crest!
     const crimsonMat = trackMat(makeClay('#E8473F', 0.56));
@@ -1040,7 +1180,7 @@ export function updatePetAnimation(
     const isMoving = mode === 'walk' || mode === 'shop_play';
     const isPlayingJump = mode === 'play_jump';
     const isHeld = mode === 'held_arms';
-    const isCat = rig.speciesId === 'chinese_cat';
+    const isCat = rig.speciesId === 'chinese_cat' || rig.speciesId === 'black_cat';
     const isShiba = rig.speciesId === 'shiba_puppy';
 
     const wagSpeed = rig.sickGroup ? 4.2 : isPlayingJump || isHeld ? 13 : isCat ? 4.5 : 9.5;

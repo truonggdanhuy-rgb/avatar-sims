@@ -29,6 +29,8 @@ import {PeppaShopModal} from './components/modals/PeppaShopModal';
 import {ApplianceCookModal} from './components/modals/ApplianceCookModal';
 import {MayCafeModal} from './components/modals/MayCafeModal';
 import {ArcadeHubModal} from './components/modals/ArcadeHubModal';
+import {ArcadeMiniGameModal} from './components/modals/ArcadeMiniGameModal';
+import {CoinGameShopModal} from './components/modals/CoinGameShopModal';
 import {WorldCanvas} from './components/WorldCanvas';
 import {MAY_CAFE_ITEMS, MayCafeItemId} from './data/mayCafeCatalog';
 import {
@@ -147,6 +149,7 @@ import {
   ActionId,
   AnimalProduceId,
   AnimalType,
+  ArcadeGameId,
   ArcadeHubSection,
   AvatarConfig,
   BbqFoodId,
@@ -420,6 +423,20 @@ export default function App() {
   const [bbqGrillOpen, setBbqGrillOpen] = useState(false);
   const [vendingOpen, setVendingOpen] = useState(false);
   const [arcadeHubSection, setArcadeHubSection] = useState<ArcadeHubSection | null>(null);
+  const [activeArcadeGame, setActiveArcadeGame] = useState<ArcadeGameId | null>(null);
+  const [coinGameShopOpen, setCoinGameShopOpen] = useState(false);
+  const [lastFreeClawDate, setLastFreeClawDate] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return typeof parsed.lastFreeClawDate === 'string' ? parsed.lastFreeClawDate : null;
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return null;
+  });
   const [bagOpen, setBagOpen] = useState(false);
   const [bagInitialSubTab, setBagInitialSubTab] = useState<BagSubTab>('list');
   const [phoneInitialTab, setPhoneInitialTab] = useState<
@@ -1837,6 +1854,7 @@ export default function App() {
             peppaIngredients: pruneZeroCounts(peppaIngredients),
             unlockedPeppaRecipes,
             peppaDishes: pruneZeroCounts(peppaDishes),
+            lastFreeClawDate,
           }),
         );
       } catch {
@@ -1897,6 +1915,7 @@ export default function App() {
     peppaIngredients,
     unlockedPeppaRecipes,
     peppaDishes,
+    lastFreeClawDate,
   ]);
 
   // Gentle passive hunger decay (-1 every 130 seconds for relaxed pacing)
@@ -1948,6 +1967,8 @@ export default function App() {
     }
     if (next !== 'arcade') {
       setArcadeHubSection(null);
+      setActiveArcadeGame(null);
+      setCoinGameShopOpen(false);
     }
   };
 
@@ -2006,6 +2027,25 @@ export default function App() {
       coins: prev.coins + amount,
       mood: Math.min(100, prev.mood + 4),
     }));
+  };
+
+  const handleEarnCoinGame = (amount: number) => {
+    if (amount <= 0) return;
+    setStats((prev) => ({
+      ...prev,
+      coinGame: Math.max(0, (prev.coinGame ?? 0) + amount),
+      mood: Math.min(100, prev.mood + 3),
+    }));
+  };
+
+  const handleSpendCoins = (amount: number): boolean => {
+    if (amount <= 0) return true;
+    if (stats.coins < amount) return false;
+    setStats((prev) => ({
+      ...prev,
+      coins: Math.max(0, prev.coins - amount),
+    }));
+    return true;
   };
 
   // === FARMING & PLOT HANDLERS ===
@@ -2694,6 +2734,28 @@ export default function App() {
       ...prev,
       coins: prev.coins - def.price,
       mood: Math.min(100, prev.mood + 8),
+    }));
+    setOwnedMounts((prev) => ({
+      ownedIds: prev.ownedIds.includes(mountId) ? prev.ownedIds : [...prev.ownedIds, mountId],
+      activeMountId: mountId,
+      lastMountId: mountId,
+    }));
+    setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    setEquippedFoodId(null);
+    setAvatar((prev) => (prev.handheld !== 'none' ? {...prev, handheld: 'none'} : prev));
+  };
+
+  const handleBuyCoinGameMount = (mountId: MountId) => {
+    const def = MOUNT_CATALOG[mountId];
+    const cost = def?.coinGamePrice ?? def?.price ?? 0;
+    if (!def || def.currency !== 'coinGame' || ownedMounts.ownedIds.includes(mountId)) return;
+    if ((stats.coinGame ?? 0) < cost) return;
+    soundFX.sparkle();
+    setStats((prev) => ({
+      ...prev,
+      coinGame: Math.max(0, (prev.coinGame ?? 0) - cost),
+      mood: Math.min(100, prev.mood + 10),
     }));
     setOwnedMounts((prev) => ({
       ownedIds: prev.ownedIds.includes(mountId) ? prev.ownedIds : [...prev.ownedIds, mountId],
@@ -4064,6 +4126,16 @@ export default function App() {
         onPondProximityChange={setNearPond}
         onAddCoins={addCoins}
         onOpenArcadeHub={(section = 'overview') => setArcadeHubSection(section)}
+        onOpenArcadeGame={(gameId) => {
+          setArcadeHubSection(null);
+          setCoinGameShopOpen(false);
+          setActiveArcadeGame(gameId);
+        }}
+        onOpenCoinGameShop={() => {
+          setArcadeHubSection(null);
+          setActiveArcadeGame(null);
+          setCoinGameShopOpen(true);
+        }}
       />
 
       {wardrobeOpen && (
@@ -4327,7 +4399,46 @@ export default function App() {
           coins={stats.coins}
           coinGame={stats.coinGame ?? 0}
           onSelectSection={setArcadeHubSection}
+          onOpenArcadeGame={(gameId) => {
+            setArcadeHubSection(null);
+            setActiveArcadeGame(gameId);
+          }}
+          onOpenCoinGameShop={() => {
+            setArcadeHubSection(null);
+            setCoinGameShopOpen(true);
+          }}
           onClose={() => setArcadeHubSection(null)}
+        />
+      )}
+
+      {zone === 'arcade' && activeArcadeGame && (
+        <ArcadeMiniGameModal
+          gameId={activeArcadeGame}
+          coins={stats.coins}
+          coinGame={stats.coinGame ?? 0}
+          hasFreeClawToday={lastFreeClawDate !== getTodayDateKey()}
+          onUseFreeClawToday={() => setLastFreeClawDate(getTodayDateKey())}
+          onSpendCoins={handleSpendCoins}
+          onEarnCoinGame={handleEarnCoinGame}
+          onEarnCoins={addCoins}
+          onSelectGame={setActiveArcadeGame}
+          onClose={() => setActiveArcadeGame(null)}
+        />
+      )}
+
+      {zone === 'arcade' && coinGameShopOpen && (
+        <CoinGameShopModal
+          coinGame={stats.coinGame ?? 0}
+          coins={stats.coins}
+          ownedMounts={ownedMounts}
+          onBuyCoinGameMount={handleBuyCoinGameMount}
+          onToggleMount={handleToggleMount}
+          onOpenBagMounts={() => {
+            setCoinGameShopOpen(false);
+            setBagInitialSubTab('mounts');
+            setBagOpen(true);
+          }}
+          onClose={() => setCoinGameShopOpen(false)}
         />
       )}
 

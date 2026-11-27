@@ -22,7 +22,10 @@ export type HairBackStyle =
   | 'boy_2'
   | 'boy_3'
   | 'boy_4'
-  | 'hero_wave';
+  | 'hero_wave'
+  | 'witch_bob'
+  | 'midautumn_buns'
+  | 'midautumn_spiky';
 
 export type HairFrontStyle = 'air_bangs' | 'side_sweep' | 'curtain' | 'neat_fringe';
 
@@ -83,7 +86,10 @@ export type TopStyle =
   | 'goose_pinafore_dress'
   | 'goose_raglan_tee'
   | 'pompom_pajama_shirt'
-  | 'pompom_sleep_dress';
+  | 'pompom_sleep_dress'
+  | 'witch_cat_dress'
+  | 'midautumn_girl_top'
+  | 'midautumn_boy_top';
 
 export type BottomStyle =
   | 'pleated_skirt'
@@ -107,7 +113,10 @@ export type BottomStyle =
   | 'picnic_chinos'
   | 'vampire_slit_pants'
   | 'goose_puff_shorts'
-  | 'pompom_pajama_pants';
+  | 'pompom_pajama_pants'
+  | 'witch_cat_skirt'
+  | 'midautumn_bloomers'
+  | 'midautumn_boy_pants';
 
 export type ShoeStyle =
   | 'sneakers'
@@ -125,7 +134,10 @@ export type ShoeStyle =
   | 'rain_boots'
   | 'vampire_buckle_boots'
   | 'goose_slippers'
-  | 'pompom_slippers';
+  | 'pompom_slippers'
+  | 'witch_mary_janes'
+  | 'midautumn_girl_boots'
+  | 'midautumn_boy_boots';
 
 export type HeadItemStyle =
   | 'none'
@@ -154,7 +166,8 @@ export type HeadItemStyle =
   | 'vampire_giant_bow'
   | 'sunflower_hat'
   | 'pompom_sleep_mask'
-  | 'pompom_ear_hood';
+  | 'pompom_ear_hood'
+  | 'witch_giant_bow';
 
 export type AccessoryStyle =
   | 'none'
@@ -195,7 +208,9 @@ export type HandheldStyle =
   | 'paper_lantern'
   | 'lotus_fan'
   | 'matcha_latte'
-  | 'daisy_flower';
+  | 'daisy_flower'
+  | 'star_lantern'
+  | 'rooster_lantern';
 
 export type AvatarPose =
   | 'idle'
@@ -216,6 +231,10 @@ export type AvatarPose =
   | 'skate_push'
   | 'bike_idle'
   | 'bike_ride'
+  | 'lotus_idle'
+  | 'lotus_ride'
+  | 'broom_idle'
+  | 'broom_ride'
   | 'swim'
   | 'climb'
   | 'happy_jump';
@@ -454,6 +473,13 @@ export interface FarmOrder {
 export const COINGAME_TO_XU_RATE = 10;
 
 export type ArcadeHubSection = 'overview' | 'blindbox' | 'exchange' | 'games';
+
+export type ArcadeGameId =
+  | 'whack_mole'
+  | 'catch_stars'
+  | 'claw_ball'
+  | 'rhythm_dance'
+  | 'pc_games';
 
 export interface GameStats {
   coins: number;
@@ -827,6 +853,7 @@ export type PetSpeciesId =
   | 'blue_bird'
   | 'shiba_puppy'
   | 'chinese_cat'
+  | 'black_cat'
   | 'mischievous_parrot';
 
 export interface PetSpeciesDefinition {
@@ -862,11 +889,15 @@ export interface PetSupplies {
   intimacyTest: number;
 }
 
-export type MountRank = 'B' | 'S';
+export type MountRank = 'B' | 'A' | 'S';
 
-export type MountKind = 'skateboard' | 'bicycle';
+export type MountKind = 'skateboard' | 'bicycle' | 'lotus_umbrella' | 'witch_broom';
 
-export type MountId = 'skateboard_classic' | 'bicycle_classic';
+export type MountId =
+  | 'skateboard_classic'
+  | 'bicycle_classic'
+  | 'lotus_umbrella'
+  | 'witch_broom';
 
 export interface MountSkinPalette {
   primary: string;
@@ -882,6 +913,8 @@ export interface MountDefinition {
   rank: MountRank;
   name: string;
   price: number;
+  currency?: 'coins' | 'coinGame';
+  coinGamePrice?: number;
   speedMultiplier: number;
   description: string;
   palette: MountSkinPalette;

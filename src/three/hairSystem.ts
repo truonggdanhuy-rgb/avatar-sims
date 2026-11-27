@@ -141,7 +141,8 @@ function isMaleStyle(hairBack: HairBackStyle): boolean {
     hairBack === 'boy_2' ||
     hairBack === 'boy_3' ||
     hairBack === 'boy_4' ||
-    hairBack === 'hero_wave'
+    hairBack === 'hero_wave' ||
+    hairBack === 'midautumn_spiky'
   );
 }
 
@@ -226,6 +227,35 @@ function getFrontPetals(
         {c: -4, hw: 16, drop: 11},
         {c: 20, hw: 14, drop: 8},
         {c: 44, hw: 18, drop: 24},
+      ],
+    };
+  }
+
+  if (hairBack === 'midautumn_spiky') {
+    return {
+      browBaseLat: 56,
+      partLon: -14,
+      petals: [
+        {c: -52, hw: 16, drop: 30},
+        {c: -30, hw: 16, drop: 20},
+        {c: -8, hw: 15, drop: 16},
+        {c: 14, hw: 16, drop: 22},
+        {c: 36, hw: 16, drop: 24},
+        {c: 54, hw: 15, drop: 30},
+      ],
+    };
+  }
+
+  if (hairBack === 'witch_bob' || hairBack === 'midautumn_buns') {
+    return {
+      browBaseLat: 65,
+      partLon: null,
+      petals: [
+        {c: -48, hw: 16, drop: 21},
+        {c: -24, hw: 14, drop: 16},
+        {c: 0, hw: 14, drop: 16},
+        {c: 24, hw: 14, drop: 16},
+        {c: 48, hw: 16, drop: 21},
       ],
     };
   }
@@ -324,7 +354,8 @@ function createUnifiedClayCapGeometry(
   const innerSegs = 4;
 
   const male = isMaleStyle(hairBack);
-  const hasBackCurtain = hairBack === 'long_wave' || hairBack === 'bob_cut';
+  const hasBackCurtain =
+    hairBack === 'long_wave' || hairBack === 'bob_cut' || hairBack === 'witch_bob';
   const isSnugCap = hatMode === 'snug_cap';
   const isOnHairHat = hatMode === 'on_hair';
 
@@ -332,7 +363,7 @@ function createUnifiedClayCapGeometry(
 
   // Full plush Nendoroid volume across crown & brow (never crushed flat!)
   const baseCrownLoft =
-    hairBack === 'boy_4' || hairBack === 'hero_wave'
+    hairBack === 'boy_4' || hairBack === 'hero_wave' || hairBack === 'midautumn_spiky'
       ? 0.088
       : hairBack === 'boy_3'
         ? 0.086
@@ -369,8 +400,11 @@ function createUnifiedClayCapGeometry(
         ? 120
         : hairBack === 'boy_2'
           ? 135
-          : hairBack === 'boy_4' || hairBack === 'boy_3' || hairBack === 'hero_wave'
-            ? 133
+          : hairBack === 'boy_4' ||
+              hairBack === 'boy_3' ||
+              hairBack === 'hero_wave' ||
+              hairBack === 'midautumn_spiky'
+            ? 134
             : hairBack === 'boy_1' || hairBack === 'short_crop'
               ? 131
               : 128;
@@ -539,17 +573,18 @@ function createUnifiedClayCapGeometry(
  * - Zero intersecting ribbon meshes or jagged hanging strips from side or rear angles!
  */
 function createBackClayBellGeometry(
-  style: 'long_wave' | 'bob_cut',
+  style: 'long_wave' | 'bob_cut' | 'witch_bob',
   crownOffset: number,
 ): THREE.BufferGeometry {
   const isLong = style === 'long_wave';
+  const isWitchBob = style === 'witch_bob';
   const lonMin = 80; // Tucked smoothly right behind the ears to eliminate side air gap!
   const lonMax = 280; // Wraps across 180° back to -80° (= 280°)
   const uSegs = 56;
   const vSegs = 24;
 
-  const hemBaseY = isLong ? -0.095 : 0.032;
-  const bellRadius = isLong ? 0.364 : 0.354;
+  const hemBaseY = isLong ? -0.095 : isWitchBob ? 0.008 : 0.032;
+  const bellRadius = isLong ? 0.364 : isWitchBob ? 0.362 : 0.354;
   const outerHalfThick = 0.026;
 
   const evalBellPoint = (
@@ -1049,6 +1084,51 @@ function buildFrontSignatureAccents(
         hairMat,
       ),
     );
+  } else if (hairBack === 'midautumn_spiky' && !isSnugCap) {
+    // Dynamic layered anime spikes sweeping forward & upward over crown (Mid-Autumn Boy look)
+    const spikyWaves: {steps: LockStep[]; w: number; d: number}[] = [
+      {
+        steps: [
+          {lat: 16, lon: -10, offset: crownOuterOffset + 0.002},
+          {lat: 26, lon: -28, offset: crownOuterOffset + 0.056},
+          {lat: 40, lon: -42, offset: crownOuterOffset + 0.034},
+        ],
+        w: 0.09,
+        d: 0.038,
+      },
+      {
+        steps: [
+          {lat: 10, lon: 18, offset: crownOuterOffset + 0.004},
+          {lat: 28, lon: 46, offset: crownOuterOffset + 0.048},
+          {lat: 52, lon: 68, offset: crownOuterOffset + 0.016},
+        ],
+        w: 0.088,
+        d: 0.036,
+      },
+      {
+        steps: [
+          {lat: 34, lon: -12, offset: crownOuterOffset + 0.004},
+          {lat: 54, lon: -18, offset: crownOuterOffset + 0.022},
+          {lat: 74, lon: -10, offset: 0.016},
+        ],
+        w: 0.068,
+        d: 0.03,
+      },
+    ];
+    spikyWaves.forEach((s) =>
+      grp.add(
+        new THREE.Mesh(
+          createClayLockGeometry(sampleHeadSteps(s.steps, 14), {
+            width: s.w,
+            depth: s.d,
+            profile: 'tuft',
+            edgePinch: 0.22,
+            roundTipScale: 0.14,
+          }),
+          hairMat,
+        ),
+      ),
+    );
   }
 
   return grp;
@@ -1067,6 +1147,35 @@ function buildSideCheekDrapes(
 ): THREE.Group {
   const grp = new THREE.Group();
   grp.name = 'SideHair';
+
+  if (hairBack === 'midautumn_spiky') {
+    const rootOff = crownOffset * 0.85;
+    [-1, 1].forEach((side) => {
+      const pts: [number, number, number][] = [
+        headSurfacePoint(40, side * 56, rootOff),
+        headSurfacePoint(78, side * 62, 0.024),
+        [side * 0.268, 0.145, 0.105],
+        [side * 0.215, 0.005, 0.118],
+      ];
+      grp.add(
+        new THREE.Mesh(
+          createClayLockGeometry(pts, {
+            width: 0.048,
+            depth: 0.028,
+            innerFlatten: 0.62,
+            edgePinch: 0.28,
+            profile: 'blade',
+            outwardMode: 'drape',
+            tubularSegs: 16,
+            radialSegs: 12,
+            roundTipScale: 0.18,
+          }),
+          hairMat,
+        ),
+      );
+    });
+    return grp;
+  }
 
   if (isMaleStyle(hairBack)) {
     // Male sideburns and over-ear shapes are smoothly sculpted directly into the unified HairBase!
@@ -1105,13 +1214,14 @@ function buildSideCheekDrapes(
       return;
     }
 
-    if (hairBack === 'bob_cut') {
+    if (hairBack === 'bob_cut' || hairBack === 'witch_bob') {
+      const isWitch = hairBack === 'witch_bob';
       const pts: [number, number, number][] = [
         headSurfacePoint(26, side * 56, rootOff),
         headSurfacePoint(74, side * 66, sideOff * 0.56),
         [side * 0.302, 0.19, 0.064],
-        [side * 0.268, 0.098, 0.07],
-        [side * 0.214, 0.046, 0.078],
+        [side * 0.272, isWitch ? 0.08 : 0.098, 0.072],
+        [side * 0.218, isWitch ? 0.02 : 0.046, 0.082],
       ];
       grp.add(
         new THREE.Mesh(
@@ -1175,7 +1285,7 @@ function buildBackClayStructures(
   backHairGroup: THREE.Group,
   accGroup: THREE.Group,
 ): void {
-  if (hairBack === 'long_wave' || hairBack === 'bob_cut') {
+  if (hairBack === 'long_wave' || hairBack === 'bob_cut' || hairBack === 'witch_bob') {
     backHairGroup.add(
       new THREE.Mesh(
         createBackClayBellGeometry(hairBack, crownOffset),
@@ -1329,6 +1439,121 @@ function buildBackClayStructures(
 
       backHairGroup.add(bunBase, swirlRing);
       accGroup.add(tie);
+    });
+    return;
+  }
+
+  if (hairBack === 'midautumn_buns') {
+    const crimsonMat = new THREE.MeshStandardMaterial({
+      color: '#DF2930',
+      roughness: 0.52,
+      metalness: 0.02,
+    });
+    const goldTieMat = new THREE.MeshStandardMaterial({
+      color: '#F5C43E',
+      roughness: 0.35,
+      metalness: 0.25,
+    });
+    const jadeMat = new THREE.MeshStandardMaterial({
+      color: '#4EB869',
+      roughness: 0.22,
+      metalness: 0.08,
+    });
+
+    const braidBeadGeo = new THREE.SphereGeometry(0.026, 10, 8);
+    [-1, 1].forEach((side) => {
+      // Braided top twin loop arches curving from center crown parting out over temple buns
+      if (!isSnugCap) {
+        const archPts = [
+          new THREE.Vector3(side * 0.022, HEAD_CY + HEAD_RY + crownOffset - 0.015, 0.015),
+          new THREE.Vector3(side * 0.16, HEAD_CY + HEAD_RY + crownOffset + 0.082, 0.005),
+          new THREE.Vector3(side * 0.295, HEAD_CY + HEAD_RY + crownOffset + 0.055, -0.012),
+          new THREE.Vector3(side * 0.375, HEAD_CY + 0.175, -0.018),
+          new THREE.Vector3(side * 0.35, HEAD_CY + 0.02, -0.02),
+        ];
+        const archCurve = new THREE.CatmullRomCurve3(archPts);
+        for (let b = 0; b <= 11; b++) {
+          const t = b / 11;
+          const p = archCurve.getPointAt(t);
+          const bead = new THREE.Mesh(braidBeadGeo, hairMat);
+          bead.position.copy(p);
+          const s = 0.85 + 0.35 * Math.sin(t * Math.PI);
+          bead.scale.set(s, s * 0.92, s * 0.92);
+          backHairGroup.add(bead);
+        }
+      }
+
+      // Low coiled side hair buns + golden ribbon bows + hanging red tassels
+      const bunAnchor = new THREE.Vector3(side * 0.345, HEAD_CY - 0.005, -0.022);
+      const sideBun = new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.032, 10, 18), hairMat);
+      sideBun.position.copy(bunAnchor);
+      sideBun.rotation.y = side * 0.55;
+      const bunCore = new THREE.Mesh(new THREE.SphereGeometry(0.056, 12, 10), hairMat);
+      bunCore.position.copy(bunAnchor);
+      backHairGroup.add(sideBun, bunCore);
+
+      // Golden tie bow + two vivid crimson tassels hanging neatly beside cheeks
+      const tieKnot = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), goldTieMat);
+      tieKnot.position.set(side * 0.36, HEAD_CY + 0.048, 0.012);
+      const tieLoopL = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.008, 6, 12), goldTieMat);
+      tieLoopL.position.set(side * 0.348, HEAD_CY + 0.068, 0.02);
+      tieLoopL.rotation.z = side * 0.45;
+      const tasselCap = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.025, 10), goldTieMat);
+      tasselCap.position.set(side * 0.365, HEAD_CY + 0.022, 0.016);
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.115, 12), crimsonMat);
+      tassel.position.set(side * 0.368, HEAD_CY - 0.038, 0.018);
+      accGroup.add(tieKnot, tieLoopL, tasselCap, tassel);
+
+      // Green jade orb drop earrings below each ear
+      const stud = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), goldTieMat);
+      stud.position.set(side * 0.312, HEAD_CY - 0.072, 0.052);
+      const jadeOrb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 10), jadeMat);
+      jadeOrb.position.set(side * 0.318, HEAD_CY - 0.112, 0.055);
+      accGroup.add(stud, jadeOrb);
+
+      // Flowing back hair ribbons curling slightly behind shoulders
+      backHairGroup.add(
+        new THREE.Mesh(
+          createClayLockGeometry(
+            [
+              [side * 0.25, HEAD_CY - 0.06, -0.14],
+              [side * 0.32, HEAD_CY - 0.19, -0.16],
+              [side * 0.38, HEAD_CY - 0.3, -0.09],
+            ],
+            {
+              width: 0.076,
+              depth: 0.046,
+              innerFlatten: 0.65,
+              profile: 'drape',
+              outwardMode: 'drape',
+              tubularSegs: 14,
+              radialSegs: 12,
+              roundTipScale: 0.34,
+            },
+          ),
+          hairMat,
+        ),
+      );
+    });
+    return;
+  }
+
+  if (hairBack === 'midautumn_spiky') {
+    const crimsonMat = new THREE.MeshStandardMaterial({
+      color: '#DF2930',
+      roughness: 0.52,
+      metalness: 0.02,
+    });
+    // Back layered spikes & red tie ribbons fluttering behind collar
+    [-1, 1].forEach((side) => {
+      const tieRibbon = new THREE.Mesh(
+        new THREE.ConeGeometry(0.022, 0.13, 8),
+        crimsonMat,
+      );
+      tieRibbon.position.set(side * 0.115, HEAD_CY - 0.16, -0.255);
+      tieRibbon.rotation.z = side * 0.38;
+      tieRibbon.rotation.x = 0.24;
+      accGroup.add(tieRibbon);
     });
   }
 }

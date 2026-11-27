@@ -1,6 +1,6 @@
 import React from 'react';
 import {Backpack, CheckCircle2, Coins, Sparkles, Store, X, Zap} from 'lucide-react';
-import {MOUNT_LIST, MOUNT_RANK_META, SKATEBOARD_CLASSIC_PRICE} from '../../data/mountCatalog';
+import {MOUNT_RANK_META, SKATEBOARD_CLASSIC_PRICE, TUN_SHOP_MOUNTS} from '../../data/mountCatalog';
 import {MountId, OwnedMountsState} from '../../types/game';
 import {soundFX} from '../../utils/sound';
 import {BicycleMountIcon, MountCarIcon, SkateboardMountIcon} from '../FishingIcons';
@@ -74,7 +74,7 @@ export function TunShopModal({
             </span>
           </div>
 
-          {MOUNT_LIST.map((def) => {
+          {TUN_SHOP_MOUNTS.map((def) => {
             const owned = ownedMounts.ownedIds.includes(def.id);
             const isActive = ownedMounts.activeMountId === def.id;
             const rankMeta = MOUNT_RANK_META[def.rank];

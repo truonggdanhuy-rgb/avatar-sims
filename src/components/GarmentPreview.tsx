@@ -623,6 +623,39 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             </g>
           );
         }
+        if (style === 'witch_cat_dress') {
+          return (
+            <g>
+              <path d="M25 21 L12 37 L18 42 L26 32 L18 65 H62 L54 32 L62 42 L68 37 L55 21 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M26 49 Q33 44 40 49 Q47 44 54 49" stroke="#3B3548" strokeWidth="1.6" fill="none" />
+              <path d="M26 36 L48 56" stroke="#D9A842" strokeWidth="2.2" />
+              <path d="M46 54 C46 61, 55 62, 57 55 C53 56, 49 54, 48 51 Z" fill="#F8CE48" stroke={outline} strokeWidth="1.4" />
+            </g>
+          );
+        }
+        if (style === 'midautumn_girl_top') {
+          return (
+            <g>
+              <path d="M25 22 L12 37 L18 43 L26 33 L21 63 H59 L54 33 L62 43 L68 37 L55 22 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M25 22 C28 31, 52 31, 55 22 Z" fill="#DA2A2E" stroke="#F4C542" strokeWidth="1.6" />
+              <path d="M24 52 Q32 48 40 53 Q48 48 56 52 L59 63 H21 Z" fill="#DA2A2E" stroke="#F4C542" strokeWidth="1.4" />
+              <circle cx="40" cy="30" r="2.5" fill="#46B966" stroke={outline} strokeWidth="1.1" />
+              <line x1="40" y1="32.5" x2="40" y2="41" stroke="#DA2A2E" strokeWidth="2.6" strokeLinecap="round" />
+            </g>
+          );
+        }
+        if (style === 'midautumn_boy_top') {
+          return (
+            <g>
+              <path d="M25 21 L12 37 L18 43 L26 33 V64 H54 V33 L62 43 L68 37 L55 21 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M32 21 L40 36 L48 21" stroke="#F4C542" strokeWidth="2.4" fill="none" />
+              <path d="M32 21 L40 35 L48 21 Z" fill="#1E1C22" />
+              <rect x="26" y="54" width="28" height="4.5" fill="#F5F3EE" stroke={outline} strokeWidth="1.2" />
+              <circle cx="40" cy="34" r="2.4" fill="#46B966" />
+              <line x1="40" y1="36.4" x2="40" y2="45" stroke="#DA2A2E" strokeWidth="2.5" strokeLinecap="round" />
+            </g>
+          );
+        }
 
         // cardigan_vest
         return (
@@ -887,6 +920,34 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
           );
         }
 
+        if (style === 'witch_cat_skirt') {
+          return (
+            <g>
+              <path d="M24 22 H56 L66 58 Q53 63 40 59 Q27 63 14 58 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M24 27 H56" stroke="#3D384B" strokeWidth="2" />
+              <path d="M31 28 L24 58 M40 28 V59 M49 28 L56 58" stroke="#181520" strokeWidth="1.6" strokeLinecap="round" />
+            </g>
+          );
+        }
+        if (style === 'midautumn_bloomers') {
+          return (
+            <g>
+              <path d="M24 25 H56 C63 34, 63 50, 56 54 H42 L40 44 L38 54 H24 C17 50, 17 34, 24 25 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M24 54 H38 M42 54 H56" stroke="#DA2A2E" strokeWidth="2.8" strokeLinecap="round" />
+            </g>
+          );
+        }
+        if (style === 'midautumn_boy_pants') {
+          return (
+            <g>
+              <path d="M23 19 H57 L61 65 H43 L40 38 L37 65 H19 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <rect x="31" y="21" width="18" height="39" rx="2" fill="#DA2A2E" stroke="#F4C542" strokeWidth="1.8" />
+              <path d="M34 45 Q40 40 46 45 M34 52 Q40 47 46 52" stroke="#F4C542" strokeWidth="1.5" fill="none" />
+              <path d="M22 57 Q29 53 34 57 M49 57 Q54 53 59 57" stroke="#F5EFE4" strokeWidth="1.5" fill="none" />
+            </g>
+          );
+        }
+
         // pleated_skirt
         return (
           <g>
@@ -909,7 +970,7 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             {back === 'long_wave' && (
               <path d="M21 32 C15 44, 15 60, 21 68 H59 C65 60, 65 44, 59 32 C55 18, 48 14, 40 14 C32 14, 25 18, 21 32 Z" fill={col} stroke={outline} strokeWidth="2.1" />
             )}
-            {back === 'bob_cut' && (
+            {(back === 'bob_cut' || back === 'witch_bob') && (
               <path d="M21 32 C17 43, 19 53, 26 58 H54 C61 53, 63 43, 59 32 C55 18, 48 14, 40 14 C32 14, 25 18, 21 32 Z" fill={col} stroke={outline} strokeWidth="2.1" />
             )}
             {back === 'twin_tails' && (
@@ -925,6 +986,22 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <g>
                 <circle cx="23" cy="20" r="9" fill={col} stroke={outline} strokeWidth="2" />
                 <circle cx="57" cy="20" r="9" fill={col} stroke={outline} strokeWidth="2" />
+              </g>
+            )}
+            {back === 'midautumn_buns' && (
+              <g>
+                <path d="M21 24 C16 14, 27 8, 35 16 M59 24 C64 14, 53 8, 45 16" stroke={col} strokeWidth="5.5" strokeLinecap="round" fill="none" />
+                <circle cx="20" cy="40" r="7.5" fill={col} stroke={outline} strokeWidth="1.9" />
+                <circle cx="60" cy="40" r="7.5" fill={col} stroke={outline} strokeWidth="1.9" />
+                <path d="M17 44 L15 53 M63 44 L65 53" stroke="#DA2A2E" strokeWidth="3" strokeLinecap="round" />
+                <circle cx="15" cy="54" r="2.2" fill="#46B966" />
+                <circle cx="65" cy="54" r="2.2" fill="#46B966" />
+              </g>
+            )}
+            {back === 'midautumn_spiky' && (
+              <g>
+                <path d="M24 38 C20 48, 20 55, 22 60 M56 38 C60 48, 60 55, 58 60" stroke={col} strokeWidth="3.5" strokeLinecap="round" />
+                <path d="M24 53 L21 62 M56 53 L59 62" stroke="#DA2A2E" strokeWidth="2.5" strokeLinecap="round" />
               </g>
             )}
             {/* Sculpted Fluffy Hairline Base Cap + Chibi Face */}
@@ -949,6 +1026,8 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <path d="M42 10 L44 14 C53 15, 60 22, 59 39 L54 33 L50 38 L46 31 L42 38 L38 30 L34 38 L30 31 L25 38 L21 33 L15 32 L20 27 C20 18, 29 14, 39 14 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
             ) : back === 'short_crop' ? (
               <path d="M22 36 C22 18, 31 14, 40 14 C49 14, 58 18, 58 36 C53 33, 49 34, 46 31 C42 35, 38 35, 34 31 C31 34, 27 33, 22 36 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
+            ) : back === 'midautumn_spiky' ? (
+              <path d="M36 9 L42 14 C52 15, 60 22, 59 39 L53 34 L48 39 L44 29 L40 37 L35 28 L31 38 L27 33 L21 39 C20 22, 27 15, 35 14 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
             ) : front === 'curtain' ? (
               <path d="M22 38 C23 20, 32 15, 40 15 C48 15, 57 20, 58 38 C50 35, 45 31, 40 26 C35 31, 30 35, 22 38 Z" fill={col} stroke={outline} strokeWidth="1.8" />
             ) : front === 'side_sweep' ? (
@@ -1431,6 +1510,16 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             </g>
           );
         }
+        if (style === 'witch_giant_bow') {
+          return (
+            <g>
+              <path d="M18 53 Q40 31 62 53" stroke={col} strokeWidth="4.5" fill="none" strokeLinecap="round" />
+              <path d="M40 33 L15 16 L20 42 Z" fill={col} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <path d="M40 33 L65 16 L60 42 Z" fill={col} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <ellipse cx="40" cy="33" rx="6" ry="5" fill={shade(col, -18)} stroke={outline} strokeWidth="1.8" />
+            </g>
+          );
+        }
         // ribbon_bow
         return (
           <g>
@@ -1897,6 +1986,36 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             </g>
           );
         }
+        if (style === 'witch_mary_janes') {
+          return (
+            <g>
+              <path d="M24 22 H40 V45 H24 Z" fill="#D98A1A" stroke={outline} strokeWidth="1.8" />
+              <path d="M18 42 C22 50, 38 50, 44 42 L59 46 C64 48, 64 56, 59 57 H19 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M29 44 Q33 36 39 42" stroke={col} strokeWidth="3.2" fill="none" />
+              <path d="M29 44 Q33 36 39 42" stroke={outline} strokeWidth="1.4" fill="none" />
+            </g>
+          );
+        }
+        if (style === 'midautumn_girl_boots') {
+          return (
+            <g>
+              <path d="M23 23 H41 L43 44 H58 C63 46, 63 57, 57 57 H21 Z" fill="#FFFFFF" stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <path d="M22 46 H58 C62 48, 62 56, 57 57 H21 Z" fill={col} stroke={outline} strokeWidth="1.8" strokeLinejoin="round" />
+              <path d="M23 24 H41" stroke={col} strokeWidth="2.8" />
+              <circle cx="32" cy="24" r="2.2" fill="#46B966" />
+              <line x1="32" y1="26" x2="32" y2="33" stroke={col} strokeWidth="2.2" strokeLinecap="round" />
+            </g>
+          );
+        }
+        if (style === 'midautumn_boy_boots') {
+          return (
+            <g>
+              <path d="M23 24 H41 L43 44 H58 C63 46, 63 57, 57 57 H21 Z" fill={col} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <path d="M21 53 H60 V57 H21 Z" fill="#C92228" stroke={outline} strokeWidth="1.4" />
+              <path d="M27 32 Q32 28 37 32 M27 38 Q32 34 37 38" stroke="#E8E1D3" strokeWidth="1.5" fill="none" />
+            </g>
+          );
+        }
         // mary_janes
         return (
           <g>
@@ -2043,6 +2162,32 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
                 ))}
                 <circle cx="0" cy="0" r="6" fill="#F4C430" stroke={outline} strokeWidth="1.5" />
               </g>
+            </g>
+          );
+        }
+        if (style === 'star_lantern') {
+          return (
+            <g>
+              <line x1="40" y1="54" x2="40" y2="70" stroke="#7A4E2E" strokeWidth="3.2" strokeLinecap="round" />
+              <polygon
+                points="40,14 46,28 61,28 49,37 54,52 40,43 26,52 31,37 19,28 34,28"
+                fill="#40B966"
+                stroke="#F5C942"
+                strokeWidth="2.4"
+                strokeLinejoin="round"
+              />
+              <circle cx="40" cy="34" r="8.5" fill={col} stroke="#FFFFFF" strokeWidth="1.5" />
+            </g>
+          );
+        }
+        if (style === 'rooster_lantern') {
+          return (
+            <g>
+              <line x1="36" y1="52" x2="36" y2="70" stroke="#7A4E2E" strokeWidth="3" strokeLinecap="round" />
+              <path d="M26 24 C29 14, 41 14, 44 21 L49 18 L47 25 C55 28, 56 44, 46 49 L31 49 C22 45, 21 31, 26 24 Z" fill="#46B868" stroke="#F8D24E" strokeWidth="2.2" strokeLinejoin="round" />
+              <path d="M36 16 C37 11, 41 11, 43 15" stroke={col} strokeWidth="3.4" strokeLinecap="round" />
+              <polygon points="48,22 55,25 48,27" fill="#F8CE48" />
+              <ellipse cx="37" cy="38" rx="6.5" ry="4" fill="#F8CE48" stroke={col} strokeWidth="1.5" />
             </g>
           );
         }

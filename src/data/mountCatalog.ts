@@ -2,6 +2,8 @@ import {MountDefinition, MountId, MountRank, OwnedMountsState} from '../types/ga
 
 export const SKATEBOARD_CLASSIC_PRICE = 240;
 export const BICYCLE_CLASSIC_PRICE = 360;
+export const LOTUS_UMBRELLA_COINGAME_PRICE = 60;
+export const WITCH_BROOM_COINGAME_PRICE = 90;
 
 export const MOUNT_RANK_META: Record<
   MountRank,
@@ -14,6 +16,14 @@ export const MOUNT_RANK_META: Record<
     badgeText: 'text-[#1D5E82]',
     badgeBorder: 'border-[#7DBCE0]',
     hint: 'Nhanh hơn đi bộ, gọn nhẹ dạo khắp thị trấn.',
+  },
+  A: {
+    label: 'Hạng A · Cao Cấp',
+    shortTag: 'A',
+    badgeBg: 'bg-gradient-to-r from-[#A7F3D0] to-[#38BDF8]',
+    badgeText: 'text-[#0B3B2E]',
+    badgeBorder: 'border-[#10B981]',
+    hint: 'Bay lướt nhanh bậc A, kèm hiệu ứng độc quyền.',
   },
   S: {
     label: 'Hạng S · Siêu Hiếm',
@@ -32,6 +42,7 @@ export const MOUNT_CATALOG: Record<MountId, MountDefinition> = {
     rank: 'B',
     name: 'Ván Trượt Mây Cổ Điển',
     price: SKATEBOARD_CLASSIC_PRICE,
+    currency: 'coins',
     speedMultiplier: 1.42,
     description:
       'Ván gỗ maple 7 lớp lướt êm mượt. Đứng yên tự bật mũi ván khoanh tay cực ngầu, trượt đường dài tự lấy đà cực chất.',
@@ -49,6 +60,7 @@ export const MOUNT_CATALOG: Record<MountId, MountDefinition> = {
     rank: 'B',
     name: 'Xe Đạp Cổ Điển',
     price: BICYCLE_CLASSIC_PRICE,
+    currency: 'coins',
     speedMultiplier: 1.62,
     description:
       'Xe đạp khung retro kèm giỏ mây và chuông bạc, ngồi đạp nhịp nhàng nhanh hơn đi bộ rõ rệt.',
@@ -60,9 +72,53 @@ export const MOUNT_CATALOG: Record<MountId, MountDefinition> = {
       wheelOrTire: '#2B303A',
     },
   },
+  lotus_umbrella: {
+    id: 'lotus_umbrella',
+    kind: 'lotus_umbrella',
+    rank: 'A',
+    name: 'Lá Sen Che Mưa',
+    price: 0,
+    currency: 'coinGame',
+    coinGamePrice: LOTUS_UMBRELLA_COINGAME_PRICE,
+    speedMultiplier: 1.95,
+    description:
+      'Lá sen khổng lồ to như chiếc dù, cầm lên bay lướt nhanh bậc A cùng chú ếch cute và hiệu ứng mây đổ mưa rơi.',
+    palette: {
+      primary: '#2EA860',
+      secondary: '#A7F3D0',
+      accent: '#7CE352',
+      trim: '#CBE4F5',
+      wheelOrTire: '#60C5F1',
+    },
+  },
+  witch_broom: {
+    id: 'witch_broom',
+    kind: 'witch_broom',
+    rank: 'A',
+    name: 'Chổi Phù Thủy Mèo Đen',
+    price: 0,
+    currency: 'coinGame',
+    coinGamePrice: WITCH_BROOM_COINGAME_PRICE,
+    speedMultiplier: 1.98,
+    description:
+      'Chổi phù thủy bay lơ lửng tốc độ bậc A thắt nơ đỏ rực, treo túi trăng khuyết vàng kèm bé Mèo Đen đồng hành.',
+    palette: {
+      primary: '#5C3A21',
+      secondary: '#D9A754',
+      accent: '#DF2B32',
+      trim: '#F8CE48',
+      wheelOrTire: '#282233',
+    },
+  },
 };
 
 export const MOUNT_LIST: MountDefinition[] = Object.values(MOUNT_CATALOG);
+export const TUN_SHOP_MOUNTS: MountDefinition[] = MOUNT_LIST.filter(
+  (m) => m.currency !== 'coinGame',
+);
+export const COINGAME_SHOP_MOUNTS: MountDefinition[] = MOUNT_LIST.filter(
+  (m) => m.currency === 'coinGame',
+);
 
 export function createInitialOwnedMounts(): OwnedMountsState {
   return {
