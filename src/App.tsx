@@ -2167,17 +2167,34 @@ export default function App() {
   const handleRedeemGiftCode = (rawCode: string): {ok: boolean; message: string} => {
     const code = rawCode.trim().toUpperCase();
     if (code === 'HUYHUY03') {
-      if (redeemedCodes.includes('HUYHUY03')) {
+      const hadXu = redeemedCodes.includes('HUYHUY03');
+      const hadCg = redeemedCodes.includes('HUYHUY03_CG');
+      if (hadXu && hadCg) {
         return {
           ok: false,
           message: 'Mã "HUYHUY03" đã được quy đổi trên thiết bị này rồi.',
         };
       }
-      setRedeemedCodes((prev) => [...prev, 'HUYHUY03']);
-      setStats((prev) => ({...prev, coins: prev.coins + 10000}));
+      if (hadXu && !hadCg) {
+        setRedeemedCodes((prev) => [...prev, 'HUYHUY03_CG']);
+        setStats((prev) => ({
+          ...prev,
+          coinGame: Math.max(0, (prev.coinGame ?? 0) + 10000),
+        }));
+        return {
+          ok: true,
+          message: 'Cập nhật mã HUYHUY03 thành công! Bạn nhận thêm +10.000 CoinGame.',
+        };
+      }
+      setRedeemedCodes((prev) => [...prev, 'HUYHUY03', 'HUYHUY03_CG']);
+      setStats((prev) => ({
+        ...prev,
+        coins: prev.coins + 10000,
+        coinGame: Math.max(0, (prev.coinGame ?? 0) + 10000),
+      }));
       return {
         ok: true,
-        message: 'Nhập mã HUYHUY03 thành công! Bạn nhận được +10.000 Xu.',
+        message: 'Nhập mã HUYHUY03 thành công! Bạn nhận được +10.000 Xu & +10.000 CoinGame.',
       };
     }
     return {

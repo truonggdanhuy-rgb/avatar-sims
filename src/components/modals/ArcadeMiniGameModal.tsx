@@ -16,6 +16,8 @@ import {
   Sparkles,
   Star,
   Trophy,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react';
 import {ArcadeGameId, AvatarConfig, COINGAME_TO_XU_RATE} from '../../types/game';
@@ -59,8 +61,8 @@ const GAME_META: Record<
     accentBorder: 'border-[#FBBF24]',
   },
   rhythm_dance: {
-    title: 'Sàn Nhảy Rhythm',
-    badge: '+1 đến +3 CG · 30s',
+    title: 'Sàn Nhảy Rhythm (4 Bài Nhạc)',
+    badge: '+2 đến +12 CG · 35s',
     headerBg: 'bg-gradient-to-r from-[#6366F1] to-[#8B5CF6]',
     accentBorder: 'border-[#818CF8]',
   },
@@ -72,13 +74,13 @@ const GAME_META: Record<
   },
   parkour_climb: {
     title: 'Parkour Leo Trèo (3 Map)',
-    badge: '+2 đến +7 CG · N Mạng',
+    badge: '+5 đến +40+ CG · N Mạng',
     headerBg: 'bg-gradient-to-r from-[#0284C7] to-[#38BDF8]',
     accentBorder: 'border-[#38BDF8]',
   },
   obstacle_rush: {
     title: 'Về Đích Vượt Chướng Ngại Vật',
-    badge: '+1 đến +6 CG · Đua Giây · 5 Mạng',
+    badge: '+5 đến +35 CG · 500m · 6 Mạng',
     headerBg: 'bg-gradient-to-r from-[#EA580C] to-[#FB923C]',
     accentBorder: 'border-[#FB923C]',
   },
@@ -273,6 +275,8 @@ const WhackMoleGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onEar
   ]);
   const [whackFx, setWhackFx] = useState<{idx: number; text: string; color: string} | null>(null);
   const scoreRef = useRef(0);
+  const onEarnCoinGameRef = useRef(onEarnCoinGame);
+  onEarnCoinGameRef.current = onEarnCoinGame;
 
   const start = () => {
     soundFX.sparkle();
@@ -295,7 +299,7 @@ const WhackMoleGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onEar
           const cg = computeCoinGameTier(scoreRef.current);
           setRewarded(cg);
           setPhase('done');
-          onEarnCoinGame(cg);
+          onEarnCoinGameRef.current(cg);
           soundFX.sparkle();
           return 0;
         }
@@ -320,7 +324,7 @@ const WhackMoleGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onEar
       window.clearInterval(timer);
       window.clearInterval(spawner);
     };
-  }, [phase, onEarnCoinGame]);
+  }, [phase]);
 
   const hitHole = (idx: number) => {
     if (phase !== 'playing') return;
@@ -471,6 +475,8 @@ const CatchStarsGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onEa
   const itemsRef = useRef<FallingItem[]>([]);
   const nextIdRef = useRef(1);
   const arenaRef = useRef<HTMLDivElement | null>(null);
+  const onEarnCoinGameRef = useRef(onEarnCoinGame);
+  onEarnCoinGameRef.current = onEarnCoinGame;
 
   const start = () => {
     soundFX.sparkle();
@@ -523,7 +529,7 @@ const CatchStarsGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onEa
           const cg = computeCoinGameTier(scoreRef.current);
           setRewarded(cg);
           setPhase('done');
-          onEarnCoinGame(cg);
+          onEarnCoinGameRef.current(cg);
           soundFX.sparkle();
           return 0;
         }
@@ -593,7 +599,7 @@ const CatchStarsGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onEa
       window.clearInterval(timer);
       cancelAnimationFrame(rafId);
     };
-  }, [phase, onEarnCoinGame]);
+  }, [phase]);
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (phase !== 'playing' || !arenaRef.current) return;
@@ -775,6 +781,8 @@ const ClawBallGame: React.FC<{
   const steerRef = useRef<-1 | 0 | 1>(0);
   const xRef = useRef(52);
   const joyPadRef = useRef<HTMLDivElement | null>(null);
+  const onEarnCoinGameRef = useRef(onEarnCoinGame);
+  onEarnCoinGameRef.current = onEarnCoinGame;
 
   // Manual joystick movement loop during 'aiming'
   useEffect(() => {
@@ -877,13 +885,13 @@ const ClawBallGame: React.FC<{
           }
           setWonCg(cg);
           setResultText(label);
-          onEarnCoinGame(cg);
+          onEarnCoinGameRef.current(cg);
           soundFX.sparkle();
           setPhase('result');
         }, 560);
       }, 540);
     }, 520);
-  }, [phase, onEarnCoinGame]);
+  }, [phase]);
 
   useEffect(() => {
     if (phase !== 'aiming') return;
@@ -1187,7 +1195,7 @@ const ClawBallGame: React.FC<{
 };
 
 // ============================================================================
-// 4. RHYTHM BEAT DANCE STAGE (Luminous Stage + Glowing Hit Receptors)
+// 4. RHYTHM BEAT DANCE STAGE (4 Playable Songs + Synth Beat Fallback + Equalizer)
 // ============================================================================
 interface BeatNote {
   id: number;
@@ -1195,39 +1203,272 @@ interface BeatNote {
   y: number;
 }
 
+interface RhythmSong {
+  id: string;
+  title: string;
+  artist: string;
+  difficulty: 'Dễ' | 'Vừa' | 'Khó' | 'Siêu Khó';
+  bpm: number;
+  noteSpeed: number;
+  doubleChance: number;
+  baseReward: number;
+  maxReward: number;
+  accent: string;
+  mp3Url: string;
+  scaleNotes: number[];
+  bassNotes: number[];
+}
+
+const RHYTHM_SONGS: RhythmSong[] = [
+  {
+    id: 'neon_city',
+    title: 'Neon City Pop',
+    artist: 'SoundHelix Vol.1',
+    difficulty: 'Dễ',
+    bpm: 112,
+    noteSpeed: 48,
+    doubleChance: 0,
+    baseReward: 2,
+    maxReward: 5,
+    accent: '#0EA5E9',
+    mp3Url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    scaleNotes: [523.25, 587.33, 659.25, 783.99, 880.0, 783.99, 659.25, 587.33],
+    bassNotes: [130.81, 130.81, 164.81, 164.81, 196.0, 196.0, 146.83, 196.0],
+  },
+  {
+    id: 'starlight_disco',
+    title: 'Starlight Disco',
+    artist: 'SoundHelix Vol.8',
+    difficulty: 'Vừa',
+    bpm: 124,
+    noteSpeed: 56,
+    doubleChance: 0.14,
+    baseReward: 3,
+    maxReward: 7,
+    accent: '#EC4899',
+    mp3Url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+    scaleNotes: [440.0, 523.25, 587.33, 659.25, 783.99, 659.25, 587.33, 523.25],
+    bassNotes: [110.0, 110.0, 146.83, 146.83, 164.81, 164.81, 130.81, 164.81],
+  },
+  {
+    id: 'cyber_sakura',
+    title: 'Cyber Sakura Groove',
+    artist: 'SoundHelix Vol.10',
+    difficulty: 'Khó',
+    bpm: 134,
+    noteSpeed: 64,
+    doubleChance: 0.24,
+    baseReward: 4,
+    maxReward: 9,
+    accent: '#8B5CF6',
+    mp3Url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
+    scaleNotes: [587.33, 659.25, 783.99, 880.0, 1046.5, 880.0, 783.99, 659.25],
+    bassNotes: [146.83, 146.83, 174.61, 174.61, 196.0, 196.0, 130.81, 146.83],
+  },
+  {
+    id: 'turbo_galaxy',
+    title: 'Turbo Galaxy Remix',
+    artist: 'SoundHelix Vol.13',
+    difficulty: 'Siêu Khó',
+    bpm: 146,
+    noteSpeed: 74,
+    doubleChance: 0.34,
+    baseReward: 5,
+    maxReward: 12,
+    accent: '#F59E0B',
+    mp3Url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3',
+    scaleNotes: [659.25, 783.99, 880.0, 987.77, 1174.66, 987.77, 880.0, 783.99],
+    bassNotes: [164.81, 164.81, 196.0, 196.0, 220.0, 220.0, 146.83, 196.0],
+  },
+];
+
 const LANE_LABELS = ['←', '↓', '↑', '→'] as const;
 const LANE_COLORS = ['#0EA5E9', '#EC4899', '#8B5CF6', '#F59E0B'] as const;
 
 const RhythmDanceGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onEarnCoinGame}) => {
+  const [selectedSongId, setSelectedSongId] = useState<string>(RHYTHM_SONGS[0].id);
   const [phase, setPhase] = useState<'ready' | 'playing' | 'done'>('ready');
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(35);
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
-  const [judge, setJudge] = useState<string>('BẮT NHỊP');
+  const [judge, setJudge] = useState<string>('CHỌN NHẠC');
   const [litLane, setLitLane] = useState<number | null>(null);
   const [rewarded, setRewarded] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [eqHeights, setEqHeights] = useState<number[]>([26, 48, 34, 62, 42, 54, 30, 44]);
+  const [audioSourceLabel, setAudioSourceLabel] = useState<string>('Nhạc MP3 + Beat Synth');
   const [notes, setNotes] = useState<BeatNote[]>([
-    {id: -1, lane: 0, y: 28},
-    {id: -2, lane: 2, y: 56},
-    {id: -3, lane: 3, y: 76},
+    {id: -1, lane: 0, y: 26},
+    {id: -2, lane: 2, y: 52},
+    {id: -3, lane: 3, y: 74},
   ]);
+
+  const song = RHYTHM_SONGS.find((s) => s.id === selectedSongId) || RHYTHM_SONGS[0];
+  const songRef = useRef(song);
+  songRef.current = song;
 
   const notesRef = useRef<BeatNote[]>([]);
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
   const nextIdRef = useRef(1);
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
+
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const mp3PlayingRef = useRef(false);
+
+  const stopAllMusic = useCallback(() => {
+    if (audioElRef.current) {
+      audioElRef.current.pause();
+      audioElRef.current.currentTime = 0;
+      audioElRef.current.src = '';
+      audioElRef.current = null;
+    }
+    mp3PlayingRef.current = false;
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      audioCtxRef.current.close().catch(() => {});
+    }
+    audioCtxRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopAllMusic();
+    };
+  }, [stopAllMusic]);
+
+  const playSynthStep = useCallback((stepIdx: number, activeSong: RhythmSong) => {
+    if (mutedRef.current) return;
+    try {
+      const AudioCtor =
+        window.AudioContext ||
+        (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext;
+      if (!AudioCtor) return;
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioCtor();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      const now = ctx.currentTime;
+      const isDownbeat = stepIdx % 2 === 0;
+      const masterGain = mp3PlayingRef.current ? 0.05 : 0.14;
+
+      // Kick drum on downbeats
+      if (isDownbeat) {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(145, now);
+        osc.frequency.exponentialRampToValueAtTime(42, now + 0.13);
+        g.gain.setValueAtTime(masterGain * 1.4, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        osc.connect(g);
+        g.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      } else {
+        // Crisp synth clap/hi-hat on offbeat
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(920, now);
+        osc.frequency.exponentialRampToValueAtTime(340, now + 0.06);
+        g.gain.setValueAtTime(masterGain * 0.55, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+        osc.connect(g);
+        g.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.07);
+      }
+
+      // Bass pulse (only strong when MP3 is not streaming)
+      if (!mp3PlayingRef.current) {
+        const bassOsc = ctx.createOscillator();
+        const bassGain = ctx.createGain();
+        bassOsc.type = 'sawtooth';
+        const bassFreq = activeSong.bassNotes[stepIdx % activeSong.bassNotes.length];
+        bassOsc.frequency.setValueAtTime(bassFreq, now);
+        bassGain.gain.setValueAtTime(masterGain * 0.52, now);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+        bassOsc.connect(bassGain);
+        bassGain.connect(ctx.destination);
+        bassOsc.start(now);
+        bassOsc.stop(now + 0.2);
+
+        // Lead melody chime
+        const leadOsc = ctx.createOscillator();
+        const leadGain = ctx.createGain();
+        leadOsc.type = stepIdx % 4 === 0 ? 'square' : 'triangle';
+        const leadFreq = activeSong.scaleNotes[stepIdx % activeSong.scaleNotes.length];
+        leadOsc.frequency.setValueAtTime(leadFreq, now);
+        leadGain.gain.setValueAtTime(masterGain * 0.42, now);
+        leadGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        leadOsc.connect(leadGain);
+        leadGain.connect(ctx.destination);
+        leadOsc.start(now);
+        leadOsc.stop(now + 0.17);
+      }
+    } catch {
+      // Ignore browser autoplay / audio errors safely
+    }
+  }, []);
+
+  const toggleMute = () => {
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+    if (audioElRef.current) {
+      audioElRef.current.muted = nextMuted;
+    }
+  };
+
+  const computeSongReward = (pts: number, activeSong: RhythmSong) => {
+    const ratio = Math.min(1, pts / (activeSong.bpm >= 134 ? 540 : 420));
+    return Math.round(activeSong.baseReward + ratio * (activeSong.maxReward - activeSong.baseReward));
+  };
 
   const start = () => {
+    stopAllMusic();
     soundFX.sparkle();
+    const activeSong = songRef.current;
     notesRef.current = [];
     scoreRef.current = 0;
     comboRef.current = 0;
     setNotes([]);
     setScore(0);
     setCombo(0);
-    setJudge('SẴN SÀNG');
+    setJudge(activeSong.title.toUpperCase());
     setRewarded(0);
-    setTimeLeft(30);
+    setTimeLeft(35);
+    setAudioSourceLabel(`Đang phát: ${activeSong.title}`);
+
+    // Start streaming free SoundHelix MP3 track (with seamless Synth fallback if offline/blocked)
+    try {
+      const audio = new Audio(activeSong.mp3Url);
+      audio.crossOrigin = 'anonymous';
+      audio.volume = 0.55;
+      audio.muted = mutedRef.current;
+      audio.currentTime = 12; // Jump straight into energetic beat section!
+      audio.onplaying = () => {
+        mp3PlayingRef.current = true;
+        setAudioSourceLabel(`MP3 Live · ${activeSong.title}`);
+      };
+      audio.onerror = () => {
+        mp3PlayingRef.current = false;
+        setAudioSourceLabel(`Beat Synth · ${activeSong.title}`);
+      };
+      audio.play().catch(() => {
+        mp3PlayingRef.current = false;
+        setAudioSourceLabel(`Beat Synth · ${activeSong.title}`);
+      });
+      audioElRef.current = audio;
+    } catch {
+      mp3PlayingRef.current = false;
+      setAudioSourceLabel(`Beat Synth · ${activeSong.title}`);
+    }
+
     setPhase('playing');
   };
 
@@ -1238,7 +1479,7 @@ const RhythmDanceGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onE
       window.setTimeout(() => setLitLane((cur) => (cur === lane ? null : cur)), 130);
 
       const idx = notesRef.current.findIndex(
-        (n) => n.lane === lane && n.y >= 68 && n.y <= 96,
+        (n) => n.lane === lane && n.y >= 67 && n.y <= 97,
       );
       if (idx === -1) {
         comboRef.current = 0;
@@ -1252,13 +1493,13 @@ const RhythmDanceGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onE
       setNotes(notesRef.current);
 
       const dist = Math.abs(note.y - 82);
-      const pts = dist <= 7 ? 20 : 12;
+      const pts = dist <= 7.5 ? 24 : 14;
       comboRef.current += 1;
-      scoreRef.current += pts + Math.min(8, Math.floor(comboRef.current / 4) * 2);
+      scoreRef.current += pts + Math.min(12, Math.floor(comboRef.current / 4) * 3);
       setCombo(comboRef.current);
       setScore(scoreRef.current);
-      setJudge(dist <= 7 ? 'PERFECT!' : 'GOOD!');
-      soundFX.sparkle();
+      setJudge(dist <= 7.5 ? 'PERFECT!' : 'GOOD!');
+      if (!mutedRef.current) soundFX.sparkle();
     },
     [phase],
   );
@@ -1275,16 +1516,24 @@ const RhythmDanceGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onE
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [phase, hitLane]);
 
+  const onEarnCoinGameRef = useRef(onEarnCoinGame);
+  onEarnCoinGameRef.current = onEarnCoinGame;
+
   useEffect(() => {
     if (phase !== 'playing') return;
+    const activeSong = songRef.current;
+    const beatInterval = 60 / activeSong.bpm;
+    let beatStep = 0;
+
     const timer = window.setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           window.clearInterval(timer);
-          const cg = computeCoinGameTier(scoreRef.current);
+          stopAllMusic();
+          const cg = computeSongReward(scoreRef.current, songRef.current);
           setRewarded(cg);
           setPhase('done');
-          onEarnCoinGame(cg);
+          onEarnCoinGameRef.current(cg);
           soundFX.sparkle();
           return 0;
         }
@@ -1299,14 +1548,27 @@ const RhythmDanceGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onE
       const dt = Math.min(0.05, (now - lastTs) / 1000);
       lastTs = now;
       spawnAcc += dt;
-      if (spawnAcc >= 0.48) {
-        spawnAcc = 0;
+      if (spawnAcc >= beatInterval) {
+        spawnAcc -= beatInterval;
+        playSynthStep(beatStep, activeSong);
+        beatStep += 1;
+
+        setEqHeights(
+          Array.from({length: 8}, (_, i) =>
+            Math.round(24 + ((Math.sin(beatStep * 1.1 + i) + 1) * 0.5) * 68),
+          ),
+        );
+
         const lane = Math.floor(Math.random() * 4) as 0 | 1 | 2 | 3;
         notesRef.current.push({id: nextIdRef.current++, lane, y: -5});
+        if (Math.random() < activeSong.doubleChance) {
+          const lane2 = ((lane + 1 + Math.floor(Math.random() * 3)) % 4) as 0 | 1 | 2 | 3;
+          notesRef.current.push({id: nextIdRef.current++, lane: lane2, y: -5});
+        }
       }
       const next: BeatNote[] = [];
       for (const n of notesRef.current) {
-        const ny = n.y + 52 * dt;
+        const ny = n.y + activeSong.noteSpeed * dt;
         if (ny <= 100) next.push({...n, y: ny});
         else {
           comboRef.current = 0;
@@ -1322,36 +1584,106 @@ const RhythmDanceGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onE
       window.clearInterval(timer);
       cancelAnimationFrame(rafId);
     };
-  }, [phase, onEarnCoinGame]);
+  }, [phase, playSynthStep, stopAllMusic]);
 
   return (
     <div className="space-y-2.5">
-      <div className="flex items-center justify-between rounded-2xl border border-[#C4B5FD] bg-[#F5F3FF] px-3.5 py-2 text-xs font-black">
+      {/* Song Header & Volume Strip */}
+      <div className="flex items-center justify-between gap-2 rounded-2xl border border-[#C4B5FD] bg-[#F5F3FF] px-3 py-2 text-xs font-black">
         <span className="tabular-nums text-[#4F46E5]">Điểm: {score}</span>
-        <span className="text-[#DB2777]">
+        <span className="truncate text-[#DB2777]">
           {judge} · x{combo}
         </span>
-        <span className="tabular-nums text-[#0284C7]">{timeLeft}s</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="flex h-6 w-6 items-center justify-center rounded-lg bg-white text-[#4F46E5] shadow-sm active:scale-95"
+            aria-label={muted ? 'Bật nhạc' : 'Tắt nhạc'}
+          >
+            {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+          </button>
+          <span className="tabular-nums text-[#0284C7]">{timeLeft}s</span>
+        </div>
       </div>
 
-      {/* Luminous Dance Stage (Always Visible!) */}
-      <div className="relative grid h-56 grid-cols-4 overflow-hidden rounded-3xl border-4 border-[#818CF8] bg-gradient-to-b from-[#EEF2FF] via-[#E0E7FF] to-[#C7D2FE]">
+      {/* Selectable 4-Song Playlist when Ready or Done */}
+      {phase !== 'playing' && (
+        <div className="grid grid-cols-2 gap-1.5">
+          {RHYTHM_SONGS.map((s) => {
+            const active = s.id === selectedSongId;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  setSelectedSongId(s.id);
+                }}
+                className={`rounded-xl border-2 px-2.5 py-2 text-left transition active:scale-95 ${
+                  active
+                    ? 'border-[#6366F1] bg-[#EEF2FF] shadow-sm'
+                    : 'border-[#E2E8F0] bg-[#F8FAFC] hover:border-[#C7D2FE]'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className="truncate text-[11px] font-black text-[#0F172A]">{s.title}</span>
+                  <span
+                    style={{backgroundColor: s.accent}}
+                    className="shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black text-white"
+                  >
+                    {s.difficulty}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex items-center justify-between text-[10px] font-bold text-[#475569]">
+                  <span>{s.bpm} BPM</span>
+                  <span className="text-[#4F46E5]">
+                    +{s.baseReward}–{s.maxReward} CG
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Luminous Dance Stage with Live Beat Equalizer */}
+      <div className="relative grid h-52 grid-cols-4 overflow-hidden rounded-3xl border-4 border-[#818CF8] bg-gradient-to-b from-[#1E1B4B] via-[#312E81] to-[#4338CA]">
+        {/* Animated Equalizer Bars */}
+        <div className="pointer-events-none absolute inset-x-3 bottom-0 flex h-24 items-end justify-between gap-1.5 opacity-35">
+          {eqHeights.map((h, i) => (
+            <div
+              key={i}
+              style={{
+                height: `${h}%`,
+                backgroundColor: LANE_COLORS[i % 4],
+              }}
+              className="flex-1 rounded-t-md transition-[height] duration-150"
+            />
+          ))}
+        </div>
+
+        {/* Now Playing Pill */}
+        <div className="pointer-events-none absolute top-2 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/45 px-2.5 py-0.5 text-[10px] font-black text-[#E0E7FF] backdrop-blur-sm">
+          {phase === 'playing' ? audioSourceLabel : `${song.title} · ${song.bpm} BPM`}
+        </div>
+
         {/* Target Receptor Hit Bar */}
         <div
           style={{top: '82%'}}
-          className="pointer-events-none absolute inset-x-0 h-11 -translate-y-1/2 border-y-2 border-[#6366F1]/50 bg-white/55"
+          className="pointer-events-none absolute inset-x-0 h-11 -translate-y-1/2 border-y-2 border-[#A5B4FC]/60 bg-white/15"
         />
         {([0, 1, 2, 3] as const).map((lane) => (
           <div
             key={lane}
-            className={`relative border-r border-[#A5B4FC]/60 transition-colors last:border-r-0 ${
-              litLane === lane ? 'bg-white/60' : ''
+            className={`relative border-r border-white/15 transition-colors last:border-r-0 ${
+              litLane === lane ? 'bg-white/25' : ''
             }`}
           >
             {/* Receptor Ring */}
             <div
               style={{top: '82%', borderColor: LANE_COLORS[lane]}}
-              className="pointer-events-none absolute left-1/2 flex h-10 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border-2 bg-white/80 text-sm font-black opacity-75"
+              className="pointer-events-none absolute left-1/2 flex h-10 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border-2 bg-black/35 text-sm font-black text-white opacity-85"
             >
               {LANE_LABELS[lane]}
             </div>
@@ -1381,7 +1713,7 @@ const RhythmDanceGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onE
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#6366F1] py-3 text-sm font-black text-white shadow-md transition hover:bg-[#4F46E5] active:scale-95"
         >
           <Play className="h-4 w-4 fill-current" />
-          <span>Lên sàn nhảy (30s)</span>
+          <span>Phát nhạc &amp; Nhảy: {song.title} (35s)</span>
         </button>
       )}
 
@@ -1409,7 +1741,8 @@ const RhythmDanceGame: React.FC<{onEarnCoinGame: (amt: number) => void}> = ({onE
             <Trophy className="h-6 w-6 shrink-0 text-[#F59E0B]" />
             <div>
               <div className="text-xs font-bold text-[#475569]">
-                Điểm vũ đạo: <span className="font-black tabular-nums text-[#0F172A]">{score}</span>
+                {song.title} · Điểm:{' '}
+                <span className="font-black tabular-nums text-[#0F172A]">{score}</span>
               </div>
               <div className="text-sm font-black tabular-nums text-[#4F46E5]">
                 Nhận +{rewarded} CoinGame
@@ -1455,6 +1788,8 @@ const PcHtmlGames: React.FC<{onEarnCoins: (amt: number) => void}> = ({onEarnCoin
   ]);
   const appleRef = useRef<{x: number; y: number}>({x: 7, y: 5});
   const snakeScoreRef = useRef(0);
+  const onEarnCoinsRef = useRef(onEarnCoins);
+  onEarnCoinsRef.current = onEarnCoins;
 
   const startSnake = () => {
     soundFX.sparkle();
@@ -1494,7 +1829,7 @@ const PcHtmlGames: React.FC<{onEarnCoins: (amt: number) => void}> = ({onEarnCoin
         const xu = Math.min(8, 2 + Math.floor(snakeScoreRef.current / 2));
         setSnakeReward(xu);
         setSnakePhase('done');
-        onEarnCoins(xu);
+        onEarnCoinsRef.current(xu);
         soundFX.tap();
         return;
       }
@@ -1523,7 +1858,7 @@ const PcHtmlGames: React.FC<{onEarnCoins: (amt: number) => void}> = ({onEarnCoin
       window.removeEventListener('keydown', onKey);
       window.clearInterval(id);
     };
-  }, [selected, snakePhase, onEarnCoins]);
+  }, [selected, snakePhase]);
 
   // --- Tic-Tac-Toe XO ---
   const [board, setBoard] = useState<(null | 'X' | 'O')[]>(Array(9).fill(null));

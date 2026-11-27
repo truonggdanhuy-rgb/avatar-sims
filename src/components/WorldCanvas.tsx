@@ -499,12 +499,12 @@ function getResponsiveCameraSettings(zone: ZoneId, aspect: number) {
 
   if (zone === 'arcade') {
     if (isPortrait) {
-      return {fov, pos: [0, 9.8, 15.2] as const, look: [0, 0.9, -0.5] as const};
+      return {fov, pos: [0, 11.4, 17.8] as const, look: [0, 0.9, -0.4] as const};
     }
     if (isSquare) {
-      return {fov, pos: [0, 9.2, 14.0] as const, look: [0, 0.9, -0.5] as const};
+      return {fov, pos: [0, 10.6, 16.4] as const, look: [0, 0.9, -0.4] as const};
     }
-    return {fov, pos: [0, 8.6, 12.8] as const, look: [0, 0.9, -0.5] as const};
+    return {fov, pos: [0, 10.0, 15.2] as const, look: [0, 0.9, -0.4] as const};
   }
 
   if (isPortrait) {
@@ -541,7 +541,7 @@ function getZoneWalkBounds(zone: ZoneId) {
     };
   }
   if (zone === 'arcade') {
-    return {minX: -7.4, maxX: 7.4, minZ: -6.1, maxZ: 6.35};
+    return {minX: -10.6, maxX: 10.6, minZ: -8.35, maxZ: 8.5};
   }
   return {minX: -3.45, maxX: 3.45, minZ: -4.05, maxZ: 4.05};
 }
@@ -3035,7 +3035,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             playerPos.rotY = ISLAND_SPAWN.rotY;
           } else if (z === 'arcade') {
             playerPos.x = 0;
-            playerPos.z = 5.0;
+            playerPos.z = 7.4;
             playerPos.rotY = Math.PI;
           } else {
             playerPos.x = 0;
@@ -5024,6 +5024,26 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
               soundFX.sparkle();
               callbacksRef.current.onBoostMood();
               callbacksRef.current.onOpenArcadeHub?.('games');
+            });
+            return;
+          }
+
+          if (kind === 'arcade_parkour') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onBoostMood();
+              callbacksRef.current.onOpenArcadeGame('parkour_climb');
+            });
+            return;
+          }
+
+          if (kind === 'arcade_obstacle') {
+            soundFX.tap();
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              soundFX.sparkle();
+              callbacksRef.current.onBoostMood();
+              callbacksRef.current.onOpenArcadeGame('obstacle_rush');
             });
             return;
           }

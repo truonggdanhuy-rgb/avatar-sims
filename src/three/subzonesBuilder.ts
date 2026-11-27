@@ -4373,8 +4373,8 @@ export function buildSubzoneScene(
       ctx.lineWidth = 3;
       ctx.strokeRect(18, 18, w - 36, h - 36);
       ctx.beginPath();
-      ctx.arc(w / 2, h / 2, 110, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(46, 230, 214, 0.32)';
+      ctx.arc(w / 2, h / 2, 118, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(46, 230, 214, 0.34)';
       ctx.lineWidth = 4;
       ctx.stroke();
     });
@@ -4390,13 +4390,13 @@ export function buildSubzoneScene(
       ctx.lineWidth = 5;
       ctx.strokeRect(8, 8, w - 16, h - 16);
       ctx.fillStyle = '#38BDF8';
-      ctx.font = '900 42px system-ui, sans-serif';
+      ctx.font = '900 40px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('CYBER GAME ARENA', w / 2, h / 2 - 12);
       ctx.fillStyle = '#FDE68A';
-      ctx.font = '800 20px system-ui, sans-serif';
-      ctx.fillText('COINGAME  ·  HDDOLL  ·  ESPORTS', w / 2, h / 2 + 28);
+      ctx.font = '800 19px system-ui, sans-serif';
+      ctx.fillText('PARKOUR · VƯỢT CHƯỚNG NGẠI VẬT · COINGAME', w / 2, h / 2 + 28);
     });
 
     const blindboxBannerTex = makeArcadeCanvasTex(512, 160, (ctx, w, h) => {
@@ -4549,7 +4549,7 @@ export function buildSubzoneScene(
       ctx.fillText('SHOP COINGAME', w / 2, 56);
       ctx.fillStyle = '#FDE68A';
       ctx.font = '900 24px system-ui, sans-serif';
-      ctx.fillText('PREMIUM · LÁ SEN HẠNG A', w / 2, 112);
+      ctx.fillText('PREMIUM · LÁ SEN · CHỔI BAY', w / 2, 112);
     });
 
     const whackBannerTex = makeArcadeCanvasTex(384, 128, (ctx, w, h) => {
@@ -4571,8 +4571,47 @@ export function buildSubzoneScene(
       ctx.fillText('THƯỞNG COINGAME', w / 2, 94);
     });
 
+    const parkourBannerTex = makeArcadeCanvasTex(384, 160, (ctx, w, h) => {
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, '#065F46');
+      grad.addColorStop(1, '#0284C7');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#6EE7B7';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(8, 8, w - 16, h - 16);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '900 40px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PARKOUR LEO TRÈO', w / 2, 58);
+      ctx.fillStyle = '#FDE047';
+      ctx.font = '900 22px system-ui, sans-serif';
+      ctx.fillText('3 MAP · THANG DÂY · ĐẾN +40 CG', w / 2, 114);
+    });
+
+    const obstacleBannerTex = makeArcadeCanvasTex(384, 160, (ctx, w, h) => {
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, '#7C2D12');
+      grad.addColorStop(1, '#B91C1C');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#FDBA74';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(8, 8, w - 16, h - 16);
+      ctx.fillStyle = '#FEF08A';
+      ctx.font = '900 32px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('VƯỢT CHƯỚNG NGẠI VẬT', w / 2, 58);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '900 22px system-ui, sans-serif';
+      ctx.fillText('ĐÁ LĂN · QUẠT TÉ · MƯA ĐỘC', w / 2, 114);
+    });
+
+    // Spacious Cyber Game Arena (23.6 x 19.6)
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(16.8, 15.2),
+      new THREE.PlaneGeometry(23.6, 19.6),
       new THREE.MeshStandardMaterial({map: floorTex, roughness: 0.42, metalness: 0.14}),
     );
     floor.rotation.x = -Math.PI / 2;
@@ -4580,7 +4619,6 @@ export function buildSubzoneScene(
     groundMesh = floor;
     group.add(floor);
 
-    // Architectural surround walls & glowing LED trims (open front toward camera)
     const wallMat = clayMat('#1B213C', 0.62);
     const trimMat = clayMat('#2B355B', 0.48);
     const cyanLedMat = new THREE.MeshStandardMaterial({
@@ -4613,52 +4651,55 @@ export function buildSubzoneScene(
       emissiveIntensity: 0.8,
       roughness: 0.25,
     });
+    const orangeLedMat = new THREE.MeshStandardMaterial({
+      color: '#FED7AA',
+      emissive: '#F97316',
+      emissiveIntensity: 0.85,
+      roughness: 0.25,
+    });
 
     const archGroup = new THREE.Group();
-    const backWall = new THREE.Mesh(new RoundedBoxGeometry(17.1, 3.35, 0.36, 2, 0.06), wallMat);
-    backWall.position.set(0, 1.675, -7.65);
-    const leftWall = new THREE.Mesh(new RoundedBoxGeometry(0.36, 3.2, 15.4, 2, 0.06), wallMat);
-    leftWall.position.set(-8.45, 1.6, 0);
-    const rightWall = new THREE.Mesh(new RoundedBoxGeometry(0.36, 3.2, 15.4, 2, 0.06), wallMat);
-    rightWall.position.set(8.45, 1.6, 0);
+    const backWall = new THREE.Mesh(new RoundedBoxGeometry(23.9, 3.55, 0.36, 2, 0.06), wallMat);
+    backWall.position.set(0, 1.775, -9.85);
+    const leftWall = new THREE.Mesh(new RoundedBoxGeometry(0.36, 3.3, 19.8, 2, 0.06), wallMat);
+    leftWall.position.set(-11.85, 1.65, 0);
+    const rightWall = new THREE.Mesh(new RoundedBoxGeometry(0.36, 3.3, 19.8, 2, 0.06), wallMat);
+    rightWall.position.set(11.85, 1.65, 0);
 
-    const backTrimTop = new THREE.Mesh(new RoundedBoxGeometry(17.2, 0.2, 0.44, 2, 0.04), trimMat);
-    backTrimTop.position.set(0, 3.32, -7.64);
-    const backLedStrip = new THREE.Mesh(new THREE.BoxGeometry(15.8, 0.09, 0.08), cyanLedMat);
-    backLedStrip.position.set(0, 3.05, -7.43);
-    const leftLedStrip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.09, 14.2), violetLedMat);
-    leftLedStrip.position.set(-8.23, 2.95, 0);
-    const rightLedStrip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.09, 14.2), pinkLedMat);
-    rightLedStrip.position.set(8.23, 2.95, 0);
+    const backTrimTop = new THREE.Mesh(new RoundedBoxGeometry(24.0, 0.22, 0.44, 2, 0.04), trimMat);
+    backTrimTop.position.set(0, 3.52, -9.84);
+    const backLedStrip = new THREE.Mesh(new THREE.BoxGeometry(22.4, 0.1, 0.08), cyanLedMat);
+    backLedStrip.position.set(0, 3.22, -9.63);
+    const leftLedStrip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 18.4), violetLedMat);
+    leftLedStrip.position.set(-11.63, 3.05, 0);
+    const rightLedStrip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 18.4), pinkLedMat);
+    rightLedStrip.position.set(11.63, 3.05, 0);
 
-    // Vertical acoustic LED fins along the back wall
-    for (let i = -3; i <= 3; i++) {
+    for (let i = -4; i <= 4; i++) {
       if (i === 0) continue;
       const fin = new THREE.Mesh(
-        new RoundedBoxGeometry(0.16, 2.55, 0.12, 2, 0.03),
+        new RoundedBoxGeometry(0.16, 2.75, 0.12, 2, 0.03),
         i % 2 === 0 ? cyanLedMat : violetLedMat,
       );
-      fin.position.set(i * 2.35, 1.48, -7.42);
+      fin.position.set(i * 2.45, 1.56, -9.62);
       archGroup.add(fin);
     }
 
-    // Main overhead glowing Cyber Game Arena sign
     const mainSignBacking = new THREE.Mesh(
-      new RoundedBoxGeometry(5.6, 1.12, 0.22, 2, 0.06),
+      new RoundedBoxGeometry(6.8, 1.24, 0.22, 2, 0.06),
       trimMat,
     );
-    mainSignBacking.position.set(0, 2.75, -7.36);
+    mainSignBacking.position.set(0, 2.9, -9.56);
     const mainSignFace = new THREE.Mesh(
-      new THREE.PlaneGeometry(5.25, 0.92),
+      new THREE.PlaneGeometry(6.4, 1.02),
       new THREE.MeshBasicMaterial({map: cyberBannerTex}),
     );
-    mainSignFace.position.set(0, 2.75, -7.24);
+    mainSignFace.position.set(0, 2.9, -9.44);
 
-    // Front low perimeter curb
-    const frontCurbL = new THREE.Mesh(new RoundedBoxGeometry(6.6, 0.26, 0.28, 2, 0.05), trimMat);
-    frontCurbL.position.set(-5.1, 0.13, 7.45);
+    const frontCurbL = new THREE.Mesh(new RoundedBoxGeometry(9.2, 0.26, 0.28, 2, 0.05), trimMat);
+    frontCurbL.position.set(-7.1, 0.13, 9.65);
     const frontCurbR = frontCurbL.clone();
-    frontCurbR.position.x = 5.1;
+    frontCurbR.position.x = 7.1;
 
     archGroup.add(
       backWall,
@@ -4678,7 +4719,7 @@ export function buildSubzoneScene(
 
     // 1. Back-Left: HDDOLL Blindbox Showcase Tower
     const blindboxTower = new THREE.Group();
-    blindboxTower.position.set(-3.45, 0, -5.55);
+    blindboxTower.position.set(-4.35, 0, -7.65);
     const bbBase = new THREE.Mesh(
       new RoundedBoxGeometry(2.2, 1.05, 1.4, 3, 0.08),
       clayMat('#27224E', 0.42),
@@ -4752,20 +4793,20 @@ export function buildSubzoneScene(
       blindboxTower,
       [2.35, 3.3, 1.65],
       [0, 1.65, 0],
-      {kind: 'arcade_blindbox_hddoll', tx: -3.45, tz: -3.35},
+      {kind: 'arcade_blindbox_hddoll', tx: -4.35, tz: -5.45},
       clickTargets,
     );
-    colliders.push({type: 'box', x: -3.45, z: -5.55, hw: 1.18, hd: 0.82});
+    colliders.push({type: 'box', x: -4.35, z: -7.65, hw: 1.18, hd: 0.82});
     labelAnchors.push({
       id: 'arcade_blindbox_hddoll',
       label: 'Blindbox HDDOLL (Soon)',
-      worldPos: new THREE.Vector3(-3.45, 3.45, -5.55),
+      worldPos: new THREE.Vector3(-4.35, 3.45, -7.65),
     });
     group.add(blindboxTower);
 
-    // 1b. Center-Back Hero: Shop CoinGame Premium Showcase (Lá Sen Che Mưa Hạng A!)
+    // 1b. Center-Back Hero: Shop CoinGame Premium Showcase
     const coinShopBooth = new THREE.Group();
-    coinShopBooth.position.set(0, 0, -5.55);
+    coinShopBooth.position.set(0, 0, -7.65);
     const csBase = new THREE.Mesh(
       new RoundedBoxGeometry(2.45, 1.08, 1.46, 3, 0.08),
       clayMat('#0B3B36', 0.38),
@@ -4810,7 +4851,6 @@ export function buildSubzoneScene(
     csGlass.position.set(0, 1.84, 0.04);
     csGlass.renderOrder = 6;
 
-    // Animated miniature giant Lotus Umbrella + Frog + Cloud inside Shop CoinGame Showcase
     const miniLotus = new THREE.Group();
     miniLotus.position.set(0, 1.62, 0.06);
     const mStem = new THREE.Mesh(
@@ -4842,20 +4882,20 @@ export function buildSubzoneScene(
       coinShopBooth,
       [2.6, 3.35, 1.72],
       [0, 1.68, 0],
-      {kind: 'arcade_coingame_shop', tx: 0, tz: -3.35},
+      {kind: 'arcade_coingame_shop', tx: 0, tz: -5.45},
       clickTargets,
     );
-    colliders.push({type: 'box', x: 0, z: -5.55, hw: 1.32, hd: 0.86});
+    colliders.push({type: 'box', x: 0, z: -7.65, hw: 1.32, hd: 0.86});
     labelAnchors.push({
       id: 'arcade_coingame_shop',
       label: 'Shop CoinGame',
-      worldPos: new THREE.Vector3(0, 3.5, -5.55),
+      worldPos: new THREE.Vector3(0, 3.5, -7.65),
     });
     group.add(coinShopBooth);
 
     // 2. Back-Right: CoinGame Exchange Kiosk
     const exchangeKiosk = new THREE.Group();
-    exchangeKiosk.position.set(3.45, 0, -5.55);
+    exchangeKiosk.position.set(4.35, 0, -7.65);
     const exBase = new THREE.Mesh(
       new RoundedBoxGeometry(2.1, 1.12, 1.32, 3, 0.08),
       clayMat('#162344', 0.4),
@@ -4897,23 +4937,23 @@ export function buildSubzoneScene(
       exchangeKiosk,
       [2.25, 3.25, 1.55],
       [0, 1.62, 0],
-      {kind: 'arcade_exchange_kiosk', tx: 3.45, tz: -3.35},
+      {kind: 'arcade_exchange_kiosk', tx: 4.35, tz: -5.45},
       clickTargets,
     );
-    colliders.push({type: 'box', x: 3.45, z: -5.55, hw: 1.15, hd: 0.78});
+    colliders.push({type: 'box', x: 4.35, z: -7.65, hw: 1.15, hd: 0.78});
     labelAnchors.push({
       id: 'arcade_exchange_kiosk',
       label: 'Đổi CoinGame ⇄ Xu (Soon)',
-      worldPos: new THREE.Vector3(3.45, 3.4, -5.55),
+      worldPos: new THREE.Vector3(4.35, 3.4, -7.65),
     });
     group.add(exchangeKiosk);
 
-    // 3. Left Wing: 3 Modern RGB Gaming PC Arena Stations (Sittable Chairs + HTML Mini-Games!)
-    const pcZs = [-3.4, -0.3, 2.8];
+    // 3. Left Wing: 3 Modern RGB Gaming PC Arena Stations
+    const pcZs = [-4.2, -0.4, 3.4];
     const pcAccentMats = [cyanLedMat, pinkLedMat, violetLedMat];
     pcZs.forEach((pz, idx) => {
       const rig = new THREE.Group();
-      rig.position.set(-6.05, 0, pz);
+      rig.position.set(-9.15, 0, pz);
 
       const deskTop = new THREE.Mesh(
         new RoundedBoxGeometry(1.38, 0.09, 2.32, 2, 0.03),
@@ -4997,29 +5037,175 @@ export function buildSubzoneScene(
         [0.2, 0.92, 0],
         {
           kind: 'arcade_pc_station',
-          tx: -4.15,
+          tx: -7.15,
           tz: pz,
-          seatX: -4.99,
+          seatX: -8.09,
           seatZ: pz,
           seatY: 0.52,
           sitRotY: -Math.PI / 2,
         },
         clickTargets,
       );
-      colliders.push({type: 'box', x: -5.75, z: pz, hw: 1.05, hd: 1.2});
+      colliders.push({type: 'box', x: -8.85, z: pz, hw: 1.05, hd: 1.2});
       if (idx === 1) {
         labelAnchors.push({
           id: 'arcade_pc_arena',
           label: 'Dàn PC Esports (Game HTML)',
-          worldPos: new THREE.Vector3(-5.95, 1.95, pz),
+          worldPos: new THREE.Vector3(-9.0, 1.95, pz),
         });
       }
       group.add(rig);
     });
 
+    // 3b. Dedicated 3D Machine #1: Máy Parkour Leo Trèo (Left-Center)
+    const parkourCab = new THREE.Group();
+    parkourCab.position.set(-4.65, 0, -0.35);
+    const pkBase = new THREE.Mesh(
+      new RoundedBoxGeometry(1.95, 1.02, 1.48, 3, 0.08),
+      clayMat('#064E3B', 0.4),
+    );
+    pkBase.position.y = 0.51;
+    const pkTrim = new THREE.Mesh(
+      new RoundedBoxGeometry(2.02, 0.09, 1.55, 2, 0.03),
+      emeraldLedMat,
+    );
+    pkTrim.position.y = 1.02;
+    const pkBody = new THREE.Mesh(
+      new RoundedBoxGeometry(1.85, 1.75, 0.85, 3, 0.06),
+      clayMat('#0F2A38', 0.42),
+    );
+    pkBody.position.set(0, 1.82, -0.25);
+    const pkMarquee = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.72, 0.72),
+      new THREE.MeshBasicMaterial({map: parkourBannerTex}),
+    );
+    pkMarquee.position.set(0, 2.28, 0.19);
+    const pkScreen = new THREE.Mesh(
+      new RoundedBoxGeometry(1.52, 0.72, 0.08, 2, 0.03),
+      new THREE.MeshStandardMaterial({
+        color: '#0C4A6E',
+        emissive: '#38BDF8',
+        emissiveIntensity: 0.65,
+      }),
+    );
+    pkScreen.position.set(0, 1.5, 0.17);
+    const pkJoyL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.18, 8), emeraldLedMat);
+    pkJoyL.position.set(-0.42, 1.12, 0.45);
+    const pkBtnR = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.08, 12), goldLedMat);
+    pkBtnR.position.set(0.38, 1.07, 0.45);
+
+    // Mini 3D Parkour Tree & Rope Ladder Display on top of the machine
+    const pkHolo = new THREE.Group();
+    pkHolo.position.set(0, 2.98, 0);
+    const pkTreeTrunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.09, 0.45, 10),
+      clayMat('#92400E', 0.55),
+    );
+    const pkTreeCrown = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.24, 1),
+      clayMat('#22C55E', 0.5),
+    );
+    pkTreeCrown.position.y = 0.3;
+    const pkLadderBar = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.36, 0.06),
+      goldLedMat,
+    );
+    pkLadderBar.position.set(0.2, 0.05, 0.1);
+    pkHolo.add(pkTreeTrunk, pkTreeCrown, pkLadderBar);
+
+    parkourCab.add(pkBase, pkTrim, pkBody, pkMarquee, pkScreen, pkJoyL, pkBtnR, pkHolo);
+    mergeStaticGroupByMaterial(parkourCab, new Set([pkHolo]));
+    addBoxProxy(
+      parkourCab,
+      [2.1, 3.3, 1.7],
+      [0, 1.65, 0],
+      {kind: 'arcade_parkour', tx: -4.65, tz: 1.4},
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: -4.65, z: -0.35, hw: 1.05, hd: 0.85});
+    labelAnchors.push({
+      id: 'arcade_parkour',
+      label: 'Parkour Leo Trèo (3 Map)',
+      worldPos: new THREE.Vector3(-4.65, 3.55, -0.35),
+    });
+    group.add(parkourCab);
+
+    // 3c. Dedicated 3D Machine #2: Máy Vượt Chướng Ngại Vật (Right-Center)
+    const obstacleCab = new THREE.Group();
+    obstacleCab.position.set(4.65, 0, -0.35);
+    const obBase = new THREE.Mesh(
+      new RoundedBoxGeometry(1.95, 1.02, 1.48, 3, 0.08),
+      clayMat('#7C2D12', 0.4),
+    );
+    obBase.position.y = 0.51;
+    const obTrim = new THREE.Mesh(
+      new RoundedBoxGeometry(2.02, 0.09, 1.55, 2, 0.03),
+      orangeLedMat,
+    );
+    obTrim.position.y = 1.02;
+    const obBody = new THREE.Mesh(
+      new RoundedBoxGeometry(1.85, 1.75, 0.85, 3, 0.06),
+      clayMat('#2B1410', 0.42),
+    );
+    obBody.position.set(0, 1.82, -0.25);
+    const obMarquee = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.72, 0.72),
+      new THREE.MeshBasicMaterial({map: obstacleBannerTex}),
+    );
+    obMarquee.position.set(0, 2.28, 0.19);
+    const obScreen = new THREE.Mesh(
+      new RoundedBoxGeometry(1.52, 0.72, 0.08, 2, 0.03),
+      new THREE.MeshStandardMaterial({
+        color: '#431407',
+        emissive: '#F97316',
+        emissiveIntensity: 0.65,
+      }),
+    );
+    obScreen.position.set(0, 1.5, 0.17);
+    const obJoyL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.18, 8), orangeLedMat);
+    obJoyL.position.set(-0.42, 1.12, 0.45);
+    const obBtnR = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.08, 12), pinkLedMat);
+    obBtnR.position.set(0.38, 1.07, 0.45);
+
+    // Spinning 3D Sweeper Bar + Boulder topper
+    const obSpinner = new THREE.Group();
+    obSpinner.position.set(0, 3.05, 0);
+    const obPole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.08, 0.42, 10),
+      clayMat('#334155', 0.4),
+    );
+    const obArm = new THREE.Mesh(
+      new RoundedBoxGeometry(0.95, 0.09, 0.09, 2, 0.03),
+      new THREE.MeshStandardMaterial({color: '#EF4444', emissive: '#F97316', emissiveIntensity: 0.55}),
+    );
+    obArm.position.y = 0.18;
+    const obBoulder = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.16, 1),
+      clayMat('#64748B', 0.65),
+    );
+    obBoulder.position.set(0.45, 0.18, 0);
+    obSpinner.add(obPole, obArm, obBoulder);
+
+    obstacleCab.add(obBase, obTrim, obBody, obMarquee, obScreen, obJoyL, obBtnR, obSpinner);
+    mergeStaticGroupByMaterial(obstacleCab, new Set([obSpinner]));
+    addBoxProxy(
+      obstacleCab,
+      [2.1, 3.3, 1.7],
+      [0, 1.65, 0],
+      {kind: 'arcade_obstacle', tx: 4.65, tz: 1.4},
+      clickTargets,
+    );
+    colliders.push({type: 'box', x: 4.65, z: -0.35, hw: 1.05, hd: 0.85});
+    labelAnchors.push({
+      id: 'arcade_obstacle',
+      label: 'Vượt Chướng Ngại Vật',
+      worldPos: new THREE.Vector3(4.65, 3.55, -0.35),
+    });
+    group.add(obstacleCab);
+
     // 4. Right Wing: Sim Racing Pod + Playable Star Catcher + Mystery ? Claw Machine
     const racingPod = new THREE.Group();
-    racingPod.position.set(5.65, 0, -3.0);
+    racingPod.position.set(8.65, 0, -4.4);
     const raceDeck = new THREE.Mesh(
       new RoundedBoxGeometry(2.1, 0.16, 2.4, 2, 0.05),
       clayMat('#1A213C', 0.45),
@@ -5065,20 +5251,20 @@ export function buildSubzoneScene(
       racingPod,
       [2.2, 2.0, 2.5],
       [0, 1.0, 0],
-      {kind: 'arcade_racing_pod', tx: 3.7, tz: -2.6},
+      {kind: 'arcade_racing_pod', tx: 6.55, tz: -4.0},
       clickTargets,
     );
-    colliders.push({type: 'box', x: 5.65, z: -3.0, hw: 1.15, hd: 1.28});
+    colliders.push({type: 'box', x: 8.65, z: -4.4, hw: 1.15, hd: 1.28});
     labelAnchors.push({
       id: 'arcade_racing_pod',
       label: 'Đua Xe Sim Racing (Soon)',
-      worldPos: new THREE.Vector3(5.65, 2.1, -3.0),
+      worldPos: new THREE.Vector3(8.65, 2.1, -4.4),
     });
     group.add(racingPod);
 
-    // Playable Catch Stars Cabinet (CoinGame)
+    // Playable Catch Stars Cabinet
     const cab = new THREE.Group();
-    cab.position.set(6.05, 0, 0.55);
+    cab.position.set(9.15, 0, -0.35);
     cab.rotation.y = -Math.PI / 2;
     const cabBody = new THREE.Mesh(
       new RoundedBoxGeometry(1.68, 2.55, 1.32, 3, 0.09),
@@ -5100,14 +5286,14 @@ export function buildSubzoneScene(
     joyStick.position.set(-0.25, 1.08, 0.72);
     cab.add(cabBody, cabTrim, screen, joyStick);
     mergeStaticGroupByMaterial(cab);
-    addBoxProxy(cab, [1.85, 2.7, 1.55], [0, 1.35, 0], {kind: 'arcade_star', tx: 4.4, tz: 0.55}, clickTargets);
-    colliders.push({type: 'box', x: 6.05, z: 0.55, hw: 0.85, hd: 0.95});
-    labelAnchors.push({id: 'arcade_star', label: 'Hứng Sao Bầu Trời', worldPos: new THREE.Vector3(6.05, 2.85, 0.55)});
+    addBoxProxy(cab, [1.85, 2.7, 1.55], [0, 1.35, 0], {kind: 'arcade_star', tx: 7.35, tz: -0.35}, clickTargets);
+    colliders.push({type: 'box', x: 9.15, z: -0.35, hw: 0.85, hd: 0.95});
+    labelAnchors.push({id: 'arcade_star', label: 'Hứng Sao Bầu Trời', worldPos: new THREE.Vector3(9.15, 2.85, -0.35)});
     group.add(cab);
 
-    // Mystery "?" Ball Claw Cabinet (CoinGame)
+    // Mystery "?" Ball Claw Cabinet
     const claw = new THREE.Group();
-    claw.position.set(6.05, 0, 3.35);
+    claw.position.set(9.15, 0, 3.25);
     claw.rotation.y = -Math.PI / 2;
     const clawBase = new THREE.Mesh(
       new RoundedBoxGeometry(1.68, 1.15, 1.32, 3, 0.08),
@@ -5154,14 +5340,14 @@ export function buildSubzoneScene(
     clawArmStem.position.set(0, 2.22, 0);
     claw.add(clawBase, clawHeader, clawGlass, clawArmStem);
     mergeStaticGroupByMaterial(claw);
-    addBoxProxy(claw, [1.85, 2.8, 1.55], [0, 1.4, 0], {kind: 'arcade_claw', tx: 4.4, tz: 3.35}, clickTargets);
-    colliders.push({type: 'box', x: 6.05, z: 3.35, hw: 0.85, hd: 0.95});
-    labelAnchors.push({id: 'arcade_claw', label: 'Gắp Bóng ? (15 Xu)', worldPos: new THREE.Vector3(6.05, 2.9, 3.35)});
+    addBoxProxy(claw, [1.85, 2.8, 1.55], [0, 1.4, 0], {kind: 'arcade_claw', tx: 7.35, tz: 3.25}, clickTargets);
+    colliders.push({type: 'box', x: 9.15, z: 3.25, hw: 0.85, hd: 0.95});
+    labelAnchors.push({id: 'arcade_claw', label: 'Gắp Bóng ? (15 Xu)', worldPos: new THREE.Vector3(9.15, 2.9, 3.25)});
     group.add(claw);
 
-    // 4b. Playable Whack-a-Mole Cyber Machine (Front-Right Center)
+    // 4b. Playable Whack-a-Mole Cyber Machine (Right-Front)
     const whackGroup = new THREE.Group();
-    whackGroup.position.set(2.45, 0, 2.85);
+    whackGroup.position.set(5.45, 0, 4.65);
     const wCab = new THREE.Mesh(
       new RoundedBoxGeometry(1.75, 0.96, 1.35, 3, 0.07),
       clayMat('#3B1B54', 0.44),
@@ -5222,27 +5408,27 @@ export function buildSubzoneScene(
       whackGroup,
       [1.9, 2.25, 1.55],
       [0, 1.12, 0],
-      {kind: 'arcade_whack_mole', tx: 2.45, tz: 1.25},
+      {kind: 'arcade_whack_mole', tx: 5.45, tz: 3.05},
       clickTargets,
     );
-    colliders.push({type: 'box', x: 2.45, z: 2.85, hw: 0.95, hd: 0.78});
+    colliders.push({type: 'box', x: 5.45, z: 4.65, hw: 0.95, hd: 0.78});
     labelAnchors.push({
       id: 'arcade_whack_mole',
       label: 'Đập Chuột Cyber',
-      worldPos: new THREE.Vector3(2.45, 2.38, 2.85),
+      worldPos: new THREE.Vector3(5.45, 2.38, 4.65),
     });
     group.add(whackGroup);
 
     // 5. Center Rhythm Dance Pad Stage
     const danceStage = new THREE.Group();
-    danceStage.position.set(0, 0, -0.35);
+    danceStage.position.set(0, 0, -1.55);
     const padDeck = new THREE.Mesh(
-      new RoundedBoxGeometry(2.55, 0.08, 2.25, 2, 0.03),
+      new RoundedBoxGeometry(2.75, 0.08, 2.4, 2, 0.03),
       clayMat('#1A2242', 0.45),
     );
     padDeck.position.y = 0.04;
     const padSurface = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.26, 1.98),
+      new THREE.PlaneGeometry(2.42, 2.1),
       new THREE.MeshBasicMaterial({
         map: dancePadTex,
         polygonOffset: true,
@@ -5253,46 +5439,46 @@ export function buildSubzoneScene(
     padSurface.rotation.x = -Math.PI / 2;
     padSurface.position.y = 0.085;
     const spkL = new THREE.Mesh(new RoundedBoxGeometry(0.38, 1.85, 0.42, 2, 0.04), clayMat('#131932', 0.45));
-    spkL.position.set(-1.12, 0.925, -1.25);
+    spkL.position.set(-1.18, 0.925, -1.32);
     const spkR = spkL.clone();
-    spkR.position.x = 1.12;
+    spkR.position.x = 1.18;
     const danceBar = new THREE.Mesh(
-      new RoundedBoxGeometry(2.58, 0.16, 0.2, 2, 0.04),
+      new RoundedBoxGeometry(2.72, 0.16, 0.2, 2, 0.04),
       violetLedMat,
     );
-    danceBar.position.set(0, 1.85, -1.25);
+    danceBar.position.set(0, 1.85, -1.32);
     const danceMonitor = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.56, 0.92),
+      new THREE.PlaneGeometry(1.66, 0.96),
       new THREE.MeshBasicMaterial({map: pcScreenTex}),
     );
-    danceMonitor.position.set(0, 1.24, -1.16);
+    danceMonitor.position.set(0, 1.24, -1.23);
     danceStage.add(padDeck, padSurface, spkL, spkR, danceBar, danceMonitor);
     mergeStaticGroupByMaterial(danceStage);
     addBoxProxy(
       danceStage,
-      [2.6, 1.95, 2.5],
+      [2.8, 1.95, 2.65],
       [0, 0.98, -0.1],
-      {kind: 'arcade_dance_pad', tx: 0, tz: -0.25},
+      {kind: 'arcade_dance_pad', tx: 0, tz: -1.4},
       clickTargets,
     );
-    colliders.push({type: 'box', x: 0, z: -1.6, hw: 1.38, hd: 0.28});
+    colliders.push({type: 'box', x: 0, z: -2.88, hw: 1.44, hd: 0.28});
     labelAnchors.push({
       id: 'arcade_dance_pad',
       label: 'Sàn Nhảy Rhythm',
-      worldPos: new THREE.Vector3(0, 2.15, -1.6),
+      worldPos: new THREE.Vector3(0, 2.15, -2.85),
     });
     group.add(danceStage);
 
-    // 6. Center-Left Cyber Chill Lounge Sofa & Neon Coffee Table (Sittable!)
+    // 6. Sittable Cyber Chill Lounge Sofa & Neon Coffee Table (Clean Walk-to Clearances!)
     const loungeGroup = new THREE.Group();
-    loungeGroup.position.set(-2.35, 0, 3.35);
+    loungeGroup.position.set(-4.5, 0, 5.45);
     const sofaBase = new THREE.Mesh(
-      new RoundedBoxGeometry(2.35, 0.34, 0.95, 3, 0.06),
+      new RoundedBoxGeometry(2.45, 0.34, 0.95, 3, 0.06),
       clayMat('#272E58', 0.62),
     );
     sofaBase.position.y = 0.22;
     const sofaBack = new THREE.Mesh(
-      new RoundedBoxGeometry(2.35, 0.56, 0.24, 3, 0.06),
+      new RoundedBoxGeometry(2.45, 0.56, 0.24, 3, 0.06),
       clayMat('#1F254A', 0.62),
     );
     sofaBack.position.set(0, 0.56, 0.36);
@@ -5300,49 +5486,114 @@ export function buildSubzoneScene(
       new RoundedBoxGeometry(0.22, 0.46, 0.95, 2, 0.05),
       clayMat('#1F254A', 0.62),
     );
-    sofaArmL.position.set(-1.12, 0.38, 0);
+    sofaArmL.position.set(-1.14, 0.38, 0);
     const sofaArmR = sofaArmL.clone();
-    sofaArmR.position.x = 1.12;
+    sofaArmR.position.x = 1.14;
     const neonTable = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.56, 0.48, 0.38, 18),
+      new THREE.CylinderGeometry(0.54, 0.46, 0.38, 18),
       clayMat('#151C36', 0.38),
     );
-    neonTable.position.set(0, 0.19, -1.05);
-    const neonTableRim = new THREE.Mesh(new THREE.TorusGeometry(0.54, 0.03, 8, 24), cyanLedMat);
+    neonTable.position.set(0, 0.19, -1.8);
+    const neonTableRim = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.03, 8, 24), cyanLedMat);
     neonTableRim.rotation.x = Math.PI / 2;
-    neonTableRim.position.set(0, 0.39, -1.05);
+    neonTableRim.position.set(0, 0.39, -1.8);
 
     loungeGroup.add(sofaBase, sofaBack, sofaArmL, sofaArmR, neonTable, neonTableRim);
     mergeStaticGroupByMaterial(loungeGroup);
     addBoxProxy(
       loungeGroup,
-      [2.45, 0.95, 1.1],
+      [2.55, 0.95, 1.1],
       [0, 0.48, 0],
       {
         kind: 'bench',
         sitMessage: 'Thư giãn tại Cyber Lounge Mây! (+Vui vẻ)',
         seatSlots: [
-          {seatX: -2.9, seatZ: 3.25, seatY: 0.48, sitRotY: Math.PI, tx: -2.9, tz: 2.35},
-          {seatX: -1.8, seatZ: 3.25, seatY: 0.48, sitRotY: Math.PI, tx: -1.8, tz: 2.35},
+          {seatX: -5.05, seatZ: 5.38, seatY: 0.48, sitRotY: Math.PI, tx: -5.05, tz: 4.55},
+          {seatX: -3.95, seatZ: 5.38, seatY: 0.48, sitRotY: Math.PI, tx: -3.95, tz: 4.55},
         ],
       },
       clickTargets,
     );
-    colliders.push({type: 'box', x: -2.35, z: 3.35, hw: 1.25, hd: 0.56});
-    colliders.push({type: 'circle', x: -2.35, z: 2.3, r: 0.58});
+    colliders.push({type: 'box', x: -4.5, z: 5.45, hw: 1.28, hd: 0.52});
+    colliders.push({type: 'circle', x: -4.5, z: 3.65, r: 0.54});
     group.add(loungeGroup);
 
-    // Sleek Corner Planters for Warmth & Contrast
-    for (const px of [-7.35, 7.35]) {
+    // 7. Sittable Cyber Cafe Tables & Neon Gaming Stools (Bàn ghế khu Game ngồi được!)
+    const cyberTables: Array<{x: number; z: number; accent: THREE.Material}> = [
+      {x: 2.25, z: 4.85, accent: violetLedMat},
+      {x: 8.15, z: 6.45, accent: cyanLedMat},
+    ];
+    cyberTables.forEach((tbl) => {
+      const tGroup = new THREE.Group();
+      tGroup.position.set(tbl.x, 0, tbl.z);
+      const tCol = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.62, 12), trimMat);
+      tCol.position.y = 0.31;
+      const tFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.42, 0.08, 14), trimMat);
+      tFoot.position.y = 0.04;
+      const tTop = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.58, 0.09, 20), clayMat('#18203D', 0.4));
+      tTop.position.y = 0.66;
+      const tRim = new THREE.Mesh(new THREE.TorusGeometry(0.61, 0.025, 8, 24), tbl.accent);
+      tRim.rotation.x = Math.PI / 2;
+      tRim.position.y = 0.7;
+      tGroup.add(tCol, tFoot, tTop, tRim);
+      mergeStaticGroupByMaterial(tGroup);
+      colliders.push({type: 'circle', x: tbl.x, z: tbl.z, r: 0.62});
+      group.add(tGroup);
+
+      // Left & Right Sittable Cyber Stools beside each table
+      ([-1, 1] as const).forEach((side) => {
+        const sx = tbl.x + side * 1.12;
+        const sz = tbl.z;
+        const stool = new THREE.Group();
+        stool.position.set(sx, 0, sz);
+        const sBase = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.06, 12), trimMat);
+        sBase.position.y = 0.03;
+        const sPost = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.38, 10), trimMat);
+        sPost.position.y = 0.23;
+        const sSeat = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.28, 0.11, 16), clayMat('#2B3663', 0.5));
+        sSeat.position.y = 0.44;
+        const sBack = new THREE.Mesh(
+          new RoundedBoxGeometry(0.1, 0.44, 0.42, 2, 0.03),
+          clayMat('#232C52', 0.5),
+        );
+        sBack.position.set(side * 0.24, 0.68, 0);
+        const sRim = new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.02, 8, 18), tbl.accent);
+        sRim.rotation.x = Math.PI / 2;
+        sRim.position.y = 0.45;
+        stool.add(sBase, sPost, sSeat, sBack, sRim);
+        mergeStaticGroupByMaterial(stool);
+        addBoxProxy(
+          stool,
+          [0.72, 0.95, 0.72],
+          [0, 0.48, 0],
+          {
+            kind: 'bench',
+            sitMessage: 'Ngồi nghỉ tại bàn Cyber Game! (+Vui vẻ)',
+            seatX: sx,
+            seatZ: sz,
+            seatY: 0.49,
+            sitRotY: side === -1 ? Math.PI / 2 : -Math.PI / 2,
+            tx: sx,
+            tz: sz + 0.92,
+          },
+          clickTargets,
+        );
+        colliders.push({type: 'circle', x: sx, z: sz, r: 0.34});
+        group.add(stool);
+      });
+    });
+
+    // Corner Planters
+    for (const px of [-10.55, 10.55]) {
       const potGroup = new THREE.Group();
-      potGroup.position.set(px, 0, 5.75);
-      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.28, 0.56, 12), clayMat('#1E2647', 0.45));
-      pot.position.y = 0.28;
-      const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(0.46, 1), clayMat('#38A169', 0.72));
-      leaves.position.y = 0.82;
+      potGroup.position.set(px, 0, 7.85);
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.3, 0.58, 12), clayMat('#1E2647', 0.45));
+      pot.position.y = 0.29;
+      const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(0.48, 1), clayMat('#38A169', 0.72));
+      leaves.position.y = 0.85;
       potGroup.add(pot, leaves);
       mergeStaticGroupByMaterial(potGroup);
-      colliders.push({type: 'circle', x: px, z: 5.75, r: 0.42});
+      colliders.push({type: 'circle', x: px, z: 7.85, r: 0.44});
       group.add(potGroup);
     }
 
@@ -5351,13 +5602,16 @@ export function buildSubzoneScene(
       holoCoinGem.position.y = 2.98 + Math.sin(elapsed * 2.4) * 0.06;
       miniLotus.rotation.y = elapsed * 0.95;
       miniLotus.position.y = 1.62 + Math.sin(elapsed * 2.2) * 0.055;
+      pkHolo.rotation.y = elapsed * 0.85;
+      pkHolo.position.y = 2.98 + Math.sin(elapsed * 2.1) * 0.05;
+      obSpinner.rotation.y = elapsed * 2.4;
       animatedDolls.forEach((doll, idx) => {
         doll.position.y = 1.48 + Math.sin(elapsed * 2.3 + idx * 1.1) * 0.045;
         doll.rotation.y = Math.sin(elapsed * 1.1 + idx * 0.9) * 0.35;
       });
     };
 
-    group.add(createExitDoorway('Ra Thị Trấn', [0, 0, 6.75], '#38BDF8', clickTargets, labelAnchors));
+    group.add(createExitDoorway('Ra Thị Trấn', [0, 0, 8.95], '#38BDF8', clickTargets, labelAnchors));
   } else if (zone === 'boutique') {
     // Expanded boutique floor (12.8 x 11.6) housing Tina (Thời Trang) & Bob (Nội Thất)
     const floor = new THREE.Mesh(
