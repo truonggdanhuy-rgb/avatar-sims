@@ -643,41 +643,55 @@ function createClayLockGeometry(
     edgePinch = 0.4,
     profile = 'petal',
     outwardMode = 'spherical',
-    tubularSegs = 16,
-    radialSegs = 12,
+    tubularSegs: tubularSegsIn = 16,
+    radialSegs: radialSegsIn = 12,
     roundTipScale = 0.42,
   } = opts;
+  // More rings / sides = smooth round locks (no faceted or spiky look)
+  const tubularSegs = Math.max(tubularSegsIn, 24);
+  const radialSegs = Math.max(radialSegsIn, 14);
 
   const vecs = points.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
   const curve = new THREE.CatmullRomCurve3(vecs, false, 'centripetal', 0.5);
   const safeTip = Math.max(0.28, roundTipScale);
 
+  // Blunt, rounded lock end: the body only narrows a little, then a quarter-ellipse cap closes it
+  // (no thin pointed tips).
+  const curveLen = Math.max(0.05, curve.getLength());
+  const capLen = Math.min(curveLen * 0.38, width * 0.9);
+  const capStart = 1 - capLen / curveLen;
+  const tipBody = Math.min(0.8, Math.max(0.55, safeTip + 0.14));
+  const bodyTaper = (t: number) =>
+    1 - (1 - tipBody) * smoothstep01(0.3, Math.max(0.35, capStart), t);
+  const capScale = (t: number) => {
+    if (t <= capStart) return 1;
+    const k = (t - capStart) / (1 - capStart);
+    return Math.max(0.03, Math.sqrt(Math.max(0, 1 - k * k)));
+  };
+
   const evalProfileScale = (t: number): {wScale: number; dScale: number} => {
+    const cap = capScale(t);
     if (profile === 'bell') {
       const rootFlare = 0.36 + 0.8 * Math.sin(Math.pow(t, 0.58) * Math.PI * 0.78);
-      const tipRound = 1 - (1 - safeTip) * Math.pow(smoothstep01(0.62, 1.0, t), 1.35);
-      return {
-        wScale: Math.max(0.22, rootFlare * tipRound),
-        dScale: Math.max(0.22, rootFlare * tipRound),
-      };
+      const body = Math.max(0.3, rootFlare * bodyTaper(t));
+      return {wScale: body * cap, dScale: body * cap};
     }
     if (profile === 'quiff') {
       const rootEase = smoothstep01(0.0, 0.25, t);
       const swell = 0.9 + 0.2 * Math.sin(Math.pow(t, 0.8) * Math.PI);
-      const tipEase = 1 - (1 - safeTip) * Math.pow(smoothstep01(0.58, 1.0, t), 1.3);
+      const taper = bodyTaper(t);
       return {
-        wScale: Math.max(safeTip * 0.8, (0.78 + 0.22 * rootEase) * swell * tipEase),
-        dScale: Math.max(safeTip * 0.8, (0.58 + 0.42 * rootEase) * swell * tipEase),
+        wScale: (0.78 + 0.22 * rootEase) * swell * taper * cap,
+        dScale: (0.58 + 0.42 * rootEase) * swell * taper * cap,
       };
     }
-    // 'petal' / 'drape' / 'bob' / 'tuft': broad plush clay lock tapering softly to rounded petal tip
+    // 'petal' / 'drape' / 'bob' / 'tuft': broad plush lock with a soft round end
     const rootEase = smoothstep01(0.0, 0.2, t);
     const swell = 0.94 + 0.1 * Math.sin(smoothstep01(0.1, 0.78, t) * Math.PI);
-    const u = smoothstep01(0.55, 1.0, t);
-    const tipTaper = 1 - (1 - safeTip) * Math.pow(u, 1.35);
+    const taper = bodyTaper(t);
     return {
-      wScale: Math.max(safeTip * 0.85, (0.82 + 0.18 * rootEase) * swell * tipTaper),
-      dScale: Math.max(safeTip * 0.85, (0.62 + 0.38 * rootEase) * swell * tipTaper),
+      wScale: (0.82 + 0.18 * rootEase) * swell * taper * cap,
+      dScale: (0.62 + 0.38 * rootEase) * swell * taper * cap,
     };
   };
 
@@ -713,17 +727,11 @@ function createClayLockGeometry(
     const sideDir = tan.clone().cross(outDir).normalize();
     const {wScale, dScale} = evalProfileScale(t);
 
-    // Smooth hemispherical rounded cap at the tip instead of a sharp spike cone
-    const tipDist = 1 - t;
-    const endRound =
-      i === 0
-        ? 0.72
-        : tipDist < 0.09
-          ? Math.max(0.36, Math.sqrt(Math.max(0.12, tipDist / 0.09)))
-          : 1.0;
+    // Root end is hidden inside the hair cap; the rounded tip comes from capScale() above.
+    const endRound = i === 0 ? 0.72 : 1.0;
 
     const w = width * wScale * endRound;
-    const h = depth * dScale * endRound;
+    const h = depth * 1.1 * dScale * endRound;
 
     for (let j = 0; j <= radialSegs; j++) {
       const u = j / radialSegs;
@@ -731,10 +739,11 @@ function createClayLockGeometry(
       const cos = Math.cos(theta);
       const sin = Math.sin(theta);
 
-      const sx = Math.sign(cos) * Math.pow(Math.abs(cos), 0.78);
+      const sx = Math.sign(cos) * Math.pow(Math.abs(cos), 0.9);
       const absSin = Math.abs(sin);
-      const edgeTaper = edgePinch + (1 - edgePinch) * Math.pow(absSin, 0.56);
-      const sy = Math.sign(sin) * Math.pow(absSin, 0.74) * edgeTaper;
+      const pinch = Math.max(edgePinch, 0.72); // no knife-thin edges
+      const edgeTaper = pinch + (1 - pinch) * Math.pow(absSin, 0.6);
+      const sy = Math.sign(sin) * Math.pow(absSin, 0.88) * edgeTaper;
       const lateral = sx * w;
       const ridge = sy > 0 ? 1 + ridgeBoost * Math.pow(absSin, 1.4) : innerFlatten;
       const out = sy * h * ridge;
