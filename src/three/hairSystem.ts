@@ -108,7 +108,7 @@ function getHairSheenGradientTexture(color: string | number): THREE.CanvasTextur
   if (typeof document === 'undefined') return null;
   const baseCol = new THREE.Color(color);
   const hex = `#${baseCol.getHexString()}`;
-  const key = `hair_silky_v2_${hex}`;
+  const key = `hair_strand_v3_${hex}`;
   const cached = _hairTexCache.get(key);
   if (cached) return cached;
 
@@ -147,6 +147,24 @@ function getHairSheenGradientTexture(color: string | number): THREE.CanvasTextur
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Soft glossy strand streaks (light + dark ribbons running along the hair, very low contrast)
+  // so hair reads as strands like Heartopia instead of one flat colour.
+  const streakCount = 14;
+  for (let i = 0; i < streakCount; i++) {
+    const frac = (i + 0.5 + 0.35 * Math.sin(i * 12.9898)) / streakCount;
+    const x = frac * canvas.width;
+    const sw = canvas.width * (0.025 + 0.02 * (0.5 + 0.5 * Math.sin(i * 4.1)));
+    const light = i % 3 !== 1;
+    const sg = ctx.createLinearGradient(x - sw, 0, x + sw, 0);
+    const c = light ? '255,255,255' : '0,0,0';
+    const a = light ? 0.1 : 0.08;
+    sg.addColorStop(0, `rgba(${c},0)`);
+    sg.addColorStop(0.5, `rgba(${c},${a})`);
+    sg.addColorStop(1, `rgba(${c},0)`);
+    ctx.fillStyle = sg;
+    ctx.fillRect(x - sw, 0, sw * 2, canvas.height);
+  }
+
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.ClampToEdgeWrapping;
@@ -164,9 +182,9 @@ export function createHairClayMaterial(color: string | number): THREE.MeshStanda
   return new THREE.MeshStandardMaterial({
     color: sheenTex ? '#FFFFFF' : color,
     map: sheenTex ?? undefined,
-    roughness: 0.5,
+    roughness: 0.42,
     metalness: 0.02,
-    envMapIntensity: 0.42,
+    envMapIntensity: 0.55,
     userData: {pooled: false},
   });
 }
@@ -259,7 +277,11 @@ function createUnifiedClayCapGeometry(
     // Clean, smooth forehead hairline tucked cleanly under FrontHair bangs (around lat 56..60)
     const partNotch =
       partLon !== null ? 5.0 * Math.exp(-Math.pow((lonDeg - partLon) / 10, 2)) : 0;
-    const frontHairline = (isSnugCap ? 62 : 58) - partNotch;
+    // Continuous soft scalloped fringe (covers the forehead, no gaps between bang sheets)
+    const fringeLobe = 0.5 + 0.5 * Math.cos((2 * Math.PI * (lonDeg + 1)) / 21);
+    const fringeLat =
+      68 + 5 * smoothstep01(14, 50, a) + 6.5 * fringeLobe * (1 - smoothstep01(46, 62, a));
+    const frontHairline = (isSnugCap ? 62 : fringeLat) - partNotch;
 
     const toSideZone = smoothstep01(48, 70, a);
 
@@ -622,6 +644,8 @@ interface ClayLockOptions {
   tubularSegs?: number;
   radialSegs?: number;
   roundTipScale?: number;
+  /** Bang sheets: start thin at the crown and widen (strand emerging from the hair cap). */
+  rootTaper?: boolean;
 }
 
 const _headCenter = new THREE.Vector3(0, HEAD_CY, 0);
@@ -646,6 +670,7 @@ function createClayLockGeometry(
     tubularSegs: tubularSegsIn = 16,
     radialSegs: radialSegsIn = 12,
     roundTipScale = 0.42,
+    rootTaper = false,
   } = opts;
   // More rings / sides = smooth round locks (no faceted or spiky look)
   const tubularSegs = Math.max(tubularSegsIn, 24);
@@ -655,19 +680,21 @@ function createClayLockGeometry(
   const curve = new THREE.CatmullRomCurve3(vecs, false, 'centripetal', 0.5);
   const safeTip = Math.max(0.28, roundTipScale);
 
-  // Blunt, rounded lock end: the body only narrows a little, then a quarter-ellipse cap closes it
-  // (no thin pointed tips).
+  // Leaf-shaped lock: broad body, soft narrowing, then a short rounded end. Never a needle point
+  // and never a fat worm-like capsule.
   const curveLen = Math.max(0.05, curve.getLength());
-  const capLen = Math.min(curveLen * 0.38, width * 0.9);
+  const tipBody = Math.min(0.55, Math.max(0.4, safeTip + 0.06));
+  const capLen = Math.min(curveLen * 0.2, width * tipBody * 1.3);
   const capStart = 1 - capLen / curveLen;
-  const tipBody = Math.min(0.8, Math.max(0.55, safeTip + 0.14));
   const bodyTaper = (t: number) =>
-    1 - (1 - tipBody) * smoothstep01(0.3, Math.max(0.35, capStart), t);
+    1 - (1 - tipBody) * smoothstep01(0.38, Math.max(0.42, capStart), t);
   const capScale = (t: number) => {
     if (t <= capStart) return 1;
     const k = (t - capStart) / (1 - capStart);
-    return Math.max(0.03, Math.sqrt(Math.max(0, 1 - k * k)));
+    return Math.max(0.04, Math.sqrt(Math.max(0, 1 - k * k)));
   };
+  const rootMin = rootTaper ? 0.25 : 0.82;
+  const rootLen = rootTaper ? 0.35 : 0.2;
 
   const evalProfileScale = (t: number): {wScale: number; dScale: number} => {
     const cap = capScale(t);
@@ -676,22 +703,15 @@ function createClayLockGeometry(
       const body = Math.max(0.3, rootFlare * bodyTaper(t));
       return {wScale: body * cap, dScale: body * cap};
     }
-    if (profile === 'quiff') {
-      const rootEase = smoothstep01(0.0, 0.25, t);
-      const swell = 0.9 + 0.2 * Math.sin(Math.pow(t, 0.8) * Math.PI);
-      const taper = bodyTaper(t);
-      return {
-        wScale: (0.78 + 0.22 * rootEase) * swell * taper * cap,
-        dScale: (0.58 + 0.42 * rootEase) * swell * taper * cap,
-      };
-    }
-    // 'petal' / 'drape' / 'bob' / 'tuft': broad plush lock with a soft round end
-    const rootEase = smoothstep01(0.0, 0.2, t);
-    const swell = 0.94 + 0.1 * Math.sin(smoothstep01(0.1, 0.78, t) * Math.PI);
+    const rootEase = smoothstep01(0.0, rootLen, t);
+    const swell =
+      profile === 'quiff'
+        ? 0.9 + 0.2 * Math.sin(Math.pow(t, 0.8) * Math.PI)
+        : 1 + 0.07 * Math.sin(smoothstep01(0.1, 0.8, t) * Math.PI);
     const taper = bodyTaper(t);
     return {
-      wScale: (0.82 + 0.18 * rootEase) * swell * taper * cap,
-      dScale: (0.62 + 0.38 * rootEase) * swell * taper * cap,
+      wScale: (rootMin + (1 - rootMin) * rootEase) * swell * taper * cap,
+      dScale: (0.55 + 0.45 * (rootMin + (1 - rootMin) * rootEase)) * swell * taper * cap,
     };
   };
 
@@ -731,7 +751,7 @@ function createClayLockGeometry(
     const endRound = i === 0 ? 0.72 : 1.0;
 
     const w = width * wScale * endRound;
-    const h = depth * 1.1 * dScale * endRound;
+    const h = depth * dScale * endRound;
 
     for (let j = 0; j <= radialSegs; j++) {
       const u = j / radialSegs;
@@ -806,18 +826,25 @@ function addLockMesh(
   d: number,
   opts?: Partial<ClayLockOptions>,
 ) {
+  // Every other sheet sits slightly higher so overlapping bang sheets layer instead of z-fighting.
+  const lift = (grp.children.length % 2) * 0.004;
+  const lifted = steps.map((st, i) => ({
+    ...st,
+    offset: st.offset + lift + (i === 0 ? 0 : 0.004),
+  }));
   grp.add(
     new THREE.Mesh(
-      createClayLockGeometry(sampleHeadSteps(steps, 16), {
-        width: w,
-        depth: d,
+      createClayLockGeometry(sampleHeadSteps(lifted, 16), {
+        width: w * 1.2,
+        depth: d * 0.94,
         innerFlatten: 0.24,
         ridgeBoost: 0.1,
         edgePinch: 0.42,
         profile: 'petal',
-        tubularSegs: 16,
-        radialSegs: 12,
-        roundTipScale: 0.42,
+        tubularSegs: 24,
+        radialSegs: 14,
+        roundTipScale: 0.44,
+        rootTaper: true,
         ...opts,
       }),
       hairMat,
