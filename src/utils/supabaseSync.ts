@@ -1,78 +1,221 @@
 import {getSupabaseConfig} from '../config/supabase';
-import {
-  AccountSavePreview,
-  encodeAccountTransferCode,
-  extractSavePreview,
-} from './accountSave';
 
-export interface SupabaseAuthSession {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number; // unix epoch ms
-  userId: string;
-  email: string;
-}
-
-export interface CloudSaveRecord {
-  userId: string;
-  email: string;
+export interface RememberedAccount {
+  username: string;
+  displayUsername: string;
+  deviceId: string;
+  deviceToken: string;
   accountId: string;
   playerName: string;
   coins: number;
   coinGame: number;
-  saveCode: string;
-  saveJson: Record<string, unknown>;
-  updatedAt: string;
-  preview: AccountSavePreview;
+  hasCharacter: boolean;
+  saveJson: Record<string, unknown> | null;
+  updatedAt: string | null;
 }
+
+export type RpcActionResult<T = unknown> =
+  | (T extends Record<string, unknown> ? {ok: true} & T : {ok: true})
+  | {
+      ok: false;
+      code?: string;
+      isConflict?: boolean;
+      isAuthError?: boolean;
+      message: string;
+    };
 
 const REQUEST_TIMEOUT_MS = 12000;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const IDB_NAME = 'thi_tran_may_account_db';
+const IDB_STORE = 'kv';
+const IDB_REMEMBERED_KEY = 'remembered_account_v2';
+const IDB_DEVICE_ID_KEY = 'device_id_v2';
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
 
-function translateSupabaseError(rawMessage: string, status?: number): string {
-  const msg = rawMessage.toLowerCase();
-  if (msg.includes('invalid login credentials')) {
-    return 'Email hoặc mật khẩu chưa đúng. Vui lòng kiểm tra lại.';
+function createRandomId(byteLen = 16): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(byteLen);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   }
-  if (msg.includes('email not confirmed')) {
-    return 'Email chưa được xác nhận. Hãy kiểm tra hộp thư đến hoặc tắt "Confirm email" trong Supabase Auth.';
-  }
-  if (msg.includes('user already registered') || msg.includes('already been registered')) {
-    return 'Email này đã được đăng ký rồi. Hãy chuyển sang tab Đăng nhập.';
-  }
-  if (msg.includes('password should be at least')) {
-    return 'Mật khẩu cần tối thiểu 6 ký tự.';
-  }
-  if (msg.includes('unable to validate email address') || msg.includes('invalid email')) {
-    return 'Địa chỉ email không hợp lệ.';
-  }
-  if (msg.includes('rate limit') || status === 429) {
-    return 'Bạn thao tác hơi nhanh. Vui lòng đợi vài giây rồi thử lại.';
-  }
-  if (msg.includes('relation') && msg.includes('avatar_sims_saves') && msg.includes('does not exist')) {
-    return 'Chưa tạo bảng "avatar_sims_saves" trong Supabase SQL Editor. Hãy chạy đoạn SQL hướng dẫn trước.';
-  }
-  if (msg.includes('row-level security') || msg.includes('permission denied') || status === 403) {
-    return 'Phiên đăng nhập hết hạn hoặc chưa bật quyền RLS cho bảng avatar_sims_saves.';
-  }
-  if (status === 401 || msg.includes('jwt expired') || msg.includes('invalid jwt')) {
-    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-  }
-  if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('aborted')) {
-    return 'Không kết nối được tới Supabase. Hãy kiểm tra mạng hoặc URL Supabase.';
-  }
-  return rawMessage || 'Đã có lỗi xảy ra khi kết nối Supabase.';
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
 }
 
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
+// Unique per open browser tab/session (kept purely in JS memory)
+const TAB_SESSION_ID = `sess_${createRandomId(12)}`;
+
+let memoryDeviceId: string | null = null;
+let memoryRemembered: RememberedAccount | null | undefined = undefined;
+
+function openAuthDb(): Promise<IDBDatabase | null> {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function idbGet<T>(key: string): Promise<T | null> {
+  const db = await openAuthDb();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve((req.result as T | undefined) ?? null);
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function idbSet<T>(key: string, value: T): Promise<void> {
+  const db = await openAuthDb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+async function idbDelete(key: string): Promise<void> {
+  const db = await openAuthDb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+export async function getOrCreateDeviceId(): Promise<string> {
+  if (memoryDeviceId) return memoryDeviceId;
+  const saved = await idbGet<string>(IDB_DEVICE_ID_KEY);
+  if (typeof saved === 'string' && saved.trim().length >= 8) {
+    memoryDeviceId = saved.trim();
+    return memoryDeviceId;
+  }
+  const fresh = `dev_${createRandomId(16)}`;
+  memoryDeviceId = fresh;
+  await idbSet(IDB_DEVICE_ID_KEY, fresh);
+  return fresh;
+}
+
+export function getTabSessionId(): string {
+  return TAB_SESSION_ID;
+}
+
+export async function loadRememberedAccount(): Promise<RememberedAccount | null> {
+  if (memoryRemembered !== undefined) return memoryRemembered;
+  const stored = await idbGet<RememberedAccount>(IDB_REMEMBERED_KEY);
+  if (
+    stored &&
+    typeof stored === 'object' &&
+    typeof stored.username === 'string' &&
+    typeof stored.deviceId === 'string' &&
+    typeof stored.deviceToken === 'string'
+  ) {
+    memoryRemembered = stored;
+    return stored;
+  }
+  memoryRemembered = null;
+  return null;
+}
+
+export async function saveRememberedAccount(account: RememberedAccount): Promise<void> {
+  memoryRemembered = account;
+  await idbSet(IDB_REMEMBERED_KEY, account);
+}
+
+export async function clearRememberedAccount(): Promise<void> {
+  memoryRemembered = null;
+  await idbDelete(IDB_REMEMBERED_KEY);
+}
+
+function translateRpcError(rawMessage: string, status?: number, code?: string): string {
+  const lower = rawMessage.toLowerCase();
+  if (code === 'USERNAME_TAKEN') {
+    return 'Tên tài khoản này đã có người sử dụng. Hãy chọn tên khác.';
+  }
+  if (code === 'INVALID_CREDENTIALS') {
+    return 'Tên tài khoản hoặc mật khẩu chưa đúng.';
+  }
+  if (code === 'CONCURRENT_LOGIN') {
+    return 'Tài khoản này đang có người đăng nhập chơi cùng lúc trên thiết bị khác!';
+  }
+  if (code === 'AUTH_INVALID') {
+    return 'Phiên thiết bị đã hết hiệu lực. Vui lòng đăng nhập lại bằng mật khẩu.';
+  }
+  if (
+    lower.includes('could not find the function') ||
+    lower.includes('pgrst202') ||
+    (lower.includes('function') && lower.includes('does not exist'))
+  ) {
+    return 'Máy chủ Supabase chưa chạy đoạn SQL tài khoản mới (ttm_*). Hãy chạy SQL mới trong Supabase SQL Editor.';
+  }
+  if (status === 429) {
+    return 'Thao tác hơi nhanh, vui lòng đợi vài giây rồi thử lại.';
+  }
+  if (lower.includes('failed to fetch') || lower.includes('networkerror') || lower.includes('aborted')) {
+    return 'Không kết nối được tới máy chủ Supabase. Hãy kiểm tra mạng của bạn.';
+  }
+  return rawMessage || 'Có lỗi xảy ra khi kết nối máy chủ.';
+}
+
+async function callSupabaseRpc(
+  fnName: string,
+  params: Record<string, unknown>,
+  keepalive = false,
 ): Promise<{ok: boolean; status: number; data: unknown}> {
+  const cfg = getSupabaseConfig();
+  if (!cfg.isConfigured) {
+    return {
+      ok: false,
+      status: 0,
+      data: {message: 'Chưa cấu hình VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY.'},
+    };
+  }
+
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = keepalive
+    ? null
+    : window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   try {
-    const res = await fetch(url, {...init, signal: controller.signal});
+    const res = await fetch(`${cfg.url}/rest/v1/rpc/${encodeURIComponent(fnName)}`, {
+      method: 'POST',
+      headers: {
+        apikey: cfg.anonKey,
+        Authorization: `Bearer ${cfg.anonKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(params),
+      keepalive,
+      signal: keepalive ? undefined : controller.signal,
+    });
     const text = await res.text();
     let data: unknown = null;
     if (text) {
@@ -84,360 +227,430 @@ async function fetchWithTimeout(
     }
     return {ok: res.ok, status: res.status, data};
   } finally {
-    window.clearTimeout(timer);
+    if (timer !== null) window.clearTimeout(timer);
   }
 }
 
-function extractErrorMessage(data: unknown): string {
+function extractRpcFailureMessage(data: unknown): string {
   if (!data || typeof data !== 'object') return '';
   const obj = data as Record<string, unknown>;
-  for (const key of ['msg', 'message', 'error_description', 'error', 'hint']) {
-    if (typeof obj[key] === 'string' && obj[key].trim()) {
-      return obj[key].trim();
+  for (const k of ['message', 'msg', 'details', 'hint', 'error']) {
+    if (typeof obj[k] === 'string' && obj[k].trim()) {
+      return obj[k].trim();
     }
   }
   return '';
 }
 
-function parseSessionResponse(
-  data: unknown,
-  fallbackEmail: string,
-): SupabaseAuthSession | null {
-  if (!data || typeof data !== 'object') return null;
-  const obj = data as Record<string, unknown>;
-  const accessToken = typeof obj.access_token === 'string' ? obj.access_token : '';
-  const refreshToken = typeof obj.refresh_token === 'string' ? obj.refresh_token : '';
-  const expiresIn =
-    typeof obj.expires_in === 'number' && obj.expires_in > 0 ? obj.expires_in : 3600;
-  const userObj =
-    obj.user && typeof obj.user === 'object'
-      ? (obj.user as Record<string, unknown>)
-      : null;
-  const userId = userObj && typeof userObj.id === 'string' ? userObj.id : '';
-  const email =
-    userObj && typeof userObj.email === 'string' ? userObj.email : fallbackEmail;
-
-  if (!accessToken || !userId || !UUID_RE.test(userId)) {
-    return null;
-  }
-
-  return {
-    accessToken,
-    refreshToken,
-    expiresAt: Date.now() + expiresIn * 1000,
-    userId,
-    email,
-  };
+function normalizeUsernameInput(raw: string): string {
+  return raw.trim();
 }
 
-export async function signUpWithSupabase(
-  rawEmail: string,
+export function validateUsernameAndPassword(
+  rawUsername: string,
   password: string,
-): Promise<
-  | {ok: true; session: SupabaseAuthSession | null; needsEmailConfirm: boolean; message: string}
-  | {ok: false; message: string}
-> {
-  const cfg = getSupabaseConfig();
-  if (!cfg.isConfigured) {
-    return {ok: false, message: 'Chưa cấu hình VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY.'};
+): string | null {
+  const username = normalizeUsernameInput(rawUsername);
+  if (!USERNAME_RE.test(username)) {
+    return 'Tên tài khoản chỉ gồm 3–20 ký tự chữ không dấu, số hoặc dấu gạch dưới (_).';
+  }
+  if (password.length < 4 || password.length > 64) {
+    return 'Mật khẩu cần từ 4 đến 64 ký tự.';
+  }
+  return null;
+}
+
+export async function registerAccount(
+  rawUsername: string,
+  password: string,
+): Promise<RpcActionResult<{account: RememberedAccount}>> {
+  const validationErr = validateUsernameAndPassword(rawUsername, password);
+  if (validationErr) {
+    return {ok: false, message: validationErr};
   }
 
-  const email = rawEmail.trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) {
-    return {ok: false, message: 'Vui lòng nhập địa chỉ email hợp lệ.'};
-  }
-  if (password.length < 6) {
-    return {ok: false, message: 'Mật khẩu cần tối thiểu 6 ký tự.'};
-  }
+  const cleanUsername = normalizeUsernameInput(rawUsername);
+  const deviceId = await getOrCreateDeviceId();
 
   try {
-    const res = await fetchWithTimeout(`${cfg.url}/auth/v1/signup`, {
-      method: 'POST',
-      headers: {
-        apikey: cfg.anonKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({email, password}),
+    const res = await callSupabaseRpc('ttm_register_account', {
+      p_username: cleanUsername,
+      p_password: password,
+      p_device_id: deviceId,
     });
 
     if (!res.ok) {
       return {
         ok: false,
-        message: translateSupabaseError(extractErrorMessage(res.data), res.status),
+        message: translateRpcError(extractRpcFailureMessage(res.data), res.status),
       };
     }
 
-    const session = parseSessionResponse(res.data, email);
-    if (!session) {
+    const body = res.data as Record<string, unknown> | null;
+    if (!body || body.ok !== true) {
+      const code = typeof body?.code === 'string' ? body.code : undefined;
       return {
-        ok: true,
-        session: null,
-        needsEmailConfirm: true,
-        message:
-          'Đăng ký thành công! Vui lòng kiểm tra email để xác nhận tài khoản rồi đăng nhập lại.',
+        ok: false,
+        code,
+        message: translateRpcError(
+          typeof body?.message === 'string' ? body.message : '',
+          res.status,
+          code,
+        ),
       };
     }
 
-    return {
-      ok: true,
-      session,
-      needsEmailConfirm: false,
-      message: `Đã tạo tài khoản và liên kết với ${session.email}!`,
+    const account: RememberedAccount = {
+      username: String(body.username),
+      displayUsername: String(body.displayUsername ?? cleanUsername),
+      deviceId,
+      deviceToken: String(body.deviceToken),
+      accountId: String(body.accountId ?? 'MAY-NEW'),
+      playerName: String(body.playerName ?? 'Mây Nhỏ'),
+      coins: typeof body.coins === 'number' ? body.coins : 150,
+      coinGame: typeof body.coinGame === 'number' ? body.coinGame : 0,
+      hasCharacter: Boolean(body.hasCharacter),
+      saveJson:
+        body.saveJson && typeof body.saveJson === 'object' && !Array.isArray(body.saveJson)
+          ? (body.saveJson as Record<string, unknown>)
+          : null,
+      updatedAt: typeof body.updatedAt === 'string' ? body.updatedAt : null,
     };
+
+    await saveRememberedAccount(account);
+    return {ok: true, account};
   } catch (err) {
-    const raw = err instanceof Error ? err.message : 'Network error';
-    return {ok: false, message: translateSupabaseError(raw)};
+    return {
+      ok: false,
+      message: translateRpcError(err instanceof Error ? err.message : 'Network error'),
+    };
   }
 }
 
-export async function signInWithSupabase(
-  rawEmail: string,
+export async function loginAccount(
+  rawUsername: string,
   password: string,
-): Promise<{ok: true; session: SupabaseAuthSession; message: string} | {ok: false; message: string}> {
-  const cfg = getSupabaseConfig();
-  if (!cfg.isConfigured) {
-    return {ok: false, message: 'Chưa cấu hình VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY.'};
+): Promise<RpcActionResult<{account: RememberedAccount}>> {
+  const validationErr = validateUsernameAndPassword(rawUsername, password);
+  if (validationErr) {
+    return {ok: false, message: validationErr};
   }
 
-  const email = rawEmail.trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) {
-    return {ok: false, message: 'Vui lòng nhập địa chỉ email hợp lệ.'};
-  }
-  if (!password) {
-    return {ok: false, message: 'Vui lòng nhập mật khẩu.'};
-  }
+  const cleanUsername = normalizeUsernameInput(rawUsername);
+  const deviceId = await getOrCreateDeviceId();
 
   try {
-    const res = await fetchWithTimeout(`${cfg.url}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: {
-        apikey: cfg.anonKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({email, password}),
+    const res = await callSupabaseRpc('ttm_login_account', {
+      p_username: cleanUsername,
+      p_password: password,
+      p_device_id: deviceId,
     });
 
     if (!res.ok) {
       return {
         ok: false,
-        message: translateSupabaseError(extractErrorMessage(res.data), res.status),
+        message: translateRpcError(extractRpcFailureMessage(res.data), res.status),
       };
     }
 
-    const session = parseSessionResponse(res.data, email);
-    if (!session) {
-      return {ok: false, message: 'Phản hồi đăng nhập không hợp lệ từ Supabase.'};
+    const body = res.data as Record<string, unknown> | null;
+    if (!body || body.ok !== true) {
+      const code = typeof body?.code === 'string' ? body.code : undefined;
+      return {
+        ok: false,
+        code,
+        message: translateRpcError(
+          typeof body?.message === 'string' ? body.message : '',
+          res.status,
+          code,
+        ),
+      };
     }
 
-    return {
-      ok: true,
-      session,
-      message: `Đăng nhập thành công (${session.email})!`,
+    const account: RememberedAccount = {
+      username: String(body.username),
+      displayUsername: String(body.displayUsername ?? cleanUsername),
+      deviceId,
+      deviceToken: String(body.deviceToken),
+      accountId: String(body.accountId ?? 'MAY-PLAYER'),
+      playerName: String(body.playerName ?? 'Mây Nhỏ'),
+      coins: typeof body.coins === 'number' ? body.coins : 150,
+      coinGame: typeof body.coinGame === 'number' ? body.coinGame : 0,
+      hasCharacter: Boolean(body.hasCharacter),
+      saveJson:
+        body.saveJson && typeof body.saveJson === 'object' && !Array.isArray(body.saveJson)
+          ? (body.saveJson as Record<string, unknown>)
+          : null,
+      updatedAt: typeof body.updatedAt === 'string' ? body.updatedAt : null,
     };
+
+    await saveRememberedAccount(account);
+    return {ok: true, account};
   } catch (err) {
-    const raw = err instanceof Error ? err.message : 'Network error';
-    return {ok: false, message: translateSupabaseError(raw)};
+    return {
+      ok: false,
+      message: translateRpcError(err instanceof Error ? err.message : 'Network error'),
+    };
   }
 }
 
-export async function refreshSupabaseSession(
-  session: SupabaseAuthSession,
-): Promise<SupabaseAuthSession | null> {
-  if (session.expiresAt - Date.now() > 60_000) {
-    return session;
-  }
-  if (!session.refreshToken) return null;
-
-  const cfg = getSupabaseConfig();
-  if (!cfg.isConfigured) return null;
-
+export async function fetchRememberedProfile(
+  account: RememberedAccount,
+): Promise<RpcActionResult<{account: RememberedAccount}>> {
   try {
-    const res = await fetchWithTimeout(`${cfg.url}/auth/v1/token?grant_type=refresh_token`, {
-      method: 'POST',
-      headers: {
-        apikey: cfg.anonKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({refresh_token: session.refreshToken}),
+    const res = await callSupabaseRpc('ttm_get_remembered_profile', {
+      p_username: account.username,
+      p_device_id: account.deviceId,
+      p_device_token: account.deviceToken,
     });
-    if (!res.ok) return null;
-    return parseSessionResponse(res.data, session.email);
-  } catch {
-    return null;
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: translateRpcError(extractRpcFailureMessage(res.data), res.status),
+      };
+    }
+
+    const body = res.data as Record<string, unknown> | null;
+    if (!body || body.ok !== true) {
+      const code = typeof body?.code === 'string' ? body.code : undefined;
+      return {
+        ok: false,
+        code,
+        isAuthError: code === 'AUTH_INVALID',
+        message: translateRpcError(
+          typeof body?.message === 'string' ? body.message : '',
+          res.status,
+          code,
+        ),
+      };
+    }
+
+    const updated: RememberedAccount = {
+      ...account,
+      displayUsername: String(body.displayUsername ?? account.displayUsername),
+      accountId: String(body.accountId ?? account.accountId),
+      playerName: String(body.playerName ?? account.playerName),
+      coins: typeof body.coins === 'number' ? body.coins : account.coins,
+      coinGame: typeof body.coinGame === 'number' ? body.coinGame : account.coinGame,
+      hasCharacter: Boolean(body.hasCharacter),
+      saveJson:
+        body.saveJson && typeof body.saveJson === 'object' && !Array.isArray(body.saveJson)
+          ? (body.saveJson as Record<string, unknown>)
+          : null,
+      updatedAt: typeof body.updatedAt === 'string' ? body.updatedAt : account.updatedAt,
+    };
+
+    await saveRememberedAccount(updated);
+    return {ok: true, account: updated};
+  } catch (err) {
+    return {
+      ok: false,
+      message: translateRpcError(err instanceof Error ? err.message : 'Network error'),
+    };
   }
 }
 
-export async function signOutFromSupabase(session: SupabaseAuthSession | null): Promise<void> {
-  if (!session) return;
-  const cfg = getSupabaseConfig();
-  if (!cfg.isConfigured) return;
-
+export async function claimPlaySession(
+  account: RememberedAccount,
+): Promise<RpcActionResult<{account: RememberedAccount}>> {
   try {
-    await fetchWithTimeout(`${cfg.url}/auth/v1/logout`, {
-      method: 'POST',
-      headers: {
-        apikey: cfg.anonKey,
-        Authorization: `Bearer ${session.accessToken}`,
-      },
+    const res = await callSupabaseRpc('ttm_claim_play_session', {
+      p_username: account.username,
+      p_device_id: account.deviceId,
+      p_device_token: account.deviceToken,
+      p_session_id: TAB_SESSION_ID,
     });
-  } catch {
-    // ignore logout network errors; caller clears in-memory session regardless
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: translateRpcError(extractRpcFailureMessage(res.data), res.status),
+      };
+    }
+
+    const body = res.data as Record<string, unknown> | null;
+    if (!body || body.ok !== true) {
+      const code = typeof body?.code === 'string' ? body.code : undefined;
+      return {
+        ok: false,
+        code,
+        isConflict: code === 'CONCURRENT_LOGIN',
+        isAuthError: code === 'AUTH_INVALID',
+        message: translateRpcError(
+          typeof body?.message === 'string' ? body.message : '',
+          res.status,
+          code,
+        ),
+      };
+    }
+
+    const updated: RememberedAccount = {
+      ...account,
+      playerName: String(body.playerName ?? account.playerName),
+      coins: typeof body.coins === 'number' ? body.coins : account.coins,
+      coinGame: typeof body.coinGame === 'number' ? body.coinGame : account.coinGame,
+      hasCharacter: Boolean(body.saveJson),
+      saveJson:
+        body.saveJson && typeof body.saveJson === 'object' && !Array.isArray(body.saveJson)
+          ? (body.saveJson as Record<string, unknown>)
+          : null,
+      updatedAt: typeof body.updatedAt === 'string' ? body.updatedAt : account.updatedAt,
+    };
+
+    await saveRememberedAccount(updated);
+    return {ok: true, account: updated};
+  } catch (err) {
+    return {
+      ok: false,
+      message: translateRpcError(err instanceof Error ? err.message : 'Network error'),
+    };
   }
 }
 
-export async function uploadSaveToSupabase(
-  session: SupabaseAuthSession,
+export async function heartbeatPlaySession(
+  account: RememberedAccount,
+): Promise<RpcActionResult> {
+  try {
+    const res = await callSupabaseRpc('ttm_heartbeat_session', {
+      p_username: account.username,
+      p_device_id: account.deviceId,
+      p_device_token: account.deviceToken,
+      p_session_id: TAB_SESSION_ID,
+    });
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: translateRpcError(extractRpcFailureMessage(res.data), res.status),
+      };
+    }
+
+    const body = res.data as Record<string, unknown> | null;
+    if (!body || body.ok !== true) {
+      const code = typeof body?.code === 'string' ? body.code : undefined;
+      return {
+        ok: false,
+        code,
+        isConflict: code === 'CONCURRENT_LOGIN',
+        isAuthError: code === 'AUTH_INVALID',
+        message: translateRpcError(
+          typeof body?.message === 'string' ? body.message : '',
+          res.status,
+          code,
+        ),
+      };
+    }
+
+    return {ok: true};
+  } catch (err) {
+    return {
+      ok: false,
+      message: translateRpcError(err instanceof Error ? err.message : 'Network error'),
+    };
+  }
+}
+
+export async function saveAccountToServer(
+  account: RememberedAccount,
   payload: Record<string, unknown>,
-): Promise<
-  | {ok: true; session: SupabaseAuthSession; updatedAt: string; message: string}
-  | {ok: false; sessionExpired?: boolean; message: string}
-> {
-  const cfg = getSupabaseConfig();
-  if (!cfg.isConfigured) {
-    return {ok: false, message: 'Chưa cấu hình kết nối Supabase.'};
-  }
+): Promise<RpcActionResult<{updatedAt: string}>> {
+  const avatar =
+    payload.avatar && typeof payload.avatar === 'object'
+      ? (payload.avatar as Record<string, unknown>)
+      : {};
+  const stats =
+    payload.stats && typeof payload.stats === 'object'
+      ? (payload.stats as Record<string, unknown>)
+      : {};
 
-  const activeSession = await refreshSupabaseSession(session);
-  if (!activeSession) {
-    return {
-      ok: false,
-      sessionExpired: true,
-      message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
-    };
-  }
-
-  const preview = extractSavePreview(payload);
-  const saveCode = await encodeAccountTransferCode(payload);
-  const updatedAt = new Date().toISOString();
-
-  const row = {
-    user_id: activeSession.userId,
-    email: activeSession.email,
-    account_id: preview.accountId,
-    player_name: preview.playerName,
-    coins: preview.coins,
-    coin_game: preview.coinGame,
-    save_code: saveCode,
-    save_json: payload,
-    updated_at: updatedAt,
-  };
+  const playerName =
+    typeof avatar.name === 'string' && avatar.name.trim()
+      ? avatar.name.trim()
+      : account.playerName;
+  const coins =
+    typeof stats.coins === 'number' && Number.isFinite(stats.coins)
+      ? Math.max(0, Math.floor(stats.coins))
+      : 0;
+  const coinGame =
+    typeof stats.coinGame === 'number' && Number.isFinite(stats.coinGame)
+      ? Math.max(0, Math.floor(stats.coinGame))
+      : 0;
 
   try {
-    const res = await fetchWithTimeout(`${cfg.url}/rest/v1/avatar_sims_saves?on_conflict=user_id`, {
-      method: 'POST',
-      headers: {
-        apikey: cfg.anonKey,
-        Authorization: `Bearer ${activeSession.accessToken}`,
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-      },
-      body: JSON.stringify(row),
+    const res = await callSupabaseRpc('ttm_save_account_data', {
+      p_username: account.username,
+      p_device_id: account.deviceId,
+      p_device_token: account.deviceToken,
+      p_session_id: TAB_SESSION_ID,
+      p_player_name: playerName,
+      p_coins: coins,
+      p_coin_game: coinGame,
+      p_save_json: payload,
     });
 
     if (!res.ok) {
       return {
         ok: false,
-        sessionExpired: res.status === 401,
-        message: translateSupabaseError(extractErrorMessage(res.data), res.status),
+        message: translateRpcError(extractRpcFailureMessage(res.data), res.status),
       };
     }
 
-    return {
-      ok: true,
-      session: activeSession,
+    const body = res.data as Record<string, unknown> | null;
+    if (!body || body.ok !== true) {
+      const code = typeof body?.code === 'string' ? body.code : undefined;
+      return {
+        ok: false,
+        code,
+        isConflict: code === 'CONCURRENT_LOGIN',
+        isAuthError: code === 'AUTH_INVALID',
+        message: translateRpcError(
+          typeof body?.message === 'string' ? body.message : '',
+          res.status,
+          code,
+        ),
+      };
+    }
+
+    const updatedAt =
+      typeof body.updatedAt === 'string' ? body.updatedAt : new Date().toISOString();
+
+    await saveRememberedAccount({
+      ...account,
+      playerName,
+      coins,
+      coinGame,
+      hasCharacter: true,
+      saveJson: payload,
       updatedAt,
-      message: `Đã lưu tiến trình "${preview.playerName}" lên Supabase thành công!`,
-    };
+    });
+
+    return {ok: true, updatedAt};
   } catch (err) {
-    const raw = err instanceof Error ? err.message : 'Network error';
-    return {ok: false, message: translateSupabaseError(raw)};
+    return {
+      ok: false,
+      message: translateRpcError(err instanceof Error ? err.message : 'Network error'),
+    };
   }
 }
 
-export async function downloadSaveFromSupabase(
-  session: SupabaseAuthSession,
-): Promise<
-  | {ok: true; session: SupabaseAuthSession; record: CloudSaveRecord | null; message: string}
-  | {ok: false; sessionExpired?: boolean; message: string}
-> {
-  const cfg = getSupabaseConfig();
-  if (!cfg.isConfigured) {
-    return {ok: false, message: 'Chưa cấu hình kết nối Supabase.'};
-  }
-
-  const activeSession = await refreshSupabaseSession(session);
-  if (!activeSession || !UUID_RE.test(activeSession.userId)) {
-    return {
-      ok: false,
-      sessionExpired: true,
-      message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
-    };
-  }
-
-  const query = `user_id=eq.${encodeURIComponent(activeSession.userId)}&select=user_id,email,account_id,player_name,coins,coin_game,save_code,save_json,updated_at&limit=1`;
-
+export async function releasePlaySession(
+  account: RememberedAccount | null,
+  keepalive = false,
+): Promise<void> {
+  if (!account) return;
   try {
-    const res = await fetchWithTimeout(`${cfg.url}/rest/v1/avatar_sims_saves?${query}`, {
-      method: 'GET',
-      headers: {
-        apikey: cfg.anonKey,
-        Authorization: `Bearer ${activeSession.accessToken}`,
-        Accept: 'application/json',
+    await callSupabaseRpc(
+      'ttm_release_play_session',
+      {
+        p_username: account.username,
+        p_device_id: account.deviceId,
+        p_device_token: account.deviceToken,
+        p_session_id: TAB_SESSION_ID,
       },
-    });
-
-    if (!res.ok) {
-      return {
-        ok: false,
-        sessionExpired: res.status === 401,
-        message: translateSupabaseError(extractErrorMessage(res.data), res.status),
-      };
-    }
-
-    if (!Array.isArray(res.data) || res.data.length === 0) {
-      return {
-        ok: true,
-        session: activeSession,
-        record: null,
-        message: 'Tài khoản này chưa có bản lưu nào trên Supabase. Hãy bấm "Lưu lên Supabase" trước.',
-      };
-    }
-
-    const raw = res.data[0] as Record<string, unknown>;
-    const saveJson =
-      raw.save_json && typeof raw.save_json === 'object' && !Array.isArray(raw.save_json)
-        ? (raw.save_json as Record<string, unknown>)
-        : null;
-
-    if (!saveJson || !saveJson.avatar || typeof saveJson.avatar !== 'object') {
-      return {
-        ok: false,
-        message: 'Bản lưu trên Supabase bị thiếu dữ liệu nhân vật.',
-      };
-    }
-
-    const preview = extractSavePreview(saveJson);
-    const record: CloudSaveRecord = {
-      userId: typeof raw.user_id === 'string' ? raw.user_id : activeSession.userId,
-      email: typeof raw.email === 'string' ? raw.email : activeSession.email,
-      accountId: typeof raw.account_id === 'string' ? raw.account_id : preview.accountId,
-      playerName: typeof raw.player_name === 'string' ? raw.player_name : preview.playerName,
-      coins: typeof raw.coins === 'number' ? raw.coins : preview.coins,
-      coinGame: typeof raw.coin_game === 'number' ? raw.coin_game : preview.coinGame,
-      saveCode: typeof raw.save_code === 'string' ? raw.save_code : '',
-      saveJson,
-      updatedAt: typeof raw.updated_at === 'string' ? raw.updated_at : new Date().toISOString(),
-      preview,
-    };
-
-    return {
-      ok: true,
-      session: activeSession,
-      record,
-      message: `Tìm thấy bản lưu của "${record.playerName}" trên Supabase!`,
-    };
-  } catch (err) {
-    const raw = err instanceof Error ? err.message : 'Network error';
-    return {ok: false, message: translateSupabaseError(raw)};
+      keepalive,
+    );
+  } catch {
+    // ignore cleanup failures
   }
 }

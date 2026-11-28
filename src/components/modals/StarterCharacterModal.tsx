@@ -9,9 +9,7 @@ import {AvatarConfig} from '../../types/game';
 import {AccountSavePreview, decodeAccountTransferCode} from '../../utils/accountSave';
 import {finalizePlayerName, sanitizePlayerNameInput} from '../../utils/playerName';
 import {soundFX} from '../../utils/sound';
-import {SupabaseAuthSession} from '../../utils/supabaseSync';
 import {AvatarPreview3D} from '../AvatarPreview3D';
-import {SupabaseCloudPanel} from './SupabaseCloudPanel';
 
 interface StarterCharacterModalProps {
   onConfirm: (payload: {
@@ -19,17 +17,15 @@ interface StarterCharacterModalProps {
     unlockItemIds: string[];
   }) => void;
   onRestoreAccountCode?: (code: string) => Promise<{ok: boolean; message: string}>;
-  supabaseSession?: SupabaseAuthSession | null;
-  onSupabaseSessionChange?: (session: SupabaseAuthSession | null) => void;
-  onRestoreAccountPayload?: (payload: Record<string, unknown>) => Promise<{ok: boolean; message: string}>;
+  accountUsername?: string;
+  onBackToTitle?: () => void;
 }
 
 export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
   onConfirm,
   onRestoreAccountCode,
-  supabaseSession = null,
-  onSupabaseSessionChange,
-  onRestoreAccountPayload,
+  accountUsername,
+  onBackToTitle,
 }) => {
   const [mode, setMode] = useState<'create' | 'restore'>('create');
   const [selectedId, setSelectedId] = useState<'girl' | 'boy'>('girl');
@@ -113,53 +109,59 @@ export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
             </div>
             <div>
               <h1 className="font-display text-base font-bold text-[#4A3525] sm:text-lg">
-                Chào Mừng Đến Thị Trấn Mây
+                {accountUsername
+                  ? `Tạo Nhân Vật · @${accountUsername}`
+                  : 'Chào Mừng Đến Thị Trấn Mây'}
               </h1>
               <p className="text-xs font-medium text-[#7A6048]">
                 {mode === 'create'
                   ? 'Chọn nhân vật Nam hoặc Nữ & đặt tên để bắt đầu hành trình'
-                  : 'Đăng nhập Supabase hoặc dán mã TTM1- từ máy cũ để tiếp tục hành trình'}
+                  : 'Dán mã lưu tài khoản từ máy cũ để tiếp tục hành trình của bạn'}
               </p>
             </div>
           </div>
 
-          {(onRestoreAccountCode || onRestoreAccountPayload) && (
-            <button
-              type="button"
-              onClick={() => {
-                soundFX.tap();
-                setRestoreMessage(null);
-                setMode((prev) => (prev === 'create' ? 'restore' : 'create'));
-              }}
-              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold transition-all active:scale-95 ${
-                mode === 'restore'
-                  ? 'border border-[#D8C2A6] bg-white text-[#5B422E]'
-                  : 'bg-[#2F6296] text-white shadow-xs hover:bg-[#275380]'
-              }`}
-            >
-              <KeyRound className="h-3.5 w-3.5" />
-              <span>
-                {mode === 'restore' ? 'Quay lại tạo mới' : 'Đã có tài khoản? Khôi phục'}
-              </span>
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {onBackToTitle && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  onBackToTitle();
+                }}
+                className="flex items-center gap-1.5 rounded-xl border border-[#D8C2A6] bg-white px-3 py-2 text-xs font-extrabold text-[#5B422E] transition-colors hover:bg-[#F7EFE2] active:scale-95"
+              >
+                <span>Đổi tài khoản</span>
+              </button>
+            )}
+
+            {onRestoreAccountCode && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  setRestoreMessage(null);
+                  setMode((prev) => (prev === 'create' ? 'restore' : 'create'));
+                }}
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold transition-all active:scale-95 ${
+                  mode === 'restore'
+                    ? 'border border-[#D8C2A6] bg-white text-[#5B422E]'
+                    : 'bg-[#2F6296] text-white shadow-xs hover:bg-[#275380]'
+                }`}
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                <span>
+                  {mode === 'restore' ? 'Quay lại tạo mới' : 'Khôi phục bằng mã'}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Body */}
         {mode === 'restore' ? (
           <div className="custom-scroll flex-1 overflow-y-auto p-5 sm:p-6">
             <div className="mx-auto max-w-lg space-y-4">
-              {onRestoreAccountPayload && onSupabaseSessionChange && (
-                <SupabaseCloudPanel
-                  mode="restore"
-                  session={supabaseSession}
-                  autoSyncEnabled={true}
-                  lastCloudSyncAt={null}
-                  onSessionChange={onSupabaseSessionChange}
-                  onToggleAutoSync={() => {}}
-                  onRestorePayload={onRestoreAccountPayload}
-                />
-              )}
               <div className="space-y-4 rounded-2xl border border-[#DFCCB0] bg-white p-5 shadow-xs">
               <div className="flex items-center gap-2 text-sm font-black text-[#4A3525]">
                 <KeyRound className="h-5 w-5 text-[#2F6296]" />

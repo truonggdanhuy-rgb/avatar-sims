@@ -31,7 +31,11 @@ import {MayCafeModal} from './components/modals/MayCafeModal';
 import {ArcadeHubModal} from './components/modals/ArcadeHubModal';
 import {ArcadeMiniGameModal} from './components/modals/ArcadeMiniGameModal';
 import {CoinGameShopModal} from './components/modals/CoinGameShopModal';
+import {ConcurrentLockModal} from './components/ConcurrentLockModal';
+import {OrientationAndFullscreenGuard} from './components/OrientationAndFullscreenGuard';
+import {TitleScreen} from './components/TitleScreen';
 import {WorldCanvas} from './components/WorldCanvas';
+import {getSupabaseConfig} from './config/supabase';
 import {MAY_CAFE_ITEMS, MayCafeItemId} from './data/mayCafeCatalog';
 import {
   createInitialPeppaDishes,
@@ -215,8 +219,14 @@ import {
 import {finalizePlayerName, sanitizePlayerNameInput} from './utils/playerName';
 import {soundFX} from './utils/sound';
 import {
-  SupabaseAuthSession,
-  uploadSaveToSupabase,
+  RememberedAccount,
+  claimPlaySession,
+  clearRememberedAccount,
+  fetchRememberedProfile,
+  heartbeatPlaySession,
+  loadRememberedAccount,
+  releasePlaySession,
+  saveAccountToServer,
 } from './utils/supabaseSync';
 
 const HOUSE_LAYOUT_VERSION = 5;
@@ -398,7 +408,25 @@ function migrateSavedPondFish(raw: unknown): PondFishState[] {
     });
 }
 
-export default function App() {
+interface GameWorldProps {
+  activeAccount: RememberedAccount | null;
+  lastCloudSyncAt: string | null;
+  isSessionConflicted: boolean;
+  onSaveToServer: (payload: Record<string, unknown>) => Promise<{ok: boolean; message: string}>;
+  onCharacterCreated: () => void;
+  onRehydrateWorld: () => void;
+  onExitToTitle: () => void;
+}
+
+function GameWorld({
+  activeAccount,
+  lastCloudSyncAt,
+  isSessionConflicted,
+  onSaveToServer,
+  onCharacterCreated,
+  onRehydrateWorld,
+  onExitToTitle,
+}: GameWorldProps) {
   const [zone, setZone] = useState<ZoneId>('town');
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [boutiqueOpen, setBoutiqueOpen] = useState(false);
@@ -519,9 +547,7 @@ export default function App() {
   const hasGeneratedCodeOnceRef = useRef(false);
   const latestBuildSavePayloadRef = useRef<((savedAt?: number) => Record<string, unknown>) | null>(null);
   const isCloudSyncingRef = useRef(false);
-  const [supabaseSession, setSupabaseSession] = useState<SupabaseAuthSession | null>(null);
-  const [supabaseAutoSync, setSupabaseAutoSync] = useState<boolean>(true);
-  const [lastCloudSyncAt, setLastCloudSyncAt] = useState<string | null>(null);
+  const forceImmediateCloudSyncRef = useRef(false);
 
   const homeSpotRef = useRef<{x: number; z: number}>({x: -1.8, z: 4.5});
 
@@ -1317,6 +1343,9 @@ export default function App() {
       }
     } catch {
       // ignore storage errors
+    }
+    if (activeAccount?.accountId) {
+      return activeAccount.accountId;
     }
     const randCode = Math.random().toString(36).slice(2, 6).toUpperCase();
     const randNum = Math.floor(1000 + Math.random() * 9000);
@@ -2114,25 +2143,21 @@ export default function App() {
     timeOfDay,
   ]);
 
-  // Debounced automatic Supabase cloud backup while linked
+  // Automatic Supabase server save when playing (immediate after character creation, else 10s debounce)
   useEffect(() => {
-    if (!hasCreatedCharacter || !supabaseSession || !supabaseAutoSync) return;
+    if (!hasCreatedCharacter || !activeAccount || isSessionConflicted) return;
+    const delayMs = forceImmediateCloudSyncRef.current ? 300 : 10000;
     const timer = window.setTimeout(async () => {
-      if (isRestoringSaveRef.current || isCloudSyncingRef.current) return;
+      if (isRestoringSaveRef.current || isCloudSyncingRef.current || isSessionConflicted) return;
       const buildFn = latestBuildSavePayloadRef.current;
       if (!buildFn) return;
+      forceImmediateCloudSyncRef.current = false;
       isCloudSyncingRef.current = true;
-      const res = await uploadSaveToSupabase(supabaseSession, buildFn(Date.now()));
+      await onSaveToServer(buildFn(Date.now()));
       isCloudSyncingRef.current = false;
-      if (res.ok) {
-        setSupabaseSession(res.session);
-        setLastCloudSyncAt(res.updatedAt);
-      } else if (res.sessionExpired) {
-        setSupabaseSession(null);
-      }
-    }, 15000);
+    }, delayMs);
     return () => window.clearTimeout(timer);
-  }, [lastSavedAt, hasCreatedCharacter, supabaseSession, supabaseAutoSync]);
+  }, [lastSavedAt, hasCreatedCharacter, activeAccount, isSessionConflicted, onSaveToServer]);
 
   // Gentle passive hunger decay (-1 every 130 seconds for relaxed pacing)
   useEffect(() => {
@@ -2248,19 +2273,20 @@ export default function App() {
       };
     }
     const preview = extractSavePreview(payload);
+    const nextPayload: Record<string, unknown> = {
+      ...payload,
+      characterCreated: true,
+      savedAt: Date.now(),
+    };
     try {
       isRestoringSaveRef.current = true;
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          ...payload,
-          characterCreated: true,
-          savedAt: Date.now(),
-        }),
-      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPayload));
+      if (activeAccount && !isSessionConflicted) {
+        await onSaveToServer(nextPayload);
+      }
       window.setTimeout(() => {
-        window.location.reload();
-      }, 450);
+        onRehydrateWorld();
+      }, 250);
       return {
         ok: true,
         message: `Đã khôi phục tài khoản "${preview.playerName}"! Đang mở Thị Trấn Mây...`,
@@ -2284,30 +2310,18 @@ export default function App() {
     return handleRestoreAccountPayload(decoded.payload);
   };
 
-  const handleUploadToSupabase = async (): Promise<{
-    ok: boolean;
-    updatedAt?: string;
-    message: string;
-  }> => {
-    if (!supabaseSession) {
-      return {ok: false, message: 'Vui lòng đăng nhập Supabase trước khi đồng bộ.'};
+  const handleSyncToServerNow = async (): Promise<{ok: boolean; message: string}> => {
+    if (!activeAccount) {
+      return {ok: false, message: 'Chưa liên kết tài khoản máy chủ.'};
     }
     const buildFn = latestBuildSavePayloadRef.current;
     if (!buildFn) {
       return {ok: false, message: 'Dữ liệu trò chơi chưa sẵn sàng để lưu.'};
     }
     isCloudSyncingRef.current = true;
-    const res = await uploadSaveToSupabase(supabaseSession, buildFn(Date.now()));
+    const res = await onSaveToServer(buildFn(Date.now()));
     isCloudSyncingRef.current = false;
-    if (!res.ok) {
-      if (res.sessionExpired) {
-        setSupabaseSession(null);
-      }
-      return {ok: false, message: res.message};
-    }
-    setSupabaseSession(res.session);
-    setLastCloudSyncAt(res.updatedAt);
-    return {ok: true, updatedAt: res.updatedAt, message: res.message};
+    return res;
   };
 
   const markQuestDone = (key: DailyQuestKey) => {
@@ -3630,9 +3644,11 @@ export default function App() {
     avatar: AvatarConfig;
     unlockItemIds: string[];
   }) => {
+    forceImmediateCloudSyncRef.current = true;
     setAvatar(chosenAvatar);
     setOwnedIds((prev) => Array.from(new Set([...prev, ...unlockItemIds])));
     setHasCreatedCharacter(true);
+    onCharacterCreated();
   };
 
   const handleEquipAvatar = (next: AvatarConfig) => {
@@ -4895,13 +4911,21 @@ export default function App() {
           onToggleSound={handleToggleSound}
           onRedeemGiftCode={handleRedeemGiftCode}
           onRestoreAccountCode={handleRestoreAccountCode}
-          supabaseSession={supabaseSession}
-          supabaseAutoSync={supabaseAutoSync}
+          accountUsername={activeAccount?.displayUsername ?? null}
           lastCloudSyncAt={lastCloudSyncAt}
-          onSupabaseSessionChange={setSupabaseSession}
-          onToggleSupabaseAutoSync={setSupabaseAutoSync}
-          onUploadToSupabase={handleUploadToSupabase}
-          onRestoreAccountPayload={handleRestoreAccountPayload}
+          onSyncToServerNow={handleSyncToServerNow}
+          onExitToTitle={() => {
+            setPhoneOpen(false);
+            void (async () => {
+              if (hasCreatedCharacter && activeAccount && !isSessionConflicted) {
+                const buildFn = latestBuildSavePayloadRef.current;
+                if (buildFn) {
+                  await onSaveToServer(buildFn(Date.now()));
+                }
+              }
+              onExitToTitle();
+            })();
+          }}
           onClose={() => setPhoneOpen(false)}
         />
       )}
@@ -4945,11 +4969,297 @@ export default function App() {
         <StarterCharacterModal
           onConfirm={handleConfirmStarterCharacter}
           onRestoreAccountCode={handleRestoreAccountCode}
-          supabaseSession={supabaseSession}
-          onSupabaseSessionChange={setSupabaseSession}
-          onRestoreAccountPayload={handleRestoreAccountPayload}
+          accountUsername={activeAccount?.displayUsername}
+          onBackToTitle={onExitToTitle}
         />
       )}
     </main>
   );
 }
+
+export default function App() {
+  const [rememberedAccount, setRememberedAccount] = useState<RememberedAccount | null>(null);
+  const [isLoadingAccount, setIsLoadingAccount] = useState<boolean>(true);
+  const [screenMode, setScreenMode] = useState<'title' | 'create_character' | 'town'>('title');
+  const [worldSessionKey, setWorldSessionKey] = useState<number>(1);
+  const [isEnteringTown, setIsEnteringTown] = useState<boolean>(false);
+  const [enteringError, setEnteringError] = useState<string | null>(null);
+  const [lastCloudSyncAt, setLastCloudSyncAt] = useState<string | null>(null);
+  const [sessionConflict, setSessionConflict] = useState<{
+    username: string;
+    message?: string;
+  } | null>(null);
+
+  const activeAccountRef = useRef<RememberedAccount | null>(null);
+  const hasActivePlayLockRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    activeAccountRef.current = rememberedAccount;
+  }, [rememberedAccount]);
+
+  // Initial load: check remembered account in IndexedDB & refresh latest cloud preview
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      const savedAcc = await loadRememberedAccount();
+      if (cancelled) return;
+      if (savedAcc) {
+        setRememberedAccount(savedAcc);
+        setLastCloudSyncAt(savedAcc.updatedAt);
+        if (getSupabaseConfig().isConfigured) {
+          const fresh = await fetchRememberedProfile(savedAcc);
+          if (cancelled) return;
+          if (fresh.ok) {
+            setRememberedAccount(fresh.account);
+            setLastCloudSyncAt(fresh.account.updatedAt);
+            if (fresh.account.saveJson) {
+              try {
+                localStorage.setItem(
+                  STORAGE_KEY,
+                  JSON.stringify({
+                    ...fresh.account.saveJson,
+                    characterCreated: true,
+                  }),
+                );
+              } catch {
+                // ignore quota errors
+              }
+            }
+          } else if (fresh.isAuthError) {
+            await clearRememberedAccount();
+            if (!cancelled) setRememberedAccount(null);
+          }
+        }
+      }
+      if (!cancelled) setIsLoadingAccount(false);
+    };
+    void init();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Release active session when closing tab/browser
+  useEffect(() => {
+    const handleLeave = () => {
+      if (hasActivePlayLockRef.current && activeAccountRef.current) {
+        void releasePlaySession(activeAccountRef.current, true);
+      }
+    };
+    window.addEventListener('pagehide', handleLeave);
+    window.addEventListener('beforeunload', handleLeave);
+    return () => {
+      window.removeEventListener('pagehide', handleLeave);
+      window.removeEventListener('beforeunload', handleLeave);
+    };
+  }, []);
+
+  // Periodic heartbeat while inside town or character creation to detect simultaneous multi-device play
+  useEffect(() => {
+    if (screenMode === 'title' || !rememberedAccount || sessionConflict) return;
+    let cancelled = false;
+
+    const tickHeartbeat = async () => {
+      const current = activeAccountRef.current;
+      if (!current || cancelled) return;
+      const res = await heartbeatPlaySession(current);
+      if (cancelled) return;
+      if (!res.ok) {
+        if (res.isConflict) {
+          hasActivePlayLockRef.current = false;
+          setSessionConflict({
+            username: current.displayUsername,
+            message: res.message,
+          });
+        } else if (res.isAuthError) {
+          hasActivePlayLockRef.current = false;
+          await clearRememberedAccount();
+          setRememberedAccount(null);
+          setScreenMode('title');
+          setEnteringError(res.message);
+        }
+      }
+    };
+
+    const id = window.setInterval(() => {
+      void tickHeartbeat();
+    }, 4500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [screenMode, rememberedAccount, sessionConflict]);
+
+  const applyAccountSaveToLocalStorage = (acc: RememberedAccount) => {
+    try {
+      if (acc.saveJson && acc.hasCharacter) {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            ...acc.saveJson,
+            characterCreated: true,
+          }),
+        );
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const handleEnterTown = async (acc: RememberedAccount) => {
+    setEnteringError(null);
+    setIsEnteringTown(true);
+    const res = await claimPlaySession(acc);
+    setIsEnteringTown(false);
+
+    if (!res.ok) {
+      if (res.isConflict) {
+        setSessionConflict({
+          username: acc.displayUsername,
+          message: res.message,
+        });
+        return;
+      }
+      if (res.isAuthError) {
+        await clearRememberedAccount();
+        setRememberedAccount(null);
+      }
+      setEnteringError(res.message);
+      return;
+    }
+
+    setRememberedAccount(res.account);
+    setLastCloudSyncAt(res.account.updatedAt);
+    applyAccountSaveToLocalStorage(res.account);
+    hasActivePlayLockRef.current = true;
+    setWorldSessionKey((k) => k + 1);
+    setScreenMode(res.account.hasCharacter && res.account.saveJson ? 'town' : 'create_character');
+  };
+
+  const handleStartCharacterCreation = async (acc: RememberedAccount) => {
+    setEnteringError(null);
+    setRememberedAccount(acc);
+    const res = await claimPlaySession(acc);
+    if (!res.ok && res.isConflict) {
+      setSessionConflict({
+        username: acc.displayUsername,
+        message: res.message,
+      });
+      return;
+    }
+    const targetAcc = res.ok ? res.account : acc;
+    setRememberedAccount(targetAcc);
+    applyAccountSaveToLocalStorage({...targetAcc, hasCharacter: false, saveJson: null});
+    hasActivePlayLockRef.current = true;
+    setWorldSessionKey((k) => k + 1);
+    setScreenMode('create_character');
+  };
+
+  const handleSaveToServer = async (
+    payload: Record<string, unknown>,
+  ): Promise<{ok: boolean; message: string}> => {
+    const current = activeAccountRef.current;
+    if (!current) {
+      return {ok: false, message: 'Chưa có tài khoản máy chủ.'};
+    }
+    const res = await saveAccountToServer(current, payload);
+    if (!res.ok) {
+      if (res.isConflict) {
+        hasActivePlayLockRef.current = false;
+        setSessionConflict({
+          username: current.displayUsername,
+          message: res.message,
+        });
+      }
+      return {ok: false, message: res.message};
+    }
+    setLastCloudSyncAt(res.updatedAt);
+    const latest = await loadRememberedAccount();
+    if (latest) setRememberedAccount(latest);
+    return {ok: true, message: 'Đã đồng bộ dữ liệu lên máy chủ thành công!'};
+  };
+
+  const handleExitToTitle = async () => {
+    const current = activeAccountRef.current;
+    hasActivePlayLockRef.current = false;
+    setSessionConflict(null);
+    setEnteringError(null);
+    setScreenMode('title');
+    if (current) {
+      await releasePlaySession(current);
+      const fresh = await fetchRememberedProfile(current);
+      if (fresh.ok) {
+        setRememberedAccount(fresh.account);
+        setLastCloudSyncAt(fresh.account.updatedAt);
+      }
+    }
+  };
+
+  const handleRetryConflict = async (): Promise<{ok: boolean; message?: string}> => {
+    const current = activeAccountRef.current;
+    if (!current) {
+      setSessionConflict(null);
+      setScreenMode('title');
+      return {ok: false, message: 'Không tìm thấy thông tin tài khoản.'};
+    }
+    const res = await claimPlaySession(current);
+    if (!res.ok) {
+      return {ok: false, message: res.message};
+    }
+    setRememberedAccount(res.account);
+    setLastCloudSyncAt(res.account.updatedAt);
+    setSessionConflict(null);
+    hasActivePlayLockRef.current = true;
+    if (screenMode === 'title') {
+      applyAccountSaveToLocalStorage(res.account);
+      setWorldSessionKey((k) => k + 1);
+      setScreenMode(res.account.hasCharacter && res.account.saveJson ? 'town' : 'create_character');
+    }
+    return {ok: true};
+  };
+
+  return (
+    <>
+      <OrientationAndFullscreenGuard />
+      {screenMode === 'title' ? (
+        <TitleScreen
+          rememberedAccount={rememberedAccount}
+          isLoadingAccount={isLoadingAccount}
+          enteringError={enteringError}
+          isEnteringTown={isEnteringTown}
+          onAccountChanged={(acc) => {
+            setRememberedAccount(acc);
+            setEnteringError(null);
+            setLastCloudSyncAt(acc?.updatedAt ?? null);
+          }}
+          onEnterTown={handleEnterTown}
+          onStartCharacterCreation={handleStartCharacterCreation}
+        />
+      ) : (
+        <GameWorld
+          key={worldSessionKey}
+          activeAccount={rememberedAccount}
+          lastCloudSyncAt={lastCloudSyncAt}
+          isSessionConflicted={Boolean(sessionConflict)}
+          onSaveToServer={handleSaveToServer}
+          onCharacterCreated={() => setScreenMode('town')}
+          onRehydrateWorld={() => setWorldSessionKey((k) => k + 1)}
+          onExitToTitle={() => {
+            void handleExitToTitle();
+          }}
+        />
+      )}
+      {sessionConflict && (
+        <ConcurrentLockModal
+          username={sessionConflict.username}
+          message={sessionConflict.message}
+          onRetryClaim={handleRetryConflict}
+          onSwitchAccount={handleExitToTitle}
+        />
+      )}
+    </>
+  );
+}
+

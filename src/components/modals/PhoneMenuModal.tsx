@@ -59,11 +59,9 @@ import {
   decodeAccountTransferCode,
 } from '../../utils/accountSave';
 import {soundFX} from '../../utils/sound';
-import {SupabaseAuthSession} from '../../utils/supabaseSync';
 import {AvatarPreview3D} from '../AvatarPreview3D';
 import {FishIllustration} from '../FishingIcons';
 import {CreatureBookIcon, InsectIllustration} from '../InsectIcons';
-import {SupabaseCloudPanel} from './SupabaseCloudPanel';
 
 interface PhoneMenuModalProps {
   zone: ZoneId;
@@ -96,13 +94,10 @@ interface PhoneMenuModalProps {
   onToggleSound: () => void;
   onRedeemGiftCode: (code: string) => {ok: boolean; message: string};
   onRestoreAccountCode: (code: string) => Promise<{ok: boolean; message: string}>;
-  supabaseSession: SupabaseAuthSession | null;
-  supabaseAutoSync: boolean;
+  accountUsername?: string | null;
   lastCloudSyncAt: string | null;
-  onSupabaseSessionChange: (session: SupabaseAuthSession | null) => void;
-  onToggleSupabaseAutoSync: (enabled: boolean) => void;
-  onUploadToSupabase: () => Promise<{ok: boolean; updatedAt?: string; message: string}>;
-  onRestoreAccountPayload: (payload: Record<string, unknown>) => Promise<{ok: boolean; message: string}>;
+  onSyncToServerNow?: () => Promise<{ok: boolean; message: string}>;
+  onExitToTitle?: () => void;
   onClose: () => void;
 }
 
@@ -174,13 +169,10 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   onToggleSound,
   onRedeemGiftCode,
   onRestoreAccountCode,
-  supabaseSession,
-  supabaseAutoSync,
+  accountUsername,
   lastCloudSyncAt,
-  onSupabaseSessionChange,
-  onToggleSupabaseAutoSync,
-  onUploadToSupabase,
-  onRestoreAccountPayload,
+  onSyncToServerNow,
+  onExitToTitle,
   onClose,
 }) => {
   const [tab, setTab] = useState<PhoneTab>(initialTab);
@@ -195,6 +187,8 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   const [restorePreview, setRestorePreview] = useState<AccountSavePreview | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<{ok: boolean; text: string} | null>(null);
   const [isRestoringCode, setIsRestoringCode] = useState(false);
+  const [isSyncingServer, setIsSyncingServer] = useState(false);
+  const [serverSyncMsg, setServerSyncMsg] = useState<{ok: boolean; text: string} | null>(null);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -703,17 +697,73 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 </div>
               </div>
 
-              {/* Liên kết Supabase Cloud */}
-              <SupabaseCloudPanel
-                mode="account"
-                session={supabaseSession}
-                autoSyncEnabled={supabaseAutoSync}
-                lastCloudSyncAt={lastCloudSyncAt}
-                onSessionChange={onSupabaseSessionChange}
-                onToggleAutoSync={onToggleSupabaseAutoSync}
-                onUploadNow={onUploadToSupabase}
-                onRestorePayload={onRestoreAccountPayload}
-              />
+              {/* Tài khoản máy chủ & Đổi tài khoản */}
+              <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3.5 shadow-xs space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black text-[#4A3525]">
+                    Tài Khoản Máy Chủ
+                  </span>
+                  {accountUsername && (
+                    <span className="text-[11px] font-extrabold text-[#0E7A60]">
+                      @{accountUsername}
+                    </span>
+                  )}
+                </div>
+
+                {lastCloudSyncAt && (
+                  <div className="text-[10px] font-semibold text-[#5B7C68] tabular-nums">
+                    Đồng bộ máy chủ gần nhất: {formatSavedClock(Date.parse(lastCloudSyncAt))}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-2">
+                  {onSyncToServerNow && accountUsername && (
+                    <button
+                      type="button"
+                      disabled={isSyncingServer}
+                      onClick={async () => {
+                        soundFX.tap();
+                        setIsSyncingServer(true);
+                        const res = await onSyncToServerNow();
+                        setIsSyncingServer(false);
+                        setServerSyncMsg({ok: res.ok, text: res.message});
+                        if (res.ok) soundFX.sparkle();
+                      }}
+                      className="flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl bg-[#0E8A6D] px-3 py-2 text-xs font-black text-white shadow-xs transition-transform active:scale-95 disabled:opacity-60"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isSyncingServer ? 'animate-spin' : ''}`} />
+                      <span>
+                        {isSyncingServer ? 'Đang lưu máy chủ...' : 'Lưu Lên Máy Chủ Ngay'}
+                      </span>
+                    </button>
+                  )}
+
+                  {onExitToTitle && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFX.tap();
+                        onExitToTitle();
+                      }}
+                      className="flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-[#DFCBB0] bg-[#FAF4EA] px-3 py-2 text-xs font-black text-[#5B422E] transition-colors hover:bg-[#F2E5D2] active:scale-95"
+                    >
+                      <span>Về Màn Hình Chính / Đổi Tài Khoản</span>
+                    </button>
+                  )}
+                </div>
+
+                {serverSyncMsg && (
+                  <p
+                    className={`rounded-xl px-2.5 py-2 text-[11px] font-semibold leading-relaxed ${
+                      serverSyncMsg.ok
+                        ? 'bg-[#EAF8EE] text-[#2A6E40]'
+                        : 'bg-[#FDF0ED] text-[#A8382B]'
+                    }`}
+                  >
+                    {serverSyncMsg.text}
+                  </p>
+                )}
+              </div>
 
               {/* Khôi phục tài khoản từ mã (Đổi máy) */}
               <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3.5 shadow-xs space-y-2">
