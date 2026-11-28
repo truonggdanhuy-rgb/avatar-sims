@@ -1470,6 +1470,8 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <path d="M12 52 C14 43, 66 43, 68 52 C56 58, 24 58, 12 52 Z" fill={col} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
               <path d="M22 44 L25 25 C31 22, 49 22, 55 25 L58 44 Z" fill={shade(col, 10)} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
               <path d="M22 42 Q40 45 58 42" stroke={shade(col, -26)} strokeWidth="4" fill="none" />
+              <rect x="35" y="30" width="10" height="5.5" rx="1.8" fill="#FAF5EE" stroke={outline} strokeWidth="1.2" />
+              <line x1="37" y1="32.8" x2="43" y2="32.8" stroke="#D99B72" strokeWidth="1.6" strokeLinecap="round" />
             </g>
           );
         }
@@ -1615,8 +1617,11 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             <g>
               <ellipse cx="40" cy="49" rx="31" ry="9.5" fill={col} stroke={outline} strokeWidth="2.2" />
               <path d="M23 46 C24 26, 56 26, 57 46 Z" fill="#FFE066" stroke={outline} strokeWidth="2.2" />
-              <circle cx="27" cy="39" r="7" fill="#F9B826" stroke={outline} strokeWidth="1.5" />
-              <circle cx="27" cy="39" r="3.2" fill="#5C3A21" />
+              <path d="M23 43 Q40 46 57 43" stroke="#8C522E" strokeWidth="3.8" fill="none" />
+              <ellipse cx="55" cy="41" rx="4" ry="2.2" transform="rotate(-25 55 41)" fill="#4ADE80" stroke={outline} strokeWidth="1.1" />
+              <ellipse cx="47" cy="43" rx="3.5" ry="2" transform="rotate(20 47 43)" fill="#4ADE80" stroke={outline} strokeWidth="1.1" />
+              <circle cx="51" cy="37" r="7" fill="#F9B826" stroke={outline} strokeWidth="1.5" />
+              <circle cx="51" cy="37" r="3.2" fill="#5C3A21" />
             </g>
           );
         }
@@ -1655,13 +1660,255 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
             </g>
           );
         }
-        // ribbon_bow
+        if (style === 'ribbon_bow') {
+          return (
+            <g>
+              <path d="M19 52 Q40 30 61 52" stroke={col} strokeWidth="4" fill="none" strokeLinecap="round" />
+              <path d="M40 32 L24 22 L28 38 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <path d="M40 32 L56 22 L52 38 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <circle cx="40" cy="32" r="4.5" fill={shade(col, -20)} stroke={outline} strokeWidth="1.8" />
+            </g>
+          );
+        }
+
+        // ==================== BOX-HEAD HAIRSTYLES & ANIMAL HOODS ====================
+        const boxGhost = (
+          <rect
+            x="24"
+            y="29"
+            width="32"
+            height="27"
+            rx="6.5"
+            fill="#F6DEC5"
+            stroke="#C9A889"
+            strokeWidth="1.5"
+          />
+        );
+        const boxFaceDots = (
+          <g opacity="0.65">
+            <circle cx="34" cy="44" r="1.8" fill="#5B4339" />
+            <circle cx="46" cy="44" r="1.8" fill="#5B4339" />
+            <path d="M38 48.5 Q40 50.5 42 48.5" stroke="#5B4339" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          </g>
+        );
+        const hi = shade(col, 16);
+
+        if (style === 'bunny_hood_hat') {
+          return (
+            <g>
+              <ellipse cx="18" cy="46" rx="6.5" ry="16" transform="rotate(14 18 46)" fill={col} stroke={outline} strokeWidth="2" />
+              <ellipse cx="18.5" cy="47" rx="3" ry="10.5" transform="rotate(14 18.5 47)" fill="#F9A8D4" />
+              <ellipse cx="62" cy="46" rx="6.5" ry="16" transform="rotate(-14 62 46)" fill={col} stroke={outline} strokeWidth="2" />
+              <ellipse cx="61.5" cy="47" rx="3" ry="10.5" transform="rotate(-14 61.5 47)" fill="#F9A8D4" />
+              {boxGhost}
+              <path d="M21 44 C21 20, 59 20, 59 44 L58 34 C46 31, 34 31, 22 34 Z" fill={col} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <circle cx="34" cy="26" r="1.5" fill="#2A1E24" />
+              <circle cx="46" cy="26" r="1.5" fill="#2A1E24" />
+              <circle cx="40" cy="28" r="1.4" fill="#FB7185" />
+              <ellipse cx="30" cy="28.5" rx="2.4" ry="1.3" fill="#FDA4AF" />
+              <ellipse cx="50" cy="28.5" rx="2.4" ry="1.3" fill="#FDA4AF" />
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'panda_hood_hat') {
+          return (
+            <g>
+              <circle cx="24" cy="21" r="6.5" fill="#242429" stroke={outline} strokeWidth="1.9" />
+              <circle cx="56" cy="21" r="6.5" fill="#242429" stroke={outline} strokeWidth="1.9" />
+              {boxGhost}
+              <path d="M21 44 C21 20, 59 20, 59 44 L56 34 C45 31, 35 31, 24 34 Z" fill={col} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <ellipse cx="34" cy="26" rx="3.4" ry="2.6" transform="rotate(-15 34 26)" fill="#242429" />
+              <ellipse cx="46" cy="26" rx="3.4" ry="2.6" transform="rotate(15 46 26)" fill="#242429" />
+              <circle cx="34.5" cy="25.5" r="1" fill="#FFFFFF" />
+              <circle cx="45.5" cy="25.5" r="1" fill="#FFFFFF" />
+              <circle cx="40" cy="28.8" r="1.4" fill="#242429" />
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'frog_hood_hat') {
+          return (
+            <g>
+              <circle cx="29" cy="21" r="6.2" fill={col} stroke={outline} strokeWidth="2" />
+              <circle cx="51" cy="21" r="6.2" fill={col} stroke={outline} strokeWidth="2" />
+              <circle cx="29" cy="21" r="3.6" fill="#FFFFFF" />
+              <circle cx="51" cy="21" r="3.6" fill="#FFFFFF" />
+              <circle cx="29.4" cy="21" r="1.8" fill="#1B1D24" />
+              <circle cx="50.6" cy="21" r="1.8" fill="#1B1D24" />
+              {boxGhost}
+              <path d="M21 43 C21 21, 59 21, 59 43 L56 34 C45 31, 35 31, 24 34 Z" fill={col} stroke={outline} strokeWidth="2.1" strokeLinejoin="round" />
+              <ellipse cx="29.5" cy="28.5" rx="2.6" ry="1.4" fill="#FB7185" />
+              <ellipse cx="50.5" cy="28.5" rx="2.6" ry="1.4" fill="#FB7185" />
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'hair_cat_ears_brown') {
+          return (
+            <g>
+              <path d="M24 27 L20 12 L34 21 Z" fill="#242026" stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <path d="M56 27 L60 12 L46 21 Z" fill="#242026" stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <path d="M24.5 24 L22.5 16 L30.5 21 Z" fill="#FB7185" />
+              <path d="M55.5 24 L57.5 16 L49.5 21 Z" fill="#FB7185" />
+              {boxGhost}
+              <path d="M21 54 C19 36, 22 20, 40 20 C58 20, 61 36, 59 54 L55 54 L55 34 Q44 37 36 30 Q29 36 25 35 L25 54 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'hair_boy_buzz') {
+          return (
+            <g>
+              {boxGhost}
+              <path d="M22 39 L22 28 C22 21, 58 21, 58 28 L58 39 L55 34 L25 34 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'hair_boy_spiky' || style === 'hair_boy_flame') {
+          return (
+            <g>
+              {boxGhost}
+              <path d="M22 39 L19 26 L27 25 L26 16 L35 21 L41 13 L46 21 L55 17 L53 26 L61 27 L58 39 L53 33 L27 33 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'hair_boy_sidepart' || style === 'hair_boy_comma' || style === 'hair_boy_slick') {
+          return (
+            <g>
+              {boxGhost}
+              <path d="M21 40 C19 25, 29 17, 44 18 C56 19, 61 28, 58 40 L54 34 C46 37, 36 33, 30 35 L25 38 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              <path d="M29 24 Q41 28 52 24" stroke={hi} strokeWidth="2" fill="none" strokeLinecap="round" />
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'hair_boy_curtain_black' || style === 'hair_boy_ash_violet' || style === 'hair_boy_wolf') {
+          const isWolf = style === 'hair_boy_wolf';
+          return (
+            <g>
+              {boxGhost}
+              <path
+                d={
+                  isWolf
+                    ? 'M20 53 C17 44, 19 22, 40 20 C61 22, 63 44, 60 53 L55 51 L55 34 Q46 38 40 30 Q34 38 25 34 L25 51 Z'
+                    : 'M21 43 C20 24, 28 19, 40 19 C52 19, 60 24, 59 43 L54 35 Q46 38 40 30 Q34 38 26 35 Z'
+                }
+                fill={col}
+                stroke={outline}
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'hair_boy_curl' || style === 'hair_boy_messy' || style === 'hair_boy_fluffy' || style === 'hair_boy_layered') {
+          return (
+            <g>
+              {boxGhost}
+              <path d="M20 42 C18 24, 28 18, 40 18 C52 18, 62 24, 60 42 L55 35 L50 38 L44 34 L39 38 L33 34 L26 38 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'hair_girl_twin_buns') {
+          return (
+            <g>
+              <circle cx="22" cy="22" r="7.5" fill={col} stroke={outline} strokeWidth="2" />
+              <circle cx="58" cy="22" r="7.5" fill={col} stroke={outline} strokeWidth="2" />
+              {boxGhost}
+              <path d="M22 44 C21 25, 29 21, 40 21 C51 21, 59 25, 58 44 L54 35 H26 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'hair_girl_high_pony' || style === 'hair_girl_side_pony') {
+          return (
+            <g>
+              <path d="M54 25 C67 24, 69 44, 62 58 C57 54, 56 42, 54 34 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              {style === 'hair_girl_high_pony' && (
+                <ellipse cx="54" cy="24" rx="5" ry="3" transform="rotate(25 54 24)" fill="#FB7185" stroke={outline} strokeWidth="1.4" />
+              )}
+              {boxGhost}
+              <path d="M21 55 C19 36, 22 20, 40 20 C58 20, 61 36, 59 55 L55 55 L55 34 H25 L25 55 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              {style === 'hair_girl_side_pony' && (
+                <circle cx="50" cy="31" r="3.4" fill="#FF9EBB" stroke={outline} strokeWidth="1.2" />
+              )}
+              {boxFaceDots}
+            </g>
+          );
+        }
+        if (style === 'hair_girl_twin_tails' || style === 'hair_girl_twin_braids' || style === 'hair_girl_side_braid') {
+          return (
+            <g>
+              {boxGhost}
+              <path d="M21 53 C19 35, 22 20, 40 20 C58 20, 61 35, 59 53 L55 53 L55 34 H25 L25 53 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
+              {(style === 'hair_girl_twin_tails' || style === 'hair_girl_twin_braids') && (
+                <g>
+                  <ellipse cx="21" cy="57" rx="4" ry="7" transform="rotate(14 21 57)" fill={col} stroke={outline} strokeWidth="1.8" />
+                  <ellipse cx="59" cy="57" rx="4" ry="7" transform="rotate(-14 59 57)" fill={col} stroke={outline} strokeWidth="1.8" />
+                  <circle cx="22" cy="51" r="2.5" fill={style === 'hair_girl_twin_tails' ? '#A78BFA' : '#93C5FD'} stroke={outline} strokeWidth="1" />
+                  <circle cx="58" cy="51" r="2.5" fill={style === 'hair_girl_twin_tails' ? '#A78BFA' : '#93C5FD'} stroke={outline} strokeWidth="1" />
+                </g>
+              )}
+              {style === 'hair_girl_twin_braids' && (
+                <circle cx="49" cy="31" r="3" fill="#FBCFE8" stroke={outline} strokeWidth="1.1" />
+              )}
+              {style === 'hair_girl_side_braid' && (
+                <g>
+                  <circle cx="56" cy="51" r="4" fill={col} stroke={outline} strokeWidth="1.7" />
+                  <circle cx="55" cy="57" r="3.6" fill={col} stroke={outline} strokeWidth="1.7" />
+                  <circle cx="54" cy="62" r="2.8" fill={col} stroke={outline} strokeWidth="1.6" />
+                  <circle cx="55" cy="53" r="1.8" fill="#F472B6" />
+                </g>
+              )}
+              {boxFaceDots}
+            </g>
+          );
+        }
+        // Remaining long/bob girl hairs (bob, flower_pink, wavy_daisy, straight_clip, pink_wave, lavender_flower, white_band, white_bow)
         return (
           <g>
-            <path d="M19 52 Q40 30 61 52" stroke={col} strokeWidth="4" fill="none" strokeLinecap="round" />
-            <path d="M40 32 L24 22 L28 38 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
-            <path d="M40 32 L56 22 L52 38 Z" fill={col} stroke={outline} strokeWidth="2" strokeLinejoin="round" />
-            <circle cx="40" cy="32" r="4.5" fill={shade(col, -20)} stroke={outline} strokeWidth="1.8" />
+            {boxGhost}
+            <path
+              d={
+                style === 'hair_girl_straight_clip' || style === 'hair_girl_lavender_flower' || style === 'hair_girl_white_bow'
+                  ? 'M19 60 C18 35, 22 20, 40 20 C58 20, 62 35, 61 60 L55 58 L55 34 H25 L25 58 Z'
+                  : 'M19 55 C18 35, 22 20, 40 20 C58 20, 62 35, 61 55 L55 54 L55 34 H25 L25 54 Z'
+              }
+              fill={col}
+              stroke={outline}
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+            {style === 'hair_girl_white_band' && (
+              <path d="M22 33 Q40 20 58 33" stroke="#FFFFFF" strokeWidth="4.2" fill="none" strokeLinecap="round" />
+            )}
+            {style === 'hair_girl_straight_clip' && (
+              <line x1="46" y1="30" x2="54" y2="32" stroke="#FBBF24" strokeWidth="2.8" strokeLinecap="round" />
+            )}
+            {style === 'hair_girl_flower_pink' && (
+              <g>
+                <circle cx="50" cy="31" r="3.6" fill="#FF9EBB" stroke={outline} strokeWidth="1.2" />
+                <circle cx="50" cy="31" r="1.3" fill="#FDE047" />
+              </g>
+            )}
+            {(style === 'hair_girl_wavy_daisy' || style === 'hair_girl_lavender_flower') && (
+              <g>
+                <circle cx="51" cy="31" r="3.8" fill="#FDE047" stroke={outline} strokeWidth="1.2" />
+                <circle cx="51" cy="31" r="1.4" fill="#B45309" />
+              </g>
+            )}
+            {style === 'hair_girl_white_bow' && (
+              <g>
+                <path d="M51 27 L45 23 L46 30 Z M51 27 L57 23 L56 30 Z" fill="#FFFFFF" stroke={outline} strokeWidth="1.2" strokeLinejoin="round" />
+                <circle cx="51" cy="27" r="1.8" fill="#E2E8F0" stroke={outline} strokeWidth="1" />
+              </g>
+            )}
+            {boxFaceDots}
           </g>
         );
       })()}

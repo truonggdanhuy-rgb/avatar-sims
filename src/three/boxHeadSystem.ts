@@ -50,12 +50,16 @@ function getBoxLuminance(hex: string): number {
 export function isFullCrownHat(headItem: HeadItemStyle | undefined, isPeppaMascot: boolean): boolean {
   if (isPeppaMascot) return true;
   if (!headItem || headItem === 'none') return false;
+  if (headItem.startsWith('hair_')) return true;
   return (
     headItem === 'cap' ||
     headItem === 'rainbow_cap' ||
     headItem === 'beanie' ||
     headItem === 'cc_beanie' ||
     headItem === 'bunny_beanie' ||
+    headItem === 'bunny_hood_hat' ||
+    headItem === 'panda_hood_hat' ||
+    headItem === 'frog_hood_hat' ||
     headItem === 'bucket_hat' ||
     headItem === 'frog_bucket' ||
     headItem === 'chick_hat' ||

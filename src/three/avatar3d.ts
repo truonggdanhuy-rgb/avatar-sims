@@ -17,6 +17,7 @@ import {
   createBoxHeadMouthTexture,
 } from './boxHeadSystem';
 import {isDollHandheld} from '../data/hddollCatalog';
+import {buildBoxHeadHairOrHood3D} from './boxHairHats3d';
 import {buildDollPlushModel, DollPlushRig, updateDollPlushAnimation} from './dollPlush3d';
 import {clayMat, glossyClayMat, makeShadowed} from './materials';
 import {buildPetModel, PetRig, updatePetAnimation} from './pets3d';
@@ -8899,6 +8900,18 @@ export function buildAvatarRig(
         sunBadge.scale.set(1, 1, 0.6);
         sunBadge.position.set(0.026, 0.078, BOX_FRONT_Z + 0.032);
         bucketGrp.add(sunBadge);
+      } else if (config.headItem === 'bucket_hat') {
+        const tagPatch = new THREE.Mesh(
+          new RoundedBoxGeometry(0.088, 0.044, 0.014, 2, 0.008),
+          clayMat('#FAF5EE', 0.65),
+        );
+        tagPatch.position.set(0, 0.042, BOX_FRONT_Z + 0.024);
+        const tagInner = new THREE.Mesh(
+          new RoundedBoxGeometry(0.052, 0.018, 0.016, 1, 0.004),
+          clayMat('#D99B72', 0.62),
+        );
+        tagInner.position.set(0, 0.042, BOX_FRONT_Z + 0.026);
+        bucketGrp.add(tagPatch, tagInner);
       }
       accGroup.add(bucketGrp);
     } else if (config.headItem === 'cat_ears') {
@@ -9194,7 +9207,22 @@ export function buildAvatarRig(
         petal.rotation.z = a - Math.PI / 2;
         flwGrp.add(petal);
       }
-      accGroup.add(sunHat, topCrown, flwGrp);
+      const sunRibbon = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.372, 0.382, 0.036, 28),
+        clayMat('#8C522E', 0.68),
+      );
+      sunRibbon.scale.set(1.08, 1, 0.98);
+      sunRibbon.position.set(crownTop.position.x, crownTop.position.y - 0.014, crownTop.position.z);
+
+      const leafMat = clayMat('#4ADE80', 0.64);
+      [-1, 1].forEach((ls) => {
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.024, 8, 6), leafMat);
+        leaf.scale.set(1.5, 0.72, 0.35);
+        leaf.position.set(ls * 0.055, -0.028, -0.008);
+        leaf.rotation.z = ls * 0.55;
+        flwGrp.add(leaf);
+      });
+      accGroup.add(sunHat, topCrown, sunRibbon, flwGrp);
     } else if (config.headItem === 'pompom_sleep_mask') {
       const butterMat = clayMat(headItemCol || '#FFE169', 0.68);
       const beretMat = clayMat('#6D3E24', 0.65);
@@ -9345,6 +9373,11 @@ export function buildAvatarRig(
         giantBow.add(outerLoop, innerFold, tail);
       });
       accGroup.add(giantBow);
+    } else if (config.headItem !== 'none') {
+      const boxHairOrHood = buildBoxHeadHairOrHood3D(config.headItem, headItemCol);
+      if (boxHairOrHood) {
+        accGroup.add(boxHairOrHood);
+      }
     }
   }
 
