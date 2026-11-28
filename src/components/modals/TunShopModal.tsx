@@ -1,6 +1,7 @@
 import React from 'react';
 import {Backpack, Cat, CheckCircle2, Coins, Sparkles, Store, X, Zap} from 'lucide-react';
 import {
+  BICYCLE_CLASSIC_PRICE,
   MOUNT_RANK_META,
   SKATEBOARD_CLASSIC_PRICE,
   TUN_SHOP_MOUNTS,
@@ -79,8 +80,8 @@ export function TunShopModal({
             <Zap className="mt-0.5 h-4 w-4 shrink-0 text-[#D95338]" />
             <span>
               Tun chào bạn! Các phương tiện <b>Hạng B</b> chạy nhanh (Ván trượt{' '}
-              <b>{SKATEBOARD_CLASSIC_PRICE} Xu</b>, Xe đạp <b>360 Xu</b>) và <b>Chổi Phù Thủy Mèo
-              Đen (Hạng A · {WITCH_BROOM_PRICE} Xu)</b> bay lướt cực êm đã mở bán!
+              <b>{SKATEBOARD_CLASSIC_PRICE} Xu</b>, Xe đạp <b>{BICYCLE_CLASSIC_PRICE} Xu</b>) và{' '}
+              <b>Chổi Phù Thủy Mèo Đen (Hạng A · {WITCH_BROOM_PRICE} Xu)</b> bay lướt cực êm đã mở bán!
             </span>
           </div>
 

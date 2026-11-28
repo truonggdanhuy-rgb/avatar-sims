@@ -44,7 +44,7 @@ const ARCADE_MACHINES: MachineItem[] = [
   {
     id: 'parkour_climb',
     name: 'Parkour Phiêu Lưu 3D (1 Map Lớn)',
-    reward: '+24 đến +36 CoinGame / ván (~2 Phút)',
+    reward: '+12 đến +18 CoinGame / ván (~2 Phút)',
     note: 'Nhân vật 3D của bạn leo thang dây, đu dây Zipline, nhảy nấm bật, tránh gió xoáy, cầu mục & đĩa sét!',
     accent: 'border-[#38BDF8]/65 bg-[#0F273B]',
     playable: true,
@@ -53,7 +53,7 @@ const ARCADE_MACHINES: MachineItem[] = [
   {
     id: 'obstacle_rush',
     name: 'Vượt Chướng Ngại Vật 3D (1000m)',
-    reward: '+14 đến +38 CoinGame / ván (~2 Phút)',
+    reward: '+10 đến +19 CoinGame / ván (~2 Phút)',
     note: 'Đấu trường 3D: né đá lăn, búa tạ, quạt xoay, sàn kính nứt, băng chuyền, đĩa xoay & mưa axit!',
     accent: 'border-[#FB923C]/65 bg-[#2F1A12]',
     playable: true,
@@ -89,7 +89,7 @@ const ARCADE_MACHINES: MachineItem[] = [
   {
     id: 'rhythm_dance',
     name: 'Sàn Nhảy Rhythm (4 Bài Nhạc)',
-    reward: '+2 đến +12 CoinGame / bài (35s)',
+    reward: '+1 đến +5 CoinGame / bài (35s)',
     note: 'Chọn 4 bản nhạc sôi động & bấm chuẩn nhịp ← ↓ ↑ → theo beat!',
     accent: 'border-[#A78BFA]/55 bg-[#1D1635]',
     playable: true,
@@ -257,9 +257,9 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                       <span>Shop CoinGame Premium Đã Mở!</span>
                     </div>
                     <p className="mt-1 text-xs font-semibold leading-relaxed text-[#CCFBF1]">
-                      Ra mắt vật phẩm Premium đầu tiên:{' '}
-                      <strong className="text-white">Lá Sen Che Mưa (Hạng A)</strong> bay lơ lửng
-                      với chú ếch xanh &amp; hiệu ứng mây đổ mưa.
+                      Chinh phục các trò chơi để tích lũy CoinGame săn bộ sưu tập bay{' '}
+                      <strong className="text-white">Lá Sen Che Mưa</strong> và{' '}
+                      <strong className="text-[#F9A8D4]">Sen Đồng Tháp (Hạng A)</strong>!
                     </p>
                   </div>
                 </div>

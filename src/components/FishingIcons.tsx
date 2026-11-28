@@ -314,32 +314,44 @@ export function BicycleMountIcon({className = 'w-11 h-11'}: {className?: string}
 }
 
 /**
- * Giant Floating Lotus Umbrella Icon with cute frog & raincloud aura
+ * Giant Floating Lotus Umbrella Icon with ruffled leaf, dewdrops, cute frog & rain ripples
  */
 export function LotusUmbrellaMountIcon({className = 'w-11 h-11'}: {className?: string}) {
   return (
     <svg viewBox="0 0 64 64" fill="none" className={className}>
-      {/* Fluffy raincloud above */}
+      {/* Fluffy layered raincloud above */}
       <path
-        d="M21 15 C17 15 15 12 18 9 C20 6 25 6 27 8 C29 5 35 5 38 8 C42 7 46 10 45 13 C47 15 45 17 42 17 H21 Z"
-        fill="#DCEFFB"
-        stroke="#5FA2CE"
+        d="M19 15 C15 15 13 12 16 9 C18 6 24 6 26 8 C29 4.5 36 4.5 39 8 C43 7 48 10 46 13.5 C48 15 46 17 43 17 H19 Z"
+        fill="#E5F4FF"
+        stroke="#4D95C4"
         strokeWidth="1.8"
       />
-      {/* Raindrops */}
-      <path d="M22 19 L20.5 23 M32 19 L30.5 23 M41 19 L39.5 23" stroke="#38BDF8" strokeWidth="1.8" strokeLinecap="round" />
-      {/* Curved emerald stem & J-handle */}
-      <path d="M32 34 V51 C32 55 37 56 38.5 52.5" stroke="#1E7D48" strokeWidth="3.2" strokeLinecap="round" />
-      {/* Scalloped giant lotus leaf umbrella canopy */}
+      {/* Diagonal shimmering raindrops */}
       <path
-        d="M10 35 C12 24 22 21 32 21 C42 21 52 24 54 35 Q47 38 40 35 Q32 38 24 35 Q17 38 10 35 Z"
-        fill="#34B86B"
-        stroke="#166534"
-        strokeWidth="2.2"
+        d="M18 19 L16 24 M25 18.5 L23 23.5 M33 18.5 L31 23.5 M40 18.5 L38 23.5 M46 19 L44 24"
+        stroke="#38BDF8"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      {/* Curved emerald stem & wooden J-handle */}
+      <path d="M32 35 V51 C32 55 37 56 38.5 52.5" stroke="#1E7D48" strokeWidth="3.2" strokeLinecap="round" />
+      {/* Wide ruffled lotus leaf umbrella canopy */}
+      <path
+        d="M6 36 C9 23 20 20 32 20 C44 20 55 23 58 36 Q51 40 43 36.5 Q35 40 32 36.5 Q29 40 21 36.5 Q13 40 6 36 Z"
+        fill="#2EB866"
+        stroke="#14532D"
+        strokeWidth="2.1"
         strokeLinejoin="round"
       />
-      {/* Radiating leaf veins */}
-      <path d="M32 22 L21 34 M32 22 L32 35 M32 22 L43 34" stroke="#A7F3D0" strokeWidth="1.5" strokeLinecap="round" />
+      {/* Radiating emerald veins & morning dewdrops */}
+      <path
+        d="M32 21 L17 35 M32 21 L25 36 M32 21 L39 36 M32 21 L47 35"
+        stroke="#A7F3D0"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <circle cx="20" cy="30" r="1.8" fill="#E0F7FF" />
+      <circle cx="45" cy="29" r="1.6" fill="#E0F7FF" />
       {/* Cute frog perched on top */}
       <ellipse cx="32" cy="21" rx="5.5" ry="4" fill="#6BE04C" stroke="#1E6B29" strokeWidth="1.6" />
       <circle cx="29.5" cy="17.5" r="2.1" fill="#6BE04C" stroke="#1E6B29" strokeWidth="1.3" />
@@ -347,63 +359,69 @@ export function LotusUmbrellaMountIcon({className = 'w-11 h-11'}: {className?: s
       <circle cx="29.5" cy="17.4" r="0.9" fill="#0F172A" />
       <circle cx="34.5" cy="17.4" r="0.9" fill="#0F172A" />
       <ellipse cx="32" cy="21.6" rx="2.8" ry="1.4" fill="#D9F99D" />
+      {/* Rainwater splash ripples */}
+      <ellipse cx="14" cy="48" rx="4.5" ry="1.5" stroke="#7DD3FC" strokeWidth="1.4" opacity="0.8" />
+      <ellipse cx="49" cy="49" rx="4.5" ry="1.5" stroke="#7DD3FC" strokeWidth="1.4" opacity="0.8" />
     </svg>
   );
 }
 
 /**
- * Giant Radiant Dong Thap Pink Lotus Mount Icon with sparkles & falling petals
+ * Giant Radiant Wide-Blooming Dong Thap Pink Lotus Mount Icon with pink light aura & falling petals
  */
 export function DongThapLotusMountIcon({className = 'w-11 h-11'}: {className?: string}) {
   return (
     <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Soft luminous pink aura halo */}
+      <circle cx="32" cy="25" r="22" fill="#FF8AC8" opacity="0.24" />
+      <circle cx="32" cy="25" r="15" fill="#FFC2E3" opacity="0.32" />
       {/* Golden & rose sparkles */}
-      <path d="M12 14 L13.5 17 L16.5 18.5 L13.5 20 L12 23 L10.5 20 L7.5 18.5 L10.5 17 Z" fill="#FDE047" />
-      <circle cx="52" cy="14" r="2.2" fill="#FDE047" />
-      <circle cx="15" cy="46" r="1.8" fill="#F9A8D4" />
-      <circle cx="50" cy="44" r="1.8" fill="#F9A8D4" />
-      {/* Graceful green stem & calyx cup */}
-      <path d="M32 34 C32 42, 29 50, 27 57" stroke="#54B956" strokeWidth="3.8" strokeLinecap="round" />
-      <path d="M25 33 H39 L35 39 H29 Z" fill="#479E32" stroke="#166534" strokeWidth="1.4" strokeLinejoin="round" />
-      {/* Outer luminous pink-white lotus petals */}
+      <path d="M10 13 L11.5 16 L14.5 17.5 L11.5 19 L10 22 L8.5 19 L5.5 17.5 L8.5 16 Z" fill="#FDE047" />
+      <path d="M53 11 L54 13.2 L56.2 14.2 L54 15.2 L53 17.4 L52 15.2 L49.8 14.2 L52 13.2 Z" fill="#FF9ED2" />
+      <circle cx="13" cy="47" r="2" fill="#F9A8D4" />
+      <circle cx="51" cy="45" r="2" fill="#FDE047" />
+      {/* Longer graceful green stem & calyx sepals */}
+      <path d="M32 36 C32 45, 29 52, 26.5 59" stroke="#54B956" strokeWidth="3.8" strokeLinecap="round" />
+      <path d="M23 34 H41 L35.5 40 H28.5 Z" fill="#479E32" stroke="#166534" strokeWidth="1.4" strokeLinejoin="round" />
+      {/* Wide-blooming outer pink lotus petals */}
       <path
-        d="M32 35 C20 36, 9 29, 10 19 C17 19, 25 23, 32 35 Z"
-        fill="#FFB8D9"
-        stroke="#DB2777"
-        strokeWidth="1.7"
+        d="M32 35 C17 37, 4 30, 5 18 C13 18, 23 23, 32 35 Z"
+        fill="#FF98C9"
+        stroke="#BE185D"
+        strokeWidth="1.6"
         strokeLinejoin="round"
       />
       <path
-        d="M32 35 C44 36, 55 29, 54 19 C47 19, 39 23, 32 35 Z"
-        fill="#FFB8D9"
-        stroke="#DB2777"
-        strokeWidth="1.7"
+        d="M32 35 C47 37, 60 30, 59 18 C51 18, 41 23, 32 35 Z"
+        fill="#FF98C9"
+        stroke="#BE185D"
+        strokeWidth="1.6"
         strokeLinejoin="round"
       />
       <path
-        d="M32 35 C22 30, 17 18, 22 10 C27 14, 30 22, 32 35 Z"
-        fill="#FF98C8"
+        d="M32 35 C20 32, 12 20, 17 11 C24 14, 29 22, 32 35 Z"
+        fill="#FFB4D8"
         stroke="#DB2777"
-        strokeWidth="1.7"
+        strokeWidth="1.6"
         strokeLinejoin="round"
       />
       <path
-        d="M32 35 C42 30, 47 18, 42 10 C37 14, 34 22, 32 35 Z"
-        fill="#FF98C8"
+        d="M32 35 C44 32, 52 20, 47 11 C40 14, 35 22, 32 35 Z"
+        fill="#FFB4D8"
         stroke="#DB2777"
-        strokeWidth="1.7"
+        strokeWidth="1.6"
         strokeLinejoin="round"
       />
       {/* Central radiant pearl-pink petal */}
       <path
-        d="M32 36 C25 27, 25 14, 32 7 C39 14, 39 27, 32 36 Z"
+        d="M32 36 C24 27, 24 14, 32 7 C40 14, 40 27, 32 36 Z"
         fill="#FFF5FA"
         stroke="#DB2777"
-        strokeWidth="1.9"
+        strokeWidth="1.8"
         strokeLinejoin="round"
       />
       {/* Golden stamen glow */}
-      <circle cx="32" cy="30" r="2.8" fill="#FDE047" />
+      <circle cx="32" cy="29.5" r="3" fill="#FDE047" />
     </svg>
   );
 }

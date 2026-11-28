@@ -1,10 +1,10 @@
 import {MountDefinition, MountId, MountRank, OwnedMountsState} from '../types/game';
 
-export const SKATEBOARD_CLASSIC_PRICE = 240;
-export const BICYCLE_CLASSIC_PRICE = 360;
-export const WITCH_BROOM_PRICE = 680;
-export const LOTUS_UMBRELLA_COINGAME_PRICE = 60;
-export const DONG_THAP_LOTUS_COINGAME_PRICE = 180;
+export const SKATEBOARD_CLASSIC_PRICE = 360;
+export const BICYCLE_CLASSIC_PRICE = 580;
+export const WITCH_BROOM_PRICE = 2400;
+export const LOTUS_UMBRELLA_COINGAME_PRICE = 360;
+export const DONG_THAP_LOTUS_COINGAME_PRICE = 680;
 
 export const MOUNT_RANK_META: Record<
   MountRank,
@@ -83,7 +83,7 @@ export const MOUNT_CATALOG: Record<MountId, MountDefinition> = {
     coinGamePrice: LOTUS_UMBRELLA_COINGAME_PRICE,
     speedMultiplier: 1.95,
     description:
-      'Lá sen khổng lồ to như chiếc dù, cầm lên bay lướt nhanh bậc A cùng chú ếch cute và hiệu ứng mây đổ mưa rơi.',
+      'Lá sen gân nổi cỡ lớn tạo hình sóng lượn tự nhiên có khe lá, kèm giọt sương mai, chú ếch xanh và mây đổ mưa bụi kèm gợn nước lung linh.',
     palette: {
       primary: '#2EA860',
       secondary: '#A7F3D0',
@@ -102,7 +102,7 @@ export const MOUNT_CATALOG: Record<MountId, MountDefinition> = {
     coinGamePrice: DONG_THAP_LOTUS_COINGAME_PRICE,
     speedMultiplier: 2.15,
     description:
-      'Đóa hoa sen hồng Đồng Tháp khổng lồ tỏa sáng rực rỡ, cầm lên bay lượn nhẹ nhàng bậc A cùng vầng hào quang và cánh sen bay lả tả.',
+      'Đóa sen hồng Đồng Tháp đại đóa 4 tầng cánh bung tỏa rực rỡ trên cuống sen vươn dài, tỏa ánh sáng hồng dịu dàng cùng hào quang và cánh hoa bay lả tả.',
     palette: {
       primary: '#FF8AB8',
       secondary: '#FFF5F9',

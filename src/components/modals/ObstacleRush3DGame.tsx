@@ -1098,7 +1098,7 @@ export const ObstacleRush3DGame: React.FC<ObstacleRush3DGameProps> = ({
           TOTAL_METERS,
           Math.max(0, Math.round((Math.max(0, -pz) / TOTAL_Z_SPAN) * TOTAL_METERS)),
         );
-        const consolation = Math.max(2, Math.floor(metersDone / 130));
+        const consolation = Math.max(1, Math.floor(metersDone / 220));
         if (!rewardPaid) {
           rewardPaid = true;
           onEarnRef.current(consolation);
@@ -1577,9 +1577,9 @@ export const ObstacleRush3DGame: React.FC<ObstacleRush3DGameProps> = ({
 
       if (pz <= -TOTAL_Z_SPAN && py >= 3.2) {
         gameStatusRef.current = 'won';
-        const speedBonus = Math.max(0, Math.min(20, Math.round((190 - playTimeSec) * 0.2)));
-        const heartBonus = Math.min(6, hearts);
-        const reward = 14 + speedBonus + heartBonus;
+        const speedBonus = Math.max(0, Math.min(6, Math.round((190 - playTimeSec) * 0.06)));
+        const heartBonus = Math.min(3, Math.floor(hearts / 2));
+        const reward = 10 + speedBonus + heartBonus;
         if (!rewardPaid) {
           rewardPaid = true;
           onEarnRef.current(reward);

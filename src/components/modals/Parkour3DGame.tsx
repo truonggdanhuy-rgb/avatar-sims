@@ -1265,7 +1265,7 @@ export const Parkour3DGame: React.FC<Parkour3DGameProps> = ({
       }
       if (hearts <= 0) {
         gameStatusRef.current = 'lost';
-        const consolation = highestCheckpointIdx > 0 ? highestCheckpointIdx * 3 : 2;
+        const consolation = highestCheckpointIdx > 0 ? highestCheckpointIdx + 1 : 1;
         if (!rewardPaid) {
           rewardPaid = true;
           onEarnRef.current(consolation);
@@ -1842,7 +1842,7 @@ export const Parkour3DGame: React.FC<Parkour3DGameProps> = ({
 
       if (Math.hypot(px - 0, pz - (FINISH_Z - 1.5)) < 2.2 && py >= 43.2) {
         gameStatusRef.current = 'won';
-        const reward = 24 + starsCollected;
+        const reward = 12 + Math.floor(starsCollected * 0.5);
         if (!rewardPaid) {
           rewardPaid = true;
           onEarnRef.current(reward);

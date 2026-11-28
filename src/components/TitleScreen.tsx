@@ -12,7 +12,6 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
-import titleSkyTownHero from '../assets/images/title_sky_town_hero_1795845459213.jpg';
 import {getSupabaseConfig} from '../config/supabase';
 import {DEFAULT_AVATAR} from '../data/avatarCatalog';
 import {AvatarConfig} from '../types/game';
@@ -34,6 +33,59 @@ interface TitleScreenProps {
   onEnterTown: (account: RememberedAccount) => Promise<void>;
   onStartCharacterCreation: (account: RememberedAccount) => void;
 }
+
+interface SkyCloudSpec {
+  id: string;
+  top?: string;
+  bottom?: string;
+  left?: string;
+  right?: string;
+  scale: number;
+  opacity: number;
+  durationSec: number;
+  delaySec: number;
+  reverse?: boolean;
+}
+
+const SKY_CLOUDS: SkyCloudSpec[] = [
+  {id: 'c1', top: '6%', left: '6%', scale: 0.72, opacity: 0.85, durationSec: 16, delaySec: 0},
+  {id: 'c2', top: '9%', left: '28%', scale: 0.56, opacity: 0.78, durationSec: 20, delaySec: -4, reverse: true},
+  {id: 'c3', top: '5%', left: '52%', scale: 0.92, opacity: 0.9, durationSec: 18, delaySec: -7},
+  {id: 'c4', top: '11%', right: '14%', scale: 0.76, opacity: 0.88, durationSec: 22, delaySec: -2, reverse: true},
+  {id: 'c5', top: '19%', right: '4%', scale: 0.52, opacity: 0.72, durationSec: 17, delaySec: -5},
+  {id: 'c6', top: '24%', left: '44%', scale: 0.62, opacity: 0.8, durationSec: 21, delaySec: -9, reverse: true},
+  {id: 'c7', top: '31%', right: '26%', scale: 1.05, opacity: 0.92, durationSec: 19, delaySec: -3},
+  {id: 'c8', top: '42%', left: '38%', scale: 0.48, opacity: 0.7, durationSec: 15, delaySec: -6},
+  {id: 'c9', top: '48%', right: '8%', scale: 0.84, opacity: 0.88, durationSec: 23, delaySec: -11, reverse: true},
+  {id: 'c10', top: '56%', right: '32%', scale: 0.66, opacity: 0.82, durationSec: 18, delaySec: -1},
+  {id: 'c11', bottom: '20%', left: '12%', scale: 0.6, opacity: 0.75, durationSec: 20, delaySec: -8, reverse: true},
+  {id: 'c12', bottom: '16%', left: '48%', scale: 0.95, opacity: 0.9, durationSec: 24, delaySec: -4},
+  {id: 'c13', bottom: '12%', right: '18%', scale: 0.74, opacity: 0.86, durationSec: 17, delaySec: -10},
+  {id: 'c14', bottom: '8%', right: '2%', scale: 0.58, opacity: 0.8, durationSec: 19, delaySec: -2, reverse: true},
+];
+
+const FluffyCloud: React.FC<{spec: SkyCloudSpec}> = ({spec}) => (
+  <div
+    aria-hidden="true"
+    style={{
+      top: spec.top,
+      bottom: spec.bottom,
+      left: spec.left,
+      right: spec.right,
+      opacity: spec.opacity,
+      animation: `${spec.reverse ? 'sky-cloud-drift-reverse' : 'sky-cloud-drift'} ${spec.durationSec}s ease-in-out ${spec.delaySec}s infinite`,
+    }}
+    className="pointer-events-none absolute"
+  >
+    <div style={{transform: `scale(${spec.scale})`}} className="relative h-14 w-36 origin-center">
+      <div className="absolute bottom-1 left-2 h-8 w-32 rounded-full bg-white shadow-[0_6px_18px_rgba(29,110,180,0.16)]" />
+      <div className="absolute bottom-3 left-5 h-10 w-12 rounded-full bg-white" />
+      <div className="absolute bottom-4 left-12 h-12 w-14 rounded-full bg-white" />
+      <div className="absolute bottom-2 right-4 h-9 w-11 rounded-full bg-[#F8FCFF]" />
+      <div className="absolute inset-x-4 bottom-1 h-2.5 rounded-full bg-[#DCEEFF]/70" />
+    </div>
+  </div>
+);
 
 function extractAvatarForPreview(account: RememberedAccount | null): AvatarConfig | null {
   if (!account || !account.hasCharacter || !account.saveJson) return null;
@@ -68,7 +120,6 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [imgFailed, setImgFailed] = useState(false);
 
   const previewAvatar = useMemo(
     () => extractAvatarForPreview(rememberedAccount),
@@ -124,25 +175,22 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   };
 
   return (
-    <div className="relative h-[100dvh] w-[100vw] overflow-hidden bg-gradient-to-br from-[#64B5F6] via-[#BEE6FD] to-[#FFF3D1] select-none">
-      {/* Bespoke Sky Island Key Art Backdrop */}
-      {!imgFailed && (
-        <img
-          src={titleSkyTownHero}
-          alt="Thị Trấn Mây - Đảo bay trên bầu trời"
-          referrerPolicy="no-referrer"
-          onError={() => setImgFailed(true)}
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-right transition-opacity duration-500"
-        />
-      )}
+    <div className="relative h-[100dvh] w-[100vw] overflow-hidden bg-gradient-to-b from-[#2B9DF4] via-[#67C4FF] to-[#C8ECFF] select-none">
+      {/* Pure Radiant Blue Sky Glow & Soft Sun */}
+      <div className="pointer-events-none absolute -top-20 -right-16 h-80 w-80 rounded-full bg-radial from-[#FFF9D6]/90 via-[#FFEFA6]/35 to-transparent blur-xl" />
+      <div className="pointer-events-none absolute top-10 right-14 hidden h-20 w-20 rounded-full bg-gradient-to-br from-[#FFFDF0] to-[#FDE68A] opacity-90 shadow-[0_0_55px_rgba(254,240,138,0.8)] sm:block" />
 
-      {/* Subtle atmospheric cloud & sunlit scrims for crisp left-side legibility */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#0E2236]/82 via-[#15314B]/48 to-transparent" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0B1B2B]/45 via-transparent to-[#0E2236]/20" />
+      {/* Many Fluffy Little Clouds Drifting Across the Blue Sky */}
+      {SKY_CLOUDS.map((cloud) => (
+        <FluffyCloud key={cloud.id} spec={cloud} />
+      ))}
 
-      {/* Gentle drifting sunlit clouds */}
-      <div className="anim-cloud pointer-events-none absolute top-6 left-[38%] h-14 w-44 rounded-full bg-white/15 blur-xl" />
-      <div className="anim-cloud pointer-events-none absolute bottom-10 right-[18%] h-16 w-56 rounded-full bg-amber-100/20 blur-2xl" />
+      {/* Soft Rolling Cloud Horizon at Bottom */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white/55 via-white/20 to-transparent" />
+      <div className="pointer-events-none absolute -bottom-8 -left-10 h-24 w-72 rounded-full bg-white/50 blur-md" />
+      <div className="pointer-events-none absolute -bottom-10 left-[24%] h-28 w-80 rounded-full bg-white/45 blur-md" />
+      <div className="pointer-events-none absolute -bottom-8 right-[18%] h-24 w-72 rounded-full bg-white/50 blur-md" />
+      <div className="pointer-events-none absolute -bottom-10 -right-8 h-28 w-80 rounded-full bg-white/55 blur-md" />
 
       {/* Main Content Layout (compact-friendly for mobile landscape & expansive on desktop) */}
       <div className="custom-scroll relative z-10 flex h-full w-full items-center overflow-y-auto px-5 py-4 sm:px-10 lg:px-16">
@@ -151,19 +199,19 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           <div className="w-full max-w-[430px] space-y-3 sm:space-y-4">
             {/* Editorial Kicker + Hero Title */}
             <div className="space-y-1">
-              <p className="text-[11px] font-bold tracking-[0.16em] text-amber-200 uppercase sm:text-xs">
+              <p className="text-[11px] font-extrabold tracking-[0.16em] text-[#0A4D7C] uppercase drop-shadow-[0_1px_0_rgba(255,255,255,0.65)] sm:text-xs">
                 Cuộc Sống Thanh Bình Trên Mây
               </p>
-              <h1 className="font-display text-3xl font-extrabold tracking-tight text-white drop-shadow-md sm:text-5xl">
+              <h1 className="font-display text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_3px_10px_rgba(11,76,130,0.45)] sm:text-5xl">
                 Thị Trấn Mây
               </h1>
-              <p className="hidden text-xs font-medium leading-relaxed text-sky-100/90 sm:block sm:text-sm">
+              <p className="hidden text-xs font-semibold leading-relaxed text-[#0B3B60] drop-shadow-[0_1px_0_rgba(255,255,255,0.5)] sm:block sm:text-sm">
                 Xây nhà, trồng trọt, câu cá bờ hồ và chinh phục đường đua 3D cùng nhân vật của riêng bạn.
               </p>
             </div>
 
             {/* Interactive Card */}
-            <div className="rounded-3xl border border-white/70 bg-[#FFFBF4]/95 p-4 text-[#3A2818] shadow-2xl backdrop-blur-md sm:p-5">
+            <div className="rounded-3xl border border-white/85 bg-[#FFFBF4]/96 p-4 text-[#3A2818] shadow-[0_20px_50px_rgba(12,74,126,0.25)] backdrop-blur-md sm:p-5">
               {!supabaseConfigured ? (
                 <div className="space-y-2 text-xs font-semibold text-[#7A5638]">
                   <div className="font-display text-sm font-bold text-[#3A2818]">
@@ -435,14 +483,13 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               )}
             </div>
 
-            <div className="hidden items-center gap-2 text-xs font-medium text-white/80 sm:flex">
+            <div className="hidden items-center gap-2 text-xs font-bold text-[#0B3B60]/85 sm:flex">
               <span>Lưu tự động theo tài khoản</span>
               <span aria-hidden="true">·</span>
               <span>Chơi trên nhiều thiết bị</span>
             </div>
           </div>
 
-          {/* Right side kept open so the floating sky-island artwork stays the visual focal point */}
           <div className="hidden flex-1 lg:block" />
         </div>
       </div>
