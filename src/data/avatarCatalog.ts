@@ -1421,7 +1421,7 @@ export const SHOP_ITEMS: ShopItem[] = [
   {
     id: 'acc_camera_strap',
     category: 'accessories',
-    name: 'Máy Ảnh Retro Đeo Chéo',
+    name: 'Máy Ảnh Retro Cầm Hai Tay',
     price: 260,
     patch: {accessory: 'camera_strap', accessoryColor: '#3B3438'},
   },
@@ -1552,13 +1552,6 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Túi Đeo Vai Học Sinh Xanh Than',
     price: 240,
     patch: {backpack: 'student_bag_navy', backpackColor: '#2B3E5E'},
-  },
-  {
-    id: 'bp_witch_moon_bag',
-    category: 'backpacks',
-    name: 'Túi Pháp Sư Xinh Xắn',
-    price: 265,
-    patch: {backpack: 'witch_moon_bag', backpackColor: '#F8CB46'},
   },
 
   // ========== 6. GIÀY ==========
@@ -2040,14 +2033,13 @@ export const SHOP_SETS: ShopSet[] = [
   {
     id: 'set_witch_pretty',
     name: 'Set Pháp Sư Xinh Xắn',
-    subtitle: 'Đầu hộp phù thủy · Nơ đỏ lớn · Đầm phù thủy · Túi trăng khuyết vàng',
-    price: 1120,
+    subtitle: 'Đầu hộp phù thủy · Nơ đỏ lớn · Đầm phù thủy · Giày mèo đen',
+    price: 960,
     itemIds: [
       'box_witch_rune',
       'head_witch_giant_bow',
       'top_witch_cat_dress',
       'bot_witch_cat_skirt',
-      'bp_witch_moon_bag',
       'shoe_witch_mary_janes',
     ],
     patch: {
@@ -2059,8 +2051,7 @@ export const SHOP_SETS: ShopSet[] = [
       topColor: '#232028',
       bottom: 'witch_cat_skirt',
       bottomColor: '#232028',
-      backpack: 'witch_moon_bag',
-      backpackColor: '#F8CB46',
+      backpack: 'none',
       shoes: 'witch_mary_janes',
       shoeColor: '#242026',
       accessory: 'none',

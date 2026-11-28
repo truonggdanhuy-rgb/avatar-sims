@@ -1730,11 +1730,14 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
         if (style === 'camera_strap') {
           return (
             <g>
-              <path d="M22 18 L34 38 M58 18 L46 38" stroke="#5B3F2D" strokeWidth="3.5" strokeLinecap="round" />
-              <rect x="23" y="36" width="34" height="23" rx="4" fill={col} stroke={outline} strokeWidth="2.2" />
-              <rect x="33" y="31" width="14" height="6" rx="2" fill="#D8E0E8" stroke={outline} strokeWidth="1.5" />
-              <circle cx="41" cy="48" r="7.5" fill="#2A313D" stroke="#E8EDF2" strokeWidth="2" />
-              <circle cx="41" cy="48" r="3.2" fill="#5EA8E8" />
+              <rect x="17" y="25" width="46" height="32" rx="6" fill={col} stroke={outline} strokeWidth="2.2" />
+              <rect x="17" y="25" width="46" height="10" rx="4" fill="#D8E0E8" stroke={outline} strokeWidth="1.8" />
+              <rect x="32" y="19" width="16" height="7" rx="2" fill="#D8E0E8" stroke={outline} strokeWidth="1.5" />
+              <circle cx="55" cy="22" r="2.6" fill="#E8EDF2" stroke={outline} strokeWidth="1.3" />
+              <rect x="21" y="28" width="7" height="4" rx="1" fill="#465362" />
+              <circle cx="41" cy="43" r="10.5" fill="#2A313D" stroke="#E8EDF2" strokeWidth="2.4" />
+              <circle cx="41" cy="43" r="5" fill="#4EA8E8" stroke="#1E2530" strokeWidth="1.2" />
+              <circle cx="38.5" cy="40.5" r="1.8" fill="#FFFFFF" opacity="0.85" />
             </g>
           );
         }
@@ -1937,21 +1940,6 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <rect x="20" y="31" width="40" height="30" rx="7" fill={col} stroke={outline} strokeWidth="2.2" />
               <path d="M20 35 C20 31, 60 31, 60 35 V47 H20 Z" fill={shade(col, -12)} stroke={outline} strokeWidth="2" />
               <rect x="36" y="44" width="8" height="7" rx="2" fill={trim} stroke={outline} strokeWidth="1.4" />
-            </g>
-          );
-        }
-        if (style === 'witch_moon_bag') {
-          return (
-            <g>
-              <path d="M18 19 L58 51" stroke="#E09B1D" strokeWidth="4" strokeLinecap="round" />
-              <path
-                d="M20 41 C20 56, 41 64, 57 52 C46 53, 36 45, 36 33 C28 34, 22 37, 20 41 Z"
-                fill={col}
-                stroke={outline}
-                strokeWidth="2.2"
-                strokeLinejoin="round"
-              />
-              <circle cx="29" cy="40" r="2.6" fill="#FFF6B8" stroke={outline} strokeWidth="1.2" />
             </g>
           );
         }
@@ -2276,10 +2264,12 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
         if (style === 'cupid_bow') {
           return (
             <g>
-              <path d="M28 16 C48 26, 48 54, 28 64" stroke={col} strokeWidth="4.2" fill="none" strokeLinecap="round" />
-              <line x1="28" y1="16" x2="28" y2="64" stroke="#E0D3B8" strokeWidth="1.5" />
-              <line x1="20" y1="40" x2="54" y2="40" stroke={col} strokeWidth="2.4" />
-              <circle cx="55" cy="40" r="4.5" fill="#E84258" stroke={outline} strokeWidth="1.4" />
+              <path d="M20 15 C36 22, 38 33, 33 40 C38 47, 36 58, 20 65" stroke={col} strokeWidth="4.2" fill="none" strokeLinecap="round" />
+              <line x1="20" y1="15" x2="20" y2="65" stroke="#E8DEC8" strokeWidth="1.5" />
+              <rect x="31" y="35" width="5" height="10" rx="2" fill="#E84258" stroke={outline} strokeWidth="1.2" />
+              <line x1="45" y1="59" x2="60" y2="23" stroke={col} strokeWidth="2.6" strokeLinecap="round" />
+              <path d="M60 21 C57 17, 52 19, 54 24 L61 28 L64 21 C65 16, 60 16, 60 21 Z" fill="#E84258" stroke={outline} strokeWidth="1.3" strokeLinejoin="round" />
+              <path d="M45 59 L40 62 M45 59 L48 64" stroke="#F79AB6" strokeWidth="2.2" strokeLinecap="round" />
             </g>
           );
         }

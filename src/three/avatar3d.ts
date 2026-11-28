@@ -8,6 +8,7 @@ import {
   BOX_FACE_DECAL_Z,
   BOX_FRONT_Z,
   BOX_H,
+  BOX_HEAD_SCALE,
   BOX_TOP_Y,
   BOX_W,
   buildBoxHeadAssembly,
@@ -24,7 +25,8 @@ export type HoldPose =
   | 'carry_bag'
   | 'carry_umbrella'
   | 'carry_lantern'
-  | 'carry_net';
+  | 'carry_net'
+  | 'carry_camera';
 
 const HEAD_PIVOT_Y = 0.968;
 
@@ -33,8 +35,9 @@ const HAND_POSES: Record<HoldPose, {armX: number; armZ: number; elbowX: number; 
   carry_umbrella: {armX: -0.46, armZ: 0.62, elbowX: -0.94, elbowZ: 0.18},
   carry_lantern: {armX: -0.78, armZ: 0.38, elbowX: -0.68, elbowZ: 0.1},
   carry_front: {armX: -0.42, armZ: 0.44, elbowX: -0.98, elbowZ: 0.08},
-  carry_bag: {armX: -0.06, armZ: 0.48, elbowX: -0.14, elbowZ: 0.06},
+  carry_bag: {armX: -0.06, armZ: 0.52, elbowX: -0.14, elbowZ: 0.06},
   carry_net: {armX: -1.16, armZ: 0.24, elbowX: -1.24, elbowZ: -0.18},
+  carry_camera: {armX: -0.84, armZ: 0.08, elbowX: -0.94, elbowZ: -0.44},
 };
 
 export interface AvatarMountAnimParams {
@@ -88,6 +91,7 @@ export interface AvatarRig {
   rodTipPivot?: THREE.Group;
   heldPetRig?: PetRig;
   lanternSwings?: THREE.Object3D[];
+  cameraGroup?: THREE.Group;
   headTopAbovePivot: number;
 }
 
@@ -5983,8 +5987,7 @@ export function buildAvatarRig(
     const isShoulderBag =
       backpack === 'student_bag_gingham' ||
       backpack === 'student_bag_brown' ||
-      backpack === 'student_bag_navy' ||
-      backpack === 'witch_moon_bag';
+      backpack === 'student_bag_navy';
     const torsoBackSurfaceZ =
       isHoodie || config.top === 'puffer_jacket'
         ? -0.258
@@ -6403,10 +6406,10 @@ export function buildAvatarRig(
       gBag.add(gBody, gBelly, gNeck, gHead, gBeak, gBow);
       packContent.add(gBag);
     } else if (backpack === 'student_bag_gingham') {
-      // Checkered gingham tote shoulder bag worn cleanly over shoulder & OUTSIDE skirt/arm
+      // Checkered gingham shoulder tote positioned cleanly beside hip with arm resting lightly above rim
       const hasSkirtClearance =
         isSkirtBottom || isNewDress || isDressTop || isLolitaDress || isAoDaiTop;
-      const bagX = hasSkirtClearance ? -0.376 : isOuterwear ? -0.352 : -0.336;
+      const bagX = hasSkirtClearance ? -0.336 : isOuterwear ? -0.322 : -0.306;
       const ginghamTex = getGinghamTexture(bpCol || '#DF3D48', 4, 4);
       const bagMat = ginghamTex
         ? new THREE.MeshStandardMaterial({color: '#FFFFFF', map: ginghamTex, roughness: 0.72})
@@ -6418,43 +6421,43 @@ export function buildAvatarRig(
       const trimMat = clayMat('#FFF8F4', 0.65);
 
       const strapCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(bagX + 0.02, -0.04, 0.064),
-        new THREE.Vector3(-0.245, 0.095, 0.105),
-        new THREE.Vector3(-0.158, 0.184, 0.005),
-        new THREE.Vector3(-0.242, 0.095, -0.105),
-        new THREE.Vector3(bagX + 0.02, -0.04, -0.072),
+        new THREE.Vector3(bagX + 0.014, -0.115, 0.056),
+        new THREE.Vector3(-0.228, 0.06, 0.088),
+        new THREE.Vector3(-0.146, 0.184, 0.004),
+        new THREE.Vector3(-0.226, 0.06, -0.092),
+        new THREE.Vector3(bagX + 0.014, -0.115, -0.064),
       ]);
       const shoulderStrap = new THREE.Mesh(
-        new THREE.TubeGeometry(strapCurve, 24, 0.014, 8, false),
+        new THREE.TubeGeometry(strapCurve, 24, 0.013, 8, false),
         strapMat,
       );
       bpGroup.add(shoulderStrap);
 
       const toteGrp = new THREE.Group();
-      toteGrp.position.set(bagX, -0.146, -0.018);
-      toteGrp.rotation.y = 0.18;
-      toteGrp.rotation.z = -0.12;
+      toteGrp.position.set(bagX, -0.212, -0.012);
+      toteGrp.rotation.y = 0.14;
+      toteGrp.rotation.z = -0.08;
 
       const toteBody = new THREE.Mesh(
-        new RoundedBoxGeometry(0.074, 0.212, 0.198, 4, 0.018),
+        new RoundedBoxGeometry(0.068, 0.205, 0.194, 4, 0.018),
         bagMat,
       );
       const topHem = new THREE.Mesh(
-        new RoundedBoxGeometry(0.08, 0.022, 0.204, 2, 0.008),
+        new RoundedBoxGeometry(0.074, 0.022, 0.2, 2, 0.008),
         trimMat,
       );
-      topHem.position.y = 0.096;
+      topHem.position.y = 0.092;
       const sidePocket = new THREE.Mesh(
-        new RoundedBoxGeometry(0.016, 0.112, 0.142, 3, 0.008),
+        new RoundedBoxGeometry(0.015, 0.11, 0.138, 3, 0.008),
         bagMat,
       );
-      sidePocket.position.set(-0.042, -0.022, 0);
+      sidePocket.position.set(-0.039, -0.022, 0);
       toteGrp.add(toteBody, topHem, sidePocket);
       packContent.add(toteGrp);
     } else if (backpack === 'student_bag_brown' || backpack === 'student_bag_navy') {
       const hasSkirtClearance =
         isSkirtBottom || isNewDress || isDressTop || isLolitaDress || isAoDaiTop;
-      const bagX = hasSkirtClearance ? -0.376 : isOuterwear ? -0.352 : -0.336;
+      const bagX = hasSkirtClearance ? -0.336 : isOuterwear ? -0.322 : -0.306;
       const isNavy = backpack === 'student_bag_navy';
       const baseHex = bpCol || (isNavy ? '#2B3E5E' : '#7A4D30');
       const bagMat = clayMat(baseHex, 0.56);
@@ -6463,97 +6466,44 @@ export function buildAvatarRig(
       const trimMat = isNavy ? clayMat('#F4EFE6', 0.62) : clayMat('#E9C259', 0.28, 0.35);
 
       const strapCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(bagX + 0.02, -0.04, 0.064),
-        new THREE.Vector3(-0.245, 0.095, 0.105),
-        new THREE.Vector3(-0.158, 0.184, 0.005),
-        new THREE.Vector3(-0.242, 0.095, -0.105),
-        new THREE.Vector3(bagX + 0.02, -0.04, -0.072),
+        new THREE.Vector3(bagX + 0.014, -0.115, 0.056),
+        new THREE.Vector3(-0.228, 0.06, 0.088),
+        new THREE.Vector3(-0.146, 0.184, 0.004),
+        new THREE.Vector3(-0.226, 0.06, -0.092),
+        new THREE.Vector3(bagX + 0.014, -0.115, -0.064),
       ]);
       const shoulderStrap = new THREE.Mesh(
-        new THREE.TubeGeometry(strapCurve, 24, 0.013, 8, false),
+        new THREE.TubeGeometry(strapCurve, 24, 0.0125, 8, false),
         strapMat,
       );
       bpGroup.add(shoulderStrap);
 
       const satchelGrp = new THREE.Group();
-      satchelGrp.position.set(bagX, -0.146, -0.018);
-      satchelGrp.rotation.y = 0.18;
-      satchelGrp.rotation.z = -0.12;
+      satchelGrp.position.set(bagX, -0.212, -0.012);
+      satchelGrp.rotation.y = 0.14;
+      satchelGrp.rotation.z = -0.08;
 
       const body = new THREE.Mesh(
-        new RoundedBoxGeometry(0.076, 0.192, 0.208, 4, 0.02),
+        new RoundedBoxGeometry(0.07, 0.188, 0.204, 4, 0.02),
         bagMat,
       );
       const flap = new THREE.Mesh(
-        new RoundedBoxGeometry(0.082, 0.102, 0.212, 4, 0.018),
+        new RoundedBoxGeometry(0.076, 0.098, 0.208, 4, 0.018),
         flapMat,
       );
-      flap.position.set(-0.006, 0.048, 0);
+      flap.position.set(-0.006, 0.046, 0);
       const clasp = new THREE.Mesh(
         new RoundedBoxGeometry(0.016, 0.032, 0.038, 2, 0.006),
         trimMat,
       );
-      clasp.position.set(-0.045, 0.005, 0);
+      clasp.position.set(-0.042, 0.005, 0);
       const sideStripe = new THREE.Mesh(
-        new RoundedBoxGeometry(0.012, 0.018, 0.198, 2, 0.004),
+        new RoundedBoxGeometry(0.012, 0.018, 0.194, 2, 0.004),
         trimMat,
       );
-      sideStripe.position.set(-0.043, 0.09, 0);
+      sideStripe.position.set(-0.04, 0.086, 0);
       satchelGrp.add(body, flap, clasp, sideStripe);
       packContent.add(satchelGrp);
-    } else if (backpack === 'witch_moon_bag') {
-      // Golden crossbody strap + prominent crescent moon shoulder pouch clearing flared skirt & arm!
-      const hasSkirtClearance =
-        isSkirtBottom || isNewDress || isDressTop || isLolitaDress || isAoDaiTop;
-      const moonX = hasSkirtClearance ? 0.365 : isOuterwear ? 0.335 : 0.312;
-      const goldPouchMat = glossyClayMat(bpCol || '#F8CB46', 0.26);
-      const pouchRimMat = clayMat('#D98F16', 0.38);
-      const starCharmMat = new THREE.MeshStandardMaterial({
-        color: '#FFF9C4',
-        emissive: '#FFE066',
-        emissiveIntensity: 0.45,
-        roughness: 0.2,
-      });
-
-      const strapCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-0.098, 0.192, 0.035),
-        new THREE.Vector3(0.022, 0.072, 0.228),
-        new THREE.Vector3(0.205, -0.052, 0.205),
-        new THREE.Vector3(moonX - 0.012, -0.095, 0.095),
-        new THREE.Vector3(0.205, -0.062, -0.215),
-        new THREE.Vector3(-0.098, 0.188, -0.048),
-      ]);
-      const crossStrap = new THREE.Mesh(
-        new THREE.TubeGeometry(strapCurve, 30, 0.011, 8, true),
-        pouchRimMat,
-      );
-      bpGroup.add(crossStrap);
-
-      const moonGrp = new THREE.Group();
-      moonGrp.position.set(moonX, -0.142, 0.088);
-      moonGrp.rotation.set(0.14, 1.18, -Math.PI * 0.66);
-      const crescentBody = new THREE.Mesh(
-        new THREE.TorusGeometry(0.088, 0.035, 14, 24, Math.PI * 1.18),
-        goldPouchMat,
-      );
-      const zipSeam = new THREE.Mesh(
-        new THREE.TorusGeometry(0.064, 0.009, 8, 20, Math.PI * 0.98),
-        pouchRimMat,
-      );
-      zipSeam.position.z = 0.022;
-      zipSeam.rotation.z = 0.1;
-      const charmStar = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.022, 0),
-        starCharmMat,
-      );
-      charmStar.position.set(-0.058, 0.056, 0.028);
-      const claspGem = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.016, 0),
-        glossyClayMat('#B983FF', 0.18),
-      );
-      claspGem.position.set(0.048, -0.048, 0.028);
-      moonGrp.add(crescentBody, zipSeam, charmStar, claspGem);
-      packContent.add(moonGrp);
     } else if (backpack === 'angel_wings') {
       // Sculpted multi-tiered pearlescent angel wings with beveled ExtrudeGeometry feathers & golden shoulder clasp
       const primaryWingMat = new THREE.MeshStandardMaterial({
@@ -6775,38 +6725,42 @@ export function buildAvatarRig(
     !equippedTool && !equippedFood && config.handheld && config.handheld !== 'none'
       ? config.handheld
       : null;
+  const isHoldingCamera =
+    config.accessory === 'camera_strap' && !equippedTool && !equippedFood && !handheld;
   const holdPose: HoldPose = equippedTool
     ? equippedTool === 'wooden_net'
       ? 'carry_net'
       : 'carry_front'
     : equippedFood
       ? 'carry_front'
-      : !handheld
-        ? 'none'
-        : handheld === 'tote_bag'
+      : handheld
+        ? handheld === 'tote_bag'
           ? 'carry_bag'
           : handheld === 'mini_umbrella'
             ? 'carry_umbrella'
             : handheld === 'star_lantern' || handheld === 'rooster_lantern'
               ? 'carry_lantern'
-              : 'carry_front';
+              : 'carry_front'
+        : isHoldingCamera
+          ? 'carry_camera'
+          : 'none';
 
   const hasLeftShoulderBag =
     backpack === 'student_bag_gingham' ||
     backpack === 'student_bag_brown' ||
     backpack === 'student_bag_navy';
-  const hasRightShoulderBag = backpack === 'witch_moon_bag' && holdPose === 'none';
+  const hasSkirtShoulderClearance =
+    isSkirtBottom || isNewDress || isDressTop || isLolitaDress || isAoDaiTop;
 
   const makeArm = (side: -1 | 1) => {
     // Relaxed natural A-pose seated flush on shoulder corner; slightly abducted when carrying a shoulder bag
     const shoulderPivot = new THREE.Group();
-    const isLeftBagArm = side === -1 && hasLeftShoulderBag;
-    const isRightBagArm = side === 1 && hasRightShoulderBag;
-    const isBagArm = isLeftBagArm || isRightBagArm;
-    const baseArmZ = (isOuterwear ? 0.4 : HAND_POSES.none.armZ) + (isBagArm ? 0.22 : 0);
-    const baseArmX = isBagArm ? -0.12 : 0;
-    const baseElbowX = isBagArm ? -0.26 : HAND_POSES.none.elbowX;
-    const baseElbowZ = isBagArm ? -0.18 : HAND_POSES.none.elbowZ;
+    const isBagArm = side === -1 && hasLeftShoulderBag && !isHoldingCamera;
+    const bagArmZ = hasSkirtShoulderClearance ? 0.72 : isOuterwear ? 0.68 : 0.64;
+    const baseArmZ = isBagArm ? bagArmZ : isOuterwear ? 0.4 : HAND_POSES.none.armZ;
+    const baseArmX = isBagArm ? -0.14 : 0;
+    const baseElbowX = isBagArm ? -0.28 : HAND_POSES.none.elbowX;
+    const baseElbowZ = isBagArm ? -0.28 : HAND_POSES.none.elbowZ;
     shoulderPivot.position.set(
       side * (isOuterwear ? 0.214 : isFittedBody ? 0.184 : 0.198),
       isFittedBody ? 0.885 : 0.89,
@@ -7056,8 +7010,11 @@ export function buildAvatarRig(
     handGroup.position.set(0, -0.16, 0);
     elbowPivot.add(handGroup);
 
+    const isDualHandheld = handheld === 'cupid_bow';
     const isGripping =
-      side === 1 && (Boolean(handheld) || Boolean(equippedTool) || Boolean(equippedFood));
+      (side === 1 && (Boolean(handheld) || Boolean(equippedTool) || Boolean(equippedFood))) ||
+      isHoldingCamera ||
+      (side === -1 && isDualHandheld);
     const palm = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 12), skinMat);
     palm.scale.set(0.92, 1.06, isGripping ? 0.86 : 0.88);
     if (isGripping) palm.position.set(0, 0, -0.004);
@@ -7069,7 +7026,7 @@ export function buildAvatarRig(
         new RoundedBoxGeometry(0.058, 0.044, 0.034, 3, 0.014),
         skinMat,
       );
-      fingerCurl.position.set(-0.004, -0.01, 0.034);
+      fingerCurl.position.set(-side * 0.004, -0.01, 0.034);
       fingerCurl.rotation.x = 0.22;
       handGroup.add(fingerCurl);
 
@@ -7077,8 +7034,8 @@ export function buildAvatarRig(
         new THREE.CapsuleGeometry(0.015, 0.028, 6, 8),
         skinMat,
       );
-      thumbGrip.position.set(-0.024, 0.014, 0.03);
-      thumbGrip.rotation.z = -0.95;
+      thumbGrip.position.set(-side * 0.024, 0.014, 0.03);
+      thumbGrip.rotation.z = -side * 0.95;
       thumbGrip.rotation.x = 0.25;
       handGroup.add(thumbGrip);
     } else {
@@ -7112,6 +7069,28 @@ export function buildAvatarRig(
   let rodTipPivot: THREE.Group | undefined;
   const lanternSwings: THREE.Object3D[] = [];
 
+  if (holdPose === 'carry_camera') {
+    const camPose = HAND_POSES.carry_camera;
+    const armOutZ = isOuterwear ? camPose.armZ + 0.02 : camPose.armZ;
+    leftArm.rotation.x = camPose.armX;
+    leftArm.rotation.z = -armOutZ;
+    leftArm.userData.baseX = camPose.armX;
+    leftArm.userData.baseZ = -armOutZ;
+    leftElbow.rotation.x = camPose.elbowX;
+    leftElbow.rotation.z = -camPose.elbowZ;
+    leftElbow.userData.baseX = camPose.elbowX;
+    leftElbow.userData.baseZ = -camPose.elbowZ;
+
+    rightArm.rotation.x = camPose.armX;
+    rightArm.rotation.z = armOutZ;
+    rightArm.userData.baseX = camPose.armX;
+    rightArm.userData.baseZ = armOutZ;
+    rightElbow.rotation.x = camPose.elbowX;
+    rightElbow.rotation.z = camPose.elbowZ;
+    rightElbow.userData.baseX = camPose.elbowX;
+    rightElbow.userData.baseZ = camPose.elbowZ;
+  }
+
   if (handheld || equippedTool || equippedFood) {
     const hColor = config.handheldColor || '#E8B84B';
     const poseCfg = HAND_POSES[holdPose];
@@ -7141,6 +7120,17 @@ export function buildAvatarRig(
           : new THREE.Euler(0, 0, 0),
     );
     handAnchor.quaternion.copy(handWorldQuat).invert().multiply(desiredWorldQuat);
+
+    let leftHandAnchor: THREE.Group | undefined;
+    if (handheld === 'cupid_bow') {
+      leftHandAnchor = new THREE.Group();
+      leftHandAnchor.position.set(0, -0.005, 0.026);
+      leftArmRig.handGroup.add(leftHandAnchor);
+      const leftHandWorldQuat = new THREE.Quaternion();
+      leftArmRig.handGroup.getWorldQuaternion(leftHandWorldQuat);
+      const leftDesiredQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.04));
+      leftHandAnchor.quaternion.copy(leftHandWorldQuat).invert().multiply(leftDesiredQuat);
+    }
 
     if (equippedTool === 'wooden_rod') {
       const rodGroup = new THREE.Group();
@@ -7391,63 +7381,127 @@ export function buildAvatarRig(
       bearGrp.add(bearBody, belly, bearHead, snout, bNose, bow);
       handAnchor.add(bearGrp);
     } else if (handheld === 'flower_bouquet') {
+      const bouquetGrp = new THREE.Group();
+      bouquetGrp.position.set(0.032, -0.015, 0.068);
+      bouquetGrp.rotation.set(0.42, 0, -0.16);
+      bouquetGrp.scale.setScalar(1.22);
+
+      const paperMat = clayMat('#E9D5B5', 0.8);
+      const paperInnerMat = clayMat('#FFF9F0', 0.76);
+      const ribbonMat = clayMat('#E86F82', 0.48);
+
       const wrap = new THREE.Mesh(
-        new THREE.ConeGeometry(0.14, 0.3, 14, 1, true),
-        clayMat('#E9D5B5', 0.82),
+        new THREE.ConeGeometry(0.148, 0.31, 16, 1, true),
+        paperMat,
       );
+      wrap.material.side = THREE.DoubleSide;
       wrap.rotation.x = Math.PI;
       wrap.position.set(0, 0.065, 0);
 
       const tissueRim = new THREE.Mesh(
-        new THREE.TorusGeometry(0.132, 0.021, 8, 18),
-        clayMat('#FFF9F0', 0.78),
+        new THREE.TorusGeometry(0.142, 0.024, 10, 22),
+        paperInnerMat,
       );
       tissueRim.rotation.x = Math.PI / 2;
-      tissueRim.position.set(0, 0.205, 0);
+      tissueRim.position.set(0, 0.212, 0);
 
       const ribbonTie = new THREE.Mesh(
-        new THREE.TorusGeometry(0.046, 0.014, 8, 14),
-        clayMat('#E86F82', 0.5),
+        new THREE.TorusGeometry(0.048, 0.015, 8, 16),
+        ribbonMat,
       );
       ribbonTie.rotation.x = Math.PI / 2;
       ribbonTie.position.set(0, 0.025, 0);
-      handAnchor.add(wrap, tissueRim, ribbonTie);
+      const ribbonBow = new THREE.Mesh(
+        new RoundedBoxGeometry(0.088, 0.036, 0.024, 2, 0.01),
+        ribbonMat,
+      );
+      ribbonBow.position.set(0, 0.026, 0.048);
+      [-1, 1].forEach((s) => {
+        const tail = new THREE.Mesh(
+          new RoundedBoxGeometry(0.022, 0.065, 0.01, 2, 0.004),
+          ribbonMat,
+        );
+        tail.position.set(s * 0.024, -0.012, 0.046);
+        tail.rotation.z = s * 0.28;
+        bouquetGrp.add(tail);
+      });
+      bouquetGrp.add(wrap, tissueRim, ribbonTie, ribbonBow);
 
-      const leafMat = clayMat('#5E9E69', 0.65);
-      [-1, 0, 1].forEach((s) => {
-        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), leafMat);
-        leaf.scale.set(0.75, 1.35, 0.3);
-        leaf.position.set(s * 0.08, 0.22, -0.025);
-        leaf.rotation.z = -s * 0.4;
-        handAnchor.add(leaf);
+      const leafMat = clayMat('#529B5E', 0.64);
+      [
+        [-0.11, 0.23, -0.02, 0.55],
+        [-0.05, 0.255, -0.045, 0.25],
+        [0, 0.27, -0.05, 0],
+        [0.05, 0.255, -0.045, -0.25],
+        [0.11, 0.23, -0.02, -0.55],
+      ].forEach(([lx, ly, lz, rz]) => {
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.056, 10, 8), leafMat);
+        leaf.scale.set(0.75, 1.45, 0.28);
+        leaf.position.set(lx, ly, lz);
+        leaf.rotation.z = rz;
+        bouquetGrp.add(leaf);
       });
 
-      const buildSunflower = (fx: number, fy: number, fz: number, scale: number) => {
+      const babyBreathMat = clayMat('#FFFDF7', 0.52);
+      [
+        [-0.055, 0.27, 0.06],
+        [0.058, 0.268, 0.055],
+        [0, 0.22, 0.09],
+        [-0.095, 0.21, 0.03],
+        [0.095, 0.21, 0.03],
+      ].forEach(([bx, by, bz]) => {
+        const bud = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 8), babyBreathMat);
+        bud.position.set(bx, by, bz);
+        bouquetGrp.add(bud);
+      });
+
+      const seedCoreMat = clayMat('#56341E', 0.76);
+      const pollenRingMat = clayMat('#C67D22', 0.62);
+      const petalOuterMat = clayMat(hColor, 0.55);
+      const petalInnerMat = clayMat('#FFE26A', 0.52);
+      const buildSunflower = (
+        fx: number,
+        fy: number,
+        fz: number,
+        scale: number,
+        rotX: number,
+        rotY: number,
+      ) => {
         const fGrp = new THREE.Group();
         fGrp.position.set(fx, fy, fz);
         fGrp.scale.setScalar(scale);
-        fGrp.rotation.x = 0.28;
-        const center = new THREE.Mesh(
-          new THREE.SphereGeometry(0.052, 12, 10),
-          clayMat('#5E3A22', 0.72),
-        );
-        center.scale.set(1, 1, 0.5);
-        fGrp.add(center);
-        const petalMat = clayMat(hColor, 0.58);
+        fGrp.rotation.set(rotX, rotY, 0);
+
+        const center = new THREE.Mesh(new THREE.SphereGeometry(0.054, 14, 10), seedCoreMat);
+        center.scale.set(1, 1, 0.48);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.044, 0.008, 8, 18), pollenRingMat);
+        ring.position.z = 0.016;
+        fGrp.add(center, ring);
+
         for (let i = 0; i < 10; i++) {
           const a = (i / 10) * Math.PI * 2;
-          const petal = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), petalMat);
-          petal.scale.set(0.7, 1.45, 0.4);
-          petal.position.set(Math.cos(a) * 0.068, Math.sin(a) * 0.068, -0.005);
+          const petal = new THREE.Mesh(new THREE.SphereGeometry(0.029, 8, 8), petalOuterMat);
+          petal.scale.set(0.66, 1.55, 0.34);
+          petal.position.set(Math.cos(a) * 0.072, Math.sin(a) * 0.072, -0.005);
           petal.rotation.z = a - Math.PI / 2;
           fGrp.add(petal);
         }
-        handAnchor.add(fGrp);
+        for (let i = 0; i < 8; i++) {
+          const a = ((i + 0.5) / 8) * Math.PI * 2;
+          const petal = new THREE.Mesh(new THREE.SphereGeometry(0.023, 8, 8), petalInnerMat);
+          petal.scale.set(0.62, 1.38, 0.32);
+          petal.position.set(Math.cos(a) * 0.058, Math.sin(a) * 0.058, 0.005);
+          petal.rotation.z = a - Math.PI / 2;
+          fGrp.add(petal);
+        }
+        bouquetGrp.add(fGrp);
       };
 
-      buildSunflower(0, 0.275, 0.015, 1.1);
-      buildSunflower(-0.078, 0.23, 0.02, 0.82);
-      buildSunflower(0.078, 0.23, 0.02, 0.82);
+      buildSunflower(0, 0.295, 0.025, 1.08, 0.24, 0);
+      buildSunflower(-0.088, 0.242, 0.032, 0.88, 0.3, -0.25);
+      buildSunflower(0.088, 0.242, 0.032, 0.88, 0.3, 0.25);
+      buildSunflower(0, 0.21, 0.085, 0.72, 0.45, 0);
+      handAnchor.add(bouquetGrp);
     } else if (handheld === 'tote_bag') {
       const strapMat = clayMat('#C59F76', 0.75);
       [-0.036, 0.036].forEach((sx) => {
@@ -7456,25 +7510,25 @@ export function buildAvatarRig(
           strapMat,
         );
         strap.rotation.y = Math.PI / 2;
-        strap.position.set(0.056 + sx, -0.082, 0);
+        strap.position.set(0.064 + sx, -0.082, 0);
         handAnchor.add(strap);
       });
       const bag = new THREE.Mesh(
         new RoundedBoxGeometry(0.115, 0.25, 0.215, 3, 0.025),
         clayMat(hColor, 0.78),
       );
-      bag.position.set(0.056, -0.208, 0);
+      bag.position.set(0.064, -0.208, 0);
       const pocket = new THREE.Mesh(
         new RoundedBoxGeometry(0.018, 0.12, 0.125, 2, 0.012),
         clayMat(shadeHex(hColor, -0.08).getHex(), 0.78),
       );
-      pocket.position.set(0.113, -0.218, 0);
+      pocket.position.set(0.121, -0.218, 0);
       const badge = new THREE.Mesh(
         new THREE.CylinderGeometry(0.022, 0.022, 0.01, 12),
         clayMat('#E86F82', 0.5),
       );
       badge.rotation.z = Math.PI / 2;
-      badge.position.set(0.123, -0.178, 0.038);
+      badge.position.set(0.131, -0.178, 0.038);
       handAnchor.add(bag, pocket, badge);
     } else if (handheld === 'mini_umbrella') {
       // Tall, wide protective umbrella clearing head & hats cleanly (~1.92m rim, 2.16m dome)
@@ -7544,77 +7598,235 @@ export function buildAvatarRig(
 
       handAnchor.add(stick, hook, runner, canopy, edgeTrim, tip);
     } else if (handheld === 'blue_rose_bouquet') {
+      const bouquetGrp = new THREE.Group();
+      bouquetGrp.position.set(0.032, -0.015, 0.068);
+      bouquetGrp.rotation.set(0.42, 0, -0.16);
+      bouquetGrp.scale.setScalar(1.22);
+
+      const paperMat = clayMat('#FFFDF9', 0.74);
+      const blueRibbonMat = clayMat('#3D86EC', 0.44);
       const wrap = new THREE.Mesh(
-        new THREE.ConeGeometry(0.145, 0.3, 14, 1, true),
-        clayMat('#FFFDF9', 0.78),
+        new THREE.ConeGeometry(0.15, 0.31, 16, 1, true),
+        paperMat,
       );
+      wrap.material.side = THREE.DoubleSide;
       wrap.rotation.x = Math.PI;
       wrap.position.set(0, 0.065, 0);
-      const ribbonBow = new THREE.Mesh(
-        new RoundedBoxGeometry(0.095, 0.042, 0.032, 2, 0.012),
-        clayMat('#3D86EC', 0.45),
-      );
-      ribbonBow.position.set(0, 0.032, 0.035);
-      handAnchor.add(wrap, ribbonBow);
 
-      const leafMat = clayMat('#4C9A5E', 0.65);
-      [-1, 0, 1].forEach((s) => {
-        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), leafMat);
-        leaf.scale.set(0.75, 1.35, 0.3);
-        leaf.position.set(s * 0.08, 0.22, -0.025);
-        leaf.rotation.z = -s * 0.4;
-        handAnchor.add(leaf);
+      const frillCollar = new THREE.Mesh(
+        new THREE.TorusGeometry(0.145, 0.024, 10, 22),
+        clayMat('#EEF6FF', 0.72),
+      );
+      frillCollar.rotation.x = Math.PI / 2;
+      frillCollar.position.set(0, 0.212, 0);
+
+      const ribbonTie = new THREE.Mesh(
+        new THREE.TorusGeometry(0.048, 0.014, 8, 16),
+        blueRibbonMat,
+      );
+      ribbonTie.rotation.x = Math.PI / 2;
+      ribbonTie.position.set(0, 0.028, 0);
+      const ribbonBow = new THREE.Mesh(
+        new RoundedBoxGeometry(0.098, 0.042, 0.03, 2, 0.012),
+        blueRibbonMat,
+      );
+      ribbonBow.position.set(0, 0.032, 0.046);
+      [-1, 1].forEach((s) => {
+        const tail = new THREE.Mesh(
+          new RoundedBoxGeometry(0.024, 0.07, 0.01, 2, 0.004),
+          blueRibbonMat,
+        );
+        tail.position.set(s * 0.026, -0.012, 0.046);
+        tail.rotation.z = s * 0.28;
+        bouquetGrp.add(tail);
+      });
+      bouquetGrp.add(wrap, frillCollar, ribbonTie, ribbonBow);
+
+      const leafMat = clayMat('#4C9A5E', 0.62);
+      [
+        [-0.11, 0.23, -0.02, 0.55],
+        [-0.055, 0.258, -0.045, 0.24],
+        [0, 0.275, -0.05, 0],
+        [0.055, 0.258, -0.045, -0.24],
+        [0.11, 0.23, -0.02, -0.55],
+      ].forEach(([lx, ly, lz, rz]) => {
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.056, 10, 8), leafMat);
+        leaf.scale.set(0.75, 1.45, 0.28);
+        leaf.position.set(lx, ly, lz);
+        leaf.rotation.z = rz;
+        bouquetGrp.add(leaf);
       });
 
-      const roseMat = clayMat(hColor || '#5598EE', 0.52);
-      const roseInnerMat = clayMat('#80B8FF', 0.48);
-      const buildRose = (rx: number, ry: number, rz: number, sc: number) => {
+      const pearlMat = glossyClayMat('#FFFDF9', 0.2);
+      [
+        [-0.055, 0.275, 0.06],
+        [0.055, 0.275, 0.06],
+        [0, 0.22, 0.092],
+      ].forEach(([px, py, pz]) => {
+        const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 8), pearlMat);
+        pearl.position.set(px, py, pz);
+        bouquetGrp.add(pearl);
+      });
+
+      const roseOuterMat = clayMat(hColor || '#5598EE', 0.5);
+      const roseMidMat = clayMat('#78B4FF', 0.46);
+      const roseCenterMat = clayMat('#2F6FD6', 0.44);
+      const buildRose = (
+        rx: number,
+        ry: number,
+        rz: number,
+        sc: number,
+        tiltX = 0.22,
+        tiltY = 0,
+      ) => {
         const rGrp = new THREE.Group();
         rGrp.position.set(rx, ry, rz);
         rGrp.scale.setScalar(sc);
-        const core = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 10), roseInnerMat);
-        rGrp.add(core);
-        for (let p = 0; p < 5; p++) {
-          const ang = (p / 5) * Math.PI * 2;
-          const petal = new THREE.Mesh(new THREE.SphereGeometry(0.034, 10, 8), roseMat);
-          petal.scale.set(1.1, 0.85, 0.55);
-          petal.position.set(Math.cos(ang) * 0.036, Math.sin(ang) * 0.02, Math.sin(ang) * 0.032);
+        rGrp.rotation.set(tiltX, tiltY, 0);
+
+        const spiralBud = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10), roseCenterMat);
+        spiralBud.scale.set(0.95, 1.1, 0.9);
+        spiralBud.position.z = 0.014;
+        rGrp.add(spiralBud);
+
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + 0.3;
+          const innerP = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), roseMidMat);
+          innerP.scale.set(1.15, 0.85, 0.5);
+          innerP.position.set(Math.cos(a) * 0.022, Math.sin(a) * 0.022, 0.008);
+          innerP.rotation.z = a + Math.PI / 2;
+          rGrp.add(innerP);
+        }
+        for (let p = 0; p < 6; p++) {
+          const ang = (p / 6) * Math.PI * 2;
+          const petal = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), roseOuterMat);
+          petal.scale.set(1.2, 0.88, 0.52);
+          petal.position.set(Math.cos(ang) * 0.042, Math.sin(ang) * 0.042, -0.002);
+          petal.rotation.z = ang + Math.PI / 2;
+          petal.rotation.x = 0.25;
           rGrp.add(petal);
         }
-        handAnchor.add(rGrp);
+        bouquetGrp.add(rGrp);
       };
-      buildRose(0, 0.268, 0.018, 1.05);
-      buildRose(-0.072, 0.228, 0.022, 0.88);
-      buildRose(0.072, 0.228, 0.022, 0.88);
+      buildRose(0, 0.298, 0.025, 1.1, 0.2, 0);
+      buildRose(-0.082, 0.246, 0.032, 0.94, 0.26, -0.22);
+      buildRose(0.082, 0.246, 0.032, 0.94, 0.26, 0.22);
+      buildRose(-0.038, 0.215, 0.075, 0.78, 0.36, -0.1);
+      buildRose(0.042, 0.215, 0.075, 0.78, 0.36, 0.1);
+      handAnchor.add(bouquetGrp);
     } else if (handheld === 'cupid_bow') {
-      const goldMat = glossyClayMat(hColor || '#E8B24B', 0.26);
-      const stringMat = clayMat('#FFF5DC', 0.4);
-      const heartMat = glossyClayMat('#E84258', 0.3);
+      // Dual-hand Cupid Bow & Arrow: right hand holds ornate golden recurve bow, left hand holds heart arrow (arm pose unchanged)
+      const goldMat = glossyClayMat(hColor || '#E8B24B', 0.22);
+      const goldBrightMat = glossyClayMat('#FFE082', 0.18);
+      const velvetMat = clayMat('#D93B54', 0.56);
+      const stringMat = clayMat('#FFF8E7', 0.45);
+      const heartMat = glossyClayMat('#E84258', 0.24);
+      const featherMat = clayMat('#FFF5F8', 0.6);
 
-      const bowArc = new THREE.Mesh(
-        new THREE.TorusGeometry(0.24, 0.016, 10, 26, Math.PI * 1.1),
+      // 1. Right hand: ornate S-recurve Cupid Bow
+      const bowGrp = new THREE.Group();
+      bowGrp.position.set(0, 0.015, 0.035);
+      const bowCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, -0.27, -0.045),
+        new THREE.Vector3(0, -0.22, 0.032),
+        new THREE.Vector3(0, -0.12, 0.095),
+        new THREE.Vector3(0, 0, 0.04),
+        new THREE.Vector3(0, 0.12, 0.095),
+        new THREE.Vector3(0, 0.22, 0.032),
+        new THREE.Vector3(0, 0.27, -0.045),
+      ]);
+      const bowLimbs = new THREE.Mesh(
+        new THREE.TubeGeometry(bowCurve, 36, 0.0155, 10, false),
         goldMat,
       );
-      bowArc.rotation.z = -Math.PI * 0.55;
-      bowArc.position.set(0, 0.05, 0.06);
+      const riserGrip = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.022, 0.022, 0.09, 12),
+        velvetMat,
+      );
+      riserGrip.position.set(0, 0, 0.04);
+      [-0.046, 0.046].forEach((gy) => {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.0055, 8, 16), goldBrightMat);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.set(0, gy, 0.04);
+        bowGrp.add(ring);
+      });
+      // Center golden heart + mini winglet guard
+      const guardHeart = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), heartMat);
+      guardHeart.scale.set(0.65, 1.0, 0.9);
+      guardHeart.position.set(0, 0.01, 0.068);
+      [-1, 1].forEach((side) => {
+        const winglet = new THREE.Mesh(
+          new RoundedBoxGeometry(0.048, 0.024, 0.012, 2, 0.005),
+          goldBrightMat,
+        );
+        winglet.position.set(side * 0.028, 0.016, 0.056);
+        winglet.rotation.z = side * 0.38;
+        bowGrp.add(winglet);
+      });
+      [-0.27, 0.27].forEach((tipY) => {
+        const nock = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8), goldBrightMat);
+        nock.position.set(0, tipY, -0.045);
+        bowGrp.add(nock);
+      });
       const stringRod = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.005, 0.005, 0.46, 6),
+        new THREE.CylinderGeometry(0.004, 0.004, 0.54, 6),
         stringMat,
       );
-      stringRod.position.set(0, 0.05, 0.035);
-      const arrowShaft = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.009, 0.009, 0.38, 8),
-        goldMat,
-      );
-      arrowShaft.rotation.x = Math.PI / 2;
-      arrowShaft.position.set(0, 0.05, 0.16);
-      const arrowHeart = new THREE.Mesh(
-        new THREE.SphereGeometry(0.034, 12, 10),
-        heartMat,
-      );
-      arrowHeart.scale.set(1.15, 0.9, 0.55);
-      arrowHeart.position.set(0, 0.05, 0.35);
-      handAnchor.add(bowArc, stringRod, arrowShaft, arrowHeart);
+      stringRod.position.set(0, 0, -0.045);
+      bowGrp.add(bowLimbs, riserGrip, guardHeart, stringRod);
+      handAnchor.add(bowGrp);
+
+      // 2. Left hand: matching Cupid Heart Arrow
+      if (leftHandAnchor) {
+        const arrowGrp = new THREE.Group();
+        arrowGrp.position.set(-0.008, -0.004, 0.045);
+        arrowGrp.rotation.set(1.06, 0, -0.08);
+
+        const shaft = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.0085, 0.0085, 0.52, 8),
+          goldMat,
+        );
+        shaft.position.set(0, 0.07, 0);
+
+        // Sculpted 3D heart arrowhead (two overlapping rounded lobes + pointed tip)
+        const headGrp = new THREE.Group();
+        headGrp.position.set(0, 0.34, 0);
+        const socket = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.014, 0.01, 0.025, 8),
+          goldBrightMat,
+        );
+        socket.position.y = -0.022;
+        const tipCone = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.058, 10), heartMat);
+        tipCone.scale.set(1.2, 1, 0.55);
+        tipCone.position.y = 0.022;
+        [-1, 1].forEach((side) => {
+          const lobe = new THREE.Mesh(new THREE.SphereGeometry(0.019, 10, 8), heartMat);
+          lobe.scale.set(1.05, 1.0, 0.6);
+          lobe.position.set(side * 0.013, -0.002, 0);
+          headGrp.add(lobe);
+        });
+        headGrp.add(socket, tipCone);
+
+        // Heart-feather fletching at rear
+        [-1, 1].forEach((side) => {
+          const fletch = new THREE.Mesh(
+            new RoundedBoxGeometry(0.036, 0.068, 0.008, 2, 0.003),
+            featherMat,
+          );
+          fletch.position.set(side * 0.018, -0.155, 0);
+          fletch.rotation.z = side * 0.32;
+          const accent = new THREE.Mesh(
+            new RoundedBoxGeometry(0.024, 0.045, 0.009, 2, 0.003),
+            heartMat,
+          );
+          accent.position.set(side * 0.015, -0.162, 0);
+          accent.rotation.z = side * 0.32;
+          arrowGrp.add(fletch, accent);
+        });
+
+        arrowGrp.add(shaft, headGrp);
+        leftHandAnchor.add(arrowGrp);
+      }
     } else if (handheld === 'paper_lantern') {
       const stickMat = clayMat('#7D5333', 0.65);
       const redSilkMat = new THREE.MeshStandardMaterial({
@@ -7694,33 +7906,52 @@ export function buildAvatarRig(
       straw.rotation.z = -0.14;
       handAnchor.add(cup, creamFoam, lid, straw);
     } else if (handheld === 'daisy_flower') {
-      const stemMat = clayMat('#5EA84F', 0.62);
-      const petalMat = clayMat(hColor || '#FFFDF8', 0.52);
-      const coreMat = clayMat('#F6C844', 0.45);
+      const stemMat = clayMat('#52A348', 0.6);
+      const leafMat = clayMat('#64B858', 0.62);
+      const petalMat = clayMat(hColor || '#FFFDF8', 0.48);
+      const coreMat = clayMat('#F6C844', 0.42);
+      const coreRimMat = clayMat('#E59E22', 0.52);
+
       const flowerGrp = new THREE.Group();
-      flowerGrp.position.set(0, 0.05, 0.02);
-      flowerGrp.rotation.x = 0.25;
-      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.28, 8), stemMat);
-      stem.position.y = 0.08;
-      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), stemMat);
-      leaf.scale.set(1.6, 0.6, 0.35);
-      leaf.position.set(0.026, 0.08, 0);
-      leaf.rotation.z = 0.45;
+      flowerGrp.position.set(0.012, 0.035, 0.045);
+      flowerGrp.rotation.set(0.32, 0, -0.08);
+
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.013, 0.4, 10), stemMat);
+      stem.position.y = 0.14;
+      const leafR = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), leafMat);
+      leafR.scale.set(1.75, 0.64, 0.32);
+      leafR.position.set(0.044, 0.12, 0);
+      leafR.rotation.z = 0.48;
+      const leafL = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), leafMat);
+      leafL.scale.set(1.6, 0.6, 0.3);
+      leafL.position.set(-0.038, 0.175, -0.006);
+      leafL.rotation.z = -0.52;
+
       const headGrp = new THREE.Group();
-      headGrp.position.set(0, 0.225, 0.012);
-      headGrp.rotation.x = -0.3;
-      const centerDome = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10), coreMat);
-      centerDome.scale.set(1, 1, 0.6);
-      headGrp.add(centerDome);
-      for (let p = 0; p < 8; p++) {
-        const a = (p / 8) * Math.PI * 2;
-        const petal = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), petalMat);
-        petal.scale.set(0.68, 1.45, 0.35);
-        petal.position.set(Math.cos(a) * 0.044, Math.sin(a) * 0.044, -0.004);
+      headGrp.position.set(0, 0.34, 0.016);
+      headGrp.rotation.x = -0.24;
+      const calyx = new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.032, 10), stemMat);
+      calyx.rotation.x = Math.PI / 2;
+      calyx.position.z = -0.016;
+      const centerDome = new THREE.Mesh(new THREE.SphereGeometry(0.044, 14, 12), coreMat);
+      centerDome.scale.set(1, 1, 0.56);
+      const pollenRim = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.007, 8, 16), coreRimMat);
+      pollenRim.position.z = 0.014;
+      headGrp.add(calyx, centerDome, pollenRim);
+
+      for (let p = 0; p < 12; p++) {
+        const a = (p / 12) * Math.PI * 2;
+        const petal = new THREE.Mesh(new THREE.SphereGeometry(0.033, 10, 8), petalMat);
+        petal.scale.set(0.62, 1.58, 0.32);
+        petal.position.set(
+          Math.cos(a) * 0.068,
+          Math.sin(a) * 0.068,
+          p % 2 === 0 ? -0.002 : -0.008,
+        );
         petal.rotation.z = a - Math.PI / 2;
         headGrp.add(petal);
       }
-      flowerGrp.add(stem, leaf, headGrp);
+      flowerGrp.add(stem, leafR, leafL, headGrp);
       handAnchor.add(flowerGrp);
     } else if (handheld === 'star_lantern') {
       const bambooMat = clayMat('#C69454', 0.66);
@@ -7838,19 +8069,20 @@ export function buildAvatarRig(
       grp.position.set(0, 0.04, 0.04);
       grp.rotation.x = 0.22;
 
-      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.013, 0.38, 8), bambooMat);
-      stick.position.set(0, 0.1, 0.05);
-      stick.rotation.x = 0.52;
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.013, 0.54, 8), bambooMat);
+      stick.position.set(0, 0.17, 0.14);
+      stick.rotation.x = 0.72;
 
       const roosterSwing = new THREE.Group();
-      roosterSwing.position.set(0, 0.195, 0.195);
+      roosterSwing.position.set(0, 0.37, 0.316);
       lanternSwings.push(roosterSwing);
 
-      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.1, 6), cordMat);
-      cord.position.set(0, -0.05, 0);
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.14, 6), cordMat);
+      cord.position.set(0, -0.07, 0);
 
       const roosterPivot = new THREE.Group();
-      roosterPivot.position.set(0, -0.2, 0);
+      roosterPivot.position.set(0, -0.26, 0);
+      roosterPivot.rotation.y = 0.24;
 
       const body = new THREE.Mesh(new THREE.SphereGeometry(0.098, 16, 14), greenBodyMat);
       body.scale.set(0.68, 0.92, 1.24);
@@ -7886,15 +8118,15 @@ export function buildAvatarRig(
         roosterPivot.add(wing, wingGold, eyeRing, leg);
       });
 
-      // Fanned rooster tail plumes + bottom red festive tassel
+      // Fanned rooster tail plumes well below stick + bottom red festive tassel
       [0.35, 0, -0.35].forEach((rz, ti) => {
         const plume = new THREE.Mesh(
-          new THREE.CapsuleGeometry(0.024, 0.09, 6, 8),
+          new THREE.CapsuleGeometry(0.022, 0.078, 6, 8),
           ti === 1 ? yellowHighlightMat : greenBodyMat,
         );
         plume.scale.set(0.45, 1, 0.85);
-        plume.position.set(0, 0.085 + (ti === 1 ? 0.015 : 0), -0.105 - ti * 0.01);
-        plume.rotation.x = -0.65 + rz * 0.35;
+        plume.position.set(0, 0.062 + (ti === 1 ? 0.01 : 0), -0.095 - ti * 0.008);
+        plume.rotation.x = -0.45 + rz * 0.28;
         roosterPivot.add(plume);
       });
       const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.015, 0.078, 8), combRedMat);
@@ -8128,8 +8360,13 @@ export function buildAvatarRig(
   neck.position.y = -0.004;
   headPivot.add(neck);
 
+  // Unified scaled head container so slightly smaller Box Head stays 100% synced with ALL hats, glasses, earrings, & faceplates
+  const headScaleGroup = new THREE.Group();
+  headScaleGroup.scale.setScalar(BOX_HEAD_SCALE);
+  headPivot.add(headScaleGroup);
+
   const boxAssembly = buildBoxHeadAssembly(config, {isPeppaMascot});
-  headPivot.add(boxAssembly.root);
+  headScaleGroup.add(boxAssembly.root);
   const isDarkFace = boxAssembly.isDarkFace;
 
   // Soft Rosy Cheeks mounted flush on the front box panel beneath the eyes
@@ -8146,7 +8383,7 @@ export function buildAvatarRig(
     [-1, 1].forEach((side) => {
       const cheek = new THREE.Mesh(blushPillGeo, blushBoxMat);
       cheek.position.set(side * 0.162, 0.244, BOX_FACE_DECAL_Z - 0.001);
-      headPivot.add(cheek);
+      headScaleGroup.add(cheek);
     });
   }
 
@@ -8206,7 +8443,7 @@ export function buildAvatarRig(
     closedEye.position.set(side * 0.124, 0.338, BOX_FACE_DECAL_Z);
     closedEyeGroup.add(closedEye);
   });
-  headPivot.add(openEyeGroup, closedEyeGroup);
+  headScaleGroup.add(openEyeGroup, closedEyeGroup);
 
   // Clean Box-Face Eyebrows (only on anime/expressive eyes or pout, omitted on clean minimalist box icons)
   const isMinimalIconEye =
@@ -8235,7 +8472,7 @@ export function buildAvatarRig(
       const isCool = config.eyeStyle === 'cool' || config.expression === 'confident';
       brow.position.set(side * 0.124, isPout ? 0.422 : 0.432, BOX_FACE_DECAL_Z);
       brow.rotation.z = isPout ? -side * 0.18 : isCool ? -side * 0.06 : side * 0.08;
-      headPivot.add(brow);
+      headScaleGroup.add(brow);
     });
   }
 
@@ -8257,7 +8494,7 @@ export function buildAvatarRig(
   });
   const mouthMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.195, 0.132), mouthMat);
   mouthMesh.position.set(0, 0.202, BOX_FACE_DECAL_Z);
-  headPivot.add(mouthMesh);
+  headScaleGroup.add(mouthMesh);
 
   // ========== PEPPA MASCOT CAP & BOX-FITTED HEADWEAR ==========
   {
@@ -8327,7 +8564,7 @@ export function buildAvatarRig(
         capCheek.position.set(side * 0.145, BOX_TOP_Y - 0.018, BOX_FRONT_Z + 0.014);
         hoodGroup.add(cuteEyeArc, capCheek);
       });
-      headPivot.add(hoodGroup);
+      headScaleGroup.add(hoodGroup);
     }
 
     if (config.headItem === 'beret') {
@@ -9096,12 +9333,12 @@ export function buildAvatarRig(
       const gx = side * 0.124;
       const rim = new THREE.Mesh(new THREE.TorusGeometry(0.074, 0.0095, 8, 22), frameMat);
       rim.position.set(gx, 0.338, 0.302);
-      headPivot.add(rim);
+      headScaleGroup.add(rim);
       if (isSun) {
         const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.068, 0.01, 18), lensMat);
         lens.rotation.x = Math.PI / 2;
         lens.position.set(gx, 0.338, 0.298);
-        headPivot.add(lens);
+        headScaleGroup.add(lens);
       }
       const pStart = new THREE.Vector3(side * 0.2, 0.34, 0.298);
       const pEnd = new THREE.Vector3(side * (BOX_W * 0.5 + 0.006), 0.34, 0.015);
@@ -9116,11 +9353,11 @@ export function buildAvatarRig(
         new THREE.Vector3(0, 1, 0),
         pEnd.clone().sub(pStart).normalize(),
       );
-      headPivot.add(arm);
+      headScaleGroup.add(arm);
     });
     const bridge = new THREE.Mesh(new RoundedBoxGeometry(0.066, 0.013, 0.013, 2, 0.005), frameMat);
     bridge.position.set(0, 0.344, 0.304);
-    headPivot.add(bridge);
+    headScaleGroup.add(bridge);
   } else if (config.accessory === 'star_glasses') {
     const frameMat = glossyClayMat(accCol || '#F3BA3D', 0.22);
     const lensMat = new THREE.MeshStandardMaterial({
@@ -9142,11 +9379,11 @@ export function buildAvatarRig(
       starFrame.position.set(side * 0.124, 0.334, 0.298);
       const lens = new THREE.Mesh(new THREE.CircleGeometry(0.056, 12), lensMat);
       lens.position.set(side * 0.124, 0.336, 0.304);
-      headPivot.add(starFrame, lens);
+      headScaleGroup.add(starFrame, lens);
     });
     const bridge = new THREE.Mesh(new RoundedBoxGeometry(0.066, 0.013, 0.013, 2, 0.005), frameMat);
     bridge.position.set(0, 0.344, 0.304);
-    headPivot.add(bridge);
+    headScaleGroup.add(bridge);
   } else if (config.accessory === 'vampire_cross_earring') {
     const blackMetal = clayMat('#1E1B22', 0.35, 0.5);
     const silverMetal = new THREE.MeshStandardMaterial({
@@ -9163,7 +9400,7 @@ export function buildAvatarRig(
     const hBar = new THREE.Mesh(new RoundedBoxGeometry(0.036, 0.01, 0.008, 1, 0.002), blackMetal);
     hBar.position.y = -0.026;
     earGrp.add(hoop, vBar, hBar);
-    headPivot.add(earGrp);
+    headScaleGroup.add(earGrp);
   } else if (config.accessory === 'scarf') {
     const scarfMat = clayMat(accCol, 0.78);
     const scarfLightMat = clayMat(shadeHex(accCol, 0.14).getHex(), 0.72);
@@ -9315,39 +9552,87 @@ export function buildAvatarRig(
       torsoGroup.add(wing);
     });
     torsoGroup.add(chokerRing, pendant);
-  } else if (config.accessory === 'camera_strap') {
-    const camBodyMat = clayMat(accCol || '#3B3438', 0.45);
+  }
+
+  let cameraGroup: THREE.Group | undefined;
+  if (config.accessory === 'camera_strap' && holdPose === 'carry_camera') {
+    const camBodyMat = clayMat(accCol || '#3B3438', 0.48);
+    const gripLeatherMat = clayMat('#242024', 0.72);
     const silverMat = new THREE.MeshStandardMaterial({
-      color: '#DDE5EE',
+      color: '#E2E8F0',
       roughness: 0.2,
-      metalness: 0.65,
+      metalness: 0.68,
     });
-    const strapMat = clayMat('#7D5236', 0.72);
-    const camPad = isOuterwear ? 0.036 : torsoOffset + 0.018;
-    const strapCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.095, 0.19, 0.04 + camPad * 0.4),
-      new THREE.Vector3(-0.01, 0.075, 0.228 + camPad),
-      new THREE.Vector3(0.115, -0.055, 0.236 + camPad),
-      new THREE.Vector3(0.205, -0.08, 0.01),
-      new THREE.Vector3(0.055, 0.045, -0.225 - camPad),
-      new THREE.Vector3(-0.095, 0.185, -0.05 - camPad * 0.4),
-    ]);
-    const strap = new THREE.Mesh(
-      new THREE.TubeGeometry(strapCurve, 30, 0.012, 8, true),
-      strapMat,
-    );
+    const darkLensMat = glossyClayMat('#1E2633', 0.14);
+    const lensGlassMat = new THREE.MeshStandardMaterial({
+      color: '#4DA6F0',
+      emissive: '#1E64A8',
+      emissiveIntensity: 0.35,
+      roughness: 0.12,
+      metalness: 0.32,
+    });
+    const flashGlassMat = new THREE.MeshStandardMaterial({
+      color: '#FFFBEB',
+      emissive: '#FDE68A',
+      emissiveIntensity: 0.3,
+      roughness: 0.18,
+    });
+
     const camGrp = new THREE.Group();
-    camGrp.position.set(0.118, -0.068, 0.258 + camPad);
-    camGrp.rotation.y = 0.42;
-    camGrp.rotation.z = -0.14;
-    const camBox = new THREE.Mesh(new RoundedBoxGeometry(0.118, 0.074, 0.044, 2, 0.01), camBodyMat);
-    const camTop = new THREE.Mesh(new RoundedBoxGeometry(0.114, 0.022, 0.042, 2, 0.006), silverMat);
-    camTop.position.y = 0.032;
-    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.029, 0.034, 14), silverMat);
-    lens.rotation.x = Math.PI / 2;
-    lens.position.set(0.01, -0.004, 0.03);
-    camGrp.add(camBox, camTop, lens);
-    torsoGroup.add(strap, camGrp);
+    camGrp.position.set(0, 0.068, isOuterwear ? 0.286 : 0.272);
+    camGrp.rotation.x = -0.1;
+
+    const camBox = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.126, 0.066, 4, 0.014), camBodyMat);
+    const camTop = new THREE.Mesh(new RoundedBoxGeometry(0.214, 0.038, 0.064, 3, 0.01), silverMat);
+    camTop.position.y = 0.052;
+    const prismBump = new THREE.Mesh(new RoundedBoxGeometry(0.084, 0.032, 0.052, 2, 0.008), silverMat);
+    prismBump.position.set(0, 0.078, -0.002);
+    const shutterBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.018, 12), silverMat);
+    shutterBtn.position.set(-0.072, 0.076, 0.004);
+    const modeDial = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.014, 12), gripLeatherMat);
+    modeDial.position.set(0.068, 0.074, 0.002);
+    const flashWin = new THREE.Mesh(new RoundedBoxGeometry(0.032, 0.018, 0.01, 2, 0.004), flashGlassMat);
+    flashWin.position.set(-0.068, 0.052, 0.032);
+    const viewWindow = new THREE.Mesh(new RoundedBoxGeometry(0.028, 0.02, 0.01, 2, 0.003), darkLensMat);
+    viewWindow.position.set(0, 0.078, 0.025);
+
+    [-1, 1].forEach((side) => {
+      const sideGrip = new THREE.Mesh(
+        new RoundedBoxGeometry(0.024, 0.095, 0.07, 3, 0.01),
+        gripLeatherMat,
+      );
+      sideGrip.position.set(side * 0.104, -0.005, 0.002);
+      camGrp.add(sideGrip);
+    });
+
+    const lensOuter = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.054, 0.044, 22), silverMat);
+    lensOuter.rotation.x = Math.PI / 2;
+    lensOuter.position.set(0.006, -0.006, 0.044);
+    const lensFocus = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.048, 0.052, 22), gripLeatherMat);
+    lensFocus.rotation.x = Math.PI / 2;
+    lensFocus.position.set(0.006, -0.006, 0.054);
+    const lensGlass = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.012, 20), lensGlassMat);
+    lensGlass.rotation.x = Math.PI / 2;
+    lensGlass.position.set(0.006, -0.006, 0.078);
+    const lensCore = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.014, 14), darkLensMat);
+    lensCore.rotation.x = Math.PI / 2;
+    lensCore.position.set(0.006, -0.006, 0.079);
+
+    camGrp.add(
+      camBox,
+      camTop,
+      prismBump,
+      shutterBtn,
+      modeDial,
+      flashWin,
+      viewWindow,
+      lensOuter,
+      lensFocus,
+      lensGlass,
+      lensCore,
+    );
+    torsoGroup.add(camGrp);
+    cameraGroup = camGrp;
   }
 
   let heldPetRig: PetRig | undefined;
@@ -9491,6 +9776,7 @@ export function buildAvatarRig(
     rodTipPivot,
     heldPetRig,
     lanternSwings: lanternSwings.length > 0 ? lanternSwings : undefined,
+    cameraGroup,
     headTopAbovePivot,
   };
 }
@@ -9564,15 +9850,48 @@ export function updateAvatarRigAnimation(
   // Reset Ao Dai flaps cleanly before pose switch so idle/sit/bike always start clean
   if (rig.aoDaiFrontPanel) rig.aoDaiFrontPanel.rotation.x = 0;
   if (rig.aoDaiBackPanel) rig.aoDaiBackPanel.rotation.x = 0;
-  // Gentle continuous flutter on angel/crystal wings
+  if (rig.cameraGroup) {
+    rig.cameraGroup.visible =
+      pose === 'idle' ||
+      pose === 'walk' ||
+      pose === 'sit' ||
+      pose === 'jump' ||
+      pose === 'happy_jump';
+  }
+  // Smooth, noticeable wing-flapping animation on angel & butterfly crystal wings
   if (rig.leftWing && rig.rightWing) {
-    const isActiveFlutter =
-      pose === 'walk' || pose === 'jump' || pose === 'parachute' || pose === 'happy_jump';
-    const wingAmp = pose === 'happy_jump' ? 0.16 : isActiveFlutter ? 0.11 : 0.045;
-    const wingFreq = pose === 'happy_jump' ? 11.5 : isActiveFlutter ? 8.2 : 2.6;
-    const wingWave = Math.sin(elapsed * wingFreq) * wingAmp;
-    rig.leftWing.rotation.y = -0.22 - wingWave;
-    rig.rightWing.rotation.y = 0.22 + wingWave;
+    const isEnergeticFlap =
+      pose === 'walk' ||
+      pose === 'jump' ||
+      pose === 'parachute' ||
+      pose === 'happy_jump' ||
+      pose === 'lotus_ride' ||
+      pose === 'broom_ride';
+    const wingAmpY =
+      pose === 'happy_jump' || pose === 'jump'
+        ? 0.38
+        : isEnergeticFlap
+          ? 0.3
+          : 0.24;
+    const wingAmpZ =
+      pose === 'happy_jump' || pose === 'jump'
+        ? 0.14
+        : isEnergeticFlap
+          ? 0.1
+          : 0.08;
+    const wingFreq =
+      pose === 'happy_jump' || pose === 'jump'
+        ? 10.5
+        : isEnergeticFlap
+          ? 7.2
+          : 3.4;
+    const wingPhase = elapsed * wingFreq;
+    const wingWave = Math.sin(wingPhase) * wingAmpY;
+    const wingLift = Math.sin(wingPhase - 0.35) * wingAmpZ;
+    rig.leftWing.rotation.y = -0.32 - wingWave;
+    rig.rightWing.rotation.y = 0.32 + wingWave;
+    rig.leftWing.rotation.z = -wingLift;
+    rig.rightWing.rotation.z = wingLift;
   }
 
   if (pose !== 'sit' && pose !== 'bath' && !isBikePose) {
@@ -9629,16 +9948,24 @@ export function updateAvatarRigAnimation(
     if (rig.aoDaiBackPanel) rig.aoDaiBackPanel.rotation.x = 0.09 + Math.abs(swing) * 0.18;
     const leftBaseX = (rig.leftArm.userData.baseX as number | undefined) ?? 0;
     const leftElbowBaseX = (rig.leftElbow?.userData.baseX as number | undefined) ?? HAND_POSES.none.elbowX;
-    rig.leftArm.rotation.x = leftBaseX - swing * (leftBaseX < 0 ? 0.18 : 0.45);
-    if (rig.leftElbow) {
-      rig.leftElbow.rotation.x = leftElbowBaseX - 0.08 + Math.max(0, -swing) * 0.12;
+    if (hold === 'carry_camera') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_camera.armX + Math.abs(swing) * 0.03;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else {
+      rig.leftArm.rotation.x = leftBaseX - swing * (leftBaseX < 0 ? 0.18 : 0.45);
+      if (rig.leftElbow) {
+        rig.leftElbow.rotation.x = leftElbowBaseX - 0.08 + Math.max(0, -swing) * 0.12;
+      }
     }
     if (rig.skirtPivot) {
       rig.skirtPivot.rotation.z = Math.sin(elapsed * 6) * 0.035;
       rig.skirtPivot.rotation.x = Math.abs(swing) * 0.045;
     }
 
-    if (hold === 'carry_umbrella') {
+    if (hold === 'carry_camera') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_camera.armX + Math.abs(swing) * 0.03;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + swing * 0.06;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
     } else if (hold === 'carry_lantern') {
@@ -9745,13 +10072,21 @@ export function updateAvatarRigAnimation(
     if (rig.aoDaiFrontPanel) rig.aoDaiFrontPanel.rotation.x = -0.22;
     if (rig.aoDaiBackPanel) rig.aoDaiBackPanel.rotation.x = 0.2;
 
-    rig.leftArm.rotation.x = -0.58;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.42;
+    if (hold === 'carry_camera') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_camera.armX - 0.08;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else {
+      rig.leftArm.rotation.x = -0.58;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = -0.42;
+    }
     if (rig.skirtPivot) {
       rig.skirtPivot.scale.set(1.06, 0.98, 1.06);
       rig.skirtPivot.rotation.x = 0.09;
     }
-    if (hold === 'carry_umbrella') {
+    if (hold === 'carry_camera') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_camera.armX - 0.08;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX - 0.08;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
     } else if (hold === 'carry_lantern') {
@@ -9882,10 +10217,18 @@ export function updateAvatarRigAnimation(
       }
     }
 
-    rig.leftArm.rotation.x = -0.44 + sitBreath * 0.015;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.62;
+    if (hold === 'carry_camera') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_camera.armX + sitBreath * 0.012;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else {
+      rig.leftArm.rotation.x = -0.44 + sitBreath * 0.015;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = -0.62;
+    }
 
-    if (hold === 'carry_umbrella') {
+    if (hold === 'carry_camera') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_camera.armX + sitBreath * 0.012;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + sitBreath * 0.012;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
     } else if (hold === 'carry_lantern') {
@@ -10002,15 +10345,23 @@ export function updateAvatarRigAnimation(
     if (rig.aoDaiFrontPanel) rig.aoDaiFrontPanel.rotation.x = -(0.1 + 0.2 * hopArc);
     if (rig.aoDaiBackPanel) rig.aoDaiBackPanel.rotation.x = 0.1 + 0.2 * hopArc;
 
-    rig.leftArm.rotation.x = -2.38 + cheerWave * 0.24;
-    rig.leftArm.rotation.z = -0.34 - Math.abs(cheerSway) * 0.12;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = -0.32 + Math.cos(elapsed * 14.4) * 0.18;
+    if (hold === 'carry_camera') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_camera.armX - 0.14 * hopArc;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else {
+      rig.leftArm.rotation.x = -2.38 + cheerWave * 0.24;
+      rig.leftArm.rotation.z = -0.34 - Math.abs(cheerSway) * 0.12;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = -0.32 + Math.cos(elapsed * 14.4) * 0.18;
+    }
 
     if (rig.skirtPivot) {
       rig.skirtPivot.scale.set(1 + hopArc * 0.09, 1 - hopArc * 0.03, 1 + hopArc * 0.09);
       rig.skirtPivot.rotation.z = cheerSway * 0.04;
     }
-    if (hold === 'carry_umbrella') {
+    if (hold === 'carry_camera') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_camera.armX - 0.14 * hopArc;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX - 0.18 * hopArc;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
     } else if (hold === 'carry_lantern') {
@@ -10378,10 +10729,18 @@ export function updateAvatarRigAnimation(
     const leftIdleBaseX = (rig.leftArm.userData.baseX as number | undefined) ?? 0;
     const leftIdleElbowX =
       (rig.leftElbow?.userData.baseX as number | undefined) ?? HAND_POSES.none.elbowX;
-    rig.leftArm.rotation.x = leftIdleBaseX + Math.sin(breathPhase - 0.3) * 0.024;
-    if (rig.leftElbow) rig.leftElbow.rotation.x = leftIdleElbowX - breath01 * 0.03;
+    if (hold === 'carry_camera') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_camera.armX + breath * 0.014;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else {
+      rig.leftArm.rotation.x = leftIdleBaseX + Math.sin(breathPhase - 0.3) * 0.024;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = leftIdleElbowX - breath01 * 0.03;
+    }
 
-    if (hold === 'carry_umbrella') {
+    if (hold === 'carry_camera') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_camera.armX + breath * 0.014;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + breath * 0.014;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
     } else if (hold === 'carry_lantern') {

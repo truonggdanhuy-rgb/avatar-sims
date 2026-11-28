@@ -3,6 +3,7 @@ import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeomet
 import {AvatarConfig, BoxHeadSkinId, EyeStyle, ExpressionStyle, HeadItemStyle} from '../types/game';
 import {clayMat, glossyClayMat} from './materials';
 
+export const BOX_HEAD_SCALE = 0.85;
 export const BOX_W = 0.62;
 export const BOX_H = 0.56;
 export const BOX_D = 0.56;

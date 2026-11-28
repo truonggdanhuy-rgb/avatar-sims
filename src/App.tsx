@@ -638,6 +638,9 @@ export default function App() {
           if (String(merged.accessory ?? '') === 'gingham_neckerchief') {
             merged.accessory = 'none';
           }
+          if (String(merged.backpack ?? '') === 'witch_moon_bag') {
+            merged.backpack = 'none';
+          }
           merged.name = finalizePlayerName(String(merged.name ?? ''), DEFAULT_AVATAR.name);
           return merged;
         }

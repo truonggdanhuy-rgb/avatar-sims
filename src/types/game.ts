@@ -219,8 +219,7 @@ export type BackpackStyle =
   | 'goose_cross_bag'
   | 'student_bag_gingham'
   | 'student_bag_brown'
-  | 'student_bag_navy'
-  | 'witch_moon_bag';
+  | 'student_bag_navy';
 
 export type HandheldStyle =
   | 'none'
