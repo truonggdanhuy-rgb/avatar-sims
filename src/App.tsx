@@ -210,9 +210,14 @@ import {
   decodeAccountTransferCode,
   encodeAccountTransferCode,
   encodeAccountTransferCodeSync,
+  extractSavePreview,
 } from './utils/accountSave';
 import {finalizePlayerName, sanitizePlayerNameInput} from './utils/playerName';
 import {soundFX} from './utils/sound';
+import {
+  SupabaseAuthSession,
+  uploadSaveToSupabase,
+} from './utils/supabaseSync';
 
 const HOUSE_LAYOUT_VERSION = 5;
 const TELEPORT_COOLDOWN_MS = 15000;
@@ -512,6 +517,11 @@ export default function App() {
   });
   const isRestoringSaveRef = useRef(false);
   const hasGeneratedCodeOnceRef = useRef(false);
+  const latestBuildSavePayloadRef = useRef<((savedAt?: number) => Record<string, unknown>) | null>(null);
+  const isCloudSyncingRef = useRef(false);
+  const [supabaseSession, setSupabaseSession] = useState<SupabaseAuthSession | null>(null);
+  const [supabaseAutoSync, setSupabaseAutoSync] = useState<boolean>(true);
+  const [lastCloudSyncAt, setLastCloudSyncAt] = useState<string | null>(null);
 
   const homeSpotRef = useRef<{x: number; z: number}>({x: -1.8, z: 4.5});
 
@@ -2008,6 +2018,8 @@ export default function App() {
       savedAt,
     });
 
+    latestBuildSavePayloadRef.current = (ts?: number) => buildSavePayload(ts ?? Date.now());
+
     const persistState = (refreshTransferCode = true) => {
       if (isRestoringSaveRef.current) return;
       const now = Date.now();
@@ -2101,6 +2113,26 @@ export default function App() {
     soundEnabled,
     timeOfDay,
   ]);
+
+  // Debounced automatic Supabase cloud backup while linked
+  useEffect(() => {
+    if (!hasCreatedCharacter || !supabaseSession || !supabaseAutoSync) return;
+    const timer = window.setTimeout(async () => {
+      if (isRestoringSaveRef.current || isCloudSyncingRef.current) return;
+      const buildFn = latestBuildSavePayloadRef.current;
+      if (!buildFn) return;
+      isCloudSyncingRef.current = true;
+      const res = await uploadSaveToSupabase(supabaseSession, buildFn(Date.now()));
+      isCloudSyncingRef.current = false;
+      if (res.ok) {
+        setSupabaseSession(res.session);
+        setLastCloudSyncAt(res.updatedAt);
+      } else if (res.sessionExpired) {
+        setSupabaseSession(null);
+      }
+    }, 15000);
+    return () => window.clearTimeout(timer);
+  }, [lastSavedAt, hasCreatedCharacter, supabaseSession, supabaseAutoSync]);
 
   // Gentle passive hunger decay (-1 every 130 seconds for relaxed pacing)
   useEffect(() => {
@@ -2206,19 +2238,22 @@ export default function App() {
     };
   };
 
-  const handleRestoreAccountCode = async (
-    rawCode: string,
+  const handleRestoreAccountPayload = async (
+    payload: Record<string, unknown>,
   ): Promise<{ok: boolean; message: string}> => {
-    const decoded = await decodeAccountTransferCode(rawCode);
-    if (!decoded.ok) {
-      return {ok: false, message: decoded.message};
+    if (!payload || typeof payload !== 'object' || !payload.avatar || typeof payload.avatar !== 'object') {
+      return {
+        ok: false,
+        message: 'Dữ liệu tài khoản không hợp lệ hoặc thiếu thông tin nhân vật.',
+      };
     }
+    const preview = extractSavePreview(payload);
     try {
       isRestoringSaveRef.current = true;
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
-          ...decoded.payload,
+          ...payload,
           characterCreated: true,
           savedAt: Date.now(),
         }),
@@ -2228,7 +2263,7 @@ export default function App() {
       }, 450);
       return {
         ok: true,
-        message: `Đã khôi phục tài khoản "${decoded.preview.playerName}"! Đang mở Thị Trấn Mây...`,
+        message: `Đã khôi phục tài khoản "${preview.playerName}"! Đang mở Thị Trấn Mây...`,
       };
     } catch {
       isRestoringSaveRef.current = false;
@@ -2237,6 +2272,42 @@ export default function App() {
         message: 'Không thể ghi dữ liệu vào trình duyệt này. Vui lòng kiểm tra bộ nhớ trình duyệt.',
       };
     }
+  };
+
+  const handleRestoreAccountCode = async (
+    rawCode: string,
+  ): Promise<{ok: boolean; message: string}> => {
+    const decoded = await decodeAccountTransferCode(rawCode);
+    if (!decoded.ok) {
+      return {ok: false, message: decoded.message};
+    }
+    return handleRestoreAccountPayload(decoded.payload);
+  };
+
+  const handleUploadToSupabase = async (): Promise<{
+    ok: boolean;
+    updatedAt?: string;
+    message: string;
+  }> => {
+    if (!supabaseSession) {
+      return {ok: false, message: 'Vui lòng đăng nhập Supabase trước khi đồng bộ.'};
+    }
+    const buildFn = latestBuildSavePayloadRef.current;
+    if (!buildFn) {
+      return {ok: false, message: 'Dữ liệu trò chơi chưa sẵn sàng để lưu.'};
+    }
+    isCloudSyncingRef.current = true;
+    const res = await uploadSaveToSupabase(supabaseSession, buildFn(Date.now()));
+    isCloudSyncingRef.current = false;
+    if (!res.ok) {
+      if (res.sessionExpired) {
+        setSupabaseSession(null);
+      }
+      return {ok: false, message: res.message};
+    }
+    setSupabaseSession(res.session);
+    setLastCloudSyncAt(res.updatedAt);
+    return {ok: true, updatedAt: res.updatedAt, message: res.message};
   };
 
   const markQuestDone = (key: DailyQuestKey) => {
@@ -4824,6 +4895,13 @@ export default function App() {
           onToggleSound={handleToggleSound}
           onRedeemGiftCode={handleRedeemGiftCode}
           onRestoreAccountCode={handleRestoreAccountCode}
+          supabaseSession={supabaseSession}
+          supabaseAutoSync={supabaseAutoSync}
+          lastCloudSyncAt={lastCloudSyncAt}
+          onSupabaseSessionChange={setSupabaseSession}
+          onToggleSupabaseAutoSync={setSupabaseAutoSync}
+          onUploadToSupabase={handleUploadToSupabase}
+          onRestoreAccountPayload={handleRestoreAccountPayload}
           onClose={() => setPhoneOpen(false)}
         />
       )}
@@ -4867,6 +4945,9 @@ export default function App() {
         <StarterCharacterModal
           onConfirm={handleConfirmStarterCharacter}
           onRestoreAccountCode={handleRestoreAccountCode}
+          supabaseSession={supabaseSession}
+          onSupabaseSessionChange={setSupabaseSession}
+          onRestoreAccountPayload={handleRestoreAccountPayload}
         />
       )}
     </main>

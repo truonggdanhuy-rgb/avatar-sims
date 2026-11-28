@@ -59,9 +59,11 @@ import {
   decodeAccountTransferCode,
 } from '../../utils/accountSave';
 import {soundFX} from '../../utils/sound';
+import {SupabaseAuthSession} from '../../utils/supabaseSync';
 import {AvatarPreview3D} from '../AvatarPreview3D';
 import {FishIllustration} from '../FishingIcons';
 import {CreatureBookIcon, InsectIllustration} from '../InsectIcons';
+import {SupabaseCloudPanel} from './SupabaseCloudPanel';
 
 interface PhoneMenuModalProps {
   zone: ZoneId;
@@ -94,6 +96,13 @@ interface PhoneMenuModalProps {
   onToggleSound: () => void;
   onRedeemGiftCode: (code: string) => {ok: boolean; message: string};
   onRestoreAccountCode: (code: string) => Promise<{ok: boolean; message: string}>;
+  supabaseSession: SupabaseAuthSession | null;
+  supabaseAutoSync: boolean;
+  lastCloudSyncAt: string | null;
+  onSupabaseSessionChange: (session: SupabaseAuthSession | null) => void;
+  onToggleSupabaseAutoSync: (enabled: boolean) => void;
+  onUploadToSupabase: () => Promise<{ok: boolean; updatedAt?: string; message: string}>;
+  onRestoreAccountPayload: (payload: Record<string, unknown>) => Promise<{ok: boolean; message: string}>;
   onClose: () => void;
 }
 
@@ -165,6 +174,13 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   onToggleSound,
   onRedeemGiftCode,
   onRestoreAccountCode,
+  supabaseSession,
+  supabaseAutoSync,
+  lastCloudSyncAt,
+  onSupabaseSessionChange,
+  onToggleSupabaseAutoSync,
+  onUploadToSupabase,
+  onRestoreAccountPayload,
   onClose,
 }) => {
   const [tab, setTab] = useState<PhoneTab>(initialTab);
@@ -686,6 +702,18 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Liên kết Supabase Cloud */}
+              <SupabaseCloudPanel
+                mode="account"
+                session={supabaseSession}
+                autoSyncEnabled={supabaseAutoSync}
+                lastCloudSyncAt={lastCloudSyncAt}
+                onSessionChange={onSupabaseSessionChange}
+                onToggleAutoSync={onToggleSupabaseAutoSync}
+                onUploadNow={onUploadToSupabase}
+                onRestorePayload={onRestoreAccountPayload}
+              />
 
               {/* Khôi phục tài khoản từ mã (Đổi máy) */}
               <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3.5 shadow-xs space-y-2">

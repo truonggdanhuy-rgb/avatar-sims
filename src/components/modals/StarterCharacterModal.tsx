@@ -9,7 +9,9 @@ import {AvatarConfig} from '../../types/game';
 import {AccountSavePreview, decodeAccountTransferCode} from '../../utils/accountSave';
 import {finalizePlayerName, sanitizePlayerNameInput} from '../../utils/playerName';
 import {soundFX} from '../../utils/sound';
+import {SupabaseAuthSession} from '../../utils/supabaseSync';
 import {AvatarPreview3D} from '../AvatarPreview3D';
+import {SupabaseCloudPanel} from './SupabaseCloudPanel';
 
 interface StarterCharacterModalProps {
   onConfirm: (payload: {
@@ -17,11 +19,17 @@ interface StarterCharacterModalProps {
     unlockItemIds: string[];
   }) => void;
   onRestoreAccountCode?: (code: string) => Promise<{ok: boolean; message: string}>;
+  supabaseSession?: SupabaseAuthSession | null;
+  onSupabaseSessionChange?: (session: SupabaseAuthSession | null) => void;
+  onRestoreAccountPayload?: (payload: Record<string, unknown>) => Promise<{ok: boolean; message: string}>;
 }
 
 export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
   onConfirm,
   onRestoreAccountCode,
+  supabaseSession = null,
+  onSupabaseSessionChange,
+  onRestoreAccountPayload,
 }) => {
   const [mode, setMode] = useState<'create' | 'restore'>('create');
   const [selectedId, setSelectedId] = useState<'girl' | 'boy'>('girl');
@@ -110,12 +118,12 @@ export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
               <p className="text-xs font-medium text-[#7A6048]">
                 {mode === 'create'
                   ? 'Chọn nhân vật Nam hoặc Nữ & đặt tên để bắt đầu hành trình'
-                  : 'Dán mã lưu tài khoản từ máy cũ để tiếp tục hành trình của bạn'}
+                  : 'Đăng nhập Supabase hoặc dán mã TTM1- từ máy cũ để tiếp tục hành trình'}
               </p>
             </div>
           </div>
 
-          {onRestoreAccountCode && (
+          {(onRestoreAccountCode || onRestoreAccountPayload) && (
             <button
               type="button"
               onClick={() => {
@@ -131,7 +139,7 @@ export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
             >
               <KeyRound className="h-3.5 w-3.5" />
               <span>
-                {mode === 'restore' ? 'Quay lại tạo mới' : 'Đã có mã? Khôi phục'}
+                {mode === 'restore' ? 'Quay lại tạo mới' : 'Đã có tài khoản? Khôi phục'}
               </span>
             </button>
           )}
@@ -140,7 +148,19 @@ export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
         {/* Body */}
         {mode === 'restore' ? (
           <div className="custom-scroll flex-1 overflow-y-auto p-5 sm:p-6">
-            <div className="mx-auto max-w-lg space-y-4 rounded-2xl border border-[#DFCCB0] bg-white p-5 shadow-xs">
+            <div className="mx-auto max-w-lg space-y-4">
+              {onRestoreAccountPayload && onSupabaseSessionChange && (
+                <SupabaseCloudPanel
+                  mode="restore"
+                  session={supabaseSession}
+                  autoSyncEnabled={true}
+                  lastCloudSyncAt={null}
+                  onSessionChange={onSupabaseSessionChange}
+                  onToggleAutoSync={() => {}}
+                  onRestorePayload={onRestoreAccountPayload}
+                />
+              )}
+              <div className="space-y-4 rounded-2xl border border-[#DFCCB0] bg-white p-5 shadow-xs">
               <div className="flex items-center gap-2 text-sm font-black text-[#4A3525]">
                 <KeyRound className="h-5 w-5 text-[#2F6296]" />
                 <span>Khôi Phục Tài Khoản Bằng Mã</span>
@@ -203,6 +223,7 @@ export const StarterCharacterModal: React.FC<StarterCharacterModalProps> = ({
                   {isRestoring ? 'Đang khôi phục...' : 'Khôi Phục & Vào Thị Trấn Mây'}
                 </span>
               </button>
+              </div>
             </div>
           </div>
         ) : (
