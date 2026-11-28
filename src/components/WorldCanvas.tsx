@@ -62,8 +62,10 @@ import {
   HUNGER_NEAR_EMPTY_THRESHOLD,
 } from '../data/foodCatalog';
 import {HandheldFoodIcon} from './modals/VendingMachineModal';
+import {ANNA_AVATAR} from '../data/avatarCatalog';
 import {FURNITURE_BY_ID, isPointOnFurnitureSurface} from '../data/furnitureCatalog';
 import {FARM_DECOR_BY_ID} from '../data/farmDecorCatalog';
+import {TourCameraTarget} from './OnboardingTourOverlay';
 import {
   AvatarMountAnimParams,
   AvatarRig,
@@ -340,6 +342,9 @@ interface WorldCanvasProps {
   onFeedPet: (petId: string) => {ok: boolean; message: string} | void;
   onCurePet: (petId: string) => void;
   onPlayWithPet: (petId: string) => {ok: boolean; gainedXp: boolean; message: string} | void;
+  tourCameraTarget?: TourCameraTarget | null;
+  onOpenFurnitureDisplay: (furnitureId: string) => void;
+  onStartAnnaTour: () => void;
 }
 
 interface ProjectedTag {
@@ -1419,6 +1424,9 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   onFeedPet,
   onCurePet,
   onPlayWithPet,
+  tourCameraTarget = null,
+  onOpenFurnitureDisplay,
+  onStartAnnaTour,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const labelLayerRef = useRef<HTMLDivElement | null>(null);
@@ -1543,6 +1551,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     activePet,
     carriedPetId,
     equippedFoodId,
+    tourCameraTarget,
   });
   stateRef.current = {
     zone,
@@ -1570,6 +1579,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     activePet,
     carriedPetId,
     equippedFoodId,
+    tourCameraTarget,
   };
 
   const callbacksRef = useRef({
@@ -1627,6 +1637,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onOpenPetAdopt,
     onOpenBbqGrill,
     onOpenVendingMachine,
+    onOpenFurnitureDisplay,
+    onStartAnnaTour,
   });
   callbacksRef.current = {
     onChangeZone,
@@ -1683,7 +1695,19 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onOpenPetAdopt,
     onOpenBbqGrill,
     onOpenVendingMachine,
+    onOpenFurnitureDisplay,
+    onStartAnnaTour,
   };
+
+  const tourEndSnapRef = useRef<(() => void) | null>(null);
+  const wasTourActiveRef = useRef<boolean>(false);
+  useEffect(() => {
+    const isNowActive = Boolean(tourCameraTarget);
+    if (wasTourActiveRef.current && !isNowActive) {
+      tourEndSnapRef.current?.();
+    }
+    wasTourActiveRef.current = isNowActive;
+  }, [tourCameraTarget]);
 
   const rebuildSceneTriggerRef = useRef<(() => void) | null>(null);
   const rebuildAvatarTriggerRef = useRef<
@@ -2053,6 +2077,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     });
     playerRig.root.position.set(playerPos.x, 0.14, playerPos.z);
     scene.add(playerRig.root);
+
+    const tourAnnaRig: AvatarRig = buildAvatarRig(ANNA_AVATAR);
+    tourAnnaRig.root.visible = false;
+    scene.add(tourAnnaRig.root);
+
+    tourEndSnapRef.current = () => {
+      cameraTransitionActive = true;
+    };
 
     let mountRig: MountRig | null = null;
     let skateMoveSec = 0;
@@ -4977,11 +5009,35 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             return;
           }
 
-          if (kind === 'arcade_exchange_kiosk') {
+          if (kind === 'npc_anna') {
             soundFX.tap();
+            if (boatState.active) {
+              disembarkBoat(false);
+            }
+            if (stateRef.current.zone === 'town' && mallElev.state === 'deck') {
+              showBubble('Hãy xuống khỏi sân thượng May Mall để gặp Anna!');
+              return;
+            }
+            startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
+              const ax = typeof data.annaX === 'number' ? data.annaX : -3.25;
+              const az = typeof data.annaZ === 'number' ? data.annaZ : 3.7;
+              playerPos.rotY = Math.atan2(ax - playerPos.x, az - playerPos.z);
+              soundFX.sparkle();
+              callbacksRef.current.onStartAnnaTour();
+            });
+            return;
+          }
+
+          if (
+            kind === 'doll_display' ||
+            kind === 'aquarium_display' ||
+            kind === 'insect_display'
+          ) {
+            soundFX.tap();
+            const furnId = data.furnitureId as string;
             startWalkTo(data.tx as number, data.tz as number, 'idle', undefined, () => {
               soundFX.sparkle();
-              callbacksRef.current.onOpenArcadeHub?.('exchange');
+              callbacksRef.current.onOpenFurnitureDisplay(furnId);
             });
             return;
           }
@@ -6436,7 +6492,36 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       );
       rimLight.color.lerp(_rimColorTarget, 0.08);
 
-      if (cameraTransitionActive) {
+      const activeTour = stateRef.current.tourCameraTarget;
+      const isTourControlling = Boolean(activeTour && activeTour.zone === z);
+      if (isTourControlling && activeTour) {
+        const isPlazaStop = z === 'town' && activeTour.annaPos[2] < 10;
+        tourAnnaRig.root.visible = !isPlazaStop;
+        if (!isPlazaStop) {
+          tourAnnaRig.root.position.set(
+            activeTour.annaPos[0],
+            activeTour.annaPos[1],
+            activeTour.annaPos[2],
+          );
+          tourAnnaRig.root.rotation.y = activeTour.annaRotY;
+          updateAvatarRigAnimation(tourAnnaRig, 'idle', elapsed, false);
+        }
+        const w = container?.clientWidth || window.innerWidth || 800;
+        const h = container?.clientHeight || window.innerHeight || 600;
+        const camCfg = getResponsiveCameraSettings(z, w / h);
+        camera.fov = THREE.MathUtils.damp(camera.fov, camCfg.fov, 5, delta);
+        camera.updateProjectionMatrix();
+        camera.position.x = THREE.MathUtils.damp(camera.position.x, activeTour.camPos[0], 4.5, delta);
+        camera.position.y = THREE.MathUtils.damp(camera.position.y, activeTour.camPos[1], 4.5, delta);
+        camera.position.z = THREE.MathUtils.damp(camera.position.z, activeTour.camPos[2], 4.5, delta);
+        controls.target.x = THREE.MathUtils.damp(controls.target.x, activeTour.lookAt[0], 4.5, delta);
+        controls.target.y = THREE.MathUtils.damp(controls.target.y, activeTour.lookAt[1], 4.5, delta);
+        controls.target.z = THREE.MathUtils.damp(controls.target.z, activeTour.lookAt[2], 4.5, delta);
+      } else {
+        tourAnnaRig.root.visible = false;
+      }
+
+      if (!isTourControlling && cameraTransitionActive) {
         const w = container?.clientWidth || window.innerWidth || 800;
         const h = container?.clientHeight || window.innerHeight || 600;
         const camCfg = getResponsiveCameraSettings(z, w / h);
@@ -7519,7 +7604,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       const ridePose = swingPose ?? seesawPose;
 
       // Keep camera & OrbitControls always centered smoothly on the player character
-      if (!cameraTransitionActive) {
+      if (!isTourControlling && !cameraTransitionActive) {
         const focusX = ridePose ? ridePose.x : playerPos.x;
         const focusY = (ridePose ? ridePose.y - 0.245 : groundOffset) + 0.92;
         const focusZ = ridePose ? ridePose.z : playerPos.z;
@@ -7537,7 +7622,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
 
       controls.update();
-      if ((z === 'town' || z === 'island') && !cameraTransitionActive) {
+      if ((z === 'town' || z === 'island') && !cameraTransitionActive && !isTourControlling) {
         const camGround =
           z === 'town'
             ? Math.max(
@@ -9021,6 +9106,19 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         mountRig = null;
       }
       playerRig.heldPetRig?.dispose();
+      tourAnnaRig.heldPetRig?.dispose();
+      scene.remove(tourAnnaRig.root);
+      tourAnnaRig.root.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh) {
+          const m = obj as THREE.Mesh;
+          m.geometry?.dispose();
+          if (Array.isArray(m.material)) {
+            m.material.forEach((mat) => mat.dispose());
+          } else {
+            m.material?.dispose();
+          }
+        }
+      });
       activeTown?.dispose();
       activeSubzone?.dispose();
       selectionRing.geometry.dispose();

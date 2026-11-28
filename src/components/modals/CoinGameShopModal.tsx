@@ -1,7 +1,7 @@
 import React from 'react';
 import {Backpack, Cat, Check, CloudRain, Coins, Gamepad2, Sparkles, Wind, X} from 'lucide-react';
 import {COINGAME_SHOP_MOUNTS, MOUNT_RANK_META} from '../../data/mountCatalog';
-import {COINGAME_TO_XU_RATE, MountId, OwnedMountsState} from '../../types/game';
+import {MountId, OwnedMountsState} from '../../types/game';
 import {soundFX} from '../../utils/sound';
 import {
   DongThapLotusMountIcon,
@@ -157,9 +157,6 @@ export const CoinGameShopModal: React.FC<CoinGameShopModalProps> = ({
                     <div className="flex items-center gap-1.5 text-sm font-black tabular-nums text-[#38BDF8]">
                       <Gamepad2 className="h-4 w-4" />
                       <span>{cgPrice} CoinGame</span>
-                      <span className="text-[11px] font-semibold text-[#94A3B8]">
-                        (≈ {cgPrice * COINGAME_TO_XU_RATE} Xu)
-                      </span>
                     </div>
                   </div>
 

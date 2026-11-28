@@ -1041,6 +1041,60 @@ export const FurnitureSvgPreview: React.FC<{item: FurnitureCatalogItem}> = ({ite
           <circle cx="15" cy="40" r="1" fill="#F4C430" />
         </svg>
       );
+    case 'doll_shelf_small':
+    case 'doll_shelf_large': {
+      const large = item.kind === 'doll_shelf_large';
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x={large ? 8 : 14} y={large ? 9 : 14} width={large ? 48 : 36} height={large ? 39 : 34} rx="4" fill={c} stroke="#8D603D" strokeWidth="1.8" />
+          <rect x={large ? 12 : 18} y={large ? 13 : 18} width={large ? 40 : 28} height={large ? 30 : 24} rx="2" fill="#FFF7FB" />
+          {large && <line x1="12" y1="28" x2="52" y2="28" stroke="#8D603D" strokeWidth="2" />}
+          <circle cx={large ? 23 : 25} cy={large ? 22 : 31} r="4.5" fill={a} />
+          <circle cx={large ? 41 : 39} cy={large ? 22 : 31} r="4.5" fill="#7DD3FC" />
+          {large && (
+            <>
+              <circle cx="23" cy="37" r="4.5" fill="#FBBF24" />
+              <circle cx="41" cy="37" r="4.5" fill="#86EFAC" />
+            </>
+          )}
+        </svg>
+      );
+    }
+    case 'aquarium_small':
+    case 'aquarium_large': {
+      const large = item.kind === 'aquarium_large';
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x={large ? 7 : 14} y="34" width={large ? 50 : 36} height="14" rx="2" fill={a} />
+          <rect x={large ? 7 : 14} y="11" width={large ? 50 : 36} height="23" rx="3" fill="#7DD3FC" opacity="0.72" stroke="#334155" strokeWidth="1.8" />
+          <rect x={large ? 9 : 16} y="29" width={large ? 46 : 32} height="4" fill="#F4DFB4" />
+          <ellipse cx={large ? 24 : 28} cy="22" rx="4.5" ry="2.6" fill="#FB923C" />
+          <polygon points={large ? '19,22 15,19 15,25' : '23,22 19,19 19,25'} fill="#FB923C" />
+          {large && (
+            <>
+              <ellipse cx="42" cy="19" rx="4" ry="2.4" fill="#F472B6" />
+              <polygon points="46,19 50,16 50,22" fill="#F472B6" />
+            </>
+          )}
+          <circle cx={large ? 34 : 39} cy="16" r="1.5" fill="#FFFFFF" />
+        </svg>
+      );
+    }
+    case 'insect_display_small':
+    case 'insect_display_large': {
+      const large = item.kind === 'insect_display_large';
+      return (
+        <svg width="64" height="54" viewBox="0 0 64 54">
+          <rect x={large ? 8 : 15} y="35" width={large ? 48 : 34} height="13" rx="2" fill={c} stroke="#6E492D" strokeWidth="1.4" />
+          <rect x={large ? 8 : 15} y="11" width={large ? 48 : 34} height="24" rx="3" fill="#DCFCE7" opacity="0.75" stroke="#6E492D" strokeWidth="1.8" />
+          <rect x={large ? 10 : 17} y="30" width={large ? 44 : 30} height="4" fill={a} />
+          <line x1={large ? 14 : 20} y1="30" x2={large ? 46 : 42} y2="21" stroke="#7D5333" strokeWidth="2.5" strokeLinecap="round" />
+          <ellipse cx={large ? 23 : 27} cy="20" rx="3.5" ry="2.4" fill="#38BDF8" />
+          <ellipse cx={large ? 27 : 31} cy="20" rx="3.5" ry="2.4" fill="#38BDF8" />
+          {large && <circle cx="42" cy="24" r="3" fill="#F59E0B" />}
+        </svg>
+      );
+    }
   }
 };
 

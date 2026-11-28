@@ -91,7 +91,7 @@ function buildAlertBadge(
   return g;
 }
 
-function createInsectMeshForSpecies(
+export function createInsectMeshForSpecies(
   spec: InsectSpeciesDefinition,
   matCache: Map<string, THREE.Material>,
   geoCache: Map<string, THREE.BufferGeometry>,

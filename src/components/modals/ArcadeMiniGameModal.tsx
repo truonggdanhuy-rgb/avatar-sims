@@ -20,7 +20,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react';
-import {ArcadeGameId, AvatarConfig, COINGAME_TO_XU_RATE} from '../../types/game';
+import {ArcadeGameId, AvatarConfig} from '../../types/game';
 import {soundFX} from '../../utils/sound';
 import {ObstacleRushGame, ParkourClimbGame} from './ArcadeActionGames';
 
@@ -2340,7 +2340,7 @@ export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
         </div>
 
         <div className="border-t border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-1.5 text-center text-[10px] font-bold text-[#64748B]">
-          Quy đổi cân bằng: 1 CoinGame = {COINGAME_TO_XU_RATE} Xu (tương đương câu cá &amp; bắt bọ)
+          Kiếm CoinGame tại Máy Game để mở khóa Thú Cưỡi Bay độc quyền trong Shop CoinGame!
         </div>
       </div>
     </div>

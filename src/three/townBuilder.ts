@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {BoatId, TimeOfDay, ZoneId} from '../types/game';
-import {JOYBOY_AVATAR, KOI_AVATAR, SHIP_AVATAR} from '../data/avatarCatalog';
+import {ANNA_AVATAR, JOYBOY_AVATAR, KOI_AVATAR, SHIP_AVATAR} from '../data/avatarCatalog';
 import {BOAT_IDS} from '../data/fishingCatalog';
 import {AvatarRig, buildAvatarRig, updateAvatarRigAnimation} from './avatar3d';
 import {buildBoatById, BuiltBoatRig} from './boat3d';
@@ -11204,6 +11204,31 @@ export function buildTownScene(): TownWorld {
   };
   const getJoyboyPosition = () => ({x: joyboyState.x, z: joyboyState.z});
 
+  // ========== NPC ANNA · HƯỚNG DẪN VIÊN TÂN THỦ (QUẢNG TRƯỜNG TRUNG TÂM) ==========
+  const ANNA_POS = {x: -3.25, z: 3.7};
+  const annaGroundY = getTownGroundHeight(ANNA_POS.x, ANNA_POS.z);
+  const annaRig: AvatarRig = buildAvatarRig(ANNA_AVATAR);
+  annaRig.root.position.set(ANNA_POS.x, annaGroundY, ANNA_POS.z);
+  annaRig.root.rotation.y = Math.atan2(0 - ANNA_POS.x, 3.6 - ANNA_POS.z) * 0.45 + 0.35;
+  addInteractionProxy(
+    annaRig.root,
+    [1.15, 2.05, 1.15],
+    0.98,
+    {kind: 'npc_anna', tx: -2.05, tz: 4.15, annaX: ANNA_POS.x, annaZ: ANNA_POS.z},
+    clickTargets,
+  );
+  colliders.push({type: 'circle', x: ANNA_POS.x, z: ANNA_POS.z, r: 0.48});
+  group.add(annaRig.root);
+  labelAnchors.push({
+    id: 'npc_anna',
+    label: 'Anna · Hướng Dẫn',
+    worldPos: new THREE.Vector3(ANNA_POS.x, annaGroundY + 2.32, ANNA_POS.z),
+    isNpc: true,
+    maxLabelDist: 4.2,
+  });
+  const _annaSphere = new THREE.Sphere(new THREE.Vector3(ANNA_POS.x, annaGroundY + 1.1, ANNA_POS.z), 2.2);
+  let annaAccum = 0;
+
   // Track last applied timeOfDay so emissive updates only run when changed
   let lastAppliedTod: TimeOfDay | null = null;
   let currentTod: TimeOfDay = 'morning';
@@ -11602,6 +11627,15 @@ export function buildTownScene(): TownWorld {
       }, 52, 24)
     ) {
       updateAvatarRigAnimation(shipRig, 'idle', elapsed, false);
+    }
+
+    if (
+      (!frustum || frustum.intersectsSphere(_annaSphere)) &&
+      shouldAnimateAtDist(_annaSphere.center, annaAccum, (v) => {
+        annaAccum = v;
+      }, 46, 20)
+    ) {
+      updateAvatarRigAnimation(annaRig, 'idle', elapsed + 0.7, false);
     }
 
     // 11. Joyboy Courier cycling Central Town loop & stopping cleanly at Quảng Trường

@@ -1,6 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
-  ArrowLeftRight,
   Box,
   Check,
   Coins,
@@ -21,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  BLINDBOX_DUPLICATE_REFUND,
   BLINDBOX_SPIN_COST_XU,
   DollCatalogEntry,
   HDDOLL_CATALOG,
@@ -29,7 +29,6 @@ import {
 import {
   ArcadeGameId,
   ArcadeHubSection,
-  COINGAME_TO_XU_RATE,
   HandheldStyle,
 } from '../../types/game';
 import {soundFX} from '../../utils/sound';
@@ -152,7 +151,6 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
   onEquipDoll,
   onClose,
 }) => {
-  const [previewCoinGame, setPreviewCoinGame] = useState(10);
   const [isOpeningBox, setIsOpeningBox] = useState(false);
   const [spinResult, setSpinResult] = useState<BlindboxSpinResult | null>(null);
   const spinTimerRef = useRef<number | null>(null);
@@ -193,7 +191,6 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
     {id: 'overview', label: 'Tổng quan'},
     {id: 'games', label: 'Máy Game'},
     {id: 'blindbox', label: 'Blindbox HDDOLL'},
-    {id: 'exchange', label: 'Đổi CoinGame'},
   ];
 
   const renderMachineIcon = (id: MachineItem['id']) => {
@@ -227,7 +224,7 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                 Khu Game Cyber Mây
               </div>
               <div className="text-[11px] font-bold text-[#94A3B8]">
-                1 CoinGame = {COINGAME_TO_XU_RATE} Xu · Quay Blindbox bằng Xu Thị Trấn
+                Chơi Minigame kiếm CoinGame · Quay Blindbox bằng Xu Thị Trấn
               </div>
             </div>
           </div>
@@ -265,7 +262,7 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="grid grid-cols-4 gap-1 border-b border-white/10 bg-[#0F1426] px-3 py-2">
+        <div className="grid grid-cols-3 gap-1.5 border-b border-white/10 bg-[#0F1426] px-3 py-2">
           {tabs.map((tab) => {
             const active = section === tab.id;
             return (
@@ -430,7 +427,7 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                         </span>
                       </div>
                       <div className="text-[11px] font-bold text-[#FDE68A]">
-                        {BLINDBOX_SPIN_COST_XU} Xu / hộp · Chắc chắn trúng 1 Doll!
+                        {BLINDBOX_SPIN_COST_XU} Xu / hộp · Trùng hoàn {BLINDBOX_DUPLICATE_REFUND.common}–{BLINDBOX_DUPLICATE_REFUND.secret} Xu!
                       </div>
                     </div>
                   </div>
@@ -659,78 +656,6 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                   })}
                 </div>
               </div>
-            </div>
-          )}
-
-          {section === 'exchange' && (
-            <div className="space-y-3">
-              <div className="rounded-2xl border border-[#38BDF8]/45 bg-[#15203E] p-3.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-black text-white">
-                    <ArrowLeftRight className="h-4 w-4 text-[#38BDF8]" />
-                    <span>Tỷ Giá Cân Bằng Chính Thức</span>
-                  </div>
-                  <span className="rounded-lg bg-[#38BDF8]/20 px-2 py-0.5 text-[10px] font-black uppercase text-[#7DD3FC]">
-                    Coming Soon
-                  </span>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                  <div className="rounded-xl border border-[#38BDF8]/30 bg-[#0C1427] p-2.5">
-                    <div className="text-[10px] font-bold text-[#94A3B8]">Đổi sang Xu</div>
-                    <div className="mt-1 text-sm font-black tabular-nums text-[#38BDF8]">
-                      1 CoinGame = {COINGAME_TO_XU_RATE} Xu
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#FBBF24]/30 bg-[#1B1726] p-2.5">
-                    <div className="text-[10px] font-bold text-[#94A3B8]">Đổi sang CoinGame</div>
-                    <div className="mt-1 text-sm font-black tabular-nums text-[#FBBF24]">
-                      {COINGAME_TO_XU_RATE} Xu = 1 CoinGame
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-[#0D1324] p-3.5">
-                <div className="flex items-center justify-between text-xs font-bold text-[#CBD5E1]">
-                  <span>Mô phỏng quy đổi thử:</span>
-                  <span className="tabular-nums text-[#38BDF8]">
-                    {previewCoinGame} CoinGame ⇄ {previewCoinGame * COINGAME_TO_XU_RATE} Xu
-                  </span>
-                </div>
-                <div className="mt-2.5 flex gap-1.5">
-                  {[5, 10, 25, 50].map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => {
-                        soundFX.tap();
-                        setPreviewCoinGame(amt);
-                      }}
-                      className={`flex-1 rounded-xl py-1.5 text-xs font-black tabular-nums transition active:scale-95 ${
-                        previewCoinGame === amt
-                          ? 'bg-[#38BDF8] text-[#081226]'
-                          : 'bg-white/10 text-[#CBD5E1]'
-                      }`}
-                    >
-                      {amt} CG
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2.5 text-[11px] font-semibold leading-relaxed text-[#94A3B8]">
-                  Tỷ giá 1:10 giúp 1 ván game (~1–3 CoinGame = 10–30 Xu) ngang bằng thời gian câu
-                  cá, bắt bọ, giao hàng Joyboy hay nấu ăn, không gây lạm phát Xu khi mở khóa tính
-                  năng đổi 2 chiều ở bản cập nhật sau.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                disabled
-                className="w-full cursor-not-allowed rounded-2xl border border-white/15 bg-white/10 py-2.5 text-xs font-black text-[#94A3B8]"
-              >
-                Chức Năng Đổi Xu ⇄ CoinGame (Coming Soon)
-              </button>
             </div>
           )}
         </div>

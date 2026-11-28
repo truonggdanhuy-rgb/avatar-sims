@@ -325,36 +325,36 @@ export function buildDollPlushModel(
     const headSphere = new THREE.Mesh(new THREE.SphereGeometry(0.122, 22, 18), cloudWhiteMat);
     headSphere.scale.set(1.16, 0.92, 0.94);
 
-    // Big floppy cloud ears ("tai có lắc")
+    // Big floppy cloud ears flaring gracefully outward ("tai có lắc")
     const earL = new THREE.Group();
-    earL.position.set(-0.118, 0.044, 0.002);
-    earL.rotation.z = 0.42;
-    earL.userData.baseRotZ = 0.42;
+    earL.position.set(-0.122, 0.036, 0.004);
+    earL.rotation.z = -0.46;
+    earL.userData.baseRotZ = -0.46;
 
     const earR = new THREE.Group();
-    earR.position.set(0.118, 0.044, 0.002);
-    earR.rotation.z = -0.42;
-    earR.userData.baseRotZ = -0.42;
+    earR.position.set(0.122, 0.036, 0.004);
+    earR.rotation.z = 0.46;
+    earR.userData.baseRotZ = 0.46;
 
     ([-1, 1] as const).forEach((s, idx) => {
       const ep = idx === 0 ? earL : earR;
-      const earFlop = new THREE.Mesh(new THREE.CapsuleGeometry(0.038, 0.092, 8, 12), cloudWhiteMat);
+      const earFlop = new THREE.Mesh(new THREE.CapsuleGeometry(0.038, 0.094, 8, 12), cloudWhiteMat);
       earFlop.scale.set(1.06, 1, 0.56);
-      earFlop.position.set(s * 0.028, -0.054, 0.008);
-      earFlop.rotation.z = -s * 0.22;
+      earFlop.position.set(s * 0.02, -0.054, 0.006);
+      earFlop.rotation.z = s * 0.16;
 
-      const earTipPuff = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 10), cloudWhiteMat);
-      earTipPuff.scale.set(1.12, 0.92, 0.6);
-      earTipPuff.position.set(s * 0.044, -0.104, 0.01);
+      const earTipPuff = new THREE.Mesh(new THREE.SphereGeometry(0.043, 12, 10), cloudWhiteMat);
+      earTipPuff.scale.set(1.14, 0.92, 0.62);
+      earTipPuff.position.set(s * 0.036, -0.104, 0.008);
 
       const earInner = new THREE.Mesh(new THREE.CapsuleGeometry(0.021, 0.064, 6, 10), skyBlueMat);
       earInner.scale.set(0.95, 1, 0.35);
-      earInner.position.set(s * 0.032, -0.062, 0.025);
-      earInner.rotation.z = -s * 0.22;
+      earInner.position.set(s * 0.022, -0.058, 0.022);
+      earInner.rotation.z = s * 0.16;
 
       const earBow = new THREE.Mesh(new RoundedBoxGeometry(0.038, 0.02, 0.014, 2, 0.006), pastelRibbonMat);
-      earBow.position.set(s * 0.012, 0.002, 0.026);
-      earBow.rotation.z = -s * 0.28;
+      earBow.position.set(s * 0.012, 0.004, 0.024);
+      earBow.rotation.z = s * 0.24;
 
       ep.add(earFlop, earTipPuff, earInner, earBow);
       headGrp.add(ep);
@@ -961,8 +961,9 @@ export function updateDollPlushAnimation(doll: DollPlushRig | undefined, elapsed
     const leftBase = (doll.leftEar.userData.baseRotZ as number | undefined) ?? 0.18;
     const rightBase = (doll.rightEar.userData.baseRotZ as number | undefined) ?? -0.18;
     const earWiggle = Math.sin(elapsed * 4.4) * 0.12 + Math.sin(elapsed * 8.8) * 0.035;
-    doll.leftEar.rotation.z = leftBase + earWiggle;
-    doll.rightEar.rotation.z = rightBase - earWiggle;
+    const dir = leftBase < 0 ? -1 : 1;
+    doll.leftEar.rotation.z = leftBase + earWiggle * dir;
+    doll.rightEar.rotation.z = rightBase - earWiggle * dir;
     doll.leftEar.rotation.x = Math.cos(elapsed * 3.1) * 0.06;
     doll.rightEar.rotation.x = Math.cos(elapsed * 3.1 + 0.5) * 0.06;
   }

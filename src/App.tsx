@@ -9,6 +9,7 @@ import {FarmShopModal} from './components/modals/FarmShopModal';
 import {FarmStorageModal} from './components/modals/FarmStorageModal';
 import {FarmWorkshopModal} from './components/modals/FarmWorkshopModal';
 import {FurnitureModal} from './components/modals/FurnitureModal';
+import {FurnitureDisplayModal} from './components/modals/FurnitureDisplayModal';
 import {FurnitureShopModal} from './components/modals/FurnitureShopModal';
 import {JoyboyDeliveryModal} from './components/modals/JoyboyDeliveryModal';
 import {LivestockModal} from './components/modals/LivestockModal';
@@ -32,6 +33,11 @@ import {ArcadeHubModal, BlindboxSpinResult} from './components/modals/ArcadeHubM
 import {ArcadeMiniGameModal} from './components/modals/ArcadeMiniGameModal';
 import {CoinGameShopModal} from './components/modals/CoinGameShopModal';
 import {ConcurrentLockModal} from './components/ConcurrentLockModal';
+import {
+  GUIDED_TOUR_STOPS,
+  OnboardingTourOverlay,
+  TourCameraTarget,
+} from './components/OnboardingTourOverlay';
 import {OrientationAndFullscreenGuard} from './components/OrientationAndFullscreenGuard';
 import {TitleScreen} from './components/TitleScreen';
 import {WorldCanvas} from './components/WorldCanvas';
@@ -187,6 +193,7 @@ import {
   FishWaterType,
   FurnitureCatalogItem,
   FurnitureCategory,
+  FurnitureDisplayItem,
   GameStats,
   GardenPlotState,
   InsectDexRecord,
@@ -492,6 +499,7 @@ function GameWorld({
   const [farmPondFishPulse, setFarmPondFishPulse] = useState(0);
   const [editFurnitureMode, setEditFurnitureMode] = useState(false);
   const [selectedFurnitureId, setSelectedFurnitureId] = useState<string | null>(null);
+  const [activeDisplayFurnitureId, setActiveDisplayFurnitureId] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -707,6 +715,40 @@ function GameWorld({
     }
     return false;
   });
+
+  const [hasCompletedTour, setHasCompletedTour] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.hasCompletedTour === 'boolean') {
+          return parsed.hasCompletedTour;
+        }
+        if (parsed && (parsed.characterCreated === true || Boolean(parsed.avatar))) {
+          return true;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return false;
+  });
+  const [tourActive, setTourActive] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.characterCreated === true && parsed.hasCompletedTour === false) {
+          return true;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return false;
+  });
+  const [tourStepIndex, setTourStepIndex] = useState<number>(0);
+  const [tourAutoPlay, setTourAutoPlay] = useState<boolean>(true);
 
   const [stats, setStats] = useState<GameStats>(() => {
     try {
@@ -1993,6 +2035,7 @@ function GameWorld({
     const buildSavePayload = (savedAt: number): Record<string, unknown> => ({
       houseVersion: HOUSE_LAYOUT_VERSION,
       characterCreated: hasCreatedCharacter,
+      hasCompletedTour,
       avatar,
       stats,
       plots,
@@ -2101,6 +2144,7 @@ function GameWorld({
     };
   }, [
     hasCreatedCharacter,
+    hasCompletedTour,
     avatar,
     stats,
     plots,
@@ -2182,6 +2226,7 @@ function GameWorld({
     if (next !== 'home') {
       returnToFurnitureModalRef.current = false;
       setFurnitureModalOpen(false);
+      setActiveDisplayFurnitureId(null);
       setActiveApplianceModal(null);
       setEditFurnitureMode(false);
       setSelectedFurnitureId(null);
@@ -3685,6 +3730,11 @@ function GameWorld({
     setAvatar(chosenAvatar);
     setOwnedIds((prev) => Array.from(new Set([...prev, ...unlockItemIds])));
     setHasCreatedCharacter(true);
+    setHasCompletedTour(false);
+    setTourStepIndex(0);
+    setTourAutoPlay(true);
+    handleZoneChange(GUIDED_TOUR_STOPS[0].zone);
+    setTourActive(true);
     onCharacterCreated();
   };
 
@@ -4144,6 +4194,43 @@ function GameWorld({
       [target.catalogId]: (prev[target.catalogId] || 0) + 1,
     }));
     setSelectedFurnitureId(null);
+    if (activeDisplayFurnitureId === instanceId) {
+      setActiveDisplayFurnitureId(null);
+    }
+  };
+
+  const handleUpdateFurnitureDisplayItems = (
+    furnitureId: string,
+    nextItems: FurnitureDisplayItem[],
+  ) => {
+    setPlacedFurniture((prev) =>
+      prev.map((item) =>
+        item.instanceId === furnitureId ? {...item, displayItems: nextItems} : item,
+      ),
+    );
+    markQuestDone('decor');
+  };
+
+  const handleStartAnnaTour = () => {
+    setSettingsOpen(false);
+    setPhoneOpen(false);
+    setBagOpen(false);
+    setTourStepIndex(0);
+    setTourAutoPlay(true);
+    handleZoneChange(GUIDED_TOUR_STOPS[0].zone);
+    setTourActive(true);
+  };
+
+  const handleTourStepChange = (nextIndex: number) => {
+    const clamped = Math.max(0, Math.min(GUIDED_TOUR_STOPS.length - 1, nextIndex));
+    setTourStepIndex(clamped);
+    handleZoneChange(GUIDED_TOUR_STOPS[clamped].zone);
+  };
+
+  const handleFinishAnnaTour = () => {
+    setTourActive(false);
+    setHasCompletedTour(true);
+    handleZoneChange('town');
   };
 
   const handleToggleEditFurniture = () => {
@@ -4372,6 +4459,26 @@ function GameWorld({
 
   const activeDailyQuests = normalizeDailyQuests(dailyQuests);
   const activeJoyboyDelivery = normalizeJoyboyDeliveryState(joyboyDelivery);
+  const currentTourStop =
+    hasCreatedCharacter && tourActive
+      ? GUIDED_TOUR_STOPS[Math.max(0, Math.min(GUIDED_TOUR_STOPS.length - 1, tourStepIndex))]
+      : null;
+  const tourCameraTarget: TourCameraTarget | null = currentTourStop
+    ? {
+        zone: currentTourStop.zone,
+        camPos: currentTourStop.camPos,
+        lookAt: currentTourStop.lookAt,
+        annaPos: currentTourStop.annaPos,
+        annaRotY: currentTourStop.annaRotY,
+      }
+    : null;
+  const activeDisplayFurniture =
+    zone === 'home' && activeDisplayFurnitureId
+      ? placedFurniture.find((f) => f.instanceId === activeDisplayFurnitureId) ?? null
+      : null;
+  const activeDisplayCatalog = activeDisplayFurniture
+    ? FURNITURE_BY_ID[activeDisplayFurniture.catalogId] ?? null
+    : null;
 
   return (
     <main className="relative h-[100dvh] w-full overflow-hidden bg-[#BFE6F7] select-none">
@@ -4460,6 +4567,13 @@ function GameWorld({
         onMoveFurniture={handleMoveFurniture}
         onRotateFurniture={handleRotateFurniture}
         onStowFurniture={handleStowFurniture}
+        tourCameraTarget={tourCameraTarget}
+        onOpenFurnitureDisplay={(fid) => {
+          setEditFurnitureMode(false);
+          setSelectedFurnitureId(null);
+          setActiveDisplayFurnitureId(fid);
+        }}
+        onStartAnnaTour={handleStartAnnaTour}
         onOpenFarmDecorShop={() => setFarmDecorShopOpen(true)}
         onOpenFarmDecorBag={() => {
           returnToFarmDecorModalRef.current = false;
@@ -4531,6 +4645,20 @@ function GameWorld({
           onTabChange={setFurnitureModalTab}
           onPlaceItem={handlePlaceFurniture}
           onClose={() => setFurnitureModalOpen(false)}
+        />
+      )}
+
+      {zone === 'home' && activeDisplayFurniture && activeDisplayCatalog && (
+        <FurnitureDisplayModal
+          furniture={activeDisplayFurniture}
+          catalog={activeDisplayCatalog}
+          ownedIds={ownedIds}
+          fishBasket={fishBasket}
+          fishDex={fishDex}
+          insectBasket={insectBasket}
+          insectDex={insectDex}
+          onSaveItems={handleUpdateFurnitureDisplayItems}
+          onClose={() => setActiveDisplayFurnitureId(null)}
         />
       )}
 
@@ -5002,7 +5130,18 @@ function GameWorld({
           onChangeTimeOfDay={setTimeOfDay}
           soundEnabled={soundEnabled}
           onToggleSound={handleToggleSound}
+          onStartAnnaTour={handleStartAnnaTour}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {hasCreatedCharacter && tourActive && (
+        <OnboardingTourOverlay
+          stepIndex={tourStepIndex}
+          autoPlay={tourAutoPlay}
+          onToggleAutoPlay={() => setTourAutoPlay((prev) => !prev)}
+          onStepChange={handleTourStepChange}
+          onFinish={handleFinishAnnaTour}
         />
       )}
 

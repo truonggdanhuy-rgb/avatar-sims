@@ -19,6 +19,11 @@ import {
 } from '../types/game';
 import {buildAvatarRig, updateAvatarRigAnimation} from './avatar3d';
 import {buildPlotBotanicalDecor} from './crops3d';
+import {
+  DisplayFurnitureController,
+  populateDisplayFurnitureItems,
+  updateDisplayFurnitureAnimation,
+} from './displayFurniture3d';
 import {buildFarmDecorMesh} from './farmDecor3d';
 import {
   createFishingSpotVisuals,
@@ -954,6 +959,7 @@ export function buildSubzoneScene(
       }>;
     }[] = [];
     const vinylControllers: THREE.Object3D[] = [];
+    const displayControllers: DisplayFurnitureController[] = [];
 
     setHouseLightsOnFn = (on: boolean) => {
       houseLightsOn = on;
@@ -1043,6 +1049,17 @@ export function buildSubzoneScene(
       }
       if (meshGroup.userData.vinylDisc) {
         vinylControllers.push(meshGroup.userData.vinylDisc as THREE.Object3D);
+      }
+
+      if (
+        cat.interactive === 'doll_display' ||
+        cat.interactive === 'aquarium_display' ||
+        cat.interactive === 'insect_display'
+      ) {
+        const displayCtrl = populateDisplayFurnitureItems(meshGroup, cat, pf.displayItems);
+        if (displayCtrl) {
+          displayControllers.push(displayCtrl);
+        }
       }
 
       const isLampItem =
@@ -1166,6 +1183,19 @@ export function buildSubzoneScene(
         };
       } else if (cat.interactive === 'microwave' || cat.interactive === 'mini_oven') {
         const front = toWorld(0, cat.halfD + 0.56);
+        proxyData = {
+          kind: cat.interactive,
+          furnitureId: pf.instanceId,
+          catalogId: pf.catalogId,
+          tx: THREE.MathUtils.clamp(front.wx, -12.7, 9.7),
+          tz: THREE.MathUtils.clamp(front.wz, -8.8, 6.8),
+        };
+      } else if (
+        cat.interactive === 'doll_display' ||
+        cat.interactive === 'aquarium_display' ||
+        cat.interactive === 'insect_display'
+      ) {
+        const front = toWorld(0, cat.halfD + 0.6);
         proxyData = {
           kind: cat.interactive,
           furnitureId: pf.instanceId,
@@ -1326,6 +1356,9 @@ export function buildSubzoneScene(
       }
       for (const disc of vinylControllers) {
         disc.rotation.y = elapsed * 1.45;
+      }
+      if (displayControllers.length > 0) {
+        updateDisplayFurnitureAnimation(displayControllers, elapsed);
       }
 
       // 2. Flowing faucet stream & automatic neck-deep soaking water in bathtub
@@ -4418,29 +4451,6 @@ export function buildSubzoneScene(
       ctx.fillText('320 XU / HỘP · MỞ NGAY!', w / 2, 114);
     });
 
-    const exchangeScreenTex = makeArcadeCanvasTex(512, 320, (ctx, w, h) => {
-      ctx.fillStyle = '#0B1328';
-      ctx.fillRect(0, 0, w, h);
-      ctx.strokeStyle = '#38BDF8';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(10, 10, w - 20, h - 20);
-      ctx.fillStyle = '#7DD3FC';
-      ctx.font = '900 32px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('ĐỔI COINGAME ⇄ XU', w / 2, 66);
-      ctx.fillStyle = '#142347';
-      ctx.fillRect(42, 104, w - 84, 96);
-      ctx.strokeStyle = '#FBBF24';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(42, 104, w - 84, 96);
-      ctx.fillStyle = '#FDE68A';
-      ctx.font = '900 38px system-ui, sans-serif';
-      ctx.fillText('1 CoinGame = 10 Xu', w / 2, 165);
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = '800 24px system-ui, sans-serif';
-      ctx.fillText('COMING SOON', w / 2, 258);
-    });
-
     const pcScreenTex = makeArcadeCanvasTex(256, 144, (ctx, w, h) => {
       const grad = ctx.createLinearGradient(0, 0, w, h);
       grad.addColorStop(0, '#0D1B3E');
@@ -4893,62 +4903,7 @@ export function buildSubzoneScene(
     });
     group.add(coinShopBooth);
 
-    // 2. Back-Right: CoinGame Exchange Kiosk
-    const exchangeKiosk = new THREE.Group();
-    exchangeKiosk.position.set(4.35, 0, -7.65);
-    const exBase = new THREE.Mesh(
-      new RoundedBoxGeometry(2.1, 1.12, 1.32, 3, 0.08),
-      clayMat('#162344', 0.4),
-    );
-    exBase.position.y = 0.56;
-    const exTrim = new THREE.Mesh(new RoundedBoxGeometry(2.16, 0.09, 1.38, 2, 0.03), cyanLedMat);
-    exTrim.position.y = 1.12;
-    const exTower = new THREE.Mesh(
-      new RoundedBoxGeometry(1.95, 1.55, 0.42, 3, 0.06),
-      clayMat('#1F305C', 0.38),
-    );
-    exTower.position.set(0, 1.9, -0.32);
-    const exScreen = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.72, 1.08),
-      new THREE.MeshBasicMaterial({map: exchangeScreenTex}),
-    );
-    exScreen.position.set(0, 1.95, -0.1);
-    const exCounterPad = new THREE.Mesh(
-      new RoundedBoxGeometry(1.6, 0.06, 0.65, 2, 0.02),
-      clayMat('#0E172E', 0.4),
-    );
-    exCounterPad.position.set(0, 1.18, 0.25);
-
-    const holoCoinGem = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.24, 0),
-      new THREE.MeshStandardMaterial({
-        color: '#FDE68A',
-        emissive: '#F59E0B',
-        emissiveIntensity: 0.72,
-        roughness: 0.18,
-        metalness: 0.35,
-      }),
-    );
-    holoCoinGem.position.set(0, 2.98, -0.15);
-
-    exchangeKiosk.add(exBase, exTrim, exTower, exScreen, exCounterPad, holoCoinGem);
-    mergeStaticGroupByMaterial(exchangeKiosk, new Set([holoCoinGem]));
-    addBoxProxy(
-      exchangeKiosk,
-      [2.25, 3.25, 1.55],
-      [0, 1.62, 0],
-      {kind: 'arcade_exchange_kiosk', tx: 4.35, tz: -5.45},
-      clickTargets,
-    );
-    colliders.push({type: 'box', x: 4.35, z: -7.65, hw: 1.15, hd: 0.78});
-    labelAnchors.push({
-      id: 'arcade_exchange_kiosk',
-      label: 'Đổi CoinGame ⇄ Xu',
-      worldPos: new THREE.Vector3(4.35, 3.4, -7.65),
-    });
-    group.add(exchangeKiosk);
-
-    // 3. Left Wing: 3 Modern RGB Gaming PC Arena Stations
+    // 2. Left Wing: 3 Modern RGB Gaming PC Arena Stations
     const pcZs = [-4.2, -0.4, 3.4];
     const pcAccentMats = [cyanLedMat, pinkLedMat, violetLedMat];
     pcZs.forEach((pz, idx) => {
@@ -5598,8 +5553,6 @@ export function buildSubzoneScene(
     }
 
     updateFn = (elapsed) => {
-      holoCoinGem.rotation.y = elapsed * 1.45;
-      holoCoinGem.position.y = 2.98 + Math.sin(elapsed * 2.4) * 0.06;
       miniLotus.rotation.y = elapsed * 0.95;
       miniLotus.position.y = 1.62 + Math.sin(elapsed * 2.2) * 0.055;
       pkHolo.rotation.y = elapsed * 0.85;

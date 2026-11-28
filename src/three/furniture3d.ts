@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {FurnitureCatalogItem} from '../types/game';
+import {buildDisplayFurnitureMesh} from './displayFurniture3d';
 import {clayMat, glossyClayMat} from './materials';
 
 const _clockFaceCache = new Map<string, THREE.CanvasTexture>();
@@ -7130,6 +7131,15 @@ export function buildFurnitureMesh(item: FurnitureCatalogItem): THREE.Group {
         g.add(flower, core);
       });
       break;
+    }
+
+    case 'doll_shelf_small':
+    case 'doll_shelf_large':
+    case 'aquarium_small':
+    case 'aquarium_large':
+    case 'insect_display_small':
+    case 'insect_display_large': {
+      return buildDisplayFurnitureMesh(item);
     }
   }
 

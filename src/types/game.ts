@@ -548,9 +548,7 @@ export interface FarmOrder {
   rewardCoins: number;
 }
 
-export const COINGAME_TO_XU_RATE = 10;
-
-export type ArcadeHubSection = 'overview' | 'blindbox' | 'exchange' | 'games';
+export type ArcadeHubSection = 'overview' | 'blindbox' | 'games';
 
 export type ArcadeGameId =
   | 'whack_mole'
@@ -706,6 +704,12 @@ export type FurnitureKind =
   | 'vampire_coffin_sofa'
   | 'candelabra_gothic'
   | 'picnic_gingham_set'
+  | 'doll_shelf_small'
+  | 'doll_shelf_large'
+  | 'aquarium_small'
+  | 'aquarium_large'
+  | 'insect_display_small'
+  | 'insect_display_large'
   | 'floor_paint'
   | 'wall_paint';
 
@@ -725,6 +729,15 @@ export interface PaintStyleSpec {
   roughness?: number;
 }
 
+export type FurnitureDisplayKind = 'doll' | 'fish' | 'insect';
+
+export interface FurnitureDisplayItem {
+  slotIndex: number;
+  kind: FurnitureDisplayKind;
+  itemId: string;
+  metric?: number;
+}
+
 export interface FurnitureCatalogItem {
   id: string;
   kind: FurnitureKind;
@@ -740,7 +753,18 @@ export interface FurnitureCatalogItem {
   mountHeight?: number;
   surfaceHeight?: number;
   paintSpec?: PaintStyleSpec;
-  interactive?: 'wardrobe' | 'bed' | 'sofa' | 'bathtub' | 'lamp' | 'microwave' | 'mini_oven';
+  displayCapacity?: number;
+  interactive?:
+    | 'wardrobe'
+    | 'bed'
+    | 'sofa'
+    | 'bathtub'
+    | 'lamp'
+    | 'microwave'
+    | 'mini_oven'
+    | 'doll_display'
+    | 'aquarium_display'
+    | 'insect_display';
 }
 
 export interface PlacedFurniture {
@@ -750,6 +774,7 @@ export interface PlacedFurniture {
   z: number;
   y?: number;
   rotY: number;
+  displayItems?: FurnitureDisplayItem[];
 }
 
 export type ToolId = 'wooden_rod' | 'wooden_net';

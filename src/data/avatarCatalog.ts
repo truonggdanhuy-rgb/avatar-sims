@@ -195,6 +195,31 @@ export const JOYBOY_AVATAR: AvatarConfig = {
   handheldColor: '#E8B84B',
 };
 
+export const ANNA_AVATAR: AvatarConfig = {
+  name: 'Anna',
+  skinTone: '#F6C8A6',
+  boxHeadSkin: 'cream_cube',
+  boxHeadColor: '#FCE5CF',
+  eyeStyle: 'bright',
+  eyeColor: '#4B2E1E',
+  expression: 'sweet_smile',
+  blush: true,
+  top: 'academy_blazer',
+  topColor: '#2B5B84',
+  bottom: 'a_line_skirt',
+  bottomColor: '#FFFDF8',
+  shoes: 'mary_janes',
+  shoeColor: '#F472B6',
+  headItem: 'hair_girl_side_pony',
+  headItemColor: '#72503D',
+  accessory: 'none',
+  accessoryColor: '#4A3628',
+  backpack: 'student_bag_brown',
+  backpackColor: '#FBBF24',
+  handheld: 'none',
+  handheldColor: '#E8B84B',
+};
+
 export const FASHION_CATEGORIES: {key: ShopCategory; label: string}[] = [
   {key: 'tops', label: 'Áo'},
   {key: 'bottoms', label: 'Quần'},

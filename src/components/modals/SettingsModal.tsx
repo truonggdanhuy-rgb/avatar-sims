@@ -1,5 +1,5 @@
 import React from 'react';
-import {MapPin, Moon, Sun, Volume2, VolumeX, X} from 'lucide-react';
+import {Compass, MapPin, Moon, Sun, Volume2, VolumeX, X} from 'lucide-react';
 import {TimeOfDay} from '../../types/game';
 import {finalizePlayerName, sanitizePlayerNameInput} from '../../utils/playerName';
 import {soundFX} from '../../utils/sound';
@@ -11,6 +11,7 @@ interface SettingsModalProps {
   onChangeTimeOfDay: (time: TimeOfDay) => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  onStartAnnaTour?: () => void;
   onClose: () => void;
 }
 
@@ -29,6 +30,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onChangeTimeOfDay,
   soundEnabled,
   onToggleSound,
+  onStartAnnaTour,
   onClose,
 }) => {
   const handleClose = () => {
@@ -146,6 +148,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
             </button>
           </div>
+
+          {/* Replay Guided Tour with Anna */}
+          {onStartAnnaTour && (
+            <div className="flex items-center justify-between rounded-2xl border border-[#E0CEB6] bg-white px-3.5 py-2.5">
+              <div>
+                <div className="text-xs font-bold text-[#4A3525]">Hướng Dẫn Thị Trấn Cùng Anna</div>
+                <div className="text-[11px] text-[#7A6048]">
+                  Tua nhanh giới thiệu các khu vực nổi bật
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.sparkle();
+                  onClose();
+                  onStartAnnaTour();
+                }}
+                className="flex h-10 items-center gap-1.5 rounded-xl bg-[#38BDF8] px-3 text-xs font-bold text-slate-950 active:scale-95"
+              >
+                <Compass className="h-4 w-4" />
+                <span>Xem lại</span>
+              </button>
+            </div>
+          )}
 
           {/* Town Directory */}
           <div>

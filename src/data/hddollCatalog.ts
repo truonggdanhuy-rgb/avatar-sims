@@ -47,9 +47,9 @@ export const BLINDBOX_SPIN_COST_XU = 320;
 
 /** Tiền Xu hoàn lại khi quay trúng Doll đã sở hữu (để lượt quay luôn có giá trị) */
 export const BLINDBOX_DUPLICATE_REFUND: Record<DollRarity, number> = {
-  common: 110,
-  special: 200,
-  secret: 360,
+  common: 260,
+  special: 300,
+  secret: 420,
 };
 
 export const HDDOLL_RARITY_META: Record<
