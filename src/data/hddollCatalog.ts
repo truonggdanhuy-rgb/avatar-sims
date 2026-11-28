@@ -2,7 +2,7 @@ import {HandheldStyle, ShopItem} from '../types/game';
 
 export type DollRarity = 'common' | 'special' | 'secret';
 
-export type DollEffectTag = 'ear_sparkle' | 'blink_wave' | 'none';
+export type DollEffectTag = 'ear_sparkle' | 'ear_sparkle_hearts' | 'ear_wave_blink' | 'none';
 
 export interface DollCatalogEntry {
   /** ID đồng bộ với HandheldStyle (dùng trong avatar.handheld) */
@@ -198,9 +198,10 @@ export const HDDOLL_CATALOG: DollCatalogEntry[] = [
     dropRate: 8,
     primaryColor: '#FF7FA9',
     accentColor: '#FFF0F5',
-    effect: 'ear_sparkle',
-    effectLabel: 'Vẩy tai nhẹ · Mắt long lanh',
-    description: 'Phiên bản BabyThree dâu tây kẹo ngọt, đôi tai mềm vẩy nhẹ cùng đôi mắt sao long lanh.',
+    effect: 'ear_sparkle_hearts',
+    effectLabel: 'Vẩy tai · Mắt long lanh · Tim bay',
+    description:
+      'Phiên bản BabyThree dâu tây cao cấp với viền ren kem, nơ tai xinh, mắt sao long lanh và trái tim hồng nhẹ nhàng bay quanh.',
   },
   {
     handheldId: 'doll_luna_kuromi',
@@ -213,22 +214,25 @@ export const HDDOLL_CATALOG: DollCatalogEntry[] = [
     accentColor: '#241E38',
     effect: 'ear_sparkle',
     effectLabel: 'Vẩy tai nhẹ · Mắt long lanh',
-    description: 'Thỏ nhung tím huyền bí đội mũ hề tai dài vẩy nhẹ, ánh mắt pha lê tím lấp lánh.',
+    description:
+      'Thỏ nhung tím huyền bí đội mũ hề tai dài vẩy nhẹ, ánh mắt pha lê tím lấp lánh.',
   },
 
   // ================= 1 DOLL SECRET HIẾM NHẤT (4%) =================
+  // (Giữ nguyên mã ID slot Secret để tương thích dữ liệu người chơi đã quay trúng)
   {
     handheldId: 'doll_secret_doraemon',
     shopItemId: 'hand_doll_secret_doraemon',
-    name: 'Doraemon',
-    seriesTag: 'Secret Huyền Thoại',
+    name: 'Cinnamo Angel',
+    seriesTag: 'Secret Thiên Thần Mây',
     rarity: 'secret',
     dropRate: 4,
-    primaryColor: '#2196F3',
-    accentColor: '#FFFFFF',
-    effect: 'blink_wave',
-    effectLabel: 'Chớp mắt · Vẩy tay nhẹ',
-    description: 'Mèo máy tương lai xanh trắng kinh điển với chuông vàng, túi thần kỳ 4D, biết chớp mắt & vẩy tay chào!',
+    primaryColor: '#EAF6FF',
+    accentColor: '#7DD3FC',
+    effect: 'ear_wave_blink',
+    effectLabel: 'Lắc tai · Vẩy tay · Chớp mắt',
+    description:
+      'Cún thiên thần mây trắng đội vương miện vàng, cánh sao nhỏ & nơ xanh bầu trời — biết lắc đôi tai bông, chớp mắt và vẩy tay chào!',
   },
 ];
 

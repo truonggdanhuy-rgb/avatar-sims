@@ -355,7 +355,7 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                   </div>
                   <div className="mt-2 text-xs font-black text-white">Blindbox HDDOLL</div>
                   <div className="mt-0.5 text-[11px] font-bold text-[#FBCFE8]">
-                    Săn 10 gấu bông ôm ngực & Secret Doraemon
+                    Săn 10 gấu bông ôm ngực & Secret Thiên Thần
                   </div>
                 </button>
               </div>
@@ -453,7 +453,7 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                     <div className="text-[11px] font-black text-[#F0ABFC]">24%</div>
                   </div>
                   <div className="rounded-xl border border-[#FDE047]/55 bg-[#2A200D]/85 px-2 py-1">
-                    <div className="text-[10px] font-bold text-[#FEF08A]">Secret Doraemon</div>
+                    <div className="text-[10px] font-bold text-[#FEF08A]">Secret Thiên Thần</div>
                     <div className="text-[11px] font-black text-[#FDE047]">4%</div>
                   </div>
                 </div>

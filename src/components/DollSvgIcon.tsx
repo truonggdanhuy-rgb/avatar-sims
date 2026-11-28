@@ -182,27 +182,48 @@ export const DollSvgIcon: React.FC<DollSvgIconProps> = ({
       case 'doll_baby3_berry':
         return (
           <g>
-            <circle cx="27" cy="24" r="6" fill="#FF7FA9" stroke={OUTLINE} strokeWidth="2" />
-            <circle cx="27" cy="24" r="3" fill="#FFF0F5" />
-            <circle cx="53" cy="24" r="6" fill="#FF7FA9" stroke={OUTLINE} strokeWidth="2" />
-            <circle cx="53" cy="24" r="3" fill="#FFF0F5" />
-            <ellipse cx="40" cy="56" rx="14" ry="13" fill="#FF7FA9" stroke={OUTLINE} strokeWidth="2.1" />
-            <ellipse cx="40" cy="57" rx="8.5" ry="8" fill="#FFF0F5" />
-            <circle cx="40" cy="36" r="14.5" fill="#FF7FA9" stroke={OUTLINE} strokeWidth="2.1" />
-            {/* Strawberry leaf crown */}
-            <path d="M31 23 Q40 16 49 23 Q44 26 40 23 Q36 26 31 23 Z" fill="#4ADE80" stroke={OUTLINE} strokeWidth="1.4" />
-            <ellipse cx="40" cy="37.5" rx="11" ry="9.5" fill="#FFF3E6" />
-            {/* Sparkly starry eyes */}
-            <circle cx="34.5" cy="36" r="3.1" fill="#BE185D" />
-            <circle cx="45.5" cy="36" r="3.1" fill="#BE185D" />
-            <circle cx="33.5" cy="34.8" r="1.1" fill="#FFFFFF" />
-            <circle cx="44.5" cy="34.8" r="1.1" fill="#FFFFFF" />
-            <circle cx="35.6" cy="37.2" r="0.6" fill="#FFFBEB" />
-            <circle cx="46.6" cy="37.2" r="0.6" fill="#FFFBEB" />
-            <ellipse cx="30.5" cy="40" rx="2.6" ry="1.4" fill="#FB7185" opacity="0.8" />
-            <ellipse cx="49.5" cy="40" rx="2.6" ry="1.4" fill="#FB7185" opacity="0.8" />
-            <circle cx="40" cy="39.2" r="1.5" fill="#F43F5E" />
-            <circle cx="40" cy="50" r="2.6" fill="#F43F5E" stroke={OUTLINE} strokeWidth="1.2" />
+            {/* Floating pink hearts */}
+            <path d="M16 20 C16 18 19 17.5 19.5 19.8 C20 17.5 23 18 23 20 C23 22 19.5 24 19.5 24 C19.5 24 16 22 16 20 Z" fill="#FF4D8D" opacity="0.9" />
+            <path d="M58 18 C58 16.5 60.5 16 61 17.8 C61.5 16 64 16.5 64 18 C64 19.6 61 21.2 61 21.2 C61 21.2 58 19.6 58 18 Z" fill="#FB7185" opacity="0.85" />
+            <path d="M60 35 C60 33.8 62 33.4 62.4 34.8 C62.8 33.4 64.8 33.8 64.8 35 C64.8 36.2 62.4 37.6 62.4 37.6 C62.4 37.6 60 36.2 60 35 Z" fill="#F472B6" opacity="0.8" />
+            {/* Plush ears + satin ear bows */}
+            <circle cx="26" cy="24" r="6.2" fill="#FF6B9D" stroke={OUTLINE} strokeWidth="2" />
+            <circle cx="26" cy="24" r="3.2" fill="#FFF8FB" />
+            <circle cx="54" cy="24" r="6.2" fill="#FF6B9D" stroke={OUTLINE} strokeWidth="2" />
+            <circle cx="54" cy="24" r="3.2" fill="#FFF8FB" />
+            <path d="M22 28 L27 30 L24 33 Z" fill="#FB7185" stroke={OUTLINE} strokeWidth="1.1" strokeLinejoin="round" />
+            <path d="M58 28 L53 30 L56 33 Z" fill="#FB7185" stroke={OUTLINE} strokeWidth="1.1" strokeLinejoin="round" />
+            {/* Body + heart patch */}
+            <ellipse cx="40" cy="56.5" rx="14" ry="12.8" fill="#FF6B9D" stroke={OUTLINE} strokeWidth="2.1" />
+            <ellipse cx="40" cy="57.5" rx="8.8" ry="8" fill="#FFF5F8" />
+            <path d="M36.5 56 C36.5 54 39.5 53.5 40 55.6 C40.5 53.5 43.5 54 43.5 56 C43.5 58 40 60 40 60 C40 60 36.5 58 36.5 56 Z" fill="#FDA4AF" />
+            {/* Cream scalloped lace collar */}
+            <circle cx="32" cy="49" r="3" fill="#FFF8FB" stroke={OUTLINE} strokeWidth="1.3" />
+            <circle cx="36" cy="50" r="3" fill="#FFF8FB" stroke={OUTLINE} strokeWidth="1.3" />
+            <circle cx="44" cy="50" r="3" fill="#FFF8FB" stroke={OUTLINE} strokeWidth="1.3" />
+            <circle cx="48" cy="49" r="3" fill="#FFF8FB" stroke={OUTLINE} strokeWidth="1.3" />
+            {/* Strawberry hood + seeds + whipped lace frame */}
+            <circle cx="40" cy="36" r="14.8" fill="#FF6B9D" stroke={OUTLINE} strokeWidth="2.1" />
+            <ellipse cx="32" cy="27" rx="0.9" ry="1.4" fill="#FDE047" />
+            <ellipse cx="48" cy="27" rx="0.9" ry="1.4" fill="#FDE047" />
+            <ellipse cx="40" cy="37.5" rx="11.4" ry="9.8" fill="#FFF7FA" stroke="#FFF0F5" strokeWidth="2.2" strokeDasharray="3 1.5" />
+            {/* Berry leaf crown + blossom */}
+            <path d="M30 22.5 Q40 15.5 50 22.5 Q45 25.5 40 22.5 Q35 25.5 30 22.5 Z" fill="#4ADE80" stroke={OUTLINE} strokeWidth="1.4" />
+            <circle cx="45" cy="19.5" r="2.8" fill="#FFFBEB" stroke={OUTLINE} strokeWidth="1.1" />
+            <circle cx="45" cy="19.5" r="1.1" fill="#FDE047" />
+            {/* Sparkly starry eyes + blush */}
+            <circle cx="34.5" cy="36" r="3.2" fill="#E11D63" />
+            <circle cx="45.5" cy="36" r="3.2" fill="#E11D63" />
+            <circle cx="33.5" cy="34.8" r="1.15" fill="#FFFFFF" />
+            <circle cx="44.5" cy="34.8" r="1.15" fill="#FFFFFF" />
+            <circle cx="35.6" cy="37.3" r="0.65" fill="#FFFBEB" />
+            <circle cx="46.6" cy="37.3" r="0.65" fill="#FFFBEB" />
+            <ellipse cx="30.5" cy="40.2" rx="2.6" ry="1.4" fill="#FB7185" opacity="0.8" />
+            <ellipse cx="49.5" cy="40.2" rx="2.6" ry="1.4" fill="#FB7185" opacity="0.8" />
+            <circle cx="40" cy="39.2" r="1.4" fill="#F43F5E" />
+            {/* Neck ribbon + sculpted heart pendant */}
+            <path d="M35 48 L40 50 L35 52 Z M45 48 L40 50 L45 52 Z" fill="#FB7185" stroke={OUTLINE} strokeWidth="1.1" />
+            <path d="M37 50.5 C37 49 39.5 48.5 40 50.2 C40.5 48.5 43 49 43 50.5 C43 52.3 40 54 40 54 C40 54 37 52.3 37 50.5 Z" fill="#F43F5E" stroke={OUTLINE} strokeWidth="1.1" />
           </g>
         );
 
@@ -233,32 +254,46 @@ export const DollSvgIcon: React.FC<DollSvgIconProps> = ({
       default:
         return (
           <g>
+            {/* Tiny angel wings */}
+            <ellipse cx="23" cy="53" rx="6" ry="3.8" transform="rotate(-24 23 53)" fill="#FFFFFF" stroke={OUTLINE} strokeWidth="1.5" />
+            <ellipse cx="57" cy="53" rx="6" ry="3.8" transform="rotate(24 57 53)" fill="#FFFFFF" stroke={OUTLINE} strokeWidth="1.5" />
+            {/* Big floppy cloud ears */}
+            <ellipse cx="18" cy="40" rx="6.8" ry="11.5" transform="rotate(22 18 40)" fill="#F5FAFF" stroke={OUTLINE} strokeWidth="2" />
+            <ellipse cx="18.5" cy="40.5" rx="3.4" ry="7.2" transform="rotate(22 18.5 40.5)" fill="#7DD3FC" />
+            <ellipse cx="62" cy="40" rx="6.8" ry="11.5" transform="rotate(-22 62 40)" fill="#F5FAFF" stroke={OUTLINE} strokeWidth="2" />
+            <ellipse cx="61.5" cy="40.5" rx="3.4" ry="7.2" transform="rotate(-22 61.5 40.5)" fill="#7DD3FC" />
             {/* Waving white paw */}
-            <circle cx="56" cy="46" r="4.5" fill="#FFFFFF" stroke={OUTLINE} strokeWidth="1.8" />
-            <circle cx="24" cy="53" r="4.2" fill="#FFFFFF" stroke={OUTLINE} strokeWidth="1.8" />
-            {/* Blue Body + White Belly + 4D Pocket */}
-            <ellipse cx="40" cy="56" rx="14" ry="13" fill="#1E88E5" stroke={OUTLINE} strokeWidth="2.1" />
-            <circle cx="40" cy="56.5" r="9.5" fill="#FFFFFF" stroke={OUTLINE} strokeWidth="1.3" />
-            <path d="M33.5 56.5 A6.5 6 0 0 0 46.5 56.5 Z" fill="#FFFFFF" stroke="#94A3B8" strokeWidth="1.4" />
-            {/* Blue Head + White Face */}
-            <circle cx="40" cy="33" r="15.5" fill="#1E88E5" stroke={OUTLINE} strokeWidth="2.1" />
-            <ellipse cx="40" cy="35.5" rx="12.5" ry="11" fill="#FFFFFF" stroke={OUTLINE} strokeWidth="1.3" />
-            {/* Oval Eyes */}
-            <ellipse cx="36" cy="27.5" rx="3.4" ry="4.3" fill="#FFFFFF" stroke={OUTLINE} strokeWidth="1.4" />
-            <ellipse cx="44" cy="27.5" rx="3.4" ry="4.3" fill="#FFFFFF" stroke={OUTLINE} strokeWidth="1.4" />
-            <circle cx="37" cy="28" r="1.4" fill="#1B1D24" />
-            <circle cx="43" cy="28" r="1.4" fill="#1B1D24" />
-            {/* Red Nose + Whiskers + Smile */}
-            <circle cx="40" cy="32.5" r="2.4" fill="#E53935" stroke={OUTLINE} strokeWidth="1.2" />
-            <line x1="40" y1="35" x2="40" y2="39.5" stroke={OUTLINE} strokeWidth="1.4" />
-            <path d="M33 38.5 Q40 44.5 47 38.5" fill="#D32F2F" stroke={OUTLINE} strokeWidth="1.4" />
-            <line x1="27" y1="33" x2="33" y2="34.5" stroke={OUTLINE} strokeWidth="1.1" />
-            <line x1="26.5" y1="36" x2="33" y2="36" stroke={OUTLINE} strokeWidth="1.1" />
-            <line x1="47" y1="34.5" x2="53" y2="33" stroke={OUTLINE} strokeWidth="1.1" />
-            <line x1="47" y1="36" x2="53.5" y2="36" stroke={OUTLINE} strokeWidth="1.1" />
-            {/* Red Collar & Gold Bell */}
-            <rect x="29" y="45.5" width="22" height="3.2" rx="1.6" fill="#E53935" stroke={OUTLINE} strokeWidth="1.3" />
-            <circle cx="40" cy="48.5" r="3.2" fill="#FFD54F" stroke={OUTLINE} strokeWidth="1.4" />
+            <circle cx="57" cy="46" r="4.3" fill="#FFFFFF" stroke={OUTLINE} strokeWidth="1.8" />
+            <circle cx="57" cy="46" r="1.6" fill="#FDA4AF" />
+            <circle cx="24" cy="56" r="4" fill="#FFFFFF" stroke={OUTLINE} strokeWidth="1.8" />
+            {/* Cloud-white Body + Sky Belly Heart */}
+            <ellipse cx="40" cy="56.5" rx="13.5" ry="12.5" fill="#F5FAFF" stroke={OUTLINE} strokeWidth="2.1" />
+            <ellipse cx="40" cy="57.5" rx="8.5" ry="7.8" fill="#E0F2FE" />
+            <path d="M36.5 56.5 C36.5 54.5 39.5 54 40 56 C40.5 54 43.5 54.5 43.5 56.5 C43.5 58.4 40 60.4 40 60.4 C40 60.4 36.5 58.4 36.5 56.5 Z" fill="#7DD3FC" />
+            {/* Wide Kawaii Puppy Head */}
+            <ellipse cx="40" cy="34.5" rx="16.5" ry="13.2" fill="#F5FAFF" stroke={OUTLINE} strokeWidth="2.1" />
+            {/* Golden Angel Crown */}
+            <path d="M32 22 L34 15 L37.5 19 L40 13.5 L42.5 19 L46 15 L48 22 Z" fill="#FBBF24" stroke={OUTLINE} strokeWidth="1.5" strokeLinejoin="round" />
+            <circle cx="40" cy="19.5" r="1.6" fill="#0284C7" />
+            {/* Ear bows */}
+            <path d="M22 30 L26.5 31.5 L23.5 34.5 Z" fill="#38BDF8" stroke={OUTLINE} strokeWidth="1.1" strokeLinejoin="round" />
+            <path d="M58 30 L53.5 31.5 L56.5 34.5 Z" fill="#38BDF8" stroke={OUTLINE} strokeWidth="1.1" strokeLinejoin="round" />
+            {/* Sky-Blue Starry Eyes + Blush + Puppy Smile */}
+            <ellipse cx="33" cy="34.5" rx="2.7" ry="3.2" fill="#0284C7" />
+            <ellipse cx="47" cy="34.5" rx="2.7" ry="3.2" fill="#0284C7" />
+            <circle cx="32.2" cy="33.4" r="1.1" fill="#FFFFFF" />
+            <circle cx="46.2" cy="33.4" r="1.1" fill="#FFFFFF" />
+            <circle cx="33.8" cy="35.6" r="0.6" fill="#FFFBEB" />
+            <circle cx="47.8" cy="35.6" r="0.6" fill="#FFFBEB" />
+            <ellipse cx="29" cy="38.5" rx="2.8" ry="1.5" fill="#FDA4AF" opacity="0.85" />
+            <ellipse cx="51" cy="38.5" rx="2.8" ry="1.5" fill="#FDA4AF" opacity="0.85" />
+            <circle cx="40" cy="36.5" r="1.4" fill="#F47296" />
+            <path d="M37 39 Q38.5 41 40 39 Q41.5 41 43 39" stroke={OUTLINE} strokeWidth="1.3" fill="none" strokeLinecap="round" />
+            {/* Sky Ribbon Bow & Golden Bell */}
+            <path d="M33 46 L40 48.5 L33 51 Z M47 46 L40 48.5 L47 51 Z" fill="#38BDF8" stroke={OUTLINE} strokeWidth="1.2" strokeLinejoin="round" />
+            <circle cx="40" cy="49.5" r="2.6" fill="#FBBF24" stroke={OUTLINE} strokeWidth="1.2" />
+            {/* Sparkles */}
+            <path d="M62 20 L63 22.5 L65.5 23.5 L63 24.5 L62 27 L61 24.5 L58.5 23.5 L61 22.5 Z" fill="#FBBF24" />
           </g>
         );
     }
