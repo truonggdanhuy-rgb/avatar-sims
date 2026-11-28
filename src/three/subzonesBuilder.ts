@@ -4581,13 +4581,13 @@ export function buildSubzoneScene(
       ctx.lineWidth = 6;
       ctx.strokeRect(8, 8, w - 16, h - 16);
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 40px system-ui, sans-serif';
+      ctx.font = '900 36px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('PARKOUR LEO TRÈO', w / 2, 58);
+      ctx.fillText('PARKOUR PHIÊU LƯU 3D', w / 2, 56);
       ctx.fillStyle = '#FDE047';
-      ctx.font = '900 22px system-ui, sans-serif';
-      ctx.fillText('3 MAP · THANG DÂY · ĐẾN +40 CG', w / 2, 114);
+      ctx.font = '900 19px system-ui, sans-serif';
+      ctx.fillText('1 MAP LỚN · THANG DÂY · ĐU DÂY', w / 2, 114);
     });
 
     const obstacleBannerTex = makeArcadeCanvasTex(384, 160, (ctx, w, h) => {
@@ -4603,10 +4603,10 @@ export function buildSubzoneScene(
       ctx.font = '900 32px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('VƯỢT CHƯỚNG NGẠI VẬT', w / 2, 58);
+      ctx.fillText('VƯỢT CHƯỚNG NGẠI 3D', w / 2, 56);
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 22px system-ui, sans-serif';
-      ctx.fillText('ĐÁ LĂN · QUẠT TÉ · MƯA ĐỘC', w / 2, 114);
+      ctx.font = '900 20px system-ui, sans-serif';
+      ctx.fillText('1000M · BÚA TẠ · ĐÁ LĂN · MƯA', w / 2, 114);
     });
 
     // Spacious Cyber Game Arena (23.6 x 19.6)
@@ -4799,7 +4799,7 @@ export function buildSubzoneScene(
     colliders.push({type: 'box', x: -4.35, z: -7.65, hw: 1.18, hd: 0.82});
     labelAnchors.push({
       id: 'arcade_blindbox_hddoll',
-      label: 'Blindbox HDDOLL (Soon)',
+      label: 'Blindbox HDDOLL',
       worldPos: new THREE.Vector3(-4.35, 3.45, -7.65),
     });
     group.add(blindboxTower);
@@ -4943,7 +4943,7 @@ export function buildSubzoneScene(
     colliders.push({type: 'box', x: 4.35, z: -7.65, hw: 1.15, hd: 0.78});
     labelAnchors.push({
       id: 'arcade_exchange_kiosk',
-      label: 'Đổi CoinGame ⇄ Xu (Soon)',
+      label: 'Đổi CoinGame ⇄ Xu',
       worldPos: new THREE.Vector3(4.35, 3.4, -7.65),
     });
     group.add(exchangeKiosk);
@@ -5050,7 +5050,7 @@ export function buildSubzoneScene(
       if (idx === 1) {
         labelAnchors.push({
           id: 'arcade_pc_arena',
-          label: 'Dàn PC Esports (Game HTML)',
+          label: 'Dàn PC Esports',
           worldPos: new THREE.Vector3(-9.0, 1.95, pz),
         });
       }
@@ -5125,7 +5125,7 @@ export function buildSubzoneScene(
     colliders.push({type: 'box', x: -4.65, z: -0.35, hw: 1.05, hd: 0.85});
     labelAnchors.push({
       id: 'arcade_parkour',
-      label: 'Parkour Leo Trèo (3 Map)',
+      label: 'Parkour 3D',
       worldPos: new THREE.Vector3(-4.65, 3.55, -0.35),
     });
     group.add(parkourCab);
@@ -5198,7 +5198,7 @@ export function buildSubzoneScene(
     colliders.push({type: 'box', x: 4.65, z: -0.35, hw: 1.05, hd: 0.85});
     labelAnchors.push({
       id: 'arcade_obstacle',
-      label: 'Vượt Chướng Ngại Vật',
+      label: 'Vượt Chướng Ngại 3D',
       worldPos: new THREE.Vector3(4.65, 3.55, -0.35),
     });
     group.add(obstacleCab);
@@ -5257,7 +5257,7 @@ export function buildSubzoneScene(
     colliders.push({type: 'box', x: 8.65, z: -4.4, hw: 1.15, hd: 1.28});
     labelAnchors.push({
       id: 'arcade_racing_pod',
-      label: 'Đua Xe Sim Racing (Soon)',
+      label: 'Đua Xe (Soon)',
       worldPos: new THREE.Vector3(8.65, 2.1, -4.4),
     });
     group.add(racingPod);
@@ -5288,7 +5288,7 @@ export function buildSubzoneScene(
     mergeStaticGroupByMaterial(cab);
     addBoxProxy(cab, [1.85, 2.7, 1.55], [0, 1.35, 0], {kind: 'arcade_star', tx: 7.35, tz: -0.35}, clickTargets);
     colliders.push({type: 'box', x: 9.15, z: -0.35, hw: 0.85, hd: 0.95});
-    labelAnchors.push({id: 'arcade_star', label: 'Hứng Sao Bầu Trời', worldPos: new THREE.Vector3(9.15, 2.85, -0.35)});
+    labelAnchors.push({id: 'arcade_star', label: 'Hứng Sao', worldPos: new THREE.Vector3(9.15, 2.85, -0.35)});
     group.add(cab);
 
     // Mystery "?" Ball Claw Cabinet
@@ -5342,7 +5342,7 @@ export function buildSubzoneScene(
     mergeStaticGroupByMaterial(claw);
     addBoxProxy(claw, [1.85, 2.8, 1.55], [0, 1.4, 0], {kind: 'arcade_claw', tx: 7.35, tz: 3.25}, clickTargets);
     colliders.push({type: 'box', x: 9.15, z: 3.25, hw: 0.85, hd: 0.95});
-    labelAnchors.push({id: 'arcade_claw', label: 'Gắp Bóng ? (15 Xu)', worldPos: new THREE.Vector3(9.15, 2.9, 3.25)});
+    labelAnchors.push({id: 'arcade_claw', label: 'Gắp Bóng ?', worldPos: new THREE.Vector3(9.15, 2.9, 3.25)});
     group.add(claw);
 
     // 4b. Playable Whack-a-Mole Cyber Machine (Right-Front)
@@ -5414,7 +5414,7 @@ export function buildSubzoneScene(
     colliders.push({type: 'box', x: 5.45, z: 4.65, hw: 0.95, hd: 0.78});
     labelAnchors.push({
       id: 'arcade_whack_mole',
-      label: 'Đập Chuột Cyber',
+      label: 'Đập Chuột',
       worldPos: new THREE.Vector3(5.45, 2.38, 4.65),
     });
     group.add(whackGroup);
@@ -5464,7 +5464,7 @@ export function buildSubzoneScene(
     colliders.push({type: 'box', x: 0, z: -2.88, hw: 1.44, hd: 0.28});
     labelAnchors.push({
       id: 'arcade_dance_pad',
-      label: 'Sàn Nhảy Rhythm',
+      label: 'Sàn Nhảy',
       worldPos: new THREE.Vector3(0, 2.15, -2.85),
     });
     group.add(danceStage);

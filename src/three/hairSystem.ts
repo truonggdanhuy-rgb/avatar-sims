@@ -1757,6 +1757,8 @@ export function buildCharacterHair(
   tieMat: THREE.Material,
 ): CharacterHairAssembly {
   const hatMode = resolveHatFitMode(config.headItem);
+  const hairBack = config.hairBack ?? 'bob_cut';
+  const hairFront = config.hairFront ?? 'air_bangs';
 
   const root = new THREE.Group();
   root.name = 'CharacterHair';
@@ -1764,21 +1766,21 @@ export function buildCharacterHair(
   const hairBase = new THREE.Group();
   hairBase.name = 'HairBase';
   const {geom: baseGeom, crownOuterOffset} = createUnifiedClayCapGeometry(
-    config.hairBack,
-    config.hairFront,
+    hairBack,
+    hairFront,
     hatMode,
   );
   hairBase.add(new THREE.Mesh(baseGeom, hairMat));
 
   const frontHair = buildFrontSignatureAccents(
-    config.hairBack,
-    config.hairFront,
+    hairBack,
+    hairFront,
     hairMat,
     hatMode,
     crownOuterOffset,
   );
   const sideHair = buildSideCheekDrapes(
-    config.hairBack,
+    hairBack,
     hairMat,
     crownOuterOffset,
     hatMode,
@@ -1790,7 +1792,7 @@ export function buildCharacterHair(
   hairAccessories.name = 'HairAccessories';
 
   buildBackClayStructures(
-    config.hairBack,
+    hairBack,
     hairMat,
     tieMat,
     crownOuterOffset,

@@ -8730,6 +8730,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         if (currentAnchors.length > 0) {
           const nextTags: ProjectedTag[] = [];
           const nowMs = performance.now();
+          let arcadeCandidates: Array<{anchor: (typeof currentAnchors)[number]; dist: number}> | null =
+            z === 'arcade' ? [] : null;
           for (const a of currentAnchors) {
             if (a.id === 'campsite_bbq_tag' && (z !== 'town' || nowMs >= bbqLabelHideAtMs)) {
               continue;
@@ -8756,6 +8758,14 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 continue;
               }
             }
+            if (arcadeCandidates) {
+              const dist = Math.hypot(playerPos.x - a.worldPos.x, playerPos.z - a.worldPos.z);
+              const maxArcadeDist = a.maxLabelDist ?? (a.id.startsWith('exit') ? 4.2 : 3.75);
+              if (dist <= maxArcadeDist) {
+                arcadeCandidates.push({anchor: a, dist});
+              }
+              continue;
+            }
             _projVec.copy(a.worldPos).project(camera);
             if (_projVec.z <= 1) {
               nextTags.push({
@@ -8764,6 +8774,21 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
                 x: ((_projVec.x + 1) / 2) * cw,
                 y: ((-_projVec.y + 1) / 2) * ch,
               });
+            }
+          }
+          if (arcadeCandidates && arcadeCandidates.length > 0) {
+            arcadeCandidates.sort((lhs, rhs) => lhs.dist - rhs.dist);
+            const picked = arcadeCandidates.slice(0, 2);
+            for (const {anchor: a} of picked) {
+              _projVec.copy(a.worldPos).project(camera);
+              if (_projVec.z <= 1) {
+                nextTags.push({
+                  id: a.id,
+                  label: a.label,
+                  x: ((_projVec.x + 1) / 2) * cw,
+                  y: ((-_projVec.y + 1) / 2) * ch,
+                });
+              }
             }
           }
           const changed =

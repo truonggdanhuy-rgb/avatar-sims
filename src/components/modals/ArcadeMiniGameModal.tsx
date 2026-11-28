@@ -73,14 +73,14 @@ const GAME_META: Record<
     accentBorder: 'border-[#34D399]',
   },
   parkour_climb: {
-    title: 'Parkour Leo Trèo (3 Map)',
-    badge: '+5 đến +40+ CG · N Mạng',
-    headerBg: 'bg-gradient-to-r from-[#0284C7] to-[#38BDF8]',
+    title: 'Parkour Phiêu Lưu 3D',
+    badge: '1 Map Lớn · ~2 Phút · +24–36 CG',
+    headerBg: 'bg-gradient-to-r from-[#0284C7] to-[#10B981]',
     accentBorder: 'border-[#38BDF8]',
   },
   obstacle_rush: {
-    title: 'Về Đích Vượt Chướng Ngại Vật',
-    badge: '+5 đến +35 CG · 500m · 6 Mạng',
+    title: 'Vượt Chướng Ngại Vật 3D',
+    badge: '1000m · ~2 Phút · +14–38 CG',
     headerBg: 'bg-gradient-to-r from-[#EA580C] to-[#FB923C]',
     accentBorder: 'border-[#FB923C]',
   },
@@ -2255,6 +2255,29 @@ export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
     return <Monitor className="h-4 w-4" />;
   };
 
+  if (isWideActionGame) {
+    return (
+      <div className="fixed inset-0 z-50 h-[100dvh] w-[100vw] overflow-hidden bg-[#0F172A]">
+        {gameId === 'parkour_climb' && (
+          <ParkourClimbGame
+            avatar={avatar}
+            coinGame={coinGame}
+            onEarnCoinGame={onEarnCoinGame}
+            onClose={onClose}
+          />
+        )}
+        {gameId === 'obstacle_rush' && (
+          <ObstacleRushGame
+            avatar={avatar}
+            coinGame={coinGame}
+            onEarnCoinGame={onEarnCoinGame}
+            onClose={onClose}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/60 p-2.5 backdrop-blur-[2px] sm:p-4"
@@ -2262,9 +2285,7 @@ export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`anim-pop flex max-h-[94dvh] w-full ${
-          isWideActionGame ? 'max-w-[680px]' : 'max-w-[490px]'
-        } flex-col overflow-hidden rounded-3xl border-4 ${meta.accentBorder} bg-white text-[#0F172A] shadow-2xl`}
+        className={`anim-pop flex max-h-[94dvh] w-full max-w-[490px] flex-col overflow-hidden rounded-3xl border-4 ${meta.accentBorder} bg-white text-[#0F172A] shadow-2xl`}
       >
         {/* Slim Dedicated Game Cabinet Top Bar */}
         <div className={`flex shrink-0 items-center justify-between gap-2 px-3.5 py-2.5 text-white ${meta.headerBg}`}>
@@ -2316,12 +2337,6 @@ export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
           )}
           {gameId === 'rhythm_dance' && <RhythmDanceGame onEarnCoinGame={onEarnCoinGame} />}
           {gameId === 'pc_games' && <PcHtmlGames onEarnCoins={onEarnCoins} />}
-          {gameId === 'parkour_climb' && (
-            <ParkourClimbGame avatar={avatar} onEarnCoinGame={onEarnCoinGame} />
-          )}
-          {gameId === 'obstacle_rush' && (
-            <ObstacleRushGame avatar={avatar} onEarnCoinGame={onEarnCoinGame} />
-          )}
         </div>
 
         <div className="border-t border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-1.5 text-center text-[10px] font-bold text-[#64748B]">

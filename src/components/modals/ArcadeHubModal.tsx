@@ -43,18 +43,18 @@ interface MachineItem {
 const ARCADE_MACHINES: MachineItem[] = [
   {
     id: 'parkour_climb',
-    name: 'Parkour Leo Trèo (3 Map)',
-    reward: '+5 đến +40+ CoinGame / ván (Khó thưởng cực lớn)',
-    note: 'Leo thang dây, cây cổ thụ, cầu sập, gió đẩy & cầu sét qua 3 map. Té hết mạng thua!',
+    name: 'Parkour Phiêu Lưu 3D (1 Map Lớn)',
+    reward: '+24 đến +36 CoinGame / ván (~2 Phút)',
+    note: 'Nhân vật 3D của bạn leo thang dây, đu dây Zipline, nhảy nấm bật, tránh gió xoáy, cầu mục & đĩa sét!',
     accent: 'border-[#38BDF8]/65 bg-[#0F273B]',
     playable: true,
     gameId: 'parkour_climb',
   },
   {
     id: 'obstacle_rush',
-    name: 'Về Đích Vượt Chướng Ngại Vật',
-    reward: '+5 đến +35 CoinGame (Về càng nhanh càng nhiều)',
-    note: 'Đường đua 500m: Đá lăn, quạt té 2 chiều, hố sụp, gai, lưỡi cưa & mưa độc đi chậm!',
+    name: 'Vượt Chướng Ngại Vật 3D (1000m)',
+    reward: '+14 đến +38 CoinGame / ván (~2 Phút)',
+    note: 'Đấu trường 3D: né đá lăn, búa tạ, quạt xoay, sàn kính nứt, băng chuyền, đĩa xoay & mưa axit!',
     accent: 'border-[#FB923C]/65 bg-[#2F1A12]',
     playable: true,
     gameId: 'obstacle_rush',
@@ -317,8 +317,8 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
 
               <div className="rounded-2xl border border-white/10 bg-[#0D1324] px-3.5 py-2.5 text-[11px] font-semibold leading-relaxed text-[#CBD5E1]">
                 Chạm trực tiếp từng máy trong Khu Game hoặc chọn tab{' '}
-                <strong className="text-white">Máy Game</strong> để chơi ngay Parkour (3 Map),
-                Về Đích Vượt Chướng Ngại Vật, Đập Chuột, Hứng Sao, Gắp Bóng ?, Sàn Nhảy và PC!
+                <strong className="text-white">Máy Game</strong> để chơi ngay Parkour 3D, Vượt
+                Chướng Ngại Vật 3D, Đập Chuột, Hứng Sao, Gắp Bóng ?, Sàn Nhảy và PC!
               </div>
             </>
           )}
