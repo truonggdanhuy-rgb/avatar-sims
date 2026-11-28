@@ -32,6 +32,7 @@ interface ObstacleRush3DGameProps {
   avatar?: AvatarConfig;
   coinGame?: number;
   onEarnCoinGame: (amount: number) => void;
+  onCompleteGame?: (speedBonus: number) => number;
   onClose?: () => void;
 }
 
@@ -180,6 +181,7 @@ interface RushHud {
   dashReady: boolean;
   status: 'ready' | 'playing' | 'won' | 'lost';
   rewardEarned: number;
+  expEarned?: number;
 }
 
 const TOTAL_Z_SPAN = 380;
@@ -199,6 +201,7 @@ export const ObstacleRush3DGame: React.FC<ObstacleRush3DGameProps> = ({
   avatar,
   coinGame = 0,
   onEarnCoinGame,
+  onCompleteGame,
   onClose,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -219,6 +222,7 @@ export const ObstacleRush3DGame: React.FC<ObstacleRush3DGameProps> = ({
     dashReady: true,
     status: 'ready',
     rewardEarned: 0,
+    expEarned: 0,
   });
 
   const keysRef = useRef<Record<string, boolean>>({});
@@ -235,6 +239,8 @@ export const ObstacleRush3DGame: React.FC<ObstacleRush3DGameProps> = ({
 
   const onEarnRef = useRef(onEarnCoinGame);
   onEarnRef.current = onEarnCoinGame;
+  const onCompleteRef = useRef(onCompleteGame);
+  onCompleteRef.current = onCompleteGame;
 
   const triggerJump = useCallback(() => {
     if (gameStatusRef.current === 'ready') {
@@ -1580,9 +1586,11 @@ export const ObstacleRush3DGame: React.FC<ObstacleRush3DGameProps> = ({
         const speedBonus = Math.max(0, Math.min(6, Math.round((190 - playTimeSec) * 0.06)));
         const heartBonus = Math.min(3, Math.floor(hearts / 2));
         const reward = 10 + speedBonus + heartBonus;
+        let expEarned = 0;
         if (!rewardPaid) {
           rewardPaid = true;
           onEarnRef.current(reward);
+          expEarned = onCompleteRef.current?.(speedBonus) ?? 0;
         }
         playArcadeSfx('win');
         particles.emit(0, 6.2, -382, '#FDE047', 34, 6.2, 6.5);
@@ -1602,6 +1610,7 @@ export const ObstacleRush3DGame: React.FC<ObstacleRush3DGameProps> = ({
           dashReady: true,
           status: 'won',
           rewardEarned: reward,
+          expEarned,
         });
         return;
       }
@@ -1985,9 +1994,16 @@ export const ObstacleRush3DGame: React.FC<ObstacleRush3DGameProps> = ({
               Quãng đường: <strong className="text-white">{hud.meters}m</strong> · Thời gian:{' '}
               <strong className="text-[#FDE047]">{formatSec(hud.elapsedSec)}</strong>
             </p>
-            <div className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-[#0F172A] py-2 text-sm font-black text-[#38BDF8]">
-              <Sparkles className="h-4 w-4 text-[#FDE047]" />
-              <span>+{hud.rewardEarned} CoinGame</span>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-xl bg-[#0F172A] py-2 px-3 text-sm font-black text-[#38BDF8]">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-[#FDE047]" />
+                <span>+{hud.rewardEarned} CoinGame</span>
+              </span>
+              {hud.status === 'won' && (hud.expEarned ?? 0) > 0 && (
+                <span className="rounded-lg bg-[#22C55E]/20 px-2 py-0.5 text-xs font-black text-[#4ADE80]">
+                  +{hud.expEarned} EXP
+                </span>
+              )}
             </div>
             <div className="mt-4 flex gap-2">
               <button

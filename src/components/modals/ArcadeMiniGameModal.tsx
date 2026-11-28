@@ -34,6 +34,10 @@ interface ArcadeMiniGameModalProps {
   onSpendCoins: (amount: number) => boolean;
   onEarnCoinGame: (amount: number) => void;
   onEarnCoins: (amount: number) => void;
+  onCompleteActionGame?: (
+    gameId: 'parkour_climb' | 'obstacle_rush',
+    bonusUnits: number,
+  ) => number;
   onSelectGame: (next: ArcadeGameId) => void;
   onClose: () => void;
 }
@@ -2240,6 +2244,7 @@ export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
   onSpendCoins,
   onEarnCoinGame,
   onEarnCoins,
+  onCompleteActionGame,
   onClose,
 }) => {
   const meta = GAME_META[gameId];
@@ -2263,6 +2268,7 @@ export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
             avatar={avatar}
             coinGame={coinGame}
             onEarnCoinGame={onEarnCoinGame}
+            onCompleteGame={(stars) => onCompleteActionGame?.('parkour_climb', stars) ?? 0}
             onClose={onClose}
           />
         )}
@@ -2271,6 +2277,7 @@ export const ArcadeMiniGameModal: React.FC<ArcadeMiniGameModalProps> = ({
             avatar={avatar}
             coinGame={coinGame}
             onEarnCoinGame={onEarnCoinGame}
+            onCompleteGame={(speedBonus) => onCompleteActionGame?.('obstacle_rush', speedBonus) ?? 0}
             onClose={onClose}
           />
         )}

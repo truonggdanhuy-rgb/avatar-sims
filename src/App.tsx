@@ -148,6 +148,17 @@ import {
 } from './data/furnitureCatalog';
 import {FARM_DECOR_BY_ID} from './data/farmDecorCatalog';
 import {
+  addPlayerExp,
+  computeArcadeWinExp,
+  computeFarmOrderExp,
+  computeFishCatchExp,
+  computeInsectCatchExp,
+  createInitialPlayerLevel,
+  getClaimableMilestoneCount,
+  LEVEL_MILESTONE_REWARDS,
+  normalizePlayerLevel,
+} from './data/levelCatalog';
+import {
   CHECK_IN_REWARDS,
   createEmptyDailyQuests,
   createInitialCheckInState,
@@ -175,6 +186,7 @@ import {
   CaughtFishItem,
   CaughtInsectItem,
   CheckInState,
+  CoinGiftEvent,
   CookingJob,
   CoopKind,
   CoopTroughs,
@@ -203,6 +215,7 @@ import {
   LivestockAnimalState,
   MillJob,
   MountId,
+  OnlinePlayerMeta,
   OwnedMountsState,
   OwnedPetState,
   PetSpeciesId,
@@ -211,6 +224,7 @@ import {
   PlacedFarmDecor,
   PlacedFurniture,
   PlayerActionsState,
+  PlayerLevelState,
   PlotLevel,
   PondFishSpecies,
   PondFishState,
@@ -229,6 +243,7 @@ import {
   encodeAccountTransferCodeSync,
   extractSavePreview,
 } from './utils/accountSave';
+import {townMultiplayer} from './utils/multiplayerClient';
 import {finalizePlayerName, sanitizePlayerNameInput} from './utils/playerName';
 import {soundFX} from './utils/sound';
 import {
@@ -492,7 +507,7 @@ function GameWorld({
   const [bagOpen, setBagOpen] = useState(false);
   const [bagInitialSubTab, setBagInitialSubTab] = useState<BagSubTab>('list');
   const [phoneInitialTab, setPhoneInitialTab] = useState<
-    'menu' | 'account' | 'guide' | 'fishdex' | 'actions'
+    'menu' | 'account' | 'guide' | 'fishdex' | 'actions' | 'level'
   >('menu');
   const [nearPond, setNearPond] = useState(false);
   const [pondFeedPulse, setPondFeedPulse] = useState(0);
@@ -1415,6 +1430,34 @@ function GameWorld({
     return Date.now();
   });
 
+  const [playerLevel, setPlayerLevel] = useState<PlayerLevelState>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.playerLevel) {
+          return normalizePlayerLevel(parsed.playerLevel);
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return createInitialPlayerLevel();
+  });
+  const playerLevelRef = useRef<PlayerLevelState>(playerLevel);
+  playerLevelRef.current = playerLevel;
+
+  const statsRef = useRef<GameStats>(stats);
+  statsRef.current = stats;
+
+  const [worldToast, setWorldToast] = useState<{
+    id: number;
+    title: string;
+    subtitle?: string;
+    kind: 'exp' | 'levelup' | 'gift';
+  } | null>(null);
+  const worldToastTimerRef = useRef<number | null>(null);
+
   const [bugNet, setBugNet] = useState<BugNetState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -2079,6 +2122,7 @@ function GameWorld({
       insectDex,
       accountCreatedAt,
       accountId,
+      playerLevel,
       ownedMounts,
       redeemedCodes,
       ownedPets,
@@ -2177,6 +2221,7 @@ function GameWorld({
     insectDex,
     accountCreatedAt,
     accountId,
+    playerLevel,
     ownedMounts,
     redeemedCodes,
     ownedPets,
@@ -2769,6 +2814,84 @@ function GameWorld({
     }));
   };
 
+  const showWorldToast = (
+    title: string,
+    subtitle?: string,
+    kind: 'exp' | 'levelup' | 'gift' = 'exp',
+  ) => {
+    if (worldToastTimerRef.current !== null) {
+      window.clearTimeout(worldToastTimerRef.current);
+    }
+    setWorldToast({
+      id: Date.now() + Math.random(),
+      title,
+      subtitle,
+      kind,
+    });
+    worldToastTimerRef.current = window.setTimeout(() => {
+      setWorldToast(null);
+      worldToastTimerRef.current = null;
+    }, 3600);
+  };
+
+  const awardPlayerExp = (rawGain: number, sourceLabel?: string): number => {
+    const res = addPlayerExp(playerLevelRef.current, rawGain);
+    if (res.gainedExp <= 0) return 0;
+    playerLevelRef.current = res.nextState;
+    setPlayerLevel(res.nextState);
+    if (res.leveledUp) {
+      soundFX.sparkle();
+      forceImmediateCloudSyncRef.current = true;
+      const unlockedMilestone = LEVEL_MILESTONE_REWARDS.find(
+        (m) => m.level > res.oldLevel && m.level <= res.newLevel,
+      );
+      showWorldToast(
+        `Lên Cấp ${res.newLevel}! (+${res.gainedExp} EXP)`,
+        unlockedMilestone
+          ? `Có quà mốc Cấp ${unlockedMilestone.level} trong Điện Thoại!`
+          : sourceLabel,
+        'levelup',
+      );
+    } else {
+      showWorldToast(`+${res.gainedExp} EXP`, sourceLabel, 'exp');
+    }
+    return res.gainedExp;
+  };
+
+  const handleClaimLevelMilestone = (level: 10 | 30 | 50) => {
+    const cur = playerLevelRef.current;
+    if (cur.level < level || cur.claimedMilestones.includes(level)) return;
+    const reward = LEVEL_MILESTONE_REWARDS.find((m) => m.level === level);
+    if (!reward) return;
+    soundFX.sparkle();
+    const nextState: PlayerLevelState = {
+      ...cur,
+      claimedMilestones: [...cur.claimedMilestones, level].sort((a, b) => a - b),
+    };
+    playerLevelRef.current = nextState;
+    setPlayerLevel(nextState);
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins + reward.rewardCoins,
+      coinGame: Math.max(0, (prev.coinGame ?? 0) + reward.rewardCoinGame),
+    }));
+    forceImmediateCloudSyncRef.current = true;
+    showWorldToast(
+      `Nhận Quà Cấp ${level}!`,
+      `+${reward.rewardCoins.toLocaleString('vi-VN')} Xu Vàng & +${reward.rewardCoinGame.toLocaleString('vi-VN')} Xu Game`,
+      'gift',
+    );
+  };
+
+  const handleCompleteActionGame = (
+    gameId: 'parkour_climb' | 'obstacle_rush',
+    bonusUnits: number,
+  ): number => {
+    const label =
+      gameId === 'parkour_climb' ? 'Hoàn thành Parkour 3D' : 'Hoàn thành Vượt Ngại Vật 3D';
+    return awardPlayerExp(computeArcadeWinExp(gameId, bonusUnits), label);
+  };
+
   const handleFulfillOrder = (orderId: string) => {
     const order = farmOrders.find((o) => o.id === orderId);
     if (!order) return;
@@ -2792,6 +2915,10 @@ function GameWorld({
       prev.map((o, idx) => (o.id === orderId ? createSingleFarmOrder(idx + 1) : o)),
     );
     markQuestDone('cooking');
+    awardPlayerExp(
+      computeFarmOrderExp(order.rewardCoins, order.requirements.length),
+      `Giao đơn ${order.customerName}`,
+    );
   };
 
   const handleRefreshOrder = (orderId: string) => {
@@ -3285,6 +3412,7 @@ function GameWorld({
       mood: Math.min(100, prev.mood + 2),
     }));
     markQuestDone('fishing');
+    awardPlayerExp(computeFishCatchExp(spec.rarity, isFirstDiscovery), `Câu được ${spec.name}`);
 
     return {
       speciesId: spec.id,
@@ -3460,6 +3588,7 @@ function GameWorld({
       mood: Math.min(100, prev.mood + 2),
     }));
     markQuestDone('insects');
+    awardPlayerExp(computeInsectCatchExp(spec.rarity, isFirstDiscovery), `Bắt được ${spec.name}`);
 
     return {
       speciesId: spec.id,
@@ -4480,6 +4609,142 @@ function GameWorld({
     ? FURNITURE_BY_ID[activeDisplayFurniture.catalogId] ?? null
     : null;
 
+  const localMultiplayerMeta: OnlinePlayerMeta = {
+    id: '',
+    accountId,
+    username: activeAccount?.displayUsername ?? null,
+    name: avatar.name,
+    level: playerLevel.level,
+    joinedAt: accountCreatedAt,
+    zone,
+    avatar,
+    activeMountId: ownedMounts.activeMountId,
+    equippedTool: fishingRod.equipped ? 'wooden_rod' : bugNet.equipped ? 'wooden_net' : null,
+    equippedFood: equippedFoodId,
+    carriedPet:
+      effectiveCarriedPetId && activePet && activePet.id === effectiveCarriedPetId
+        ? {speciesId: activePet.speciesId, sick: activePet.sick}
+        : null,
+    companionPet:
+      activePet && activePet.id !== effectiveCarriedPetId
+        ? {
+            id: activePet.id,
+            speciesId: activePet.speciesId,
+            name: activePet.name,
+            sick: activePet.sick,
+            isMax: activePet.intimacyLevel >= MAX_PET_INTIMACY,
+          }
+        : null,
+    updatedAt: Date.now(),
+  };
+
+  const latestMultiplayerMetaRef = useRef<OnlinePlayerMeta>(localMultiplayerMeta);
+  latestMultiplayerMetaRef.current = localMultiplayerMeta;
+
+  useEffect(() => {
+    if (!hasCreatedCharacter) {
+      townMultiplayer.stop();
+      return;
+    }
+    townMultiplayer.start(latestMultiplayerMetaRef.current);
+    const unsubGift = townMultiplayer.subscribeGift((gift: CoinGiftEvent) => {
+      if (!gift || gift.amount <= 0) return;
+      soundFX.sparkle();
+      setStats((prev) => ({
+        ...prev,
+        coins: gift.currency === 'coins' ? prev.coins + gift.amount : prev.coins,
+        coinGame:
+          gift.currency === 'coinGame'
+            ? Math.max(0, (prev.coinGame ?? 0) + gift.amount)
+            : (prev.coinGame ?? 0),
+      }));
+      forceImmediateCloudSyncRef.current = true;
+      const unitLabel = gift.currency === 'coins' ? 'Xu Vàng' : 'Xu Game';
+      showWorldToast(
+        `Nhận quà từ ${gift.fromName}!`,
+        `+${gift.amount.toLocaleString('vi-VN')} ${unitLabel}`,
+        'gift',
+      );
+    });
+    return () => {
+      unsubGift();
+      townMultiplayer.stop();
+      if (worldToastTimerRef.current !== null) {
+        window.clearTimeout(worldToastTimerRef.current);
+        worldToastTimerRef.current = null;
+      }
+    };
+  }, [hasCreatedCharacter]);
+
+  useEffect(() => {
+    if (!hasCreatedCharacter) return;
+    townMultiplayer.sendMeta(localMultiplayerMeta);
+  }, [
+    hasCreatedCharacter,
+    zone,
+    avatar,
+    playerLevel.level,
+    ownedMounts.activeMountId,
+    fishingRod.equipped,
+    bugNet.equipped,
+    equippedFoodId,
+    activePet,
+    effectiveCarriedPetId,
+    accountId,
+    accountCreatedAt,
+    activeAccount?.displayUsername,
+  ]);
+
+  const handleSendPlayerGift = (
+    target: OnlinePlayerMeta,
+    currency: 'coins' | 'coinGame',
+    rawAmount: number,
+  ): {ok: boolean; message: string} => {
+    const amount = Math.floor(rawAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return {ok: false, message: 'Số xu tặng phải lớn hơn 0.'};
+    }
+    const curStats = statsRef.current;
+    const balance = currency === 'coins' ? curStats.coins : (curStats.coinGame ?? 0);
+    const unitLabel = currency === 'coins' ? 'Xu Vàng' : 'Xu Game';
+    if (balance < amount) {
+      return {ok: false, message: `Bạn không đủ ${unitLabel} để tặng!`};
+    }
+
+    soundFX.sparkle();
+    setStats((prev) => ({
+      ...prev,
+      coins: currency === 'coins' ? Math.max(0, prev.coins - amount) : prev.coins,
+      coinGame:
+        currency === 'coinGame'
+          ? Math.max(0, (prev.coinGame ?? 0) - amount)
+          : (prev.coinGame ?? 0),
+    }));
+    forceImmediateCloudSyncRef.current = true;
+
+    townMultiplayer.sendCoinGift({
+      fromAccountId: accountId,
+      fromUsername: activeAccount?.displayUsername ?? null,
+      fromName: avatar.name,
+      toPlayerId: target.id,
+      toAccountId: target.accountId,
+      toUsername: target.username ?? null,
+      toName: target.name,
+      currency,
+      amount,
+    });
+
+    showWorldToast(
+      `Đã tặng ${target.name}`,
+      `-${amount.toLocaleString('vi-VN')} ${unitLabel}`,
+      'gift',
+    );
+    return {
+      ok: true,
+      message: `Đã gửi tặng +${amount.toLocaleString('vi-VN')} ${unitLabel} cho ${target.name}!`,
+    };
+  };
+
   return (
     <main className="relative h-[100dvh] w-full overflow-hidden bg-[#BFE6F7] select-none">
       <WorldCanvas
@@ -4626,6 +4891,8 @@ function GameWorld({
           setActiveArcadeGame(null);
           setCoinGameShopOpen(true);
         }}
+        claimableLevelGiftsCount={getClaimableMilestoneCount(playerLevel)}
+        onSendPlayerGift={handleSendPlayerGift}
       />
 
       {wardrobeOpen && (
@@ -4930,6 +5197,7 @@ function GameWorld({
           onSpendCoins={handleSpendCoins}
           onEarnCoinGame={handleEarnCoinGame}
           onEarnCoins={addCoins}
+          onCompleteActionGame={handleCompleteActionGame}
           onSelectGame={setActiveArcadeGame}
           onClose={() => setActiveArcadeGame(null)}
         />
@@ -5047,6 +5315,7 @@ function GameWorld({
           fishDex={fishDex}
           insectDex={insectDex}
           playerActions={playerActions}
+          playerLevel={playerLevel}
           accountCreatedAt={accountCreatedAt}
           accountId={accountId}
           lastSavedAt={lastSavedAt}
@@ -5076,6 +5345,7 @@ function GameWorld({
           }}
           onEquipPlayerAction={handleEquipPlayerAction}
           onUnequipPlayerAction={handleUnequipPlayerAction}
+          onClaimLevelMilestone={handleClaimLevelMilestone}
           onChangeTimeOfDay={setTimeOfDay}
           onToggleSound={handleToggleSound}
           onRedeemGiftCode={handleRedeemGiftCode}
@@ -5143,6 +5413,26 @@ function GameWorld({
           onStepChange={handleTourStepChange}
           onFinish={handleFinishAnnaTour}
         />
+      )}
+
+      {worldToast && (
+        <div
+          key={worldToast.id}
+          className={`anim-pop pointer-events-none fixed top-14 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center rounded-2xl border-2 px-4 py-1.5 text-center shadow-xl backdrop-blur-sm ${
+            worldToast.kind === 'levelup'
+              ? 'border-[#F59E0B] bg-gradient-to-r from-[#FFF7DF] via-[#FFEFB8] to-[#FFF7DF] text-[#5C3408]'
+              : worldToast.kind === 'gift'
+                ? 'border-[#38BDF8] bg-[#F0FAFF]/95 text-[#0F3F5E]'
+                : 'border-[#54A86B]/70 bg-[#F3FFF6]/95 text-[#1F5432]'
+          }`}
+        >
+          <span className="text-xs font-black tracking-tight sm:text-sm">
+            {worldToast.title}
+          </span>
+          {worldToast.subtitle && (
+            <span className="text-[11px] font-bold opacity-85">{worldToast.subtitle}</span>
+          )}
+        </div>
       )}
 
       {!hasCreatedCharacter && (

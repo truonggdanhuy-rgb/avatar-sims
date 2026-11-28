@@ -33,6 +33,7 @@ interface Parkour3DGameProps {
   avatar?: AvatarConfig;
   coinGame?: number;
   onEarnCoinGame: (amount: number) => void;
+  onCompleteGame?: (starsCollected: number) => number;
   onClose?: () => void;
 }
 
@@ -168,6 +169,7 @@ interface HudSnapshot {
   bannerText: string;
   status: 'ready' | 'playing' | 'won' | 'lost';
   rewardEarned: number;
+  expEarned?: number;
   climbing: boolean;
   ziplining: boolean;
   windActive: boolean;
@@ -192,6 +194,7 @@ export const Parkour3DGame: React.FC<Parkour3DGameProps> = ({
   avatar,
   coinGame = 0,
   onEarnCoinGame,
+  onCompleteGame,
   onClose,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -210,6 +213,7 @@ export const Parkour3DGame: React.FC<Parkour3DGameProps> = ({
     bannerText: '',
     status: 'ready',
     rewardEarned: 0,
+    expEarned: 0,
     climbing: false,
     ziplining: false,
     windActive: false,
@@ -230,6 +234,8 @@ export const Parkour3DGame: React.FC<Parkour3DGameProps> = ({
 
   const onEarnRef = useRef(onEarnCoinGame);
   onEarnRef.current = onEarnCoinGame;
+  const onCompleteRef = useRef(onCompleteGame);
+  onCompleteRef.current = onCompleteGame;
 
   const triggerJump = useCallback(() => {
     if (gameStatusRef.current === 'ready') {
@@ -1843,9 +1849,11 @@ export const Parkour3DGame: React.FC<Parkour3DGameProps> = ({
       if (Math.hypot(px - 0, pz - (FINISH_Z - 1.5)) < 2.2 && py >= 43.2) {
         gameStatusRef.current = 'won';
         const reward = 12 + Math.floor(starsCollected * 0.5);
+        let expEarned = 0;
         if (!rewardPaid) {
           rewardPaid = true;
           onEarnRef.current(reward);
+          expEarned = onCompleteRef.current?.(starsCollected) ?? 0;
         }
         playArcadeSfx('win');
         particles.emit(0, 46.2, FINISH_Z - 1.5, '#FDE047', 34, 6.2, 6.5);
@@ -1863,6 +1871,7 @@ export const Parkour3DGame: React.FC<Parkour3DGameProps> = ({
           bannerText: `CHIẾN THẮNG! +${reward} CG`,
           status: 'won',
           rewardEarned: reward,
+          expEarned,
           climbing: false,
           ziplining: false,
           windActive: false,
@@ -2273,9 +2282,16 @@ export const Parkour3DGame: React.FC<Parkour3DGameProps> = ({
                 {hud.stars}/{hud.totalStars}
               </strong>
             </p>
-            <div className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-[#0F172A] py-2 text-sm font-black text-[#38BDF8]">
-              <Sparkles className="h-4 w-4 text-[#FDE047]" />
-              <span>+{hud.rewardEarned} CoinGame</span>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-xl bg-[#0F172A] py-2 px-3 text-sm font-black text-[#38BDF8]">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-[#FDE047]" />
+                <span>+{hud.rewardEarned} CoinGame</span>
+              </span>
+              {hud.status === 'won' && (hud.expEarned ?? 0) > 0 && (
+                <span className="rounded-lg bg-[#22C55E]/20 px-2 py-0.5 text-xs font-black text-[#4ADE80]">
+                  +{hud.expEarned} EXP
+                </span>
+              )}
             </div>
             <div className="mt-4 flex gap-2">
               <button

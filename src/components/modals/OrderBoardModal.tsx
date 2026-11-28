@@ -1,9 +1,10 @@
 import React from 'react';
-import {ClipboardList, Coins, PackageCheck, RefreshCw, X} from 'lucide-react';
+import {ClipboardList, Coins, PackageCheck, RefreshCw, Sparkles, X} from 'lucide-react';
 import {
   getFarmItemCount,
   getFarmItemName,
 } from '../../data/farmCatalog';
+import {computeFarmOrderExp} from '../../data/levelCatalog';
 import {FarmInventory, FarmOrder} from '../../types/game';
 import {soundFX} from '../../utils/sound';
 import {FarmItemIcon} from '../FarmItemIcon';
@@ -105,6 +106,10 @@ export const OrderBoardModal: React.FC<OrderBoardModalProps> = ({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">
+                  <span className="inline-flex items-center gap-0.5 rounded-md bg-[#EEF8F0] px-1.5 py-1 text-[10px] font-extrabold text-[#2E7D46] tabular-nums">
+                    <Sparkles className="h-2.5 w-2.5" />
+                    +{computeFarmOrderExp(order.rewardCoins, order.requirements.length)} EXP
+                  </span>
                   <button
                     type="button"
                     disabled={!canFulfill}

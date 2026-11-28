@@ -3,6 +3,7 @@ export const STORAGE_KEY = 'thi_tran_may_save_v1';
 export interface AccountSavePreview {
   accountId: string;
   playerName: string;
+  level?: number;
   coins: number;
   coinGame: number;
   ownedItemCount: number;
@@ -139,6 +140,11 @@ export function extractSavePreview(
     ? ownedMountsObj.ownedIds
     : [];
 
+  const playerLevelObj =
+    payload.playerLevel && typeof payload.playerLevel === 'object'
+      ? (payload.playerLevel as Record<string, unknown>)
+      : {};
+
   return {
     accountId:
       typeof payload.accountId === 'string' && payload.accountId.trim()
@@ -148,6 +154,10 @@ export function extractSavePreview(
       typeof avatar.name === 'string' && avatar.name.trim()
         ? avatar.name.trim()
         : 'Mây Nhỏ',
+    level:
+      typeof playerLevelObj.level === 'number' && Number.isFinite(playerLevelObj.level)
+        ? Math.max(1, Math.min(100, Math.floor(playerLevelObj.level)))
+        : 1,
     coins:
       typeof stats.coins === 'number' && Number.isFinite(stats.coins)
         ? Math.max(0, Math.floor(stats.coins))

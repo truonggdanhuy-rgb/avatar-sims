@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {
   ArrowLeft,
+  Award,
   BookOpen,
   CalendarCheck2,
   Check,
@@ -13,6 +14,7 @@ import {
   Heart,
   Home,
   KeyRound,
+  Lock,
   Moon,
   RefreshCw,
   Send,
@@ -20,7 +22,10 @@ import {
   ShieldCheck,
   Shirt,
   Smile,
+  Sparkles,
+  Star,
   Sun,
+  Trophy,
   UserCircle2,
   Utensils,
   Volume2,
@@ -41,12 +46,20 @@ import {
   InsectDexRecord,
   InsectSpeciesId,
   PlayerActionsState,
+  PlayerLevelState,
   TimeOfDay,
   ZoneId,
 } from '../../types/game';
 import {ALL_FISH_LIST, RIVER_FISH_LIST, SEA_FISH_LIST} from '../../data/fishingCatalog';
 import {INSECT_HABITAT_LABELS, INSECT_LIST} from '../../data/insectCatalog';
 import {HUNGER_HUNGRY_THRESHOLD} from '../../data/foodCatalog';
+import {
+  getClaimableMilestoneCount,
+  getExpForNextLevel,
+  LEVEL_EXP_GUIDE,
+  LEVEL_MILESTONE_REWARDS,
+  MAX_PLAYER_LEVEL,
+} from '../../data/levelCatalog';
 import {
   DAILY_QUEST_DEFS,
   getTodayDateKey,
@@ -76,12 +89,13 @@ interface PhoneMenuModalProps {
   fishDex: Partial<Record<FishSpeciesId, FishDexRecord>>;
   insectDex: Partial<Record<InsectSpeciesId, InsectDexRecord>>;
   playerActions: PlayerActionsState;
+  playerLevel: PlayerLevelState;
   accountCreatedAt: number;
   accountId: string;
   lastSavedAt: number;
   accountTransferCode: string;
   teleportCooldownSec: number;
-  initialTab?: 'menu' | 'account' | 'guide' | 'fishdex' | 'actions';
+  initialTab?: 'menu' | 'account' | 'guide' | 'fishdex' | 'actions' | 'level';
   onTeleportToPlaza: () => void;
   onOpenWardrobe: () => void;
   onOpenDailyQuests: () => void;
@@ -90,6 +104,7 @@ interface PhoneMenuModalProps {
   onOpenStorage: () => void;
   onEquipPlayerAction: (actionId: ActionId, targetSlotIndex?: number) => void;
   onUnequipPlayerAction: (slotIndex: number) => void;
+  onClaimLevelMilestone: (level: 10 | 30 | 50) => void;
   onChangeTimeOfDay: (time: TimeOfDay) => void;
   onToggleSound: () => void;
   onRedeemGiftCode: (code: string) => {ok: boolean; message: string};
@@ -101,7 +116,7 @@ interface PhoneMenuModalProps {
   onClose: () => void;
 }
 
-type PhoneTab = 'menu' | 'account' | 'guide' | 'fishdex' | 'actions';
+type PhoneTab = 'menu' | 'account' | 'guide' | 'fishdex' | 'actions' | 'level';
 
 const ZONE_LABELS: Record<ZoneId, string> = {
   town: 'Thị Trấn',
@@ -151,6 +166,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   fishDex,
   insectDex,
   playerActions,
+  playerLevel,
   accountCreatedAt,
   accountId,
   lastSavedAt,
@@ -165,6 +181,7 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   onOpenStorage,
   onEquipPlayerAction,
   onUnequipPlayerAction,
+  onClaimLevelMilestone,
   onChangeTimeOfDay,
   onToggleSound,
   onRedeemGiftCode,
@@ -222,6 +239,14 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
   ).length;
   const doneQuestCount = DAILY_QUEST_DEFS.filter((q) => dailyQuests.claimed[q.key]).length;
   const checkInClaimableToday = checkIn.lastClaimDate !== getTodayDateKey();
+  const nextLevelReqExp = getExpForNextLevel(playerLevel.level);
+  const levelProgressPct =
+    playerLevel.level >= MAX_PLAYER_LEVEL
+      ? 100
+      : nextLevelReqExp > 0
+        ? Math.max(0, Math.min(100, Math.round((playerLevel.exp / nextLevelReqExp) * 100)))
+        : 0;
+  const claimableMilestonesCount = getClaimableMilestoneCount(playerLevel);
 
   const TimeIcon = timeOfDay === 'morning' ? Sun : Moon;
   const nextTime: TimeOfDay = timeOfDay === 'morning' ? 'night' : 'morning';
@@ -368,6 +393,41 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Clickable Level & EXP Progress Bar inside Phone */}
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  setTab('level');
+                }}
+                className="group block w-full rounded-xl border border-[#E5D3B8] bg-[#FAF4EA] px-2 py-1 text-left transition-colors hover:bg-[#F5EBD9] active:scale-[0.99]"
+              >
+                <div className="mb-0.5 flex items-center justify-between gap-1 text-[9.5px] font-extrabold">
+                  <span className="flex items-center gap-1 text-[#7B4B1E]">
+                    <Star className="h-3 w-3 fill-[#F59E0B] text-[#D97706]" />
+                    <span>
+                      Cấp {playerLevel.level}/{MAX_PLAYER_LEVEL}
+                    </span>
+                    {claimableMilestonesCount > 0 && (
+                      <span className="rounded bg-[#E54D66] px-1 py-[1px] text-[8.5px] font-black text-white">
+                        Quà +{claimableMilestonesCount}
+                      </span>
+                    )}
+                  </span>
+                  <span className="tabular-nums text-[#6F533B]">
+                    {playerLevel.level >= MAX_PLAYER_LEVEL
+                      ? 'Tối đa'
+                      : `${playerLevel.exp}/${nextLevelReqExp} EXP`}
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#E8DAC4]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#F59E0B] via-[#FBBF24] to-[#34D399] transition-all duration-300"
+                    style={{width: `${levelProgressPct}%`}}
+                  />
+                </div>
+              </button>
             </div>
           </div>
         </div>
@@ -557,6 +617,41 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                   </span>
                 </button>
               </div>
+
+              {/* Level Shortcut Card inside Phone Launcher */}
+              <button
+                type="button"
+                onClick={() => {
+                  soundFX.tap();
+                  setTab('level');
+                }}
+                className="flex w-full items-center justify-between gap-2.5 rounded-2xl border border-[#E6C78F] bg-gradient-to-r from-[#FFF7E6] via-[#FFFDF7] to-[#EFFAF3] px-3 py-2 text-left shadow-xs transition-transform active:scale-[0.99]"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-xs font-black text-white shadow-xs">
+                    {playerLevel.level}
+                    {claimableMilestonesCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#EF4444] px-1 text-[9px] font-black text-white">
+                        {claimableMilestonesCount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#4A3525]">
+                      <span>Cấp Độ &amp; Quà Mốc</span>
+                      <span className="text-[10px] font-bold text-[#B45309]">
+                        ({levelProgressPct}%)
+                      </span>
+                    </div>
+                    <div className="truncate text-[10px] font-semibold text-[#7A6048]">
+                      {claimableMilestonesCount > 0
+                        ? `Có ${claimableMilestonesCount} phần quà cấp độ đang chờ nhận!`
+                        : 'Quà đặc biệt tại Cấp 10, 30 & 50 · Tối đa 100'}
+                    </div>
+                  </div>
+                </div>
+                <Trophy className="h-4 w-4 shrink-0 text-[#D97706]" />
+              </button>
 
               {/* Compact Secondary Shortcuts */}
               <div className="border-t border-[#E6D6C1] pt-3">
@@ -1334,6 +1429,153 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
             </div>
           )}
 
+          {tab === 'level' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFX.tap();
+                    setTab('menu');
+                  }}
+                  className="flex min-h-[34px] items-center gap-1 rounded-xl bg-[#EFE0C9] px-2.5 py-1 text-xs font-bold text-[#5B422E] active:scale-95"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <span>Quay lại</span>
+                </button>
+                <span className="text-xs font-extrabold text-[#4A3525]">Cấp Độ Thị Trấn</span>
+                <span className="w-16" />
+              </div>
+
+              <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3.5 shadow-xs space-y-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white shadow-sm">
+                      <span className="text-[9px] font-bold uppercase tracking-wider opacity-90">
+                        Cấp
+                      </span>
+                      <span className="text-lg font-black leading-none tabular-nums">
+                        {playerLevel.level}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-extrabold text-[#4A3525]">
+                        Cấp {playerLevel.level} / {MAX_PLAYER_LEVEL}
+                      </div>
+                      <div className="text-[11px] font-semibold text-[#7A6048] tabular-nums">
+                        Tổng kinh nghiệm: {playerLevel.totalExp.toLocaleString('vi-VN')} EXP
+                      </div>
+                    </div>
+                  </div>
+                  <Award className="h-6 w-6 shrink-0 text-[#D97706]" />
+                </div>
+
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-[#5B422E]">
+                    <span>Tiến độ lên cấp {Math.min(MAX_PLAYER_LEVEL, playerLevel.level + 1)}</span>
+                    <span className="tabular-nums">
+                      {playerLevel.level >= MAX_PLAYER_LEVEL
+                        ? 'Đã đạt cấp tối đa!'
+                        : `${playerLevel.exp} / ${nextLevelReqExp} EXP (${levelProgressPct}%)`}
+                    </span>
+                  </div>
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-[#EFE4D3] p-[2px]">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#F59E0B] via-[#FBBF24] to-[#34D399] transition-all duration-300"
+                      style={{width: `${levelProgressPct}%`}}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Milestone Gift Boxes (Lv 10, 30, 50) */}
+              <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3 shadow-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs font-extrabold text-[#4A3525]">
+                    <Gift className="h-4 w-4 text-[#D97706]" />
+                    <span>Quà Mốc Cấp Độ</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-[#7A6048]">Mốc 10 · 30 · 50</span>
+                </div>
+
+                <div className="space-y-2">
+                  {LEVEL_MILESTONE_REWARDS.map((m) => {
+                    const unlocked = playerLevel.level >= m.level;
+                    const claimed = playerLevel.claimedMilestones.includes(m.level);
+                    return (
+                      <div
+                        key={m.level}
+                        style={{backgroundColor: m.accentBg}}
+                        className="flex items-center justify-between gap-2 rounded-xl border border-[#E5D4BA] px-2.5 py-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              style={{backgroundColor: m.badgeColor}}
+                              className="rounded-md px-1.5 py-0.5 text-[10px] font-black text-white"
+                            >
+                              Lv.{m.level}
+                            </span>
+                            <span className="truncate text-[11px] font-extrabold text-[#4A3525]">
+                              {m.title}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 text-[10px] font-semibold text-[#6F533B]">
+                            +{m.rewardCoins} Xu Vàng · +{m.rewardCoinGame} CoinGame
+                          </div>
+                        </div>
+
+                        {claimed ? (
+                          <span className="flex shrink-0 items-center gap-1 rounded-lg bg-[#E4F2E7] px-2 py-1 text-[10px] font-extrabold text-[#2E7D46]">
+                            <Check className="h-3 w-3" />
+                            Đã nhận
+                          </span>
+                        ) : unlocked ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundFX.sparkle();
+                              onClaimLevelMilestone(m.level);
+                            }}
+                            className="shrink-0 rounded-lg bg-[#D97706] px-2.5 py-1.5 text-[10px] font-black text-white shadow-xs transition-transform active:scale-95"
+                          >
+                            Nhận Quà
+                          </button>
+                        ) : (
+                          <span className="flex shrink-0 items-center gap-1 rounded-lg bg-white/75 px-2 py-1 text-[10px] font-bold text-[#8A7562]">
+                            <Lock className="h-3 w-3" />
+                            Còn {m.level - playerLevel.level} cấp
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* EXP Sources Guide */}
+              <div className="rounded-2xl border border-[#DFCBB0] bg-white p-3 shadow-xs space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#4A3525]">
+                  <Sparkles className="h-3.5 w-3.5 text-[#D97706]" />
+                  <span>Cách Nhận EXP</span>
+                </div>
+                <div className="divide-y divide-[#F1E6D6]">
+                  {LEVEL_EXP_GUIDE.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-2 py-1.5 text-[11px]"
+                    >
+                      <span className="font-semibold text-[#4A3525]">{item.label}</span>
+                      <span className="shrink-0 font-extrabold text-[#2E7D46] tabular-nums">
+                        +{item.expRange}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {tab === 'guide' && (
             <div className="divide-y divide-[#EFE2CF] rounded-2xl border border-[#E0CEB6] bg-white">
               <div className="px-3.5 py-2.5">
@@ -1368,7 +1610,11 @@ export const PhoneMenuModal: React.FC<PhoneMenuModalProps> = ({
                 setTab('menu');
               }}
               className={`flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-colors ${
-                tab === 'menu' || tab === 'account' || tab === 'fishdex' || tab === 'actions'
+                tab === 'menu' ||
+                tab === 'account' ||
+                tab === 'fishdex' ||
+                tab === 'actions' ||
+                tab === 'level'
                   ? 'bg-[#6F4E37] text-amber-50 shadow-xs'
                   : 'bg-[#E9D9C3] text-[#5B422E]'
               }`}

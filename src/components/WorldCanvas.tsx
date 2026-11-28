@@ -72,9 +72,10 @@ import {
   buildAvatarRig,
   updateAvatarRigAnimation,
 } from '../three/avatar3d';
+import {buildBoatById, BuiltBoatRig} from '../three/boat3d';
 import {buildMountRig, MountRig, updateMountAnimation} from '../three/mounts3d';
 import {FishingVisualFrame} from '../three/fishingVisuals3d';
-import {buildPetModel, PetRig, updatePetAnimation} from '../three/pets3d';
+import {buildPetModel, PetAnimMode, PetRig, updatePetAnimation} from '../three/pets3d';
 import {
   buildSubzoneScene,
   HouseDoorHandle,
@@ -151,6 +152,7 @@ import {
   AvatarConfig,
   AvatarPose,
   BbqFoodId,
+  BoatId,
   BoatsState,
   BugNetState,
   CoopKind,
@@ -169,6 +171,9 @@ import {
   JoyboyTargetNpcId,
   LivestockAnimalState,
   MountId,
+  OnlinePlayerMeta,
+  OnlinePlayerPosePacket,
+  OnlinePlayerState,
   OwnedMountsState,
   OwnedPetState,
   PetSpeciesId,
@@ -181,9 +186,11 @@ import {
   WellWaterState,
   ZoneId,
 } from '../types/game';
+import {isPublicMultiplayerZone, townMultiplayer} from '../utils/multiplayerClient';
 import {soundFX} from '../utils/sound';
 import {PetArcMenu} from './PetArcMenu';
 import {PlotArcMenu} from './PlotArcMenu';
+import {RemotePlayerArcMenu} from './RemotePlayerArcMenu';
 
 interface WorldCanvasProps {
   zone: ZoneId;
@@ -345,6 +352,12 @@ interface WorldCanvasProps {
   tourCameraTarget?: TourCameraTarget | null;
   onOpenFurnitureDisplay: (furnitureId: string) => void;
   onStartAnnaTour: () => void;
+  claimableLevelGiftsCount?: number;
+  onSendPlayerGift?: (
+    target: OnlinePlayerMeta,
+    currency: 'coins' | 'coinGame',
+    amount: number,
+  ) => {ok: boolean; message: string};
 }
 
 interface ProjectedTag {
@@ -1427,6 +1440,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   tourCameraTarget = null,
   onOpenFurnitureDisplay,
   onStartAnnaTour,
+  claimableLevelGiftsCount = 0,
+  onSendPlayerGift,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const labelLayerRef = useRef<HTMLDivElement | null>(null);
@@ -1464,6 +1479,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const [speechBubble, setSpeechBubble] = useState<string | null>(null);
   const [arcMenuPos, setArcMenuPos] = useState<{plotId: number; x: number; y: number} | null>(null);
   const [petArcMenuPos, setPetArcMenuPos] = useState<{petId: string; x: number; y: number} | null>(null);
+  const [remoteArcMenuPos, setRemoteArcMenuPos] = useState<{
+    player: OnlinePlayerMeta;
+    x: number;
+    y: number;
+  } | null>(null);
   const [mallElevatorHud, setMallElevatorHud] = useState<'none' | 'near_ground' | 'deck' | 'riding'>('none');
   const [isBoatingHud, setIsBoatingHud] = useState(false);
   const [parachuteConfirmOpen, setParachuteConfirmOpen] = useState(false);
@@ -1639,6 +1659,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onOpenVendingMachine,
     onOpenFurnitureDisplay,
     onStartAnnaTour,
+    onSendPlayerGift,
   });
   callbacksRef.current = {
     onChangeZone,
@@ -1697,6 +1718,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     onOpenVendingMachine,
     onOpenFurnitureDisplay,
     onStartAnnaTour,
+    onSendPlayerGift,
   };
 
   const tourEndSnapRef = useRef<(() => void) | null>(null);
@@ -1743,6 +1765,7 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
   const homeExitTriggeredRef = useRef<boolean>(false);
   const selectedPlotRef = useRef<{plotId: number; worldPos: THREE.Vector3} | null>(null);
   const selectedPetRef = useRef<{petId: string} | null>(null);
+  const selectedRemoteRef = useRef<{playerId: string} | null>(null);
 
   const showBubble = (text: string, _x?: number, _y?: number, _z?: number) => {
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
@@ -1764,6 +1787,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
     homeExitTriggeredRef.current = false;
     selectedPetRef.current = null;
     setPetArcMenuPos(null);
+    selectedRemoteRef.current = null;
+    setRemoteArcMenuPos(null);
     if (zone !== 'town') {
       joyboyApproachRef.current = false;
       mallElevatorHudRef.current = 'none';
@@ -2597,6 +2622,105 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       return 0.02;
     };
 
+    interface RemotePlayerEntity {
+      id: string;
+      meta: OnlinePlayerMeta;
+      metaKey: string;
+      rig: AvatarRig;
+      clickProxy: THREE.Mesh;
+      mountRig: MountRig | null;
+      mountId: MountId | null;
+      boatRig: BuiltBoatRig | null;
+      boatId: BoatId | null;
+      petRig: PetRig | null;
+      petKey: string | null;
+      petX: number;
+      petY: number;
+      petZ: number;
+      petRotY: number;
+      nameDom: HTMLDivElement | null;
+      petNameDom: HTMLDivElement | null;
+      x: number;
+      y: number;
+      z: number;
+      rotY: number;
+      rotX: number;
+      vx: number;
+      vy: number;
+      vz: number;
+      targetX: number;
+      targetY: number;
+      targetZ: number;
+      targetRotY: number;
+      targetRotX: number;
+      pose: AvatarPose;
+      poseProgress: number;
+      speed: number;
+      mallFloor: 1 | 2;
+      boatActive: boolean;
+      boatX: number;
+      boatZ: number;
+      boatRotY: number;
+      boatMoving: boolean;
+      targetPetX: number;
+      targetPetY: number;
+      targetPetZ: number;
+      targetPetRotY: number;
+      petPlayKind: 'none' | 'jump' | 'circle';
+      skateMoveSec: number;
+      skateIdleBlend: number;
+      bikeWheelAngle: number;
+      bikeCrankAngle: number;
+      bikeSteerAngle: number;
+      bikeIdleBlend: number;
+      prevRotForSteer: number;
+      lastPoseAt: number;
+      hasInitialPose: boolean;
+      visibleInZone: boolean;
+    }
+
+    const remoteEntities = new Map<string, RemotePlayerEntity>();
+    const _remoteHeadVec = new THREE.Vector3();
+    const _remotePetVec = new THREE.Vector3();
+    const _remoteLotusHandVec = new THREE.Vector3();
+    const _remoteZeroVec = new THREE.Vector3(0, 0, 0);
+
+    const disposeObjectTree = (root: THREE.Object3D) => {
+      root.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh) {
+          const m = obj as THREE.Mesh;
+          m.geometry?.dispose();
+          if (Array.isArray(m.material)) {
+            m.material.forEach((mat) => mat.dispose());
+          } else {
+            m.material?.dispose();
+          }
+        }
+      });
+    };
+
+    const computeRemoteMetaKey = (meta: OnlinePlayerMeta): string => {
+      return JSON.stringify({
+        avatar: meta.avatar,
+        tool: meta.equippedTool,
+        food: meta.equippedFood,
+        carried: meta.carriedPet,
+      });
+    };
+
+    const createRemoteNameDom = (): HTMLDivElement | null => {
+      const layer = labelLayerRef.current;
+      if (!layer) return null;
+      const el = document.createElement('div');
+      el.style.display = 'none';
+      el.style.textShadow =
+        '0 1px 3px rgba(24,18,12,0.94), 0 0 2px rgba(24,18,12,0.96), 1px 0 0 rgba(24,18,12,0.82), -1px 0 0 rgba(24,18,12,0.82), 0 -1px 0 rgba(24,18,12,0.82)';
+      el.className =
+        'pointer-events-none absolute top-0 left-0 z-20 text-[12px] font-bold leading-none tracking-[0.01em] text-[#FFFDF5] whitespace-nowrap select-none';
+      layer.appendChild(el);
+      return el;
+    };
+
     const refreshClickTargetsWithPet = () => {
       const base = activeTown
         ? [...activeTown.clickTargets, playerProxy]
@@ -2606,8 +2730,300 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       if (petCompanion.proxy) {
         base.push(petCompanion.proxy);
       }
+      if (isPublicMultiplayerZone(stateRef.current.zone)) {
+        for (const ent of remoteEntities.values()) {
+          if (ent.visibleInZone) {
+            base.push(ent.clickProxy);
+          }
+        }
+      }
       currentClickTargets = base;
     };
+
+    const removeRemoteEntity = (playerId: string) => {
+      const ent = remoteEntities.get(playerId);
+      if (!ent) return;
+      if (ent.mountRig) {
+        ent.rig.root.remove(ent.mountRig.root);
+        ent.mountRig.dispose();
+        ent.mountRig = null;
+      }
+      if (ent.boatRig) {
+        scene.remove(ent.boatRig.boat);
+        disposeObjectTree(ent.boatRig.boat);
+        ent.boatRig = null;
+      }
+      if (ent.petRig) {
+        scene.remove(ent.petRig.root);
+        ent.petRig.dispose();
+        ent.petRig = null;
+      }
+      ent.rig.heldPetRig?.dispose();
+      ent.rig.root.remove(ent.clickProxy);
+      ent.clickProxy.geometry.dispose();
+      (ent.clickProxy.material as THREE.Material).dispose();
+      scene.remove(ent.rig.root);
+      disposeObjectTree(ent.rig.root);
+      ent.nameDom?.remove();
+      ent.petNameDom?.remove();
+      remoteEntities.delete(playerId);
+      if (selectedRemoteRef.current?.playerId === playerId) {
+        selectedRemoteRef.current = null;
+        setRemoteArcMenuPos(null);
+      }
+    };
+
+    const syncRemoteEntity = (state: OnlinePlayerState): RemotePlayerEntity => {
+      const meta = state.meta;
+      const existingEnt = remoteEntities.get(meta.id);
+      const nextMetaKey = computeRemoteMetaKey(meta);
+      let ent: RemotePlayerEntity;
+
+      if (!existingEnt) {
+        const rig = buildAvatarRig(meta.avatar, {
+          equippedTool: meta.equippedTool,
+          equippedFood: meta.equippedFood,
+          carryingPet: meta.carriedPet,
+        });
+        rig.root.visible = false;
+        const clickProxy = new THREE.Mesh(
+          new THREE.BoxGeometry(1.05, 1.95, 1.05),
+          new THREE.MeshBasicMaterial({visible: false}),
+        );
+        clickProxy.position.y = 0.95;
+        clickProxy.userData = {kind: 'remote_player', playerId: meta.id};
+        rig.root.add(clickProxy);
+        scene.add(rig.root);
+
+        ent = {
+          id: meta.id,
+          meta,
+          metaKey: nextMetaKey,
+          rig,
+          clickProxy,
+          mountRig: null,
+          mountId: null,
+          boatRig: null,
+          boatId: null,
+          petRig: null,
+          petKey: null,
+          petX: 0,
+          petY: 0,
+          petZ: 0,
+          petRotY: 0,
+          nameDom: createRemoteNameDom(),
+          petNameDom: createRemoteNameDom(),
+          x: state.pose?.x ?? 0,
+          y: state.pose?.y ?? 0.14,
+          z: state.pose?.z ?? 3.4,
+          rotY: state.pose?.rotY ?? 0,
+          rotX: state.pose?.rotX ?? 0,
+          vx: state.pose?.vx ?? 0,
+          vy: state.pose?.vy ?? 0,
+          vz: state.pose?.vz ?? 0,
+          targetX: state.pose?.x ?? 0,
+          targetY: state.pose?.y ?? 0.14,
+          targetZ: state.pose?.z ?? 3.4,
+          targetRotY: state.pose?.rotY ?? 0,
+          targetRotX: state.pose?.rotX ?? 0,
+          pose: state.pose?.pose ?? 'idle',
+          poseProgress: state.pose?.poseProgress ?? 0,
+          speed: state.pose?.speed ?? 0,
+          mallFloor: state.pose?.mallFloor ?? 1,
+          boatActive: Boolean(state.pose?.boat?.active),
+          boatX: state.pose?.boat?.x ?? 0,
+          boatZ: state.pose?.boat?.z ?? 0,
+          boatRotY: state.pose?.boat?.rotY ?? 0,
+          boatMoving: Boolean(state.pose?.boat?.moving),
+          targetPetX: state.pose?.pet?.x ?? 0,
+          targetPetY: state.pose?.pet?.y ?? 0,
+          targetPetZ: state.pose?.pet?.z ?? 0,
+          targetPetRotY: state.pose?.pet?.rotY ?? 0,
+          petPlayKind: state.pose?.pet?.playKind ?? 'none',
+          skateMoveSec: 0,
+          skateIdleBlend: 1,
+          bikeWheelAngle: 0,
+          bikeCrankAngle: 0.35,
+          bikeSteerAngle: 0,
+          bikeIdleBlend: 1,
+          prevRotForSteer: state.pose?.rotY ?? 0,
+          lastPoseAt: performance.now(),
+          hasInitialPose: Boolean(state.pose),
+          visibleInZone: false,
+        };
+        remoteEntities.set(meta.id, ent);
+      } else {
+        ent = existingEnt;
+        ent.meta = meta;
+        if (ent.metaKey !== nextMetaKey) {
+          ent.metaKey = nextMetaKey;
+          if (ent.mountRig) {
+            ent.rig.root.remove(ent.mountRig.root);
+          }
+          ent.rig.root.remove(ent.clickProxy);
+          ent.rig.heldPetRig?.dispose();
+          scene.remove(ent.rig.root);
+          disposeObjectTree(ent.rig.root);
+
+          ent.rig = buildAvatarRig(meta.avatar, {
+            equippedTool: meta.equippedTool,
+            equippedFood: meta.equippedFood,
+            carryingPet: meta.carriedPet,
+          });
+          ent.rig.root.position.set(ent.x, ent.y, ent.z);
+          ent.rig.root.rotation.set(ent.rotX, ent.rotY, 0);
+          ent.rig.root.visible = ent.visibleInZone;
+          ent.rig.root.add(ent.clickProxy);
+          if (ent.mountRig) {
+            ent.rig.root.add(ent.mountRig.root);
+          }
+          scene.add(ent.rig.root);
+        }
+      }
+
+      if (ent.nameDom) {
+        ent.nameDom.textContent = `${meta.name} · Lv.${meta.level}`;
+      }
+
+      // Sync MountRig cleanly (never hidden)
+      const nextMountId = meta.activeMountId ?? null;
+      if (ent.mountId !== nextMountId) {
+        if (ent.mountRig) {
+          ent.rig.root.remove(ent.mountRig.root);
+          ent.mountRig.dispose();
+          ent.mountRig = null;
+        }
+        ent.mountId = nextMountId;
+        if (nextMountId) {
+          ent.mountRig = buildMountRig(nextMountId);
+          ent.rig.root.add(ent.mountRig.root);
+        }
+      }
+
+      // Sync Companion PetRig (only when summoned and not currently carried in hand/shoulder)
+      const comp = meta.companionPet && !meta.carriedPet ? meta.companionPet : null;
+      const nextPetKey = comp ? `${comp.speciesId}:${comp.sick ? 1 : 0}:${comp.name}` : null;
+      if (ent.petKey !== nextPetKey) {
+        if (ent.petRig) {
+          scene.remove(ent.petRig.root);
+          ent.petRig.dispose();
+          ent.petRig = null;
+        }
+        ent.petKey = nextPetKey;
+        if (comp) {
+          const petScale = PET_CATALOG[comp.speciesId].moveType === 'fly' ? 1.35 : 1.34;
+          const pRig = buildPetModel(comp.speciesId, {
+            scale: petScale,
+            sick: comp.sick,
+            withShadow: true,
+          });
+          pRig.root.visible = ent.visibleInZone;
+          scene.add(pRig.root);
+          ent.petRig = pRig;
+          ent.petX = ent.targetPetX || ent.x - 1;
+          ent.petY = ent.targetPetY || ent.y;
+          ent.petZ = ent.targetPetZ || ent.z - 1;
+          ent.petRotY = ent.targetPetRotY || ent.rotY;
+          pRig.root.position.set(ent.petX, ent.petY, ent.petZ);
+          pRig.root.rotation.y = ent.petRotY;
+        }
+      }
+      if (ent.petNameDom) {
+        ent.petNameDom.textContent = comp
+          ? `${comp.name}${comp.sick ? ' (Ốm)' : ''}`
+          : '';
+      }
+
+      return ent;
+    };
+
+    const applyRemotePosePacket = (pkt: OnlinePlayerPosePacket) => {
+      const ent = remoteEntities.get(pkt.id);
+      if (!ent) return;
+      ent.meta = {...ent.meta, zone: pkt.zone};
+      ent.vx = pkt.vx;
+      ent.vy = pkt.vy;
+      ent.vz = pkt.vz;
+      ent.targetX = pkt.x;
+      ent.targetY = pkt.y;
+      ent.targetZ = pkt.z;
+      ent.targetRotY = pkt.rotY;
+      ent.targetRotX = pkt.rotX;
+      ent.pose = pkt.pose;
+      ent.poseProgress = pkt.poseProgress;
+      ent.speed = pkt.speed;
+      ent.mallFloor = pkt.mallFloor;
+      ent.lastPoseAt = performance.now();
+
+      if (pkt.boat && pkt.boat.active) {
+        ent.boatActive = true;
+        ent.boatX = pkt.boat.x;
+        ent.boatZ = pkt.boat.z;
+        ent.boatRotY = pkt.boat.rotY;
+        ent.boatMoving = Boolean(pkt.boat.moving);
+        const bId = pkt.boat.boatId;
+        if (ent.boatId !== bId) {
+          if (ent.boatRig) {
+            scene.remove(ent.boatRig.boat);
+            disposeObjectTree(ent.boatRig.boat);
+            ent.boatRig = null;
+          }
+          ent.boatId = bId;
+          ent.boatRig = buildBoatById(bId, true);
+          scene.add(ent.boatRig.boat);
+        }
+      } else {
+        ent.boatActive = false;
+        ent.boatMoving = false;
+      }
+
+      if (pkt.pet) {
+        ent.targetPetX = pkt.pet.x;
+        ent.targetPetY = pkt.pet.y;
+        ent.targetPetZ = pkt.pet.z;
+        ent.targetPetRotY = pkt.pet.rotY;
+        ent.petPlayKind = pkt.pet.playKind ?? 'none';
+      }
+
+      if (!ent.hasInitialPose) {
+        ent.hasInitialPose = true;
+        ent.x = pkt.x;
+        ent.y = pkt.y;
+        ent.z = pkt.z;
+        ent.rotY = pkt.rotY;
+        ent.rotX = pkt.rotX;
+        ent.prevRotForSteer = pkt.rotY;
+        if (pkt.pet) {
+          ent.petX = pkt.pet.x;
+          ent.petY = pkt.pet.y;
+          ent.petZ = pkt.pet.z;
+          ent.petRotY = pkt.pet.rotY;
+        }
+        refreshClickTargetsWithPet();
+      }
+    };
+
+    const unsubRoster = townMultiplayer.subscribeRoster((playersMap) => {
+      for (const existingId of Array.from(remoteEntities.keys())) {
+        if (!playersMap.has(existingId)) {
+          removeRemoteEntity(existingId);
+        }
+      }
+      for (const st of playersMap.values()) {
+        const ent = syncRemoteEntity(st);
+        if (st.pose) {
+          applyRemotePosePacket(st.pose);
+        }
+        if (selectedRemoteRef.current?.playerId === ent.id) {
+          setRemoteArcMenuPos((prev) => (prev ? {...prev, player: ent.meta} : prev));
+        }
+      }
+      refreshClickTargetsWithPet();
+    });
+
+    const unsubPose = townMultiplayer.subscribePose((pkt) => {
+      applyRemotePosePacket(pkt);
+    });
 
     const disposePetCompanion = () => {
       if (petCompanion.rig) {
@@ -4351,6 +4767,8 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       setArcMenuPos(null);
       selectedPetRef.current = null;
       setPetArcMenuPos(null);
+      selectedRemoteRef.current = null;
+      setRemoteArcMenuPos(null);
 
       // 1. Check interactive buildings/objects/NPCs/player
       const hits = raycaster.intersectObjects(currentClickTargets, true);
@@ -4374,6 +4792,27 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             soundFX.tap();
             setActionsTrayOpen((prev) => !prev);
             return;
+          }
+
+          if (kind === 'remote_player' && typeof data.playerId === 'string') {
+            const ent = remoteEntities.get(data.playerId);
+            if (ent && ent.visibleInZone && isPublicMultiplayerZone(stateRef.current.zone)) {
+              soundFX.tap();
+              selectedRemoteRef.current = {playerId: ent.id};
+              const cw = container?.clientWidth || window.innerWidth || 800;
+              const ch = container?.clientHeight || window.innerHeight || 600;
+              _remoteHeadVec.set(ent.x, ent.y + 1.32, ent.z).project(camera);
+              const rawX = _remoteHeadVec.z <= 1 ? ((_remoteHeadVec.x + 1) / 2) * cw : cw / 2;
+              const rawY = _remoteHeadVec.z <= 1 ? ((-_remoteHeadVec.y + 1) / 2) * ch : ch / 2;
+              const padX = Math.min(185, cw * 0.36);
+              const minY = Math.min(165, ch * 0.42);
+              setRemoteArcMenuPos({
+                player: ent.meta,
+                x: Math.max(padX, Math.min(cw - padX, rawX)),
+                y: Math.max(minY, Math.min(ch - 70, rawY)),
+              });
+              return;
+            }
           }
 
           releaseSeatIfNeeded();
@@ -6368,6 +6807,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
       }
     };
 
+    let prevSentX = playerPos.x;
+    let prevSentY = 0.14;
+    let prevSentZ = playerPos.z;
+    let prevSentZone: ZoneId = stateRef.current.zone;
+
     function tick() {
       if (disposed) return;
       if (document.hidden) {
@@ -7144,6 +7588,10 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           if (selectedPetRef.current) {
             selectedPetRef.current = null;
             setPetArcMenuPos(null);
+          }
+          if (selectedRemoteRef.current) {
+            selectedRemoteRef.current = null;
+            setRemoteArcMenuPos(null);
           }
 
           let fwdX = controls.target.x - camera.position.x;
@@ -8667,6 +9115,371 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
         activeSubzone?.update(elapsed, tod, {cameraPos: camera.position, playerPos});
       }
 
+      // High-precision local pose broadcast & 60fps remote player interpolation
+      {
+        const nowMs = performance.now();
+        const zoneSwitched = prevSentZone !== z;
+        const curX = playerRig.root.position.x;
+        const curY = playerRig.root.position.y;
+        const curZ = playerRig.root.position.z;
+        const invDt = zoneSwitched ? 0 : 1 / Math.max(0.008, delta);
+        const localVx = zoneSwitched ? 0 : (curX - prevSentX) * invDt;
+        const localVy = zoneSwitched ? 0 : (curY - prevSentY) * invDt;
+        const localVz = zoneSwitched ? 0 : (curZ - prevSentZ) * invDt;
+        prevSentX = curX;
+        prevSentY = curY;
+        prevSentZ = curZ;
+        prevSentZone = z;
+
+        if (isPublicMultiplayerZone(z)) {
+          const mallFloorNow: 1 | 2 =
+            z === 'mall'
+              ? mallState.floor
+              : z === 'town' && (isOnMallDeck || isRidingMallElevator)
+                ? 2
+                : 1;
+
+          townMultiplayer.sendPose(
+            {
+              zone: z,
+              x: curX,
+              y: curY,
+              z: curZ,
+              vx: localVx,
+              vy: localVy,
+              vz: localVz,
+              rotY: playerRig.root.rotation.y,
+              rotX: playerRig.root.rotation.x,
+              pose: playerPos.pose,
+              poseProgress: avatarPoseProgress,
+              speed: moveHorizSpeed,
+              mallFloor: mallFloorNow,
+              boat: boatState.active
+                ? {
+                    active: true,
+                    boatId: stateRef.current.boats.activeBoatId,
+                    x: boatState.x,
+                    z: boatState.z,
+                    rotY: boatState.rotY,
+                    moving: boatState.moving,
+                  }
+                : null,
+              pet:
+                petCompanion.rig && petCompanion.speciesId
+                  ? {
+                      x: petCompanion.x,
+                      y: petCompanion.y,
+                      z: petCompanion.z,
+                      rotY: petCompanion.rotY,
+                      moving: petCompanion.playTimer <= 0 && moveHorizSpeed > 0.14,
+                      playKind: petCompanion.playTimer > 0 ? petCompanion.playKind : 'none',
+                    }
+                  : null,
+            },
+            zoneSwitched,
+          );
+        }
+
+        const isPublicZoneNow = isPublicMultiplayerZone(z);
+        let clickTargetVisibilityChanged = false;
+
+        for (const ent of remoteEntities.values()) {
+          const shouldBeVisible =
+            isPublicZoneNow && ent.hasInitialPose && ent.meta.zone === z;
+
+          if (ent.visibleInZone !== shouldBeVisible) {
+            ent.visibleInZone = shouldBeVisible;
+            clickTargetVisibilityChanged = true;
+          }
+
+          if (!shouldBeVisible) {
+            ent.rig.root.visible = false;
+            ent.clickProxy.visible = false;
+            if (ent.mountRig) ent.mountRig.root.visible = false;
+            if (ent.boatRig) ent.boatRig.boat.visible = false;
+            if (ent.petRig) ent.petRig.root.visible = false;
+            if (ent.nameDom) ent.nameDom.style.display = 'none';
+            if (ent.petNameDom) ent.petNameDom.style.display = 'none';
+            continue;
+          }
+
+          // Smooth dead-reckoning + exponential damp for sub-centimeter precision
+          const ageSec = Math.min(0.11, Math.max(0, (nowMs - ent.lastPoseAt) / 1000));
+          const predX = ent.targetX + ent.vx * ageSec;
+          const predY = ent.targetY + ent.vy * ageSec;
+          const predZ = ent.targetZ + ent.vz * ageSec;
+          const distGap = Math.hypot(predX - ent.x, predY - ent.y, predZ - ent.z);
+
+          if (distGap > 9.0) {
+            ent.x = predX;
+            ent.y = predY;
+            ent.z = predZ;
+            ent.rotY = ent.targetRotY;
+            ent.rotX = ent.targetRotX;
+          } else {
+            ent.x = THREE.MathUtils.damp(ent.x, predX, 22, delta);
+            ent.y = THREE.MathUtils.damp(ent.y, predY, 22, delta);
+            ent.z = THREE.MathUtils.damp(ent.z, predZ, 22, delta);
+            let rDiff = ent.targetRotY - ent.rotY;
+            while (rDiff > Math.PI) rDiff -= Math.PI * 2;
+            while (rDiff < -Math.PI) rDiff += Math.PI * 2;
+            ent.rotY += rDiff * Math.min(1, delta * 18);
+            ent.rotX = THREE.MathUtils.damp(ent.rotX, ent.targetRotX, 18, delta);
+          }
+
+          ent.rig.root.visible = true;
+          ent.clickProxy.visible = true;
+          ent.rig.root.position.set(ent.x, ent.y, ent.z);
+          ent.rig.root.rotation.x = ent.rotX;
+          ent.rig.root.rotation.y = ent.rotY;
+
+          // Remote Boat Sync (town river & island ocean)
+          if (ent.boatRig) {
+            const showBoat = ent.boatActive && (z === 'town' || z === 'island');
+            ent.boatRig.boat.visible = showBoat;
+            if (showBoat) {
+              const bWaterY = z === 'island' ? ISLAND_WATER_Y : RIVER_WATER_Y;
+              const bBob = Math.sin(elapsed * 2.2) * 0.028;
+              ent.boatRig.boat.position.set(
+                THREE.MathUtils.damp(ent.boatRig.boat.position.x, ent.boatX, 20, delta),
+                bWaterY + 0.05 + bBob,
+                THREE.MathUtils.damp(ent.boatRig.boat.position.z, ent.boatZ, 20, delta),
+              );
+              let brDiff = ent.boatRotY - ent.boatRig.boat.rotation.y;
+              while (brDiff > Math.PI) brDiff -= Math.PI * 2;
+              while (brDiff < -Math.PI) brDiff += Math.PI * 2;
+              ent.boatRig.boat.rotation.set(
+                ent.boatMoving ? Math.sin(elapsed * 4.4) * 0.02 : Math.sin(elapsed * 1.7) * 0.01,
+                ent.boatRig.boat.rotation.y + brDiff * Math.min(1, delta * 16),
+                Math.cos(elapsed * 2.1) * 0.018,
+              );
+              if (
+                ent.boatRig.driveKind === 'oars' &&
+                ent.boatRig.oarLPivot &&
+                ent.boatRig.oarRPivot
+              ) {
+                const stroke = ent.boatMoving ? Math.sin(elapsed * 5.6) * 0.42 : 0;
+                const dip = ent.boatMoving ? Math.cos(elapsed * 5.6) * 0.14 : 0;
+                ent.boatRig.oarLPivot.rotation.set(dip, stroke, 0);
+                ent.boatRig.oarRPivot.rotation.set(dip, -stroke, 0);
+              } else if (ent.boatRig.driveKind === 'pedal') {
+                const spin = ent.boatMoving ? elapsed * 6.8 : 0;
+                if (ent.boatRig.wheelPivot) ent.boatRig.wheelPivot.rotation.x = spin;
+                if (ent.boatRig.crankPivot) ent.boatRig.crankPivot.rotation.x = spin * 0.72;
+                if (ent.boatRig.pedalLPivot) ent.boatRig.pedalLPivot.rotation.x = -spin * 0.72;
+                if (ent.boatRig.pedalRPivot) ent.boatRig.pedalRPivot.rotation.x = -spin * 0.72;
+              } else if (ent.boatRig.driveKind === 'motor') {
+                if (ent.boatRig.wheelPivot) {
+                  ent.boatRig.wheelPivot.rotation.z = ent.boatMoving
+                    ? elapsed * 14
+                    : elapsed * 1.8;
+                }
+              }
+              if (ent.boatRig.sailPivot) {
+                ent.boatRig.sailPivot.rotation.z = Math.sin(elapsed * 2.1) * 0.06;
+                ent.boatRig.sailPivot.rotation.y = ent.boatMoving
+                  ? Math.sin(elapsed * 4.2) * 0.14
+                  : Math.sin(elapsed * 1.5) * 0.06;
+              }
+            }
+          }
+
+          // Remote MountRig Animation (never hidden)
+          let remoteMountAnim: AvatarMountAnimParams | undefined;
+          const rMountDef = getMountDefinition(ent.meta.activeMountId);
+          const isRemoteMountPose =
+            ent.pose === 'skate_idle' ||
+            ent.pose === 'skate_ride' ||
+            ent.pose === 'skate_push' ||
+            ent.pose === 'lotus_idle' ||
+            ent.pose === 'lotus_ride' ||
+            ent.pose === 'broom_idle' ||
+            ent.pose === 'broom_ride' ||
+            ent.pose === 'bike_idle' ||
+            ent.pose === 'bike_ride';
+          const remoteMountVisible = Boolean(
+            ent.mountRig && rMountDef && !ent.boatActive && isRemoteMountPose,
+          );
+          if (ent.mountRig) {
+            ent.mountRig.root.visible = remoteMountVisible;
+          }
+          if (remoteMountVisible && ent.mountRig && rMountDef) {
+            ent.mountRig.root.position.lerp(_remoteZeroVec, Math.min(1, delta * 18));
+            if (rMountDef.kind === 'skateboard') {
+              const wheelR = 0.05;
+              const isMoving = ent.pose === 'skate_ride' || ent.pose === 'skate_push';
+              if (isMoving && ent.speed > 0.28) {
+                ent.skateMoveSec += delta;
+                ent.bikeWheelAngle += (ent.speed * delta) / wheelR;
+              } else {
+                ent.skateMoveSec = 0;
+              }
+              ent.skateIdleBlend = THREE.MathUtils.damp(
+                ent.skateIdleBlend,
+                ent.pose === 'skate_idle' ? 1 : 0,
+                12,
+                delta,
+              );
+              const pushPhase =
+                ent.pose === 'skate_push' && ent.skateMoveSec > 2.0
+                  ? ((ent.skateMoveSec - 2.0) % 3.1) / 0.78
+                  : 0;
+              remoteMountAnim = {pushPhase, idleBlend: ent.skateIdleBlend};
+              updateMountAnimation(ent.mountRig, {
+                pose: ent.pose === 'skate_push' ? 'skate_push' : ent.pose === 'skate_ride' ? 'skate_ride' : 'skate_idle',
+                elapsed,
+                speed: ent.speed,
+                wheelAngle: ent.bikeWheelAngle,
+                crankAngle: 0,
+                steerAngle: 0,
+                wheelRadius: wheelR,
+                idlePop: 0,
+                idleBlend: ent.skateIdleBlend,
+              });
+            } else if (rMountDef.kind === 'lotus_umbrella' || rMountDef.kind === 'dong_thap_lotus') {
+              const ib = ent.pose === 'lotus_ride' ? 0 : 1;
+              remoteMountAnim = {idleBlend: ib};
+              updateMountAnimation(ent.mountRig, {
+                pose: ent.pose === 'lotus_ride' ? 'lotus_ride' : 'lotus_idle',
+                elapsed,
+                speed: ent.speed,
+                wheelAngle: 0,
+                crankAngle: 0,
+                steerAngle: 0,
+                wheelRadius: 0.3,
+                idleBlend: ib,
+              });
+            } else if (rMountDef.kind === 'witch_broom') {
+              const ib = ent.pose === 'broom_ride' ? 0 : 1;
+              remoteMountAnim = {idleBlend: ib};
+              updateMountAnimation(ent.mountRig, {
+                pose: ent.pose === 'broom_ride' ? 'broom_ride' : 'broom_idle',
+                elapsed,
+                speed: ent.speed,
+                wheelAngle: 0,
+                crankAngle: 0,
+                steerAngle: 0,
+                wheelRadius: 0.3,
+                idleBlend: ib,
+              });
+            } else {
+              const wheelR = 0.355;
+              let rDelta = ent.rotY - ent.prevRotForSteer;
+              while (rDelta > Math.PI) rDelta -= Math.PI * 2;
+              while (rDelta < -Math.PI) rDelta += Math.PI * 2;
+              const targetSteer = THREE.MathUtils.clamp(
+                (rDelta / Math.max(0.001, delta)) * 0.14,
+                -0.45,
+                0.45,
+              );
+              ent.bikeSteerAngle = THREE.MathUtils.damp(ent.bikeSteerAngle, targetSteer, 11, delta);
+              const isBikeMoving = ent.pose === 'bike_ride' && ent.speed > 0.22;
+              ent.bikeIdleBlend = THREE.MathUtils.damp(
+                ent.bikeIdleBlend,
+                ent.pose === 'bike_idle' ? 1 : 0,
+                9.5,
+                delta,
+              );
+              if (isBikeMoving) {
+                ent.bikeWheelAngle += (ent.speed * delta) / wheelR;
+                ent.bikeCrankAngle += THREE.MathUtils.clamp(ent.speed * 1.05, 1.8, 7.6) * delta;
+              }
+              remoteMountAnim = {
+                crankAngle: ent.bikeCrankAngle,
+                steerAngle: ent.bikeSteerAngle,
+                idleBlend: ent.bikeIdleBlend,
+                leanAngle: 0,
+              };
+              updateMountAnimation(ent.mountRig, {
+                pose: ent.pose === 'bike_ride' ? 'bike_ride' : 'bike_idle',
+                elapsed,
+                speed: ent.speed,
+                wheelAngle: ent.bikeWheelAngle,
+                crankAngle: ent.bikeCrankAngle,
+                steerAngle: ent.bikeSteerAngle,
+                wheelRadius: wheelR,
+                idleBlend: ent.bikeIdleBlend,
+                leanAngle: 0,
+              });
+            }
+          }
+          ent.prevRotForSteer = ent.rotY;
+
+          updateAvatarRigAnimation(
+            ent.rig,
+            ent.pose,
+            elapsed,
+            ent.meta.avatar.eyeStyle === 'happy_arc',
+            ent.poseProgress,
+            remoteMountAnim,
+          );
+
+          if (
+            remoteMountVisible &&
+            rMountDef &&
+            (rMountDef.kind === 'lotus_umbrella' || rMountDef.kind === 'dong_thap_lotus') &&
+            ent.mountRig?.lotusPivot &&
+            ent.rig.rightHand
+          ) {
+            ent.rig.root.updateMatrixWorld(true);
+            ent.rig.rightHand.getWorldPosition(_remoteLotusHandVec);
+            ent.rig.root.worldToLocal(_remoteLotusHandVec);
+            ent.mountRig.lotusPivot.position.copy(_remoteLotusHandVec);
+          }
+
+          // Remote Companion Pet interpolation + animation
+          if (ent.petRig && ent.meta.companionPet) {
+            ent.petRig.root.visible = true;
+            const prevPx = ent.petX;
+            const prevPz = ent.petZ;
+            const petGap = Math.hypot(
+              ent.targetPetX - ent.petX,
+              ent.targetPetY - ent.petY,
+              ent.targetPetZ - ent.petZ,
+            );
+            if (petGap > 8.0) {
+              ent.petX = ent.targetPetX;
+              ent.petY = ent.targetPetY;
+              ent.petZ = ent.targetPetZ;
+              ent.petRotY = ent.targetPetRotY;
+            } else {
+              ent.petX = THREE.MathUtils.damp(ent.petX, ent.targetPetX, 18, delta);
+              ent.petY = THREE.MathUtils.damp(ent.petY, ent.targetPetY, 18, delta);
+              ent.petZ = THREE.MathUtils.damp(ent.petZ, ent.targetPetZ, 18, delta);
+              let prDiff = ent.targetPetRotY - ent.petRotY;
+              while (prDiff > Math.PI) prDiff -= Math.PI * 2;
+              while (prDiff < -Math.PI) prDiff += Math.PI * 2;
+              ent.petRotY += prDiff * Math.min(1, delta * 14);
+            }
+            const petMoveSpd = Math.hypot(ent.petX - prevPx, ent.petZ - prevPz) / Math.max(0.008, delta);
+            const isFlyPet = PET_CATALOG[ent.meta.companionPet.speciesId].moveType === 'fly';
+            const pScale = isFlyPet ? 1.35 : 1.34;
+            ent.petRig.root.position.set(ent.petX, ent.petY, ent.petZ);
+            ent.petRig.root.rotation.y = ent.petRotY;
+            const rPetMode: PetAnimMode =
+              ent.petPlayKind === 'jump'
+                ? 'play_jump'
+                : ent.petPlayKind === 'circle'
+                  ? 'play_circle'
+                  : isFlyPet
+                    ? 'fly'
+                    : petMoveSpd > 0.14
+                      ? 'walk'
+                      : 'idle';
+            updatePetAnimation(
+              ent.petRig,
+              rPetMode,
+              elapsed,
+              {baseScale: pScale, hoverHeight: 0},
+            );
+          }
+        }
+
+        if (clickTargetVisibilityChanged) {
+          refreshClickTargetsWithPet();
+        }
+      }
+
       renderer.render(scene, camera);
 
       // Project crisp native DOM nameplates every frame (ONLY visible on close zoom <= 14.5..17.5m)
@@ -8729,6 +9542,58 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             }
           } else {
             petDom.style.display = 'none';
+          }
+        }
+
+        // Project Remote Players & Remote Pets crisp DOM nameplates
+        for (const ent of remoteEntities.values()) {
+          if (!ent.visibleInZone || isEditingHome) {
+            if (ent.nameDom) ent.nameDom.style.display = 'none';
+            if (ent.petNameDom) ent.petNameDom.style.display = 'none';
+            continue;
+          }
+          if (ent.nameDom) {
+            ent.rig.headPivot.getWorldPosition(_remoteHeadVec);
+            _remoteHeadVec.y += ent.rig.headTopAbovePivot + 0.14;
+            const dCam = camera.position.distanceTo(_remoteHeadVec);
+            const alpha = dCam <= 22 ? 1 : dCam >= 28 ? 0 : 1 - (dCam - 22) / 6;
+            _projVec.copy(_remoteHeadVec).project(camera);
+            if (alpha > 0.02 && _projVec.z >= -1 && _projVec.z <= 1) {
+              const px = ((_projVec.x + 1) / 2) * cwNow;
+              const py = ((-_projVec.y + 1) / 2) * chNow;
+              ent.nameDom.style.display = 'block';
+              ent.nameDom.style.opacity = alpha.toFixed(2);
+              ent.nameDom.style.transform = `translate3d(${px.toFixed(1)}px, ${py.toFixed(1)}px, 0) translate(-50%, -100%)`;
+            } else {
+              ent.nameDom.style.display = 'none';
+            }
+          }
+          if (ent.petNameDom) {
+            const comp = ent.meta.companionPet;
+            const heldRig = ent.rig.heldPetRig;
+            if (comp && (heldRig || ent.petRig)) {
+              if (heldRig) {
+                heldRig.root.getWorldPosition(_remotePetVec);
+                _remotePetVec.y += PET_CATALOG[comp.speciesId].moveType === 'fly' ? 0.58 : 0.72;
+              } else if (ent.petRig) {
+                ent.petRig.root.getWorldPosition(_remotePetVec);
+                _remotePetVec.y += PET_CATALOG[comp.speciesId].moveType === 'fly' ? 0.66 : 0.84;
+              }
+              const dCamP = camera.position.distanceTo(_remotePetVec);
+              const pAlpha = dCamP <= 18 ? 1 : dCamP >= 23 ? 0 : 1 - (dCamP - 18) / 5;
+              _projVec.copy(_remotePetVec).project(camera);
+              if (pAlpha > 0.02 && _projVec.z >= -1 && _projVec.z <= 1) {
+                const bx = ((_projVec.x + 1) / 2) * cwNow;
+                const by = ((-_projVec.y + 1) / 2) * chNow;
+                ent.petNameDom.style.display = 'block';
+                ent.petNameDom.style.opacity = pAlpha.toFixed(2);
+                ent.petNameDom.style.transform = `translate3d(${bx.toFixed(1)}px, ${by.toFixed(1)}px, 0) translate(-50%, -100%)`;
+              } else {
+                ent.petNameDom.style.display = 'none';
+              }
+            } else {
+              ent.petNameDom.style.display = 'none';
+            }
           }
         }
       }
@@ -9066,6 +9931,33 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             }
           }
         }
+
+        if (selectedRemoteRef.current) {
+          const ent = remoteEntities.get(selectedRemoteRef.current.playerId);
+          if (!ent || !ent.visibleInZone || !isPublicMultiplayerZone(z)) {
+            selectedRemoteRef.current = null;
+            setRemoteArcMenuPos(null);
+          } else {
+            _projVec.set(ent.x, ent.y + 1.32, ent.z).project(camera);
+            if (_projVec.z <= 1) {
+              const rawX = ((_projVec.x + 1) / 2) * cw;
+              const rawY = ((-_projVec.y + 1) / 2) * ch;
+              const padX = Math.min(185, cw * 0.36);
+              const minY = Math.min(165, ch * 0.42);
+              const nx = Math.max(padX, Math.min(cw - padX, rawX));
+              const ny = Math.max(minY, Math.min(ch - 70, rawY));
+              setRemoteArcMenuPos((prev) =>
+                prev &&
+                prev.player.id === ent.id &&
+                prev.player.updatedAt === ent.meta.updatedAt &&
+                Math.abs(prev.x - nx) < 1 &&
+                Math.abs(prev.y - ny) < 1
+                  ? prev
+                  : {player: ent.meta, x: nx, y: ny},
+              );
+            }
+          }
+        }
       }
 
       scheduleNextFrame();
@@ -9082,6 +9974,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
 
     return () => {
       disposed = true;
+      unsubRoster();
+      unsubPose();
+      for (const id of Array.from(remoteEntities.keys())) {
+        removeRemoteEntity(id);
+      }
       cancelAnimationFrame(frameId);
       clearTimeout(hiddenTimerId);
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
@@ -9353,6 +10250,27 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
           />
         )}
 
+      {/* Radial Arc Menu when tapping another online player */}
+      {remoteArcMenuPos && isPublicMultiplayerZone(zone) && (
+        <RemotePlayerArcMenu
+          player={remoteArcMenuPos.player}
+          screenX={remoteArcMenuPos.x}
+          screenY={remoteArcMenuPos.y}
+          myCoins={stats.coins}
+          myCoinGame={stats.coinGame ?? 0}
+          onSendGift={(target, currency, amount) => {
+            if (callbacksRef.current.onSendPlayerGift) {
+              return callbacksRef.current.onSendPlayerGift(target, currency, amount);
+            }
+            return {ok: false, message: 'Tính năng tặng xu chưa sẵn sàng.'};
+          }}
+          onClose={() => {
+            selectedRemoteRef.current = null;
+            setRemoteArcMenuPos(null);
+          }}
+        />
+      )}
+
       {/* May Mall Panoramic Glass Elevator Action HUD */}
       {zone === 'town' && mallElevatorHud !== 'none' && (
         <div className="phone-ui absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 justify-center">
@@ -9459,6 +10377,11 @@ export const WorldCanvas: React.FC<WorldCanvasProps> = ({
             </span>
             <span className="h-[2px] w-2.5 rounded-full bg-white/80" />
           </span>
+          {claimableLevelGiftsCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-[#FFF9EF] bg-[#EF4444] px-1 text-[9px] font-black text-white shadow-xs">
+              {claimableLevelGiftsCount}
+            </span>
+          )}
         </button>
       )}
 

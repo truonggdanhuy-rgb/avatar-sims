@@ -1137,3 +1137,90 @@ export interface PlayerActionsState {
   ownedIds: ActionId[];
   equippedSlots: (ActionId | null)[];
 }
+
+export interface PlayerLevelState {
+  level: number; // 1..100
+  exp: number; // current EXP within current level
+  totalExp: number;
+  claimedMilestones: number[]; // e.g. [10, 30, 50]
+}
+
+export interface OnlinePlayerMeta {
+  id: string;
+  accountId: string;
+  username?: string | null;
+  name: string;
+  level: number;
+  joinedAt: number;
+  zone: ZoneId;
+  avatar: AvatarConfig;
+  activeMountId: MountId | null;
+  equippedTool: ToolId | null;
+  equippedFood: BbqFoodId | null;
+  carriedPet: {speciesId: PetSpeciesId; sick: boolean} | null;
+  companionPet: {
+    id: string;
+    speciesId: PetSpeciesId;
+    name: string;
+    sick: boolean;
+    isMax: boolean;
+  } | null;
+  updatedAt: number;
+}
+
+export interface OnlinePlayerPosePacket {
+  id: string;
+  seq: number;
+  t: number;
+  zone: ZoneId;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  rotY: number;
+  rotX: number;
+  pose: AvatarPose;
+  poseProgress: number;
+  speed: number;
+  mallFloor: 1 | 2;
+  boat?: {
+    active: boolean;
+    boatId: BoatId;
+    x: number;
+    z: number;
+    rotY: number;
+    moving?: boolean;
+  } | null;
+  pet?: {
+    x: number;
+    y: number;
+    z: number;
+    rotY: number;
+    moving: boolean;
+    playKind: 'none' | 'jump' | 'circle';
+  } | null;
+}
+
+export interface OnlinePlayerState {
+  meta: OnlinePlayerMeta;
+  pose: OnlinePlayerPosePacket | null;
+  lastSeenAt: number;
+}
+
+export interface CoinGiftEvent {
+  txId: string;
+  fromPlayerId: string;
+  fromAccountId: string;
+  fromUsername?: string | null;
+  fromName: string;
+  toPlayerId: string;
+  toAccountId?: string;
+  toUsername?: string | null;
+  toName: string;
+  currency: 'coins' | 'coinGame';
+  amount: number;
+  sentAt: number;
+}
+
