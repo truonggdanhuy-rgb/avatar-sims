@@ -1,12 +1,15 @@
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   ArrowLeftRight,
   Box,
+  Check,
   Coins,
+  Crown,
   Flag,
   Gamepad2,
   Gift,
   Hammer,
+  Heart,
   Monitor,
   Mountain,
   Music,
@@ -17,16 +20,38 @@ import {
   Trophy,
   X,
 } from 'lucide-react';
-import {ArcadeGameId, ArcadeHubSection, COINGAME_TO_XU_RATE} from '../../types/game';
+import {
+  BLINDBOX_SPIN_COST_XU,
+  DollCatalogEntry,
+  HDDOLL_CATALOG,
+  HDDOLL_RARITY_META,
+} from '../../data/hddollCatalog';
+import {
+  ArcadeGameId,
+  ArcadeHubSection,
+  COINGAME_TO_XU_RATE,
+  HandheldStyle,
+} from '../../types/game';
 import {soundFX} from '../../utils/sound';
+import {DollSvgIcon} from '../DollSvgIcon';
+
+export interface BlindboxSpinResult {
+  doll: DollCatalogEntry;
+  isDuplicate: boolean;
+  refundXu: number;
+}
 
 interface ArcadeHubModalProps {
   section: ArcadeHubSection;
   coins: number;
   coinGame: number;
+  ownedIds: string[];
+  currentHandheld: HandheldStyle;
   onSelectSection: (next: ArcadeHubSection) => void;
   onOpenArcadeGame: (gameId: ArcadeGameId) => void;
   onOpenCoinGameShop: () => void;
+  onSpinBlindbox: () => BlindboxSpinResult | null;
+  onEquipDoll: (doll: DollCatalogEntry) => void;
   onClose: () => void;
 }
 
@@ -114,37 +139,55 @@ const ARCADE_MACHINES: MachineItem[] = [
   },
 ];
 
-const HDDOLL_SERIES_PREVIEW = [
-  {
-    id: 'sakura',
-    name: 'HDDOLL Mây Hồng',
-    rarity: 'Hiếm',
-    color: 'from-[#F9A8D4] to-[#F472B6]',
-  },
-  {
-    id: 'cyber',
-    name: 'HDDOLL Cyber Neon',
-    rarity: 'Cực Hiếm',
-    color: 'from-[#67E8F9] to-[#6366F1]',
-  },
-  {
-    id: 'golden',
-    name: 'HDDOLL Hoàng Kim',
-    rarity: 'Bí Ẩn',
-    color: 'from-[#FDE68A] to-[#F59E0B]',
-  },
-];
-
 export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
   section,
   coins,
   coinGame,
+  ownedIds,
+  currentHandheld,
   onSelectSection,
   onOpenArcadeGame,
   onOpenCoinGameShop,
+  onSpinBlindbox,
+  onEquipDoll,
   onClose,
 }) => {
   const [previewCoinGame, setPreviewCoinGame] = useState(10);
+  const [isOpeningBox, setIsOpeningBox] = useState(false);
+  const [spinResult, setSpinResult] = useState<BlindboxSpinResult | null>(null);
+  const spinTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (spinTimerRef.current !== null) {
+        window.clearTimeout(spinTimerRef.current);
+      }
+    };
+  }, []);
+
+  const ownedDollsCount = HDDOLL_CATALOG.filter((d) =>
+    ownedIds.includes(d.shopItemId),
+  ).length;
+  const canAffordSpin = coins >= BLINDBOX_SPIN_COST_XU;
+
+  const handleSpinClick = () => {
+    if (isOpeningBox || !canAffordSpin) {
+      soundFX.tap();
+      return;
+    }
+    soundFX.tap();
+    setSpinResult(null);
+    setIsOpeningBox(true);
+    spinTimerRef.current = window.setTimeout(() => {
+      spinTimerRef.current = null;
+      const res = onSpinBlindbox();
+      setIsOpeningBox(false);
+      if (res) {
+        soundFX.sparkle();
+        setSpinResult(res);
+      }
+    }, 680);
+  };
 
   const tabs: {id: ArcadeHubSection; label: string}[] = [
     {id: 'overview', label: 'Tổng quan'},
@@ -184,7 +227,7 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                 Khu Game Cyber Mây
               </div>
               <div className="text-[11px] font-bold text-[#94A3B8]">
-                1 CoinGame = {COINGAME_TO_XU_RATE} Xu · Cân bằng tương đương Câu cá / Bắt bọ
+                1 CoinGame = {COINGAME_TO_XU_RATE} Xu · Quay Blindbox bằng Xu Thị Trấn
               </div>
             </div>
           </div>
@@ -302,23 +345,25 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
                     soundFX.tap();
                     onSelectSection('blindbox');
                   }}
-                  className="rounded-2xl border border-[#FBBF24]/40 bg-[#231B38] p-3 text-left transition active:scale-95"
+                  className="rounded-2xl border border-[#F472B6]/55 bg-[#2A1838] p-3 text-left transition active:scale-95"
                 >
                   <div className="flex items-center justify-between">
-                    <Gift className="h-4 w-4 text-[#FBBF24]" />
-                    <span className="text-[10px] font-black text-[#FDE68A]">Sắp mở</span>
+                    <Gift className="h-4 w-4 text-[#F9A8D4]" />
+                    <span className="text-[10px] font-black text-[#34D399]">
+                      Mới · {ownedDollsCount}/10
+                    </span>
                   </div>
                   <div className="mt-2 text-xs font-black text-white">Blindbox HDDOLL</div>
-                  <div className="mt-0.5 text-[11px] font-bold text-[#FDE68A]">
-                    Quay mở hộp búp bê hiếm
+                  <div className="mt-0.5 text-[11px] font-bold text-[#FBCFE8]">
+                    Săn 10 gấu bông ôm ngực & Secret Doraemon
                   </div>
                 </button>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-[#0D1324] px-3.5 py-2.5 text-[11px] font-semibold leading-relaxed text-[#CBD5E1]">
                 Chạm trực tiếp từng máy trong Khu Game hoặc chọn tab{' '}
-                <strong className="text-white">Máy Game</strong> để chơi ngay Parkour 3D, Vượt
-                Chướng Ngại Vật 3D, Đập Chuột, Hứng Sao, Gắp Bóng ?, Sàn Nhảy và PC!
+                <strong className="text-white">Blindbox HDDOLL</strong> để quay gấu bông ôm
+                ngực siêu ấm áp!
               </div>
             </>
           )}
@@ -370,50 +415,250 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
 
           {section === 'blindbox' && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-2xl border border-[#FBBF24]/50 bg-[#231B38] p-3.5">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#FBBF24]/20 text-[#FBBF24]">
-                    <Box className="h-6 w-6" />
+              {/* Banner */}
+              <div className="rounded-2xl border border-[#F472B6]/55 bg-gradient-to-br from-[#2B173D] via-[#1C1838] to-[#13203C] p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#F9A8D4]/50 bg-[#F472B6]/20 text-[#F9A8D4]">
+                      <Box className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 text-sm font-black text-white">
+                        <span>Blindbox HDDOLL</span>
+                        <span className="rounded-md bg-[#F472B6]/25 px-1.5 py-0.5 text-[9.5px] font-black text-[#FBCFE8]">
+                          CẦM TAY
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-bold text-[#FDE68A]">
+                        {BLINDBOX_SPIN_COST_XU} Xu / hộp · Chắc chắn trúng 1 Doll!
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-black text-white">Máy Quay Blindbox HDDOLL</div>
-                    <div className="text-[11px] font-bold text-[#FDE68A]">
-                      Dự kiến ~30–45 CoinGame / hộp · Coming Soon
+                  <div className="rounded-xl border border-white/15 bg-[#0D1326] px-2.5 py-1.5 text-right">
+                    <div className="text-[9.5px] font-bold text-[#94A3B8]">Bộ sưu tập</div>
+                    <div className="text-xs font-black tabular-nums text-[#F9A8D4]">
+                      {ownedDollsCount} / {HDDOLL_CATALOG.length}
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                {HDDOLL_SERIES_PREVIEW.map((doll) => (
-                  <div
-                    key={doll.id}
-                    className="flex flex-col items-center rounded-2xl border border-white/10 bg-[#171F3A] p-2.5 text-center"
-                  >
-                    <div
-                      className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${doll.color} text-[#0F172A] shadow-md`}
-                    >
+                {/* Drop Rate Summary */}
+                <div className="mt-2.5 grid grid-cols-3 gap-1.5 text-center">
+                  <div className="rounded-xl border border-white/10 bg-[#0D1326]/80 px-2 py-1">
+                    <div className="text-[10px] font-bold text-[#CBD5E1]">6 Thường</div>
+                    <div className="text-[11px] font-black text-white">72%</div>
+                  </div>
+                  <div className="rounded-xl border border-[#C084FC]/40 bg-[#23143A]/85 px-2 py-1">
+                    <div className="text-[10px] font-bold text-[#E9D5FF]">3 Đặc Biệt</div>
+                    <div className="text-[11px] font-black text-[#F0ABFC]">24%</div>
+                  </div>
+                  <div className="rounded-xl border border-[#FDE047]/55 bg-[#2A200D]/85 px-2 py-1">
+                    <div className="text-[10px] font-bold text-[#FEF08A]">Secret Doraemon</div>
+                    <div className="text-[11px] font-black text-[#FDE047]">4%</div>
+                  </div>
+                </div>
+
+                {/* Opening / Reveal Box */}
+                {isOpeningBox && (
+                  <div className="mt-3 flex flex-col items-center justify-center rounded-2xl border border-[#FDE047]/50 bg-[#0D1326]/90 py-5 text-center">
+                    <div className="flex h-14 w-14 animate-bounce items-center justify-center rounded-2xl border-2 border-[#FDE047] bg-gradient-to-br from-[#F472B6] to-[#A855F7] text-white shadow-lg">
                       <Gift className="h-7 w-7" />
                     </div>
-                    <div className="mt-2 text-[11px] font-black text-white">{doll.name}</div>
-                    <div className="mt-0.5 text-[10px] font-bold text-[#94A3B8]">{doll.rarity}</div>
+                    <div className="mt-2.5 text-xs font-black text-[#FDE68A]">
+                      Đang khui hộp Blindbox HDDOLL...
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {!isOpeningBox && spinResult && (() => {
+                  const {doll, isDuplicate, refundXu} = spinResult;
+                  const meta = HDDOLL_RARITY_META[doll.rarity];
+                  const isEquipped = currentHandheld === doll.handheldId;
+                  return (
+                    <div
+                      className={`mt-3 rounded-2xl border-2 bg-gradient-to-br ${meta.glowClass} ${meta.borderClass} p-3`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-[#FFFDF8] shadow-md">
+                          <DollSvgIcon style={doll.handheldId} size={74} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`rounded-md px-1.5 py-0.5 text-[9.5px] font-black ${meta.badgeBg} ${meta.badgeText}`}
+                            >
+                              {doll.rarity === 'secret' && (
+                                <Crown className="mr-0.5 inline h-2.5 w-2.5" />
+                              )}
+                              {meta.label}
+                            </span>
+                            <span className="text-[10px] font-bold text-[#E2E8F0]">
+                              {doll.seriesTag}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-sm font-black text-white">{doll.name}</div>
+                          <div className="mt-0.5 text-[11px] font-bold text-[#FDE68A]">
+                            Hiệu ứng: {doll.effectLabel}
+                          </div>
+                          {isDuplicate ? (
+                            <div className="mt-1 text-[10.5px] font-bold text-[#6EE7B7]">
+                              Đã có trong tủ · Hoàn lại +{refundXu} Xu may mắn!
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-[10.5px] font-bold text-[#FBCFE8]">
+                              Đã mở khóa vào Tủ Đồ → Cầm tay!
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFX.sparkle();
+                          onEquipDoll(doll);
+                        }}
+                        className={`mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black transition active:scale-95 ${
+                          isEquipped
+                            ? 'border border-[#34D399]/60 bg-[#0B2A2B] text-[#6EE7B7]'
+                            : 'bg-[#F472B6] text-[#1D0B18] shadow-sm'
+                        }`}
+                      >
+                        {isEquipped ? (
+                          <>
+                            <Check className="h-4 w-4" />
+                            <span>Đang Ôm Bé {doll.name}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 fill-current" />
+                            <span>Ôm Doll Ngay</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {/* Spin CTA */}
+                <button
+                  type="button"
+                  disabled={!canAffordSpin || isOpeningBox}
+                  onClick={handleSpinClick}
+                  className={`mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-black transition active:scale-95 ${
+                    canAffordSpin && !isOpeningBox
+                      ? 'bg-gradient-to-r from-[#F472B6] via-[#EC4899] to-[#F59E0B] text-white shadow-lg'
+                      : 'cursor-not-allowed border border-white/15 bg-white/10 text-[#94A3B8]'
+                  }`}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>
+                    {isOpeningBox
+                      ? 'Đang mở hộp...'
+                      : canAffordSpin
+                        ? `Quay Blindbox HDDOLL · ${BLINDBOX_SPIN_COST_XU} Xu`
+                        : `Cần ${BLINDBOX_SPIN_COST_XU} Xu (Thiếu ${BLINDBOX_SPIN_COST_XU - coins} Xu)`}
+                  </span>
+                </button>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-[#0D1324] p-3 text-xs font-semibold leading-relaxed text-[#CBD5E1]">
-                Mỗi hộp <strong className="text-[#FDE68A]">HDDOLL</strong> mở ra ngẫu nhiên mô hình
-                sưu tầm trưng bày tại Nhà Của Tôi hoặc phụ kiện đặc biệt. Giá mỗi lượt quay sẽ cân
-                bằng với tỷ giá <strong className="text-[#38BDF8]">1 CoinGame = 10 Xu</strong>.
-              </div>
+              {/* 10 Dolls Collection Grid */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-0.5">
+                  <span className="text-xs font-black text-[#E2E8F0]">
+                    10 Doll Đầu Tiên · Chạm Bé Đã Có Để Ôm
+                  </span>
+                  <span className="text-[10px] font-bold text-[#94A3B8]">
+                    Mục Cầm tay trong Tủ Đồ
+                  </span>
+                </div>
 
-              <button
-                type="button"
-                disabled
-                className="w-full cursor-not-allowed rounded-2xl border border-white/15 bg-white/10 py-2.5 text-xs font-black text-[#94A3B8]"
-              >
-                Quay Blindbox HDDOLL (Coming Soon)
-              </button>
+                <div className="grid grid-cols-2 gap-2">
+                  {HDDOLL_CATALOG.map((doll) => {
+                    const owned = ownedIds.includes(doll.shopItemId);
+                    const equipped = currentHandheld === doll.handheldId;
+                    const meta = HDDOLL_RARITY_META[doll.rarity];
+                    return (
+                      <div
+                        key={doll.handheldId}
+                        className={`flex flex-col justify-between rounded-2xl border p-2.5 transition ${
+                          equipped
+                            ? 'border-[#34D399] bg-[#0E2B2A]'
+                            : owned
+                              ? `${meta.borderClass} bg-[#1A213F]`
+                              : 'border-white/10 bg-[#141A33]/75'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <div
+                            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border ${
+                              owned
+                                ? 'border-white/25 bg-[#FFFDF8]'
+                                : 'border-white/10 bg-[#1D2545] opacity-65 saturate-50'
+                            }`}
+                          >
+                            <DollSvgIcon style={doll.handheldId} size={52} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span
+                                className={`rounded px-1.5 py-0.5 text-[9px] font-black ${meta.badgeBg} ${meta.badgeText}`}
+                              >
+                                {doll.rarity === 'secret'
+                                  ? 'SECRET'
+                                  : doll.rarity === 'special'
+                                    ? 'ĐẶC BIỆT'
+                                    : 'THƯỜNG'}
+                              </span>
+                              <span className="text-[9.5px] font-black tabular-nums text-[#94A3B8]">
+                                {doll.dropRate}%
+                              </span>
+                            </div>
+                            <div className="mt-1 truncate text-xs font-black text-white">
+                              {doll.name}
+                            </div>
+                            <div className="text-[10px] font-semibold leading-tight text-[#CBD5E1]">
+                              {doll.effectLabel}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-2">
+                          {owned ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                soundFX.sparkle();
+                                onEquipDoll(doll);
+                              }}
+                              className={`flex w-full items-center justify-center gap-1 rounded-xl py-1.5 text-[11px] font-black transition active:scale-95 ${
+                                equipped
+                                  ? 'bg-[#34D399] text-[#04241C]'
+                                  : 'bg-white/15 text-white hover:bg-white/25'
+                              }`}
+                            >
+                              {equipped ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5" />
+                                  <span>Đang ôm</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Heart className="h-3 w-3" />
+                                  <span>Ôm ngay</span>
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <div className="rounded-xl border border-white/10 bg-black/20 py-1.5 text-center text-[10.5px] font-bold text-[#94A3B8]">
+                              Chưa mở khóa
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
@@ -493,4 +738,3 @@ export const ArcadeHubModal: React.FC<ArcadeHubModalProps> = ({
     </div>
   );
 };
-

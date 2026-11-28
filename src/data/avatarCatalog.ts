@@ -5,6 +5,7 @@ import {
   ShopItem,
   ShopSet,
 } from '../types/game';
+import {HDDOLL_SHOP_ITEMS} from './hddollCatalog';
 
 export const DEFAULT_AVATAR: AvatarConfig = {
   name: 'Mây Nhỏ',
@@ -1851,6 +1852,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 275,
     patch: {handheld: 'rooster_lantern', handheldColor: '#56C44E'},
   },
+  ...HDDOLL_SHOP_ITEMS,
 ];
 
 export const SHOP_SETS: ShopSet[] = [

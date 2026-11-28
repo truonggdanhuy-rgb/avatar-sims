@@ -44,7 +44,10 @@ export const BoutiqueModal: React.FC<BoutiqueModalProps> = ({
     setPreviewAvatar(avatar);
   }, [avatar]);
 
-  const items = tab === 'sets' ? [] : SHOP_ITEMS.filter((item) => item.category === tab);
+  const items =
+    tab === 'sets'
+      ? []
+      : SHOP_ITEMS.filter((item) => item.category === tab && !item.blindboxOnly);
   const isPreviewDirty = JSON.stringify(previewAvatar) !== JSON.stringify(avatar);
 
   const handleTry = (item: ShopItem) => {

@@ -235,7 +235,17 @@ export type HandheldStyle =
   | 'matcha_latte'
   | 'daisy_flower'
   | 'star_lantern'
-  | 'rooster_lantern';
+  | 'rooster_lantern'
+  | 'doll_mimi_bunny'
+  | 'doll_coco_bear'
+  | 'doll_pepe_frog'
+  | 'doll_boba_capy'
+  | 'doll_lulu_sheep'
+  | 'doll_pipi_duck'
+  | 'doll_labu_mint'
+  | 'doll_baby3_berry'
+  | 'doll_luna_kuromi'
+  | 'doll_secret_doraemon';
 
 export type AvatarPose =
   | 'idle'
@@ -316,6 +326,7 @@ export interface ShopItem {
   name: string;
   price: number;
   patch: Partial<AvatarConfig>;
+  blindboxOnly?: boolean;
 }
 
 export interface ShopSet {

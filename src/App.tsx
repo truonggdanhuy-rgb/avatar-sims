@@ -28,7 +28,7 @@ import {VendingMachineModal} from './components/modals/VendingMachineModal';
 import {PeppaShopModal} from './components/modals/PeppaShopModal';
 import {ApplianceCookModal} from './components/modals/ApplianceCookModal';
 import {MayCafeModal} from './components/modals/MayCafeModal';
-import {ArcadeHubModal} from './components/modals/ArcadeHubModal';
+import {ArcadeHubModal, BlindboxSpinResult} from './components/modals/ArcadeHubModal';
 import {ArcadeMiniGameModal} from './components/modals/ArcadeMiniGameModal';
 import {CoinGameShopModal} from './components/modals/CoinGameShopModal';
 import {ConcurrentLockModal} from './components/ConcurrentLockModal';
@@ -48,6 +48,12 @@ import {
 } from './data/peppaKitchenCatalog';
 import {createInitialOwnedMounts, MOUNT_CATALOG} from './data/mountCatalog';
 import {DEFAULT_AVATAR, SHOP_ITEMS, STARTER_OWNED_IDS} from './data/avatarCatalog';
+import {
+  BLINDBOX_DUPLICATE_REFUND,
+  BLINDBOX_SPIN_COST_XU,
+  DollCatalogEntry,
+  rollBlindboxDoll,
+} from './data/hddollCatalog';
 import {
   BBQ_FOOD_CATALOG,
   createInitialBbqFoods,
@@ -3107,6 +3113,37 @@ function GameWorld({
     setOwnedMounts((prev) => (prev.activeMountId ? {...prev, activeMountId: null} : prev));
   };
 
+  const handleEquipBlindboxDoll = (doll: DollCatalogEntry) => {
+    setAvatar((prev) => ({
+      ...prev,
+      handheld: doll.handheldId,
+      handheldColor: doll.primaryColor,
+    }));
+    setFishingRod((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    setBugNet((prev) => (prev.equipped ? {...prev, equipped: false} : prev));
+    setEquippedFoodId(null);
+    setOwnedMounts((prev) => (prev.activeMountId ? {...prev, activeMountId: null} : prev));
+  };
+
+  const handleSpinBlindboxDoll = (): BlindboxSpinResult | null => {
+    if (stats.coins < BLINDBOX_SPIN_COST_XU) return null;
+    const doll = rollBlindboxDoll();
+    const isDuplicate = ownedIds.includes(doll.shopItemId);
+    const refundXu = isDuplicate ? BLINDBOX_DUPLICATE_REFUND[doll.rarity] : 0;
+
+    setStats((prev) => ({
+      ...prev,
+      coins: prev.coins - BLINDBOX_SPIN_COST_XU + refundXu,
+      mood: Math.min(100, prev.mood + (doll.rarity === 'secret' ? 20 : 10)),
+    }));
+    if (!isDuplicate) {
+      setOwnedIds((prev) =>
+        prev.includes(doll.shopItemId) ? prev : [...prev, doll.shopItemId],
+      );
+    }
+    return {doll, isDuplicate, refundXu};
+  };
+
   const handleRepairFishingRod = () => {
     if (!fishingRod.owned || fishingRod.durability >= fishingRod.maxDurability) return false;
     const cost = getRodRepairCost(fishingRod.durability, fishingRod.maxDurability);
@@ -4737,6 +4774,8 @@ function GameWorld({
           section={arcadeHubSection}
           coins={stats.coins}
           coinGame={stats.coinGame ?? 0}
+          ownedIds={ownedIds}
+          currentHandheld={avatar.handheld}
           onSelectSection={setArcadeHubSection}
           onOpenArcadeGame={(gameId) => {
             setArcadeHubSection(null);
@@ -4746,6 +4785,8 @@ function GameWorld({
             setArcadeHubSection(null);
             setCoinGameShopOpen(true);
           }}
+          onSpinBlindbox={handleSpinBlindboxDoll}
+          onEquipDoll={handleEquipBlindboxDoll}
           onClose={() => setArcadeHubSection(null)}
         />
       )}

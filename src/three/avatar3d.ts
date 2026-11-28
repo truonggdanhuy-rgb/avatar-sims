@@ -16,6 +16,8 @@ import {
   createBoxHeadEyeTexture,
   createBoxHeadMouthTexture,
 } from './boxHeadSystem';
+import {isDollHandheld} from '../data/hddollCatalog';
+import {buildDollPlushModel, DollPlushRig, updateDollPlushAnimation} from './dollPlush3d';
 import {clayMat, glossyClayMat, makeShadowed} from './materials';
 import {buildPetModel, PetRig, updatePetAnimation} from './pets3d';
 
@@ -26,7 +28,8 @@ export type HoldPose =
   | 'carry_umbrella'
   | 'carry_lantern'
   | 'carry_net'
-  | 'carry_camera';
+  | 'carry_camera'
+  | 'carry_doll';
 
 const HEAD_PIVOT_Y = 0.968;
 
@@ -38,6 +41,7 @@ const HAND_POSES: Record<HoldPose, {armX: number; armZ: number; elbowX: number; 
   carry_bag: {armX: -0.06, armZ: 0.52, elbowX: -0.14, elbowZ: 0.06},
   carry_net: {armX: -1.16, armZ: 0.24, elbowX: -1.24, elbowZ: -0.18},
   carry_camera: {armX: -0.84, armZ: 0.08, elbowX: -0.94, elbowZ: -0.44},
+  carry_doll: {armX: -0.72, armZ: 0.17, elbowX: -0.72, elbowZ: -0.42},
 };
 
 export interface AvatarMountAnimParams {
@@ -92,6 +96,8 @@ export interface AvatarRig {
   heldPetRig?: PetRig;
   lanternSwings?: THREE.Object3D[];
   cameraGroup?: THREE.Group;
+  dollHolderGroup?: THREE.Group;
+  dollPlushRig?: DollPlushRig;
   headTopAbovePivot: number;
 }
 
@@ -6725,6 +6731,7 @@ export function buildAvatarRig(
     !equippedTool && !equippedFood && config.handheld && config.handheld !== 'none'
       ? config.handheld
       : null;
+  const isHoldingDoll = Boolean(handheld && isDollHandheld(handheld));
   const isHoldingCamera =
     config.accessory === 'camera_strap' && !equippedTool && !equippedFood && !handheld;
   const holdPose: HoldPose = equippedTool
@@ -6734,13 +6741,15 @@ export function buildAvatarRig(
     : equippedFood
       ? 'carry_front'
       : handheld
-        ? handheld === 'tote_bag'
-          ? 'carry_bag'
-          : handheld === 'mini_umbrella'
-            ? 'carry_umbrella'
-            : handheld === 'star_lantern' || handheld === 'rooster_lantern'
-              ? 'carry_lantern'
-              : 'carry_front'
+        ? isHoldingDoll
+          ? 'carry_doll'
+          : handheld === 'tote_bag'
+            ? 'carry_bag'
+            : handheld === 'mini_umbrella'
+              ? 'carry_umbrella'
+              : handheld === 'star_lantern' || handheld === 'rooster_lantern'
+                ? 'carry_lantern'
+                : 'carry_front'
         : isHoldingCamera
           ? 'carry_camera'
           : 'none';
@@ -7012,9 +7021,10 @@ export function buildAvatarRig(
 
     const isDualHandheld = handheld === 'cupid_bow';
     const isGripping =
-      (side === 1 && (Boolean(handheld) || Boolean(equippedTool) || Boolean(equippedFood))) ||
-      isHoldingCamera ||
-      (side === -1 && isDualHandheld);
+      !isHoldingDoll &&
+      ((side === 1 && (Boolean(handheld) || Boolean(equippedTool) || Boolean(equippedFood))) ||
+        isHoldingCamera ||
+        (side === -1 && isDualHandheld));
     const palm = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 12), skinMat);
     palm.scale.set(0.92, 1.06, isGripping ? 0.86 : 0.88);
     if (isGripping) palm.position.set(0, 0, -0.004);
@@ -7069,29 +7079,44 @@ export function buildAvatarRig(
   let rodTipPivot: THREE.Group | undefined;
   const lanternSwings: THREE.Object3D[] = [];
 
-  if (holdPose === 'carry_camera') {
-    const camPose = HAND_POSES.carry_camera;
-    const armOutZ = isOuterwear ? camPose.armZ + 0.02 : camPose.armZ;
-    leftArm.rotation.x = camPose.armX;
-    leftArm.rotation.z = -armOutZ;
-    leftArm.userData.baseX = camPose.armX;
-    leftArm.userData.baseZ = -armOutZ;
-    leftElbow.rotation.x = camPose.elbowX;
-    leftElbow.rotation.z = -camPose.elbowZ;
-    leftElbow.userData.baseX = camPose.elbowX;
-    leftElbow.userData.baseZ = -camPose.elbowZ;
+  let dollHolderGroup: THREE.Group | undefined;
+  let dollPlushRig: DollPlushRig | undefined;
 
-    rightArm.rotation.x = camPose.armX;
+  if (holdPose === 'carry_camera' || holdPose === 'carry_doll') {
+    const dualPose = HAND_POSES[holdPose];
+    const armOutZ = isOuterwear
+      ? dualPose.armZ + (holdPose === 'carry_doll' ? 0.04 : 0.02)
+      : dualPose.armZ;
+    leftArm.rotation.x = dualPose.armX;
+    leftArm.rotation.z = -armOutZ;
+    leftArm.userData.baseX = dualPose.armX;
+    leftArm.userData.baseZ = -armOutZ;
+    leftElbow.rotation.x = dualPose.elbowX;
+    leftElbow.rotation.z = -dualPose.elbowZ;
+    leftElbow.userData.baseX = dualPose.elbowX;
+    leftElbow.userData.baseZ = -dualPose.elbowZ;
+
+    rightArm.rotation.x = dualPose.armX;
     rightArm.rotation.z = armOutZ;
-    rightArm.userData.baseX = camPose.armX;
+    rightArm.userData.baseX = dualPose.armX;
     rightArm.userData.baseZ = armOutZ;
-    rightElbow.rotation.x = camPose.elbowX;
-    rightElbow.rotation.z = camPose.elbowZ;
-    rightElbow.userData.baseX = camPose.elbowX;
-    rightElbow.userData.baseZ = camPose.elbowZ;
+    rightElbow.rotation.x = dualPose.elbowX;
+    rightElbow.rotation.z = dualPose.elbowZ;
+    rightElbow.userData.baseX = dualPose.elbowX;
+    rightElbow.userData.baseZ = dualPose.elbowZ;
   }
 
-  if (handheld || equippedTool || equippedFood) {
+  if (isHoldingDoll && handheld) {
+    dollHolderGroup = new THREE.Group();
+    dollHolderGroup.position.set(0, -0.048, isOuterwear ? 0.375 : 0.352);
+    dollHolderGroup.rotation.x = -0.04;
+    dollPlushRig = buildDollPlushModel(handheld, config.handheldColor);
+    dollPlushRig.root.scale.setScalar(1.06);
+    dollHolderGroup.add(dollPlushRig.root);
+    torsoGroup.add(dollHolderGroup);
+  }
+
+  if (!isHoldingDoll && (handheld || equippedTool || equippedFood)) {
     const hColor = config.handheldColor || '#E8B84B';
     const poseCfg = HAND_POSES[holdPose];
     const hoodieClearZ = isOuterwear ? 0.06 : 0;
@@ -9777,6 +9802,8 @@ export function buildAvatarRig(
     heldPetRig,
     lanternSwings: lanternSwings.length > 0 ? lanternSwings : undefined,
     cameraGroup,
+    dollHolderGroup,
+    dollPlushRig,
     headTopAbovePivot,
   };
 }
@@ -9857,6 +9884,15 @@ export function updateAvatarRigAnimation(
       pose === 'sit' ||
       pose === 'jump' ||
       pose === 'happy_jump';
+  }
+  if (rig.dollHolderGroup) {
+    rig.dollHolderGroup.visible =
+      pose === 'idle' ||
+      pose === 'walk' ||
+      pose === 'sit' ||
+      pose === 'jump' ||
+      pose === 'happy_jump';
+    updateDollPlushAnimation(rig.dollPlushRig, elapsed);
   }
   // Smooth, noticeable wing-flapping animation on angel & butterfly crystal wings
   if (rig.leftWing && rig.rightWing) {
@@ -9951,6 +9987,9 @@ export function updateAvatarRigAnimation(
     if (hold === 'carry_camera') {
       rig.leftArm.rotation.x = HAND_POSES.carry_camera.armX + Math.abs(swing) * 0.03;
       if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_doll') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_doll.armX + Math.abs(swing) * 0.025;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_doll.elbowX;
     } else {
       rig.leftArm.rotation.x = leftBaseX - swing * (leftBaseX < 0 ? 0.18 : 0.45);
       if (rig.leftElbow) {
@@ -9965,6 +10004,9 @@ export function updateAvatarRigAnimation(
     if (hold === 'carry_camera') {
       rig.rightArm.rotation.x = HAND_POSES.carry_camera.armX + Math.abs(swing) * 0.03;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_doll') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_doll.armX + Math.abs(swing) * 0.025;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_doll.elbowX;
     } else if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + swing * 0.06;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
@@ -9994,6 +10036,9 @@ export function updateAvatarRigAnimation(
     rig.headPivot.position.y = HEAD_PIVOT_Y;
     rig.bodyPivot.position.y = Math.abs(Math.cos(elapsed * 12)) * 0.075;
     rig.bodyPivot.rotation.x = 0.06;
+    if (hold === 'carry_doll') {
+      rig.bodyPivot.rotation.z = Math.sin(elapsed * 6) * 0.024;
+    }
     rig.headPivot.rotation.x = 0;
     rig.headPivot.rotation.z = Math.sin(elapsed * 6) * 0.03;
   } else if (pose === 'creep') {
@@ -10075,6 +10120,9 @@ export function updateAvatarRigAnimation(
     if (hold === 'carry_camera') {
       rig.leftArm.rotation.x = HAND_POSES.carry_camera.armX - 0.08;
       if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_doll') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_doll.armX - 0.06;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_doll.elbowX;
     } else {
       rig.leftArm.rotation.x = -0.58;
       if (rig.leftElbow) rig.leftElbow.rotation.x = -0.42;
@@ -10086,6 +10134,9 @@ export function updateAvatarRigAnimation(
     if (hold === 'carry_camera') {
       rig.rightArm.rotation.x = HAND_POSES.carry_camera.armX - 0.08;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_doll') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_doll.armX - 0.06;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_doll.elbowX;
     } else if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX - 0.08;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
@@ -10220,6 +10271,9 @@ export function updateAvatarRigAnimation(
     if (hold === 'carry_camera') {
       rig.leftArm.rotation.x = HAND_POSES.carry_camera.armX + sitBreath * 0.012;
       if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_doll') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_doll.armX + 0.05 + sitBreath * 0.012;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_doll.elbowX;
     } else {
       rig.leftArm.rotation.x = -0.44 + sitBreath * 0.015;
       if (rig.leftElbow) rig.leftElbow.rotation.x = -0.62;
@@ -10228,6 +10282,9 @@ export function updateAvatarRigAnimation(
     if (hold === 'carry_camera') {
       rig.rightArm.rotation.x = HAND_POSES.carry_camera.armX + sitBreath * 0.012;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_doll') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_doll.armX + 0.05 + sitBreath * 0.012;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_doll.elbowX;
     } else if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + sitBreath * 0.012;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
@@ -10348,6 +10405,9 @@ export function updateAvatarRigAnimation(
     if (hold === 'carry_camera') {
       rig.leftArm.rotation.x = HAND_POSES.carry_camera.armX - 0.14 * hopArc;
       if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_doll') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_doll.armX - 0.1 * hopArc;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_doll.elbowX;
     } else {
       rig.leftArm.rotation.x = -2.38 + cheerWave * 0.24;
       rig.leftArm.rotation.z = -0.34 - Math.abs(cheerSway) * 0.12;
@@ -10361,6 +10421,9 @@ export function updateAvatarRigAnimation(
     if (hold === 'carry_camera') {
       rig.rightArm.rotation.x = HAND_POSES.carry_camera.armX - 0.14 * hopArc;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_doll') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_doll.armX - 0.1 * hopArc;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_doll.elbowX;
     } else if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX - 0.18 * hopArc;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;
@@ -10707,10 +10770,12 @@ export function updateAvatarRigAnimation(
     if (rig.leftKnee) rig.leftKnee.rotation.x = Math.max(0.16, 0.68 - step * 0.42);
     if (rig.rightKnee) rig.rightKnee.rotation.x = Math.max(0.16, 0.68 + step * 0.42);
   } else {
-    // Gentle breathing Idle: subtle body bob & soft breathing rhythm
+    // Gentle breathing Idle: subtle body bob & soft breathing rhythm (+ warm cuddle sway when hugging a Doll!)
     const breathPhase = elapsed * 2.15;
     const breath = Math.sin(breathPhase);
     const breath01 = 0.5 + 0.5 * breath;
+    const isHuggingDoll = hold === 'carry_doll';
+    const dollSway = isHuggingDoll ? Math.sin(elapsed * 2.25) : 0;
 
     rig.leftLeg.rotation.x = 0;
     rig.rightLeg.rotation.x = 0;
@@ -10718,13 +10783,18 @@ export function updateAvatarRigAnimation(
     rig.rightLeg.rotation.z = 0;
     if (rig.leftKnee) rig.leftKnee.rotation.x = 0;
     if (rig.rightKnee) rig.rightKnee.rotation.x = 0;
-    rig.bodyPivot.position.y = breath01 * 0.016;
+    rig.bodyPivot.position.y = breath01 * 0.016 + (isHuggingDoll ? Math.abs(dollSway) * 0.008 : 0);
     rig.bodyPivot.rotation.x = breath * 0.012;
+    if (isHuggingDoll) {
+      rig.bodyPivot.rotation.z = dollSway * 0.048;
+    }
 
     if (rig.torsoGroup) rig.torsoGroup.position.y = 0.77 + breath01 * 0.014;
     rig.headPivot.position.y = HEAD_PIVOT_Y + breath01 * 0.018;
     rig.headPivot.rotation.x = Math.sin(breathPhase - 0.5) * 0.024;
-    rig.headPivot.rotation.z = Math.sin(elapsed * 0.95) * 0.016;
+    rig.headPivot.rotation.z = isHuggingDoll
+      ? dollSway * 0.06 + Math.sin(elapsed * 1.1) * 0.015
+      : Math.sin(elapsed * 0.95) * 0.016;
 
     const leftIdleBaseX = (rig.leftArm.userData.baseX as number | undefined) ?? 0;
     const leftIdleElbowX =
@@ -10732,6 +10802,9 @@ export function updateAvatarRigAnimation(
     if (hold === 'carry_camera') {
       rig.leftArm.rotation.x = HAND_POSES.carry_camera.armX + breath * 0.014;
       if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_doll') {
+      rig.leftArm.rotation.x = HAND_POSES.carry_doll.armX + breath * 0.014;
+      if (rig.leftElbow) rig.leftElbow.rotation.x = HAND_POSES.carry_doll.elbowX;
     } else {
       rig.leftArm.rotation.x = leftIdleBaseX + Math.sin(breathPhase - 0.3) * 0.024;
       if (rig.leftElbow) rig.leftElbow.rotation.x = leftIdleElbowX - breath01 * 0.03;
@@ -10740,6 +10813,9 @@ export function updateAvatarRigAnimation(
     if (hold === 'carry_camera') {
       rig.rightArm.rotation.x = HAND_POSES.carry_camera.armX + breath * 0.014;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_camera.elbowX;
+    } else if (hold === 'carry_doll') {
+      rig.rightArm.rotation.x = HAND_POSES.carry_doll.armX + breath * 0.014;
+      if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_doll.elbowX;
     } else if (hold === 'carry_umbrella') {
       rig.rightArm.rotation.x = HAND_POSES.carry_umbrella.armX + breath * 0.014;
       if (rig.rightElbow) rig.rightElbow.rotation.x = HAND_POSES.carry_umbrella.elbowX;

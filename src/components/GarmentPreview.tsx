@@ -1,5 +1,7 @@
 import React from 'react';
+import {isDollHandheld} from '../data/hddollCatalog';
 import {AvatarConfig, ShopCategory} from '../types/game';
+import {DollSvgIcon} from './DollSvgIcon';
 
 interface GarmentPreviewProps {
   category: ShopCategory;
@@ -2209,6 +2211,9 @@ export const GarmentPreview: React.FC<GarmentPreviewProps> = ({
               <path d="M28 52 L52 28" stroke="#B8A490" strokeWidth="2.4" strokeLinecap="round" />
             </g>
           );
+        }
+        if (isDollHandheld(style)) {
+          return <DollSvgIcon style={style} size={80} />;
         }
         if (style === 'milk_tea') {
           return (

@@ -4413,9 +4413,9 @@ export function buildSubzoneScene(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('HDDOLL BLINDBOX', w / 2, 58);
-      ctx.fillStyle = '#F9A8D4';
+      ctx.fillStyle = '#6EE7B7';
       ctx.font = '900 26px system-ui, sans-serif';
-      ctx.fillText('COMING SOON', w / 2, 114);
+      ctx.fillText('320 XU / HỘP · MỞ NGAY!', w / 2, 114);
     });
 
     const exchangeScreenTex = makeArcadeCanvasTex(512, 320, (ctx, w, h) => {
